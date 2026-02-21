@@ -1,0 +1,86 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
+
+export default function RoleGuard({
+    children,
+    allowedRole
+}: {
+    children: React.ReactNode,
+    allowedRole: "admin" | "worker"
+}) {
+    const router = useRouter();
+    const supabase = createClient();
+    const [isAuthorized, setIsAuthorized] = useState(false);
+
+    useEffect(() => {
+        const checkAuth = async () => {
+            // 1. 브라우저에서 사용할 수파베이스 친구(클라이언트)를 불러옵니다.
+            const { data: { session } } = await supabase.auth.getSession();
+
+            // 2. 만약 로그인 세션이 없다면? -> 로그인 창으로 쫓아냅니다!
+            if (!session) {
+                router.replace("/auth");
+                return;
+            }
+
+            // 3. ✨ 드디어 진짜 '내 서랍(DB)'에서 역할을 확인합니다!
+            const { data: profile, error } = await supabase
+                .from("profiles")
+                .select("role")
+                .eq("id", session.user.id)
+                .single();
+
+            if (error) {
+                console.warn("RoleGuard 에러:", error);
+                // 프로필 없음 (PGRST116) → setup으로 이동
+                if (error.code === "PGRST116") {
+                    router.replace("/auth/setup");
+                    return;
+                }
+                router.replace("/auth");
+                return;
+            }
+
+            if (!profile) {
+                router.replace("/auth/setup");
+                return;
+            }
+
+            // 역할 vs allowedRole 비교
+            // 현장 소장(HQ_ADMIN) + 안전관리자(SAFETY_OFFICER) 모두 admin 페이지 접근 가능
+            const isAllowed =
+                (allowedRole === "admin" && (profile.role === "HQ_ADMIN" || profile.role === "SAFETY_OFFICER")) ||
+                (allowedRole === "worker" && profile.role === "WORKER");
+
+            if (!isAllowed) {
+                // 실제 역할에 맞는 경로로 안내
+                if (profile.role === "HQ_ADMIN" || profile.role === "SAFETY_OFFICER") {
+                    router.replace("/admin");
+                } else if (profile.role === "WORKER") {
+                    router.replace("/worker");
+                } else {
+                    router.replace("/auth/setup");
+                }
+                return;
+            }
+
+            setIsAuthorized(true);
+        };
+
+        checkAuth();
+    }, [router, supabase, allowedRole]); // (allowedRole도 깐깐하게 추가했어요)
+
+    if (!isAuthorized) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-blue-400">
+                <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mb-4" />
+                <p className="animate-pulse tracking-widest font-bold">안전하게 로그인 확인 중입니다...</p>
+            </div>
+        );
+    }
+
+    return <>{children}</>;
+}
