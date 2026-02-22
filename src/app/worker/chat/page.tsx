@@ -92,16 +92,20 @@ function WorkerChatContent() {
         }
         setLang(finalLang);
 
-        let query = supabase.from("profiles").select("id").eq("role", "ADMIN").limit(1);
-        if (profile?.site_id) query = (query as any).eq("site_id", profile.site_id);
-        const { data: adminData } = await (query as any);
-        const aId = adminData?.[0]?.id;
+        // Fetch Admin ID (Prefer same site, fallback to any admin)
+        const fetchAdmin = async (siteId: string | null) => {
+            let q = supabase.from("profiles").select("id").ilike("role", "admin");
+            if (siteId) {
+                const { data: sAdmin } = await q.eq("site_id", siteId).limit(1);
+                if (sAdmin?.[0]?.id) return sAdmin[0].id;
+            }
+            // Fallback to any admin
+            const { data: anyAdmin } = await supabase.from("profiles").select("id").ilike("role", "admin").limit(1);
+            return anyAdmin?.[0]?.id || "";
+        };
+
+        const aId = await fetchAdmin(profile?.site_id);
         if (aId) setAdminId(aId);
-        else {
-            // Fallback in case lowercase
-            const { data: adminDataFallback } = await supabase.from("profiles").select("id").ilike("role", "admin").limit(1);
-            if (adminDataFallback?.[0]?.id) setAdminId(adminDataFallback[0].id);
-        }
     };
 
     useEffect(() => { load(); }, [urlLang]);
@@ -216,8 +220,13 @@ function WorkerChatContent() {
                 const transData = await transRes.json();
                 translated = transData[0].map((item: any) => item[0]).join("");
 
-                const pronParts = transData[0].map((item: any) => item[1]).filter(Boolean);
-                if (pronParts.length > 0) pron = pronParts.join(" ");
+                // Correct Pronunciation (Transliteration) logic: find block where segment[0] is null
+                if (transData[0]) {
+                    const translitBlock = transData[0].find((item: any) => item[0] === null && item[2]);
+                    if (translitBlock) pron = translitBlock[2];
+                    // For worker side, if translating to KO, pron should be Korean romanization
+                    if (!pron && translitBlock && translitBlock[3]) pron = translitBlock[3];
+                }
 
                 // 2. Reverse Trans (back to worker lang)
                 const revUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=${lang}&dt=t&q=${encodeURIComponent(translated)}`;

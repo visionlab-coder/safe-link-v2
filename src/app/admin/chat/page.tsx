@@ -198,8 +198,13 @@ function AdminChatContent() {
                 const transData = await transRes.json();
                 translated = transData[0].map((item: any) => item[0]).join("");
 
-                const pronParts = transData[0].map((item: any) => item[1]).filter(Boolean);
-                if (pronParts.length > 0) pron = pronParts.join(" ");
+                // Correct Pronunciation (Transliteration) logic: find block where segment[0] is null
+                if (transData[0]) {
+                    const translitBlock = transData[0].find((item: any) => item[0] === null && item[2]);
+                    if (translitBlock) pron = translitBlock[2];
+                    // Fallback to source translit if target not found (rare)
+                    if (!pron && translitBlock && translitBlock[3]) pron = translitBlock[3];
+                }
 
                 // 2. Reverse Trans
                 const revUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${activeWorker.preferred_lang}&tl=ko&dt=t&q=${encodeURIComponent(translated)}`;
