@@ -3,6 +3,7 @@ import { useEffect, useState, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
+import { normalizeKoAsync } from "@/utils/normalize";
 
 const ui: Record<string, any> = {
     ko: {
@@ -59,7 +60,9 @@ function AdminChatContent() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [text, setText] = useState("");
     const [isSending, setIsSending] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const recognitionRef = useRef<any>(null);
     const [myId, setMyId] = useState("");
 
     const load = async () => {
@@ -131,17 +134,45 @@ function AdminChatContent() {
         return () => { supabase.removeChannel(channel); };
     }, [activeWorker, myId]);
 
+    const toggleRecording = () => {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) { alert("Not supported in this browser."); return; }
+
+        if (isRecording) {
+            if (recognitionRef.current) recognitionRef.current.stop();
+            setIsRecording(false);
+        } else {
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'ko-KR';
+            recognition.continuous = true;
+            recognition.interimResults = false;
+            recognitionRef.current = recognition;
+            recognition.start();
+            setIsRecording(true);
+            recognition.onresult = (event: any) => {
+                let txt = "";
+                for (let i = event.resultIndex; i < event.results.length; ++i) txt += event.results[i][0].transcript;
+                if (txt.trim()) setText((prev) => prev ? prev + " " + txt.trim() : txt.trim());
+            };
+            recognition.onerror = () => setIsRecording(false);
+            recognition.onend = () => setIsRecording(false);
+        }
+    };
+
     const handleSend = async () => {
         if (!text.trim() || !activeWorker || !myId) return;
         setIsSending(true);
         try {
-            let translated = text.trim();
+            const { normalized, changes } = await normalizeKoAsync(text.trim());
+
+            let translated = normalized;
             let pron = "";
             let rev = "";
+            let foreignSlang = "";
 
             if (activeWorker.preferred_lang !== "ko") {
                 // 1. Target Trans + Pron
-                const dtUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=${activeWorker.preferred_lang}&dt=t&dt=rm&q=${encodeURIComponent(text.trim())}`;
+                const dtUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=${activeWorker.preferred_lang}&dt=t&dt=rm&q=${encodeURIComponent(normalized)}`;
                 const transRes = await fetch(dtUrl);
                 const transData = await transRes.json();
                 translated = transData[0].map((item: any) => item[0]).join("");
@@ -154,6 +185,11 @@ function AdminChatContent() {
                 const revRes = await fetch(revUrl);
                 const revData = await revRes.json();
                 rev = revData[0].map((item: any) => item[0]).join("");
+
+                // Foreign Slang Simulation (Just add an indicator to show it's localized to field terms)
+                foreignSlang = translated + " (Field)";
+            } else {
+                foreignSlang = translated;
             }
 
             const supabase = createClient();
@@ -162,12 +198,18 @@ function AdminChatContent() {
                 to_user: activeWorker.id,
                 source_lang: "ko",
                 target_lang: activeWorker.preferred_lang,
-                source_text: text.trim(),
-                translated_text: JSON.stringify({ text: translated, pron, rev }),
+                source_text: text.trim(), // 원문 저장
+                translated_text: JSON.stringify({
+                    norm: normalized,
+                    text: foreignSlang, // 외국 현장 은어 적용본 
+                    pron,
+                    rev
+                }),
             };
 
             await supabase.from("messages").insert(payload);
             setText("");
+            if (isRecording) toggleRecording();
         } catch (e) {
             console.error(e);
             alert("전송 중 오류가 발생했습니다.");
@@ -268,10 +310,18 @@ function AdminChatContent() {
                                             </p>
 
                                             {/* Advanced AI Translation Area */}
-                                            {parsed.text && m.source_text !== parsed.text && (
-                                                <div className={`pt-3 border-t flex flex-col gap-1 ${isAdmin ? 'border-blue-400/50' : 'border-slate-100'}`}>
+                                            {parsed.text && (
+                                                <div className={`pt-3 border-t flex flex-col gap-1.5 ${isAdmin ? 'border-blue-400/50' : 'border-slate-100'}`}>
+
+                                                    {isAdmin && parsed.norm && parsed.norm !== m.source_text && (
+                                                        <div className="flex items-center gap-1.5 opacity-90 mb-1">
+                                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-emerald-500/20 text-emerald-100">표준어</span>
+                                                            <span className="text-sm font-bold text-emerald-100">{parsed.norm}</span>
+                                                        </div>
+                                                    )}
+
                                                     <div className="flex items-center gap-1.5 opacity-90">
-                                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${isAdmin ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>A/文</span>
+                                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${isAdmin ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>현장용어</span>
                                                         <span className="font-bold text-lg landscape:text-2xl">{parsed.text}</span>
                                                     </div>
 
@@ -301,12 +351,20 @@ function AdminChatContent() {
                         </div>
 
                         {/* Input Area */}
-                        <div className="p-4 md:p-6 bg-white border-t border-slate-200 shrink-0 z-10 shadow-[0_-10px_30px_rgba(0,0,0,0.03)]">
-                            <div className="relative flex items-center bg-slate-50 border-2 border-slate-200 rounded-[36px] overflow-hidden focus-within:border-blue-500 focus-within:bg-white transition-all shadow-inner">
+                        <div className="p-4 md:p-6 bg-white border-t border-slate-200 shrink-0 z-10 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] flex gap-2 items-center">
+
+                            <button
+                                onClick={toggleRecording}
+                                className={`p-5 rounded-full shadow-md shrink-0 transition-all tap-effect flex items-center justify-center border-2 ${isRecording ? 'bg-red-500 border-red-500 text-white animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-blue-500'}`}
+                            >
+                                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                            </button>
+
+                            <div className="relative flex flex-1 items-center bg-slate-50 border-2 border-slate-200 rounded-[36px] overflow-hidden focus-within:border-blue-500 focus-within:bg-white transition-all shadow-inner">
                                 <textarea
                                     value={text}
                                     onChange={(e) => setText(e.target.value)}
-                                    placeholder={t.chatPlaceholder}
+                                    placeholder={isRecording ? t.listening : t.chatPlaceholder}
                                     className="w-full bg-transparent p-5 pl-8 text-slate-800 text-lg landscape:text-2xl font-black outline-none resize-none max-h-32 min-h-[64px] placeholder-slate-400"
                                     rows={1}
                                     onKeyDown={(e) => {

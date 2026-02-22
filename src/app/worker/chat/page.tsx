@@ -8,6 +8,7 @@ const ui: Record<string, any> = {
     ko: {
         title: "관리자 대화창",
         chatPlaceholder: "메시지 입력 (자동 번역/TTS)...",
+        listening: "듣고 있습니다...",
         adminName: "관리자",
         me: "나",
         pron: "발음",
@@ -16,6 +17,7 @@ const ui: Record<string, any> = {
     en: {
         title: "Admin Chat",
         chatPlaceholder: "Type message (Automated)...",
+        listening: "Listening...",
         adminName: "Admin",
         me: "Me",
         pron: "Pronunciation",
@@ -24,6 +26,7 @@ const ui: Record<string, any> = {
     zh: {
         title: "管理员对话",
         chatPlaceholder: "输入消息（自动翻译/语音）...",
+        listening: "正在倾听...",
         adminName: "管理员",
         me: "我",
         pron: "发音",
@@ -32,6 +35,7 @@ const ui: Record<string, any> = {
     vi: {
         title: "Trò chuyện quản lý",
         chatPlaceholder: "Nhập tin nhắn (dịch tự động)...",
+        listening: "Đang nghe...",
         adminName: "Quản lý",
         me: "Tôi",
         pron: "Phát âm",
@@ -40,6 +44,7 @@ const ui: Record<string, any> = {
     th: {
         title: "แชทผู้ดูแลระบบ",
         chatPlaceholder: "พิมพ์ข้อความ (แปลอัตโนมัติ)...",
+        listening: "กำลังฟัง...",
         adminName: "ผู้ดูแลระบบ",
         me: "ฉัน",
         pron: "การออกเสียง",
@@ -65,7 +70,9 @@ function WorkerChatContent() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [text, setText] = useState("");
     const [isSending, setIsSending] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const recognitionRef = useRef<any>(null);
 
     const [myId, setMyId] = useState("");
     const [adminId, setAdminId] = useState("");
@@ -142,6 +149,31 @@ function WorkerChatContent() {
         return () => { supabase.removeChannel(channel); };
     }, [adminId, myId, lang]);
 
+    const toggleRecording = () => {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) { alert("Not supported in this browser."); return; }
+
+        if (isRecording) {
+            if (recognitionRef.current) recognitionRef.current.stop();
+            setIsRecording(false);
+        } else {
+            const recognition = new SpeechRecognition();
+            recognition.lang = getVoiceLang(lang);
+            recognition.continuous = true;
+            recognition.interimResults = false;
+            recognitionRef.current = recognition;
+            recognition.start();
+            setIsRecording(true);
+            recognition.onresult = (event: any) => {
+                let txt = "";
+                for (let i = event.resultIndex; i < event.results.length; ++i) txt += event.results[i][0].transcript;
+                if (txt.trim()) setText((prev) => prev ? prev + " " + txt.trim() : txt.trim());
+            };
+            recognition.onerror = () => setIsRecording(false);
+            recognition.onend = () => setIsRecording(false);
+        }
+    };
+
     const handleSend = async () => {
         if (!text.trim() || !adminId || !myId) return;
         setIsSending(true);
@@ -149,6 +181,7 @@ function WorkerChatContent() {
             let translated = text.trim();
             let pron = "";
             let rev = "";
+            let normalizedInput = text.trim();
 
             if (lang !== "ko") {
                 // 1. Target Trans (to ko) + Pron
@@ -174,11 +207,16 @@ function WorkerChatContent() {
                 source_lang: lang,
                 target_lang: "ko",
                 source_text: text.trim(),
-                translated_text: JSON.stringify({ text: translated, pron, rev }),
+                translated_text: JSON.stringify({
+                    text: translated, // Korean output
+                    pron,
+                    rev
+                }),
             };
 
             await supabase.from("messages").insert(payload);
             setText("");
+            if (isRecording) toggleRecording();
         } catch (e) {
             console.error(e);
         } finally {
@@ -264,12 +302,20 @@ function WorkerChatContent() {
                     </div>
 
                     {/* Input Area */}
-                    <div className="p-4 md:p-6 bg-white border-t border-slate-200 shrink-0 relative z-20 shadow-[0_-15px_40px_rgba(0,0,0,0.04)]">
-                        <div className="relative flex items-center bg-slate-50 border-2 border-slate-300 rounded-[36px] overflow-hidden focus-within:border-blue-500 focus-within:bg-white transition-all shadow-inner">
+                    <div className="p-4 md:p-6 bg-white border-t border-slate-200 shrink-0 relative z-20 shadow-[0_-15px_40px_rgba(0,0,0,0.04)] flex gap-2 items-center">
+
+                        <button
+                            onClick={toggleRecording}
+                            className={`p-5 md:p-6 rounded-full shadow-md shrink-0 transition-all tap-effect flex items-center justify-center border-2 ${isRecording ? 'bg-red-500 border-red-500 text-white animate-pulse' : 'bg-slate-50 border-slate-300 text-slate-400 hover:text-blue-500'}`}
+                        >
+                            <svg className="w-8 h-8 md:w-10 md:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                        </button>
+
+                        <div className="relative flex flex-1 items-center bg-slate-50 border-2 border-slate-300 rounded-[36px] overflow-hidden focus-within:border-blue-500 focus-within:bg-white transition-all shadow-inner">
                             <textarea
                                 value={text}
                                 onChange={(e) => setText(e.target.value)}
-                                placeholder={t.chatPlaceholder}
+                                placeholder={isRecording ? t.listening : t.chatPlaceholder}
                                 className="w-full bg-transparent p-5 pl-8 text-slate-800 text-xl landscape:text-3xl font-black outline-none resize-none max-h-40 min-h-[72px]"
                                 rows={1}
                                 onKeyDown={(e) => {
