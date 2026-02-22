@@ -134,6 +134,26 @@ export default function AdminDashboard() {
                             {t.chatBtn}
                         </button>
                     </div>
+
+                    {/* 서명 현황 카드 */}
+                    <div
+                        onClick={() => router.push('/admin/tbm/status')}
+                        className="md:col-span-2 p-8 bg-slate-800/80 rounded-[32px] border border-green-500/30 hover:border-green-500/60 transition-colors cursor-pointer group"
+                    >
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="font-bold text-2xl mb-2 text-slate-200">
+                                    {lang === "ko" ? "근로자 서명 현황" : lang === "zh" ? "工人签名状态" : "Worker Signature Status"}
+                                </h3>
+                                <p className="text-slate-400">
+                                    {lang === "ko" ? "TBM 수신 확인 및 서명 완료 여부를 실시간으로 확인합니다." : lang === "zh" ? "实时查看TBM确认及签名完成情况。" : "Check TBM acknowledgement and signature status in real time."}
+                                </p>
+                            </div>
+                            <svg className="w-8 h-8 text-green-400 group-hover:translate-x-1 transition-transform flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                        </div>
+                    </div>
                 </div>
             </div>
         </RoleGuard>

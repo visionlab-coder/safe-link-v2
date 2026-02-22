@@ -4,15 +4,18 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
+import { normalizeKoAsync, formatChanges } from "@/utils/normalize";
 
 export default function AdminTBMCreate() {
     const router = useRouter();
     const [tbmText, setTbmText] = useState("");
     const [isSending, setIsSending] = useState(false);
-    const [isRecording, setIsRecording] = useState(false); // 🎤 마이크 녹음 상태
-    const [history, setHistory] = useState<any[]>([]);    // 📜 과거 기록 저장소
-    const [isGeneratingAI, setIsGeneratingAI] = useState(false); // 🤖 AI 생성 중
-    const [aiTips, setAiTips] = useState<string[]>([]);          // 🤖 AI 추천 문장들
+    const [isRecording, setIsRecording] = useState(false);
+    const [history, setHistory] = useState<any[]>([]);
+    const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+    const [aiTips, setAiTips] = useState<string[]>([]);
+    // 🔤 은어 정규화 결과
+    const [normalizeResult, setNormalizeResult] = useState<{ normalized: string; changes: { from: string; to: string }[] } | null>(null);
 
     // 🎤 음성 인식기를 기억해두는 메모장 (수동으로 끄기 위함)
     const recognitionRef = useRef<any>(null);
@@ -126,9 +129,12 @@ export default function AdminTBMCreate() {
                 .eq("id", session.user.id)
                 .single();
 
-            // 3. tbm_notices에 저장 (site_id는 있으면 넣고, 없으면 제외)
+            // 3. normalize_ko: 은어→표준어 변환 후 저장
+            const { normalized, changes } = await normalizeKoAsync(tbmText.trim());
+            setNormalizeResult({ normalized, changes });
+
             const insertPayload: any = {
-                content_ko: tbmText.trim(),
+                content_ko: normalized, // 표준어로 변환된 텍스트 저장
                 created_by: session.user.id,
             };
             if (profile?.site_id) {
@@ -150,9 +156,8 @@ export default function AdminTBMCreate() {
                 return;
             }
 
-            alert("✅ 똑똑한 AI 시스템 작동 완료!\nTBM이 데이터베이스에 완벽하게 저장 및 전파 처리되었습니다.");
-            setTbmText(""); // 입력창을 비워줍니다.
-            fetchHistory(); // 방금 보낸 걸 목록에 바로 업데이트!
+            setTbmText("");
+            fetchHistory();
 
         } catch (error: any) {
             console.error("전파 중 알 수 없는 에러:", error);
@@ -271,10 +276,37 @@ export default function AdminTBMCreate() {
                             {isSending ? (
                                 <svg className="w-10 h-10 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                             ) : (
-                                "TBM 15개국 번역 전송"
+                                "📡 TBM 전파하기"
                             )}
                         </button>
                     </div>
+
+                    {/* 🔤 은어→표준어 변환 결과 패널 (전파 후 자동 표시) */}
+                    {normalizeResult && (
+                        <div className="p-5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex flex-col gap-3">
+                            <p className="text-amber-400 font-black text-sm flex items-center gap-2">
+                                🔤 현장 은어 정규화 완료
+                                {normalizeResult.changes.length > 0
+                                    ? <span className="font-normal text-amber-300">{normalizeResult.changes.length}개 변환됨</span>
+                                    : <span className="font-normal text-slate-500">변환 없음 (표준어 사용)</span>
+                                }
+                            </p>
+                            {normalizeResult.changes.length > 0 && (
+                                <div className="flex flex-col gap-1.5">
+                                    {normalizeResult.changes.map((c, i) => (
+                                        <div key={i} className="flex items-center gap-2 text-sm">
+                                            <span className="text-red-400 font-bold bg-red-500/10 px-2 py-0.5 rounded">"{c.from}"</span>
+                                            <span className="text-slate-500">→</span>
+                                            <span className="text-green-400 font-bold bg-green-500/10 px-2 py-0.5 rounded">"{c.to}"</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            <p className="text-xs text-slate-500 border-t border-slate-700 pt-2 mt-1">
+                                전파된 내용: <span className="text-slate-300">{normalizeResult.normalized}</span>
+                            </p>
+                        </div>
+                    )}
 
                     {/* 📜 최근 전파 기록 섹션 */}
                     <div className="mt-8 flex flex-col gap-4">
