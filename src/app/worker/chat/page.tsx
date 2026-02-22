@@ -147,6 +147,10 @@ function WorkerChatContent() {
         fetchMessages();
         (window as any).refreshWorkerChat = fetchMessages; // Expose to window for the button
 
+        const loadVoices = () => { window.speechSynthesis.getVoices(); };
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+        loadVoices();
+
         const channel = supabase
             .channel(`msg_realtime_${myId}_${Date.now()}`) // Unique channel ID for this session
             .on(
@@ -198,27 +202,42 @@ function WorkerChatContent() {
     }, [myId, lang]);
 
     const playAudio = (text: string, langCode: string) => {
-        if (!text) return;
+        if (!text || typeof window === 'undefined') return;
         window.speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(text);
         const voiceLang = getVoiceLang(langCode);
         utter.lang = voiceLang;
 
-        // Try to pick a voice matching the selected gender
+        // Gender simulation via pitch (Most reliable backup)
+        // Male: lower pitch (0.5 - 0.9), Female: higher pitch (1.1 - 1.5)
+        utter.pitch = voiceGender === 'male' ? 0.8 : 1.2;
+
         const voices = window.speechSynthesis.getVoices();
-        const targetVoice = voices.find(v => {
+        const maleKeywords = ['male', 'david', 'mark', 'minho', 'kyle', 'paul', 'stefan', 'dae-ho'];
+        const femaleKeywords = ['female', 'zira', 'heami', 'yuri', 'juhye', 'sara', 'anna', 'hyunjun'];
+
+        let targetVoice = voices.find(v => {
             const lowName = v.name.toLowerCase();
             const langMatch = v.lang.startsWith(langCode) || v.lang.includes(langCode.toUpperCase());
             if (!langMatch) return false;
 
-            if (voiceGender === 'male') {
-                return lowName.includes('male') || lowName.includes('david') || lowName.includes('mark') || lowName.includes('minho') || lowName.includes('kyle') || lowName.includes('google 한국어');
-            } else {
-                return lowName.includes('female') || lowName.includes('zira') || lowName.includes('heami') || lowName.includes('yuri') || lowName.includes('juhye');
-            }
+            const keywords = voiceGender === 'male' ? maleKeywords : femaleKeywords;
+            return keywords.some(k => lowName.includes(k.toLowerCase()));
         });
 
-        if (targetVoice) utter.voice = targetVoice;
+        // Fallback: Just match language if gender-specific voice not found
+        if (!targetVoice) {
+            targetVoice = voices.find(v => (v.lang.startsWith(langCode) || v.lang.includes(langCode.toUpperCase())));
+        }
+
+        if (targetVoice) {
+            utter.voice = targetVoice;
+            // If the voice name explicitly contains the other gender, force pitch harder
+            const lowVoiceName = targetVoice.name.toLowerCase();
+            if (voiceGender === 'male' && (lowVoiceName.includes('female') || lowVoiceName.includes('zira'))) utter.pitch = 0.5;
+            if (voiceGender === 'female' && (lowVoiceName.includes('male') || lowVoiceName.includes('david'))) utter.pitch = 1.6;
+        }
+
         utter.rate = 0.95;
         window.speechSynthesis.speak(utter);
     };
