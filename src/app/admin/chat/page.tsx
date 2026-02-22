@@ -108,7 +108,17 @@ function AdminChatContent() {
                 (payload) => {
                     const msg = payload.new as Message;
                     if ((msg.from_user === myId && msg.to_user === activeWorker.id) || (msg.from_user === activeWorker.id && msg.to_user === myId)) {
-                        setMessages(prev => [...prev, msg]);
+                        setMessages(prev => {
+                            if (prev.find(m => m.id === msg.id)) return prev;
+                            // Replace optimistic message if it matches text and is from same user
+                            const isDup = prev.findIndex(m => m.id.startsWith("temp-") && m.source_text === msg.source_text && m.from_user === msg.from_user);
+                            if (isDup !== -1) {
+                                const newArr = [...prev];
+                                newArr[isDup] = msg;
+                                return newArr;
+                            }
+                            return [...prev, msg];
+                        });
                         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
 
                         // AUTO TTS for INCOMING message from worker (Admin hears Korean)
@@ -219,6 +229,10 @@ function AdminChatContent() {
             };
 
             await supabase.from("messages").insert(payload);
+            // Optimistic update
+            setMessages(prev => [...prev, { ...payload, id: `temp-${Date.now()}`, created_at: new Date().toISOString() } as any]);
+            setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+
             setText("");
             if (isRecording) toggleRecording();
 
