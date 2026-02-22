@@ -6,6 +6,7 @@ import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
 import { Suspense } from "react";
 import SignatureCanvas from "react-signature-canvas";
+import { hangulize } from "@/utils/hangulize";
 
 // ── 언어 코드 매핑 ──
 const googleLangCode: Record<string, string> = {
@@ -22,29 +23,48 @@ const isoMap: Record<string, string> = {
 };
 
 // ── 번역 함수 ──
-const translateKo = async (text: string, targetLang: string): Promise<string> => {
-    if (targetLang === "ko") return text;
+interface TransResult { text: string; pron: string; rev: string; }
+const translateKo = async (text: string, targetLang: string): Promise<TransResult> => {
+    if (targetLang === "ko") return { text, pron: "", rev: "" };
     const gl = googleLangCode[targetLang] || targetLang;
     try {
-        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=${gl}&dt=t&q=${encodeURIComponent(text)}`;
+        // 1. Target Trans + Pron
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=${gl}&dt=t&dt=rm&q=${encodeURIComponent(text)}`;
         const res = await fetch(url);
         const data = await res.json();
-        return data[0].map((item: any) => item[0]).join("");
+        const translated = data[0].map((item: any) => item[0]).join("");
+
+        let pron = "";
+        const translitBlock = data[0].find((item: any) => item[0] === null && item[2]);
+        if (translitBlock) pron = translitBlock[2];
+
+        // 2. Reverse Trans
+        const revUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${gl}&tl=ko&dt=t&q=${encodeURIComponent(translated)}`;
+        const revRes = await fetch(revUrl);
+        const revData = await revRes.json();
+        const rev = revData[0].map((item: any) => item[0]).join("");
+
+        return { text: translated, pron, rev };
     } catch {
-        return text;
+        return { text, pron: "", rev: "" };
     }
 };
 
 // ── UI 텍스트 (다국어) ──
 const uiText: Record<string, any> = {
-    ko: { title: "안전 브리핑", original: "원문 (한국어)", translated: "번역본", voice: "음성으로 듣기", signHere: "이곳에 서명하세요", clear: "다시 쓰기", confirm: "✍️ 서명 완료하기", signed: "✓ 오늘 서명 완료!", translating: "번역 중...", noTBM: "오늘 전파된 브리핑이 없습니다.", mustSign: "서명 없이 나가시겠습니까?", alreadySigned: "이미 오늘 서명하셨습니다.", back: "뒤로" },
-    en: { title: "Safety Briefing", original: "Original (Korean)", translated: "Translation", voice: "Listen", signHere: "Please sign here", clear: "Clear", confirm: "✍️ Confirm & Sign", signed: "✓ Signed!", translating: "Translating...", noTBM: "No briefing today.", mustSign: "Leave without signing?", alreadySigned: "Already signed today.", back: "Back" },
-    vi: { title: "Thông báo an toàn", original: "Gốc (Tiếng Hàn)", translated: "Bản dịch", voice: "Nghe", signHere: "Ký tên ở đây", clear: "Xóa", confirm: "✍️ Xác nhận & Ký", signed: "✓ Đã ký!", translating: "Đang dịch...", noTBM: "Chưa có thông báo hôm nay.", mustSign: "Rời đi mà không ký?", alreadySigned: "Đã ký hôm nay rồi.", back: "Quay lại" },
-    th: { title: "สรุปความปลอดภัย", original: "ต้นฉบับ (เกาหลี)", translated: "คำแปล", voice: "ฟังเสียง", signHere: "ลงชื่อที่นี่", clear: "ล้าง", confirm: "✍️ ยืนยันและลงนาม", signed: "✓ ลงนามแล้ว!", translating: "กำลังแปล...", noTBM: "ยังไม่มีสรุปวันนี้", mustSign: "ออกโดยไม่ลงนาม?", alreadySigned: "ลงนามแล้ววันนี้", back: "กลับ" },
-    uz: { title: "Xavfsizlik brifing", original: "Asl (Koreys)", translated: "Tarjima", voice: "Tinglash", signHere: "Bu yerga imzo chekish", clear: "Tozalash", confirm: "✍️ Tasdiqlash va imzo", signed: "✓ Imzolandi!", translating: "Tarjima qilinmoqda...", noTBM: "Bugungi brifing yo'q.", mustSign: "Imzosiz chiqilsinmi?", alreadySigned: "Bugun allaqachon imzolandi.", back: "Orqaga" },
-    zh: { title: "安全简报", original: "原文（韩语）", translated: "翻译", voice: "语音播放", signHere: "请在此签名", clear: "清除", confirm: "✍️ 确认并签名", signed: "✓ 签名完成！", translating: "翻译中...", noTBM: "今天没有简报", mustSign: "不签名就离开？", alreadySigned: "今天已经签名了。", back: "返回" },
+    ko: { title: "안전 브리핑", original: "원문 (한국어)", translated: "번역본", voice: "음성으로 듣기", signHere: "이곳에 서명하세요", clear: "다시 쓰기", confirm: "✍️ 서명 완료하기", signed: "✓ 오늘 서명 완료!", translating: "번역 중...", noTBM: "오늘 전파된 브리핑이 없습니다.", mustSign: "서명 없이 나가시겠습니까?", alreadySigned: "이미 오늘 서명하셨습니다.", back: "뒤로", pron: "발음", rev: "역번역" },
+    en: { title: "Safety Briefing", original: "Original (Korean)", translated: "Translation", voice: "Listen", signHere: "Please sign here", clear: "Clear", confirm: "✍️ Confirm & Sign", signed: "✓ Signed!", translating: "Translating...", noTBM: "No briefing today.", mustSign: "Leave without signing?", alreadySigned: "Already signed today.", back: "Back", pron: "Pronunciation", rev: "Reverse Trans" },
+    vi: { title: "Thông báo an toàn", original: "Gốc (Tiếng Hàn)", translated: "Bản dịch", voice: "Nghe", signHere: "Ký tên ở đây", clear: "Xóa", confirm: "✍️ Xác nhận & Ký", signed: "✓ Đã ký!", translating: "Đang dịch...", noTBM: "Chưa có thông báo hôm nay.", mustSign: "Rời đi mà không ký?", alreadySigned: "Đã ký hôm nay rồi.", back: "Quay lại", pron: "Phát âm", rev: "Dịch ngược" },
+    th: { title: "สรุปความปลอดภัย", original: "ต้นฉบับ (เกาหลี)", translated: "คำแปล", voice: "ฟังเสียง", signHere: "ลงชื่อที่นี่", clear: "ล้าง", confirm: "✍️ ยืนยันและลงนาม", signed: "✓ ลงนามแล้ว!", translating: "กำลังแปล...", noTBM: "ยังไม่มีสรุปวันนี้", mustSign: "ออกโดยไม่ลงนาม?", alreadySigned: "ลงนามแล้ววันนี้", back: "กลับ", pron: "การออกเสียง", rev: "แปลย้อนกลับ" },
+    uz: { title: "Xavfsizlik brifing", original: "Asl (Koreys)", translated: "Tarjima", voice: "Tinglash", signHere: "Bu yerga imzo chekish", clear: "Tozalash", confirm: "✍️ Tasdiqlash va imzo", signed: "✓ Imzolandi!", translating: "Tarjima qilinmoqda...", noTBM: "Bugungi brifing yo'q.", mustSign: "Imzosiz chiqilsinmi?", alreadySigned: "Bugun allaqachon imzolandi.", back: "Orqaga", pron: "Talaffuz", rev: "Teskari tarjima" },
+    zh: { title: "安全简报", original: "原文（韩语）", translated: "翻译", voice: "语音播放", signHere: "请在此签名", clear: "清除", confirm: "✍️ 确认并签名", signed: "✓ 签名完成！", translating: "翻译中...", noTBM: "今天没有简报", mustSign: "不签名就离开？", alreadySigned: "今天已经签名了。", back: "返回", pron: "发音", rev: "回译" },
 };
-const getUI = (lang: string) => uiText[lang] || uiText["en"];
+const getUI = (lang: string) => {
+    const d = uiText[lang] || uiText["en"];
+    if (!d.pron) d.pron = "Pronunciation";
+    if (!d.rev) d.rev = "Reverse Trans";
+    return d;
+};
 
 function WorkerTBMDetailContent() {
     const router = useRouter();
@@ -58,7 +78,7 @@ function WorkerTBMDetailContent() {
     const [loading, setLoading] = useState(true);
     const [translating, setTranslating] = useState(false);
     const [preferredLang, setPreferredLang] = useState("ko");
-    const [translatedText, setTranslatedText] = useState("");
+    const [transData, setTransData] = useState<{ text: string, pron: string, rev: string }>({ text: "", pron: "", rev: "" });
     const [isSigned, setIsSigned] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -117,11 +137,17 @@ function WorkerTBMDetailContent() {
 
             if (tbmData.content_ko && lang !== "ko") {
                 setTranslating(true);
-                const translated = await translateKo(tbmData.content_ko, lang);
-                setTranslatedText(translated);
+                const result = await translateKo(tbmData.content_ko, lang);
+
+                // Apply hangulize for TBM pronunciation too
+                if (result.pron) {
+                    result.pron = hangulize(result.pron, lang);
+                }
+
+                setTransData(result);
                 setTranslating(false);
             } else {
-                setTranslatedText(tbmData?.content_ko || "");
+                setTransData({ text: tbmData?.content_ko || "", pron: "", rev: "" });
             }
         }
 
@@ -131,9 +157,9 @@ function WorkerTBMDetailContent() {
     useEffect(() => { loadTBM(); }, [loadTBM]);
 
     const handlePlayAudio = () => {
-        if (!translatedText) return;
+        if (!transData.text) return;
         window.speechSynthesis.cancel();
-        const utter = new SpeechSynthesisUtterance(translatedText);
+        const utter = new SpeechSynthesisUtterance(transData.text);
         utter.lang = googleLangCode[preferredLang] || preferredLang;
         utter.onstart = () => setIsPlaying(true);
         utter.onend = () => setIsPlaying(false);
@@ -263,10 +289,32 @@ function WorkerTBMDetailContent() {
                                                 <span className="text-slate-400 font-bold">{t.translating}</span>
                                             </div>
                                         ) : (
-                                            <div className="relative group/text">
+                                            <div className="relative group/text space-y-6">
                                                 <p className="text-3xl md:text-5xl font-black text-white leading-[1.15] drop-shadow-sm transition-transform group-hover/text:scale-[1.01] duration-500">
-                                                    {translatedText || tbm.content_ko}
+                                                    {transData.text || tbm.content_ko}
                                                 </p>
+
+                                                {preferredLang !== "ko" && transData.pron && (
+                                                    <div className="flex items-start gap-4 p-4 bg-blue-500/10 rounded-2xl border border-blue-500/20">
+                                                        <div className="px-2 py-1 bg-blue-500 text-[10px] font-black text-white rounded shrink-0 mt-1 uppercase">
+                                                            {t.pron}
+                                                        </div>
+                                                        <p className="text-xl font-bold text-blue-300 italic">
+                                                            {transData.pron}
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {preferredLang !== "ko" && transData.rev && (
+                                                    <div className="flex items-start gap-4 p-4 bg-purple-500/5 rounded-2xl border border-purple-500/10">
+                                                        <div className="px-2 py-1 bg-purple-500/50 text-[10px] font-black text-white rounded shrink-0 mt-1 uppercase">
+                                                            {t.rev}
+                                                        </div>
+                                                        <p className="text-lg font-bold text-slate-400">
+                                                            {transData.rev}
+                                                        </p>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
