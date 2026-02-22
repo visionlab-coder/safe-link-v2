@@ -98,9 +98,12 @@ function WorkerChatContent() {
             const { data: admins, error: adminErr } = await supabase
                 .from("profiles")
                 .select("id, display_name")
-                .or('role.eq.HQ_ADMIN,role.eq.SAFETY_OFFICER,role.eq.ADMIN');
+                .in("role", ["HQ_ADMIN", "SAFETY_OFFICER", "ADMIN"]);
 
-            if (adminErr) console.error("[fetchAdmin] Error:", adminErr);
+            if (adminErr) {
+                console.error("[fetchAdmin] Error Message:", adminErr.message);
+                console.error("[fetchAdmin] Error Detail:", adminErr);
+            }
 
             if (admins && admins.length > 0) {
                 setAdminId(admins[0].id);
@@ -120,11 +123,15 @@ function WorkerChatContent() {
         const supabase = createClient();
 
         const fetchMessages = async () => {
-            const { data } = await supabase
+            const { data, error: msgFetchErr } = await supabase
                 .from("messages")
                 .select("*")
                 .or(`from_user.eq.${myId},to_user.eq.${myId}`)
                 .order("created_at", { ascending: true });
+
+            if (msgFetchErr) {
+                console.error("[fetchMessages] Error:", msgFetchErr.message || msgFetchErr);
+            }
             if (data) setMessages(data);
             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
         };
@@ -258,7 +265,7 @@ function WorkerChatContent() {
             const supabase = createClient();
             const payload = {
                 from_user: myId,
-                to_user: adminId || "00000000-0000-0000-0000-000000000000", // Fallback if no admin yet
+                to_user: adminId || "00000000-0000-0000-0000-000000000000",
                 source_lang: lang,
                 target_lang: "ko",
                 source_text: text.trim(),
@@ -269,12 +276,18 @@ function WorkerChatContent() {
                 }),
             };
 
-            await supabase.from("messages").insert(payload);
-            // Optimistic update
+            const { error: msgInsertErr } = await supabase.from("messages").insert(payload);
+            if (msgInsertErr) {
+                console.error("[handleSend] Insert Error:", msgInsertErr.message);
+                alert("Failed to send: " + msgInsertErr.message);
+            } else {
+                // Only clear text on success
+                setText("");
+            }
+
+            // Optimistic update (for UI feel)
             setMessages(prev => [...prev, { ...payload, id: `temp-${Date.now()}`, created_at: new Date().toISOString() } as any]);
             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-
-            setText("");
             if (isRecording) toggleRecording();
 
             // Auto TTS for outgoing message (Worker's phone speaks Korean so the Admin next to them can hear)
