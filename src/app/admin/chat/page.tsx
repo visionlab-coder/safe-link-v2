@@ -430,34 +430,35 @@ function AdminChatContent() {
                                             {/* Translation Detail Section */}
                                             <div className={`pt-3 border-t flex flex-col gap-2 ${isAdmin ? 'border-blue-400/50' : 'border-slate-100'}`}>
 
-                                                {/* Admin message → show translated (foreign) text */}
-                                                {isAdmin && (
-                                                    <div className="flex items-start gap-1.5 opacity-90">
-                                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5">번역</span>
-                                                        <span className="font-bold text-lg landscape:text-2xl">{parsed.text}</span>
-                                                    </div>
-                                                )}
-
-                                                {/* Worker message → show original source + pron + rev */}
-                                                {!isAdmin && (
+                                                {isAdmin ? (
+                                                    // ── 관리자 메시지: 번역문(외국어) + 발음 + 역번역 ──
                                                     <>
-                                                        <div className="flex items-start gap-1.5">
-                                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-500 shrink-0 mt-0.5">原文</span>
-                                                            <span className="font-bold text-lg landscape:text-2xl text-slate-700">{m.source_text}</span>
+                                                        {/* 번역: 외국어 번역 결과 */}
+                                                        <div className="flex items-start gap-1.5 opacity-90">
+                                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5">번역</span>
+                                                            <span className="font-bold text-lg landscape:text-2xl">{parsed.text}</span>
                                                         </div>
+                                                        {/* 발음: 외국어 번역문의 한글 독음 (관리자가 읽는 용) */}
                                                         {parsed.pron && (
                                                             <div className="flex items-start gap-1.5">
-                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-amber-100 text-amber-600 shrink-0 mt-0.5">{t.pron}</span>
-                                                                <span className="font-bold text-base text-amber-700">{parsed.pron}</span>
+                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5">{t.pron}</span>
+                                                                <span className="font-bold text-base opacity-90">{parsed.pron}</span>
                                                             </div>
                                                         )}
+                                                        {/* 역번역: 번역 검증 */}
                                                         {parsed.rev && (
                                                             <div className="flex items-start gap-1.5">
-                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-green-100 text-green-600 shrink-0 mt-0.5">{t.rev}</span>
-                                                                <span className="font-bold text-base text-green-700">{parsed.rev}</span>
+                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5">{t.rev}</span>
+                                                                <span className="font-bold text-base opacity-80">{parsed.rev}</span>
                                                             </div>
                                                         )}
                                                     </>
+                                                ) : (
+                                                    // ── 근로자 메시지: 원문(외국어)만 표시. 발음 불필요(관리자는 한국어 사용자) ──
+                                                    <div className="flex items-start gap-1.5">
+                                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-500 shrink-0 mt-0.5">原文</span>
+                                                        <span className="font-bold text-lg landscape:text-2xl text-slate-600">{m.source_text}</span>
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
