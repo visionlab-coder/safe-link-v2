@@ -81,14 +81,18 @@ export function normalizeKo(text: string, dict: Record<string, string> = CONSTRU
 // 비동기 버전: DB 사전 우선, 실패 시 로컬 fallback
 // ─────────────────────────────────────────────
 
+import { formalizeKo } from "./politeness";
+
 /**
  * normalizeKoAsync (비동기, 권장)
- * DB 전역 사전을 우선 사용합니다.
- * 어느 현장에서든 최신 사전이 적용됩니다.
+ * DB 전역 사전을 우선 사용하고, 문장을 존댓말로 변환합니다.
  */
 export async function normalizeKoAsync(text: string): Promise<NormalizeResult> {
     const dict = await fetchGlossaryFromDB();
-    return normalizeKo(text, dict);
+    const normalizedData = normalizeKo(text, dict);
+    // 문장을 존댓말 지침에 맞게 변환
+    normalizedData.normalized = formalizeKo(normalizedData.normalized);
+    return normalizedData;
 }
 
 /**

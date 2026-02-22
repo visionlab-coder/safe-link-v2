@@ -212,8 +212,7 @@ function AdminChatContent() {
                 const revData = await revRes.json();
                 rev = revData[0].map((item: any) => item[0]).join("");
 
-                // Foreign Slang Simulation (Just add an indicator to show it's localized to field terms)
-                foreignSlang = translated + " (Field)";
+                foreignSlang = translated;
             } else {
                 foreignSlang = translated;
             }

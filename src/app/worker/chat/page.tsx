@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
 import { hangulize } from "@/utils/hangulize";
+import { formalizeKo } from "@/utils/politeness";
 
 const ui: Record<string, any> = {
     ko: {
@@ -281,6 +282,8 @@ function WorkerChatContent() {
                 const transRes = await fetch(dtUrl);
                 const transData = await transRes.json();
                 translated = transData[0].map((item: any) => item[0]).join("");
+                // 존댓말 지침 적용
+                translated = formalizeKo(translated);
 
                 // Correct Pronunciation (Transliteration) logic: find block where segment[0] is null
                 if (transData[0]) {
