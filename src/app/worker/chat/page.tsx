@@ -138,6 +138,7 @@ function WorkerChatContent() {
                                 window.speechSynthesis.cancel();
                                 const utter = new SpeechSynthesisUtterance(speakText);
                                 utter.lang = getVoiceLang(lang);
+                                utter.rate = 0.95;
                                 window.speechSynthesis.speak(utter);
                             }
                         }
@@ -148,6 +149,15 @@ function WorkerChatContent() {
 
         return () => { supabase.removeChannel(channel); };
     }, [adminId, myId, lang]);
+
+    const playAudio = (text: string, langCode: string) => {
+        if (!text) return;
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = getVoiceLang(langCode);
+        utter.rate = 0.95;
+        window.speechSynthesis.speak(utter);
+    };
 
     const toggleRecording = () => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -217,6 +227,11 @@ function WorkerChatContent() {
             await supabase.from("messages").insert(payload);
             setText("");
             if (isRecording) toggleRecording();
+
+            // Auto TTS for outgoing message (Worker's phone speaks Korean so the Admin next to them can hear)
+            if (translated) {
+                playAudio(translated, "ko");
+            }
         } catch (e) {
             console.error(e);
         } finally {
@@ -257,28 +272,46 @@ function WorkerChatContent() {
 
                             return (
                                 <div key={m.id || i} className={`flex flex-col max-w-[85%] ${isMe ? 'self-end items-end' : 'self-start items-start'} landscape:max-w-[95%]`}>
-                                    <span className={`text-xs font-black uppercase tracking-widest text-slate-400 mb-1 ${isMe ? 'mr-2' : 'ml-2'}`}>
-                                        {isMe ? t.me : t.adminName}
-                                    </span>
+                                    <div className={`flex items-center gap-2 mb-1 ${isMe ? 'mr-2' : 'ml-2'}`}>
+                                        <span className="text-xs font-black uppercase tracking-widest text-slate-400">
+                                            {isMe ? t.me : t.adminName}
+                                        </span>
+                                        <button onClick={() => playAudio(isMe ? parsed.text : parsed.text, isMe ? "ko" : lang)} className="text-blue-500 hover:text-blue-600 tap-effect bg-white outline-none rounded-full p-1 shadow-sm border border-slate-200">
+                                            <svg className="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                                        </button>
+                                    </div>
 
-                                    <div className={`p-5 md:p-6 rounded-[32px] shadow-lg border flex flex-col gap-3 ${isMe ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
+                                    <div className={`p-5 md:p-6 rounded-[32px] shadow-lg border flex flex-col gap-3 ${isMe ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-400 rounded-tl-sm text-slate-800'}`}>
 
-                                        {/* Source Text (Landscape Mode scales it drastically up) */}
+                                        {/* Source Text (Foreign Language always as Main big text) */}
                                         <p className="font-black text-2xl md:text-3xl landscape:text-5xl leading-snug whitespace-pre-wrap drop-shadow-sm">
                                             {isMe ? m.source_text : (parsed.text || m.source_text)}
                                         </p>
 
-                                        {/* Translation Details Area */}
-                                        {parsed.text && (isMe ? m.source_text !== parsed.text : false) && (
-                                            <div className={`pt-3 mt-1 border-t flex flex-col gap-1.5 ${isMe ? 'border-blue-400/50' : 'border-slate-100'}`}>
+                                        {/* Translation Details Area (Korean text always underneath) */}
+                                        {parsed.text && (
+                                            <div className={`pt-3 mt-1 border-t flex flex-col gap-1.5 ${isMe ? 'border-blue-400/50' : 'border-slate-200'}`}>
+
+                                                {/* If Admin's message, show standard form if it differs from source text */}
+                                                {!isMe && parsed.norm && parsed.norm !== m.source_text && (
+                                                    <div className="flex items-center gap-1.5 opacity-90 mb-1">
+                                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${isMe ? 'bg-emerald-500/20 text-emerald-100' : 'bg-emerald-100 text-emerald-700'}`}>표준어</span>
+                                                        <span className={`text-sm font-bold ${isMe ? 'text-emerald-100' : 'text-emerald-700'}`}>{parsed.norm}</span>
+                                                    </div>
+                                                )}
+
                                                 <div className="flex items-center gap-1.5 opacity-90">
-                                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${isMe ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>A/文</span>
-                                                    <span className="font-bold text-xl landscape:text-3xl">{parsed.text}</span>
+                                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${isMe ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                                        {isMe ? "A/文" : "原文"}
+                                                    </span>
+                                                    <span className="font-bold text-xl landscape:text-3xl">
+                                                        {isMe ? parsed.text : m.source_text}
+                                                    </span>
                                                 </div>
 
                                                 {parsed.pron && (
                                                     <div className="flex items-center gap-1.5 opacity-80 mt-1">
-                                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${isMe ? 'bg-white/10' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}>{t.pron}</span>
+                                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${isMe ? 'bg-white/10' : 'bg-slate-50 text-slate-400 border border-slate-200'}`}>{t.pron}</span>
                                                         <span className="text-base font-medium italic landscape:text-2xl tracking-wide">{parsed.pron}</span>
                                                     </div>
                                                 )}

@@ -111,12 +111,12 @@ function AdminChatContent() {
                         setMessages(prev => [...prev, msg]);
                         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
 
-                        // AUTO TTS for INCOMING message
+                        // AUTO TTS for INCOMING message from worker (Admin hears Korean)
                         if (msg.from_user === activeWorker.id) {
                             let speakText = msg.translated_text;
                             try {
                                 const p = JSON.parse(msg.translated_text);
-                                speakText = p.text;
+                                speakText = p.text; // Korean
                             } catch (e) { }
                             if (speakText) {
                                 window.speechSynthesis.cancel();
@@ -133,6 +133,15 @@ function AdminChatContent() {
 
         return () => { supabase.removeChannel(channel); };
     }, [activeWorker, myId]);
+
+    const playAudio = (text: string, langCode: string) => {
+        if (!text) return;
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = getVoiceLang(langCode);
+        utter.rate = 0.95;
+        window.speechSynthesis.speak(utter);
+    };
 
     const toggleRecording = () => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -210,6 +219,11 @@ function AdminChatContent() {
             await supabase.from("messages").insert(payload);
             setText("");
             if (isRecording) toggleRecording();
+
+            // Auto TTS for outgoing message (Admin's phone speaks the foreign language so the worker next to them can hear)
+            if (translated && activeWorker.preferred_lang !== "ko") {
+                playAudio(translated, activeWorker.preferred_lang);
+            }
         } catch (e) {
             console.error(e);
             alert("전송 중 오류가 발생했습니다.");
@@ -299,14 +313,20 @@ function AdminChatContent() {
 
                                 return (
                                     <div key={m.id || i} className={`flex flex-col max-w-[85%] md:max-w-[70%] ${isAdmin ? 'self-end items-end' : 'self-start items-start'} landscape:max-w-[95%]`}>
-                                        <span className={`text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ${isAdmin ? 'mr-2' : 'ml-2'}`}>
-                                            {isAdmin ? t.admin : activeWorker?.display_name}
-                                        </span>
+                                        <div className={`flex items-center gap-2 mb-1 ${isAdmin ? 'mr-2' : 'ml-2'}`}>
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                {isAdmin ? t.admin : activeWorker?.display_name}
+                                            </span>
+                                            <button onClick={() => playAudio(isAdmin ? parsed.text : parsed.text, isAdmin ? activeWorker?.preferred_lang || "ko" : "ko")} className="text-blue-500 hover:text-blue-600 tap-effect bg-white outline-none rounded-full p-1 shadow-sm border border-slate-200">
+                                                <svg className="w-3.5 h-3.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                                            </button>
+                                        </div>
+
                                         <div className={`p-5 rounded-3xl shadow-md border flex flex-col gap-3 ${isAdmin ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
 
-                                            {/* Source Text (Landscape Mode scales it drastically up) */}
+                                            {/* Source Text (Korean for Admin, Foreign for Worker) as Big Text */}
                                             <p className="font-black text-xl md:text-2xl landscape:text-4xl whitespace-pre-wrap leading-snug drop-shadow-sm">
-                                                {m.source_text}
+                                                {isAdmin ? m.source_text : parsed.text}
                                             </p>
 
                                             {/* Advanced AI Translation Area */}
@@ -315,14 +335,18 @@ function AdminChatContent() {
 
                                                     {isAdmin && parsed.norm && parsed.norm !== m.source_text && (
                                                         <div className="flex items-center gap-1.5 opacity-90 mb-1">
-                                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-emerald-500/20 text-emerald-100">표준어</span>
-                                                            <span className="text-sm font-bold text-emerald-100">{parsed.norm}</span>
+                                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${isAdmin ? 'bg-emerald-500/20 text-emerald-100' : 'bg-emerald-100 text-emerald-700'}`}>표준어</span>
+                                                            <span className={`text-sm font-bold ${isAdmin ? 'text-emerald-100' : 'text-emerald-700'}`}>{parsed.norm}</span>
                                                         </div>
                                                     )}
 
                                                     <div className="flex items-center gap-1.5 opacity-90">
-                                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${isAdmin ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>현장용어</span>
-                                                        <span className="font-bold text-lg landscape:text-2xl">{parsed.text}</span>
+                                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${isAdmin ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                                            {isAdmin ? '현장용어' : '原文'}
+                                                        </span>
+                                                        <span className="font-bold text-lg landscape:text-2xl">
+                                                            {isAdmin ? parsed.text : m.source_text}
+                                                        </span>
                                                     </div>
 
                                                     {parsed.pron && (
