@@ -16,7 +16,9 @@ const workerUI: Record<string, any> = {
         chatBtn: "채널 열기",
         signOut: "로그아웃",
         safeWork: "오늘도 안전하게!",
-        status: "작업 준비 상태"
+        status: "작업 준비 상태",
+        newChat: "🚨 관리자가 대화를 요청했습니다!",
+        openChat: "대화방 입장",
     },
     en: {
         greeting: (name: string) => `Welcome, ${name}`,
@@ -29,7 +31,9 @@ const workerUI: Record<string, any> = {
         chatBtn: "Open Chat",
         signOut: "Sign out",
         safeWork: "Work Safe Today!",
-        status: "Status"
+        status: "Status",
+        newChat: "🚨 Admin requested a chat!",
+        openChat: "Enter Chat",
     },
     zh: {
         greeting: (name: string) => `您好, ${name}`,
@@ -38,11 +42,13 @@ const workerUI: Record<string, any> = {
         tbmBtn: "确认并签名",
         newTBM: "🚨 收到新的安全警报！",
         chatTitle: "实时聊天",
-        chatDesc: "点击即可与管理员聊天。",
+        chatDesc: "点击即可与管理员（Admin）聊天。",
         chatBtn: "打开频道",
         signOut: "退出",
         safeWork: "祝您今天工作安全！",
-        status: "状态"
+        status: "状态",
+        newChat: "🚨 管理员请求与您对话！",
+        openChat: "进入聊天",
     },
     vi: {
         greeting: (name: string) => `Chào mừng, ${name}`,
@@ -51,11 +57,13 @@ const workerUI: Record<string, any> = {
         tbmBtn: "Xem và Ký",
         newTBM: "🚨 Cảnh báo an toàn mới!",
         chatTitle: "Trò chuyện",
-        chatDesc: "Ký TBM để trò chuyện với quản trị viên.",
-        chatBtn: "Đang chờ",
+        chatDesc: "Nhấn để trò chuyện với quản trị viên.",
+        chatBtn: "Mo ho tro",
         signOut: "Đăng xuất",
         safeWork: "Làm việc an toàn hôm nay!",
-        status: "Trạng thái"
+        status: "Trạng thái",
+        newChat: "🚨 Quản trị viên muốn trò chuyện!",
+        openChat: "Vào trò chuyện",
     },
     th: {
         greeting: (name: string) => `ยินดีต้อนรับ, ${name}`,
@@ -64,11 +72,13 @@ const workerUI: Record<string, any> = {
         tbmBtn: "ดูและลงนาม",
         newTBM: "🚨 การแจ้งเตือนใหม่!",
         chatTitle: "แชทสด",
-        chatDesc: "ลงนาม TBM เพื่อเริ่มแชท",
-        chatBtn: "กำลังรอ",
+        chatDesc: "แตะเพื่อพูดคุยกับผู้ดูแล",
+        chatBtn: "เปิดแชท",
         signOut: "ออกจากระบบ",
         safeWork: "ทำงานอย่างปลอดภัยวันนี้!",
-        status: "สถานะ"
+        status: "สถานะ",
+        newChat: "🚨 ผู้ดูแลระบบขอแชท!",
+        openChat: "เข้าสู่แชท",
     },
 };
 const getUI = (lang: string) => workerUI[lang] || workerUI["en"];
@@ -85,6 +95,11 @@ function WorkerHomeContent() {
     const [profile, setProfile] = useState<any>(null);
     const [hasNewTBM, setHasNewTBM] = useState(false);
     const [newTBMTime, setNewTBMTime] = useState<string>("");
+
+    // 신규 채팅 알림 관련 상태
+    const [hasNewChat, setHasNewChat] = useState(false);
+    const [newChatTime, setNewChatTime] = useState<string>("");
+
     const [isLoaded, setIsLoaded] = useState(false);
 
     const urlLang = searchParams.get("lang");
@@ -145,8 +160,30 @@ function WorkerHomeContent() {
             )
             .subscribe();
 
+        // 관리자가 보낸 1:1 메시지 감지 리스너 추가
+        const chatChannel = supabase
+            .channel(`worker_home_chat_alert`)
+            .on(
+                "postgres_changes",
+                { event: "INSERT", schema: "public", table: "messages" },
+                async (payload) => {
+                    const msg = payload.new as any;
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (session && msg.to_user === session.user.id) {
+                        setHasNewChat(true);
+                        setNewChatTime(new Date().toLocaleTimeString());
+                        triggerAlert();
+
+                        // 자동 활성화 옵션: 알림과 함께 즉각적인 대화창 이동 지원 (선택적)
+                        // router.push("/worker/chat"); 
+                    }
+                }
+            )
+            .subscribe();
+
         return () => {
             supabase.removeChannel(channel);
+            supabase.removeChannel(chatChannel);
         };
     }, [urlLang]);
 
@@ -209,6 +246,31 @@ function WorkerHomeContent() {
                             <div className="w-12 h-12 glass rounded-full flex items-center justify-center text-white group-hover:translate-x-1 transition-transform">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {/* 💬 신규 채팅 알림 (강제 팝업 형태) */}
+                {hasNewChat && (
+                    <div
+                        className="relative overflow-hidden p-8 bg-blue-600/90 backdrop-blur-md rounded-[40px] border-blue-400 border-2 shadow-[0_0_60px_-15px_rgba(59,130,246,0.8)] cursor-pointer tap-effect animate-float z-50 transform transition-all hover:scale-[1.02]"
+                        onClick={() => { setHasNewChat(false); router.push("/worker/chat"); }}
+                    >
+                        <div className="flex items-center gap-6 relative z-10">
+                            <div className="w-16 h-16 bg-white/20 rounded-3xl flex items-center justify-center text-white relative shadow-inner">
+                                <div className="absolute inset-0 bg-white rounded-3xl animate-ping opacity-30" />
+                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                                </svg>
+                            </div>
+                            <div className="flex-1">
+                                <h2 className="text-2xl font-black text-white tracking-tight leading-none mb-1">{t.newChat}</h2>
+                                <p className="text-blue-100/80 font-bold text-sm">Requested at {newChatTime}</p>
+                            </div>
+                            <div className="w-12 h-12 bg-white text-blue-600 rounded-full flex items-center justify-center shadow-lg hover:bg-blue-50 transition-colors">
+                                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M5 3l14 9-14 9V3z" />
                                 </svg>
                             </div>
                         </div>
