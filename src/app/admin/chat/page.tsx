@@ -64,12 +64,16 @@ function AdminChatContent() {
     const [isRecording, setIsRecording] = useState(false);
     const [myId, setMyId] = useState("");
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
-    const voiceGenderRef = useRef<'male' | 'female'>('female'); // Ref always holds latest value (fixes stale closure)
+    const voiceGenderRef = useRef<'male' | 'female'>('female'); // Immediately updated
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const recognitionRef = useRef<any>(null);
 
-    // Keep ref in sync with state
-    useEffect(() => { voiceGenderRef.current = voiceGender; }, [voiceGender]);
+    // Helper to change gender: updates ref immediately (no async delay) + state for UI
+    const changeGender = (g: 'male' | 'female') => {
+        voiceGenderRef.current = g;
+        setVoiceGender(g);
+        console.log('[Gender] Changed to:', g, '| Ref now:', voiceGenderRef.current);
+    };
 
     const load = async () => {
         const supabase = createClient();
@@ -330,13 +334,13 @@ function AdminChatContent() {
                         {/* Voice Gender Switch */}
                         <div className="hidden md:flex items-center bg-slate-100 rounded-full p-1 border border-slate-200 shadow-inner">
                             <button
-                                onClick={() => setVoiceGender('male')}
+                                onClick={() => changeGender('male')}
                                 className={`px-3 py-1 rounded-full text-[10px] font-black transition-all ${voiceGender === 'male' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                             >
                                 MALE
                             </button>
                             <button
-                                onClick={() => setVoiceGender('female')}
+                                onClick={() => changeGender('female')}
                                 className={`px-3 py-1 rounded-full text-[10px] font-black transition-all ${voiceGender === 'female' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                             >
                                 FEMALE
@@ -424,15 +428,37 @@ function AdminChatContent() {
                                             </p>
 
                                             {/* Translation Detail Section */}
-                                            <div className={`pt-3 border-t flex flex-col gap-1.5 ${isAdmin ? 'border-blue-400/50' : 'border-slate-100'}`}>
-                                                <div className="flex items-center gap-1.5 opacity-90">
-                                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${isAdmin ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                                                        {isAdmin ? '현장용어' : '原文'}
-                                                    </span>
-                                                    <span className="font-bold text-lg landscape:text-2xl">
-                                                        {isAdmin ? parsed.text : m.source_text}
-                                                    </span>
-                                                </div>
+                                            <div className={`pt-3 border-t flex flex-col gap-2 ${isAdmin ? 'border-blue-400/50' : 'border-slate-100'}`}>
+
+                                                {/* Admin message → show translated (foreign) text */}
+                                                {isAdmin && (
+                                                    <div className="flex items-start gap-1.5 opacity-90">
+                                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5">번역</span>
+                                                        <span className="font-bold text-lg landscape:text-2xl">{parsed.text}</span>
+                                                    </div>
+                                                )}
+
+                                                {/* Worker message → show original source + pron + rev */}
+                                                {!isAdmin && (
+                                                    <>
+                                                        <div className="flex items-start gap-1.5">
+                                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-500 shrink-0 mt-0.5">原文</span>
+                                                            <span className="font-bold text-lg landscape:text-2xl text-slate-700">{m.source_text}</span>
+                                                        </div>
+                                                        {parsed.pron && (
+                                                            <div className="flex items-start gap-1.5">
+                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-amber-100 text-amber-600 shrink-0 mt-0.5">{t.pron}</span>
+                                                                <span className="font-bold text-base text-amber-700">{parsed.pron}</span>
+                                                            </div>
+                                                        )}
+                                                        {parsed.rev && (
+                                                            <div className="flex items-start gap-1.5">
+                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-green-100 text-green-600 shrink-0 mt-0.5">{t.rev}</span>
+                                                                <span className="font-bold text-base text-green-700">{parsed.rev}</span>
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                         <span className={`text-[10px] text-slate-400 font-bold mt-1 ${isAdmin ? 'mr-2' : 'ml-2'} landscape:text-base`}>

@@ -80,10 +80,14 @@ function WorkerChatContent() {
     const [adminId, setAdminId] = useState("");
     const [siteId, setSiteId] = useState<string | null>(null);
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
-    const voiceGenderRef = useRef<'male' | 'female'>('female'); // ALWAYS holds latest — fixes stale closure
+    const voiceGenderRef = useRef<'male' | 'female'>('female'); // Immediately updated on change
 
-    // Keep ref in sync with state
-    useEffect(() => { voiceGenderRef.current = voiceGender; }, [voiceGender]);
+    // Helper: update ref AND state at same time (no async delay)
+    const changeGender = (g: 'male' | 'female') => {
+        voiceGenderRef.current = g;
+        setVoiceGender(g);
+        console.log('[Gender] Changed to:', g, '| Ref now:', voiceGenderRef.current);
+    };
 
     const load = async () => {
         const supabase = createClient();
@@ -406,13 +410,13 @@ function WorkerChatContent() {
                         {/* Voice Gender Switch */}
                         <div className="flex items-center bg-slate-100 rounded-full p-1 border border-slate-200 shadow-inner">
                             <button
-                                onClick={() => setVoiceGender('male')}
+                                onClick={() => changeGender('male')}
                                 className={`px-3 py-1 rounded-full text-[10px] font-black transition-all ${voiceGender === 'male' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                             >
                                 MALE
                             </button>
                             <button
-                                onClick={() => setVoiceGender('female')}
+                                onClick={() => changeGender('female')}
                                 className={`px-3 py-1 rounded-full text-[10px] font-black transition-all ${voiceGender === 'female' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                             >
                                 FEMALE
