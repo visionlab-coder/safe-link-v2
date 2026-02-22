@@ -3,6 +3,7 @@ import { useEffect, useState, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
+import { hangulize } from "@/utils/hangulize";
 
 const ui: Record<string, any> = {
     ko: {
@@ -226,6 +227,11 @@ function WorkerChatContent() {
                     if (translitBlock) pron = translitBlock[2];
                     // For worker side, if translating to KO, pron should be Korean romanization
                     if (!pron && translitBlock && translitBlock[3]) pron = translitBlock[3];
+                }
+
+                // Convert to Hangul sounds if available
+                if (pron) {
+                    pron = hangulize(pron, lang);
                 }
 
                 // 2. Reverse Trans (back to worker lang)

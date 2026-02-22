@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
 import { normalizeKoAsync } from "@/utils/normalize";
+import { hangulize } from "@/utils/hangulize";
 
 const ui: Record<string, any> = {
     ko: {
@@ -204,6 +205,11 @@ function AdminChatContent() {
                     if (translitBlock) pron = translitBlock[2];
                     // Fallback to source translit if target not found (rare)
                     if (!pron && translitBlock && translitBlock[3]) pron = translitBlock[3];
+                }
+
+                // Convert Romanized Pronunciation to Hangul sounds
+                if (pron) {
+                    pron = hangulize(pron, activeWorker.preferred_lang);
                 }
 
                 // 2. Reverse Trans
