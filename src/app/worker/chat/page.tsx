@@ -202,13 +202,22 @@ function WorkerChatContent() {
     };
 
     const toggleRecording = () => {
+        console.log("[toggleRecording] Clicked. Current state:", isRecording);
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SpeechRecognition) { alert("Not supported in this browser."); return; }
+        if (!SpeechRecognition) {
+            console.error("[toggleRecording] SpeechRecognition not supported.");
+            alert("Not supported in this browser.");
+            return;
+        }
 
         if (isRecording) {
-            if (recognitionRef.current) recognitionRef.current.stop();
+            if (recognitionRef.current) {
+                console.log("[toggleRecording] Stopping recognition...");
+                recognitionRef.current.stop();
+            }
             setIsRecording(false);
         } else {
+            console.log("[toggleRecording] Starting recognition...");
             const recognition = new SpeechRecognition();
             recognition.lang = getVoiceLang(lang);
             recognition.continuous = true;
@@ -219,15 +228,39 @@ function WorkerChatContent() {
             recognition.onresult = (event: any) => {
                 let txt = "";
                 for (let i = event.resultIndex; i < event.results.length; ++i) txt += event.results[i][0].transcript;
+                console.log("[toggleRecording] Result:", txt);
                 if (txt.trim()) setText((prev) => prev ? prev + " " + txt.trim() : txt.trim());
             };
-            recognition.onerror = () => setIsRecording(false);
-            recognition.onend = () => setIsRecording(false);
+            recognition.onerror = (e: any) => {
+                console.error("[toggleRecording] Error:", e);
+                setIsRecording(false);
+            };
+            recognition.onend = () => {
+                console.log("[toggleRecording] Ended.");
+                setIsRecording(false);
+            };
         }
     };
 
     const handleSend = async () => {
-        if (!text.trim() || !adminId || !myId) return;
+        const supabase = createClient();
+        console.log("[handleSend] Triggered. Text length:", text.trim().length, "AdminID:", adminId, "MyID:", myId);
+        if (!text.trim() || !myId) {
+            console.warn("[handleSend] Blocked: text is empty or myId is missing.");
+            return;
+        }
+
+        // If adminId is missing, try a quick last-minute fetch or use a broadcast fallback
+        let targetId = adminId;
+        if (!targetId) {
+            console.warn("[handleSend] Admin ID missing, attempting emergency fetch...");
+            const { data: fallbackAdmins } = await supabase.from("profiles").select("id").in("role", ["HQ_ADMIN", "SAFETY_OFFICER", "ADMIN"]).limit(1);
+            if (fallbackAdmins?.[0]) {
+                targetId = fallbackAdmins[0].id;
+                setAdminId(targetId);
+            }
+        }
+
         setIsSending(true);
         try {
             let translated = text.trim();
@@ -262,10 +295,9 @@ function WorkerChatContent() {
                 rev = revData[0].map((item: any) => item[0]).join("");
             }
 
-            const supabase = createClient();
             const payload = {
                 from_user: myId,
-                to_user: adminId || "00000000-0000-0000-0000-000000000000",
+                to_user: targetId || "00000000-0000-0000-0000-000000000000",
                 source_lang: lang,
                 target_lang: "ko",
                 source_text: text.trim(),
@@ -418,16 +450,26 @@ function WorkerChatContent() {
                         <div className="relative flex flex-1 items-center bg-slate-50 border-2 border-slate-300 rounded-[36px] overflow-hidden focus-within:border-blue-500 focus-within:bg-white transition-all shadow-inner">
                             <textarea
                                 value={text}
-                                onChange={(e) => setText(e.target.value)}
+                                onChange={(e) => {
+                                    console.log("[textarea] onChange:", e.target.value);
+                                    setText(e.target.value);
+                                }}
                                 placeholder={isRecording ? t.listening : t.chatPlaceholder}
                                 className="w-full bg-transparent p-5 pl-8 text-slate-800 text-xl landscape:text-3xl font-black outline-none resize-none max-h-40 min-h-[72px]"
                                 rows={1}
                                 onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        console.log("[textarea] Enter pressed.");
+                                        handleSend();
+                                    }
                                 }}
                             />
                             <button
-                                onClick={handleSend}
+                                onClick={() => {
+                                    console.log("[SendButton] Clicked.");
+                                    handleSend();
+                                }}
                                 disabled={!text.trim() || isSending}
                                 className="mr-3 bg-blue-600 text-white p-5 rounded-full transition-all disabled:opacity-30 disabled:bg-slate-300 tap-effect shadow-md flex items-center justify-center"
                             >
