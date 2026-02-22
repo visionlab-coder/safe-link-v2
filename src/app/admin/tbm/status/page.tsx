@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
 
@@ -18,19 +18,71 @@ type WorkerStatus = {
     signed_at?: string;
 };
 
-export default function TBMStatusPage() {
+const ui: Record<string, any> = {
+    ko: {
+        title: "TBM 서명 현황",
+        signed: "서명 완료",
+        unsigned: "미서명",
+        total: "전체",
+        back: "돌아가기",
+        noTBM: "발송된 TBM이 없습니다.",
+        noWorker: "등록된 근로자가 없습니다.",
+        signedAt: "서명 시각",
+        refreshBtn: "새로고침",
+        status: "실시간 모니터링",
+        totalAttendance: "전체 출근 인원",
+        signedRate: "서명 완료율",
+        activeDispatch: "최근 발송 내용",
+        registry: "근로자 명부",
+        members: "명"
+    },
+    en: {
+        title: "TBM Status",
+        signed: "Signed",
+        unsigned: "Unsigned",
+        total: "Total",
+        back: "Back",
+        noTBM: "No TBM sent yet.",
+        noWorker: "No workers registered.",
+        signedAt: "Signed at",
+        refreshBtn: "Refresh",
+        status: "Live Monitoring",
+        totalAttendance: "Total Attendance",
+        signedRate: "Signed Rate",
+        activeDispatch: "Active Dispatch",
+        registry: "Worker Registry",
+        members: "Members"
+    },
+    zh: {
+        title: "TBM签名状态",
+        signed: "已签名",
+        unsigned: "未签名",
+        total: "全部",
+        back: "返回",
+        noTBM: "尚未发送TBM。",
+        noWorker: "没有注册的工人。",
+        signedAt: "签名时间",
+        refreshBtn: "刷新",
+        status: "实时监控",
+        totalAttendance: "总参勤人数",
+        signedRate: "签名率",
+        activeDispatch: "当前发布",
+        registry: "工人名单",
+        members: "人"
+    },
+};
+
+const getUI = (lang: string) => ui[lang] || ui["en"];
+
+function TBMStatusPageContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [workers, setWorkers] = useState<WorkerStatus[]>([]);
     const [latestTBM, setLatestTBM] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [adminLang, setAdminLang] = useState("ko");
 
-    const ui: Record<string, any> = {
-        ko: { title: "TBM 서명 현황", signed: "서명 완료", unsigned: "미서명", total: "전체", back: "돌아가기", noTBM: "발송된 TBM이 없습니다.", noWorker: "등록된 근로자가 없습니다.", signedAt: "서명 시각", refreshBtn: "새로고침", status: "실시간 모니터링" },
-        en: { title: "TBM Status", signed: "Signed", unsigned: "Unsigned", total: "Total", back: "Back", noTBM: "No TBM sent yet.", noWorker: "No workers registered.", signedAt: "Signed at", refreshBtn: "Refresh", status: "Live Monitoring" },
-        zh: { title: "TBM签名状态", signed: "已签名", unsigned: "未签名", total: "全部", back: "返回", noTBM: "尚未发送TBM。", noWorker: "没有注册的工人。", signedAt: "签名时间", refreshBtn: "刷新", status: "实时监控" },
-    };
-    const t = ui[adminLang] || ui["en"];
+    const urlLang = searchParams.get("lang");
 
     const load = async () => {
         setLoading(true);
@@ -38,7 +90,13 @@ export default function TBMStatusPage() {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
             const { data: adminProfile } = await supabase.from("profiles").select("preferred_lang").eq("id", session.user.id).single();
-            setAdminLang(adminProfile?.preferred_lang || "ko");
+            let finalLang = adminProfile?.preferred_lang || "ko";
+
+            if (urlLang && urlLang !== adminProfile?.preferred_lang) {
+                await supabase.from("profiles").update({ preferred_lang: urlLang }).eq("id", session.user.id);
+                finalLang = urlLang;
+            }
+            setAdminLang(finalLang);
         }
         const { data: tbmRows } = await supabase.from("tbm_notices").select("*").order("created_at", { ascending: false }).limit(1);
         const tbm = tbmRows?.[0] || null;
@@ -53,7 +111,7 @@ export default function TBMStatusPage() {
         const ackMap = new Map((ackData || []).map(a => [a.worker_id, a.ack_at]));
         const statusList: WorkerStatus[] = workerProfiles.map(w => ({
             id: w.id,
-            display_name: w.display_name || "이름 없음",
+            display_name: w.display_name || "Anonymous",
             preferred_lang: w.preferred_lang || "ko",
             signed: ackMap.has(w.id),
             signed_at: ackMap.get(w.id),
@@ -63,17 +121,16 @@ export default function TBMStatusPage() {
         setLoading(false);
     };
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => { load(); }, [urlLang]);
 
     const signedCount = workers.filter(w => w.signed).length;
     const totalCount = workers.length;
     const signRate = totalCount > 0 ? Math.round((signedCount / totalCount) * 100) : 0;
+    const t = getUI(adminLang);
 
     return (
         <RoleGuard allowedRole="admin">
             <div className="min-h-screen bg-mesh text-slate-50 flex flex-col font-sans selection:bg-blue-500/30">
-
-                {/* 💎 Admin Header */}
                 <header className="sticky top-0 z-50 glass border-b border-white/5 px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors tap-effect text-slate-400">
@@ -94,7 +151,6 @@ export default function TBMStatusPage() {
                 </header>
 
                 <main className="flex-1 flex flex-col p-4 md:p-8 gap-8 max-w-3xl mx-auto w-full pb-20">
-
                     <div className="flex flex-col gap-2">
                         <h2 className="text-4xl font-black text-white text-gradient tracking-tighter uppercase">{t.title}</h2>
                         <div className="flex items-center gap-2">
@@ -103,14 +159,12 @@ export default function TBMStatusPage() {
                         </div>
                     </div>
 
-                    {/* 📊 Summary Dashboard Card */}
                     {!loading && totalCount > 0 && (
                         <section className="glass rounded-[48px] p-8 md:p-10 border-white/10 shadow-3xl relative overflow-hidden group">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/10 blur-[100px] rounded-full -mr-32 -mt-32 pointer-events-none" />
-
                             <div className="flex justify-between items-end mb-8 relative">
                                 <div className="flex flex-col gap-1">
-                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Total Attendance</span>
+                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">{t.totalAttendance}</span>
                                     <div className="flex items-baseline gap-2">
                                         <span className="text-6xl font-black text-white">{signedCount}</span>
                                         <span className="text-2xl font-black text-slate-700 italic">/ {totalCount}</span>
@@ -118,64 +172,42 @@ export default function TBMStatusPage() {
                                 </div>
                                 <div className="flex flex-col items-end">
                                     <span className="text-5xl font-black italic text-gradient tracking-tighter">{signRate}%</span>
-                                    <span className="text-[10px] font-black text-green-500/50 uppercase tracking-widest">Signed Rate</span>
+                                    <span className="text-[10px] font-black text-green-500/50 uppercase tracking-widest">{t.signedRate}</span>
                                 </div>
                             </div>
-
                             <div className="relative h-4 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                                <div
-                                    className={`h-full transition-all duration-1000 ease-out rounded-full shadow-[0_0_20px_rgba(34,197,94,0.3)] ${signRate === 100 ? "bg-green-500" : signRate >= 50 ? "bg-blue-500" : "bg-red-500"
-                                        }`}
-                                    style={{ width: `${signRate}%` }}
-                                />
+                                <div className={`h-full transition-all duration-1000 ease-out rounded-full shadow-[0_0_20px_rgba(34,197,94,0.3)] ${signRate === 100 ? "bg-green-500" : signRate >= 50 ? "bg-blue-500" : "bg-red-500"}`} style={{ width: `${signRate}%` }} />
                             </div>
                         </section>
                     )}
 
-                    {/* 📜 Current TBM Brief */}
                     {latestTBM && (
                         <div className="glass rounded-[32px] p-6 border-white/5 flex flex-col gap-3 group animate-float">
                             <div className="flex justify-between items-center">
-                                <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Active Dispatch</h3>
+                                <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{t.activeDispatch}</h3>
                                 <span className="text-[10px] text-slate-700 font-bold">{new Date(latestTBM.created_at).toLocaleString()}</span>
                             </div>
                             <p className="text-slate-400 font-bold leading-relaxed line-clamp-2 italic">"{latestTBM.content_ko}"</p>
                         </div>
                     )}
 
-                    {/* 👥 Worker Status List */}
                     <section className="flex flex-col gap-4">
                         <div className="flex justify-between items-center px-4">
-                            <h3 className="text-xs font-black text-slate-600 uppercase tracking-[0.4em]">Worker Registry</h3>
-                            <span className="text-[10px] text-slate-700 font-bold uppercase">{workers.length} Members</span>
+                            <h3 className="text-xs font-black text-slate-600 uppercase tracking-[0.4em]">{t.registry}</h3>
+                            <span className="text-[10px] text-slate-700 font-bold uppercase">{workers.length} {t.members}</span>
                         </div>
-
                         {loading ? (
-                            <div className="flex justify-center py-20">
-                                <div className="w-10 h-10 border-4 border-white/10 border-t-blue-500 rounded-full animate-spin" />
-                            </div>
+                            <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-white/10 border-t-blue-500 rounded-full animate-spin" /></div>
                         ) : workers.length === 0 ? (
-                            <div className="glass rounded-[40px] p-16 text-center text-slate-600 font-bold italic border-dashed border-white/5">
-                                {t.noWorker}
-                            </div>
+                            <div className="glass rounded-[40px] p-16 text-center text-slate-600 font-bold italic border-dashed border-white/5">{latestTBM ? t.noWorker : t.noTBM}</div>
                         ) : (
                             <div className="grid gap-3">
                                 {workers.map(worker => (
-                                    <div
-                                        key={worker.id}
-                                        className={`glass p-5 rounded-[32px] border-white/5 transition-all tap-effect flex items-center justify-between group ${!worker.signed ? "hover:border-red-500/20" : "hover:border-green-500/20"
-                                            }`}
-                                    >
+                                    <div key={worker.id} className={`glass p-5 rounded-[32px] border-white/5 transition-all tap-effect flex items-center justify-between group ${!worker.signed ? "hover:border-red-500/20" : "hover:border-green-500/20"}`}>
                                         <div className="flex items-center gap-5">
                                             <div className="relative">
-                                                <img
-                                                    src={`https://flagcdn.com/w80/${isoMap[worker.preferred_lang] || "un"}.png`}
-                                                    alt={worker.preferred_lang}
-                                                    className="w-12 h-8.5 object-cover rounded-xl shadow-lg border border-white/10"
-                                                />
-                                                {!worker.signed && (
-                                                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-slate-950 animate-pulse" />
-                                                )}
+                                                <img src={`https://flagcdn.com/w80/${isoMap[worker.preferred_lang] || "un"}.png`} alt={worker.preferred_lang} className="w-12 h-8.5 object-cover rounded-xl shadow-lg border border-white/10" />
+                                                {!worker.signed && <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-slate-950 animate-pulse" />}
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="text-xl font-black text-white tracking-tight">{worker.display_name}</span>
@@ -185,11 +217,7 @@ export default function TBMStatusPage() {
                                                 </div>
                                             </div>
                                         </div>
-
-                                        <div className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${worker.signed
-                                                ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                                                : "bg-red-500/10 text-red-400 border border-red-500/20 animate-pulse"
-                                            }`}>
+                                        <div className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${worker.signed ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20 animate-pulse"}`}>
                                             <span className={`w-1.5 h-1.5 rounded-full ${worker.signed ? "bg-green-500" : "bg-red-500"}`} />
                                             {worker.signed ? t.signed : t.unsigned}
                                         </div>
@@ -201,5 +229,13 @@ export default function TBMStatusPage() {
                 </main>
             </div>
         </RoleGuard>
+    );
+}
+
+export default function TBMStatusPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-mesh" />}>
+            <TBMStatusPageContent />
+        </Suspense>
     );
 }

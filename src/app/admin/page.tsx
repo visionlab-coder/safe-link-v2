@@ -1,53 +1,66 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import RoleGuard from "@/components/RoleGuard";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
 // 관리자 모드: 한국어 / 영어 / 중국어 3개 (그 외 언어는 영어 fallback)
 const adminUI: Record<string, any> = {
     ko: {
         board: "실시간 관제 보드",
-        boardDesc: "현장 TBM 전파 및 소속 근로자 통신 현황을 확인합니다.",
+        boardDesc: "현장 TBM 전파 및 근로자 통신 현황을 모니터링합니다.",
         tbmTitle: "TBM 전파",
-        tbmDesc: "안전 지침을 작성(녹음)하고 모든 외국인 근로자에게 모국어로 일괄 전송합니다.",
-        tbmBtn: "새 TBM 작성하기",
-        chatTitle: "1:1 실시간 대화",
-        chatDesc: "근로자와의 현장 통신을 실시간으로 완벽하게 번역합니다.",
-        chatBtn: "대화 채널 열기",
+        tbmDesc: "안전 지침을 작성하고 모든 외국인 근로자에게 모국어로 전송합니다.",
+        tbmBtn: "새 브로드캐스트",
+        chatTitle: "1:1 AI 대화",
+        chatDesc: "근로자와의 통신을 실시간으로 자동 번역합니다.",
+        chatBtn: "채널 열기",
+        statusTitle: "서명 현황",
+        statusDesc: "근로자들의 TBM 확인 및 법적 서명 완료 여부를 실시간으로 파악합니다.",
         signOut: "로그아웃",
         roleLabel: { HQ_ADMIN: "현장 소장", SAFETY_OFFICER: "안전관리자", WORKER: "근로자" },
+        greeting: (name: string) => `반갑습니다, ${name}님`,
     },
     en: {
-        board: "Real-time Control Board",
-        boardDesc: "View TBM broadcast status and worker communication on site.",
+        board: "Live Control Board",
+        boardDesc: "Monitor TBM status and worker communication in real-time.",
         tbmTitle: "TBM Broadcast",
-        tbmDesc: "Write (or record) safety instructions and send to all workers in their native language.",
-        tbmBtn: "Write New TBM",
-        chatTitle: "1:1 Live Chat",
-        chatDesc: "Real-time translation of field communication including slang.",
-        chatBtn: "Open Channel",
+        tbmDesc: "Create safety guidelines and push to all workers in native languages.",
+        tbmBtn: "New Broadcast",
+        chatTitle: "1:1 AI Chat",
+        chatDesc: "Real-time auto-translation for communication with foreign workers.",
+        chatBtn: "Open Chat",
+        statusTitle: "Sign Status",
+        statusDesc: "Check TBM acknowledgments and legal signatures in real-time.",
         signOut: "Sign out",
         roleLabel: { HQ_ADMIN: "Site Manager", SAFETY_OFFICER: "Safety Officer", WORKER: "Worker" },
+        greeting: (name: string) => `Welcome, ${name}`,
     },
     zh: {
         board: "实时控制台",
-        boardDesc: "查看TBM广播状态及工人通信情况。",
+        boardDesc: "实时监控TBM发布状态及工人通信情况。",
         tbmTitle: "TBM广播",
-        tbmDesc: "撰写（或录音）安全指示，以各工人母语批量发送。",
-        tbmBtn: "新建TBM",
-        chatTitle: "1对1实时聊天",
-        chatDesc: "实时完美翻译现场通信内容。",
+        tbmDesc: "撰写安全指示并以各工人母语批量分发。",
+        tbmBtn: "新建广播",
+        chatTitle: "1对1 AI聊天",
+        chatDesc: "与外国工人沟通时的实时自动翻译。",
         chatBtn: "打开频道",
+        statusTitle: "签名状态",
+        statusDesc: "实时查看工人对TBM的确认及签名完成情况。",
         signOut: "退出",
         roleLabel: { HQ_ADMIN: "现场主管", SAFETY_OFFICER: "安全管理员", WORKER: "工人" },
+        greeting: (name: string) => `您好, ${name}`,
     },
 };
 const getUI = (lang: string) => adminUI[lang] || adminUI["en"];
 
-export default function AdminDashboard() {
+function AdminDashboardContent() {
     const router = useRouter();
-    const [currentUser, setCurrentUser] = useState<{ email: string; role: string; prefLang: string } | null>(null);
+    const searchParams = useSearchParams();
+    const [currentUser, setCurrentUser] = useState<{ name: string; email: string; role: string; prefLang: string } | null>(null);
+
+    // URL 파라미터로 명시적으로 전달된 언어가 있는지 확인 (override)
+    const urlLang = searchParams.get("lang");
 
     useEffect(() => {
         const load = async () => {
@@ -59,15 +72,28 @@ export default function AdminDashboard() {
                     .select("role, preferred_lang, display_name")
                     .eq("id", session.user.id)
                     .single();
+
+                let finalLang = profile?.preferred_lang || "ko";
+
+                // 🚨 핵심 로직: URL에 lang이 있고, DB 설정과 다르면 DB를 업데이트하고 현재 UI 언어도 바꿈
+                if (urlLang && urlLang !== profile?.preferred_lang) {
+                    await supabase
+                        .from("profiles")
+                        .update({ preferred_lang: urlLang })
+                        .eq("id", session.user.id);
+                    finalLang = urlLang;
+                }
+
                 setCurrentUser({
+                    name: profile?.display_name || "Manager",
                     email: session.user.email || "",
-                    role: profile?.role || "",
-                    prefLang: profile?.preferred_lang || "en",
+                    role: profile?.role || "SAFETY_OFFICER",
+                    prefLang: finalLang,
                 });
             }
         };
         load();
-    }, []);
+    }, [urlLang]);
 
     const handleSignOut = async () => {
         const supabase = createClient();
@@ -75,87 +101,129 @@ export default function AdminDashboard() {
         router.push("/");
     };
 
-    const lang = currentUser?.prefLang || "en";
+    const lang = currentUser?.prefLang || urlLang || "ko";
     const t = getUI(lang);
-    const roleDisplay = currentUser ? ((t.roleLabel as any)[currentUser.role] || currentUser.role) : "";
-    // 역할별 색상
-    const roleColor = currentUser?.role === "HQ_ADMIN" ? "text-blue-300 border-blue-500/30 bg-blue-500/20"
-        : currentUser?.role === "SAFETY_OFFICER" ? "text-amber-300 border-amber-500/30 bg-amber-500/20"
-            : "text-slate-300 border-slate-500/30 bg-slate-500/20";
+    const roleDisplay = currentUser ? ((t.roleLabel as any)[currentUser.role] || currentUser.role) : "Admin";
 
     return (
         <RoleGuard allowedRole="admin">
-            <div className="min-h-screen bg-slate-900 text-white p-4 md:p-8 flex flex-col gap-6">
-                {/* 헤더 */}
-                <header className="flex justify-between items-center mb-6">
-                    <h1 className="text-2xl font-black tracking-wider text-blue-400">SAFE-LINK</h1>
-                    <div className="flex items-center gap-3">
-                        {/* 이메일 + 역할 */}
-                        {currentUser && (
-                            <div className="flex flex-col items-end">
-                                <span className="text-[10px] text-slate-500 truncate max-w-[180px]">{currentUser.email}</span>
-                                <span className={`text-[10px] font-black`}>{roleDisplay}</span>
+            <div className="min-h-screen bg-mesh text-white p-4 md:p-8 flex flex-col gap-8 pb-12 font-sans selection:bg-blue-500/30">
+
+                {/* 💎 Premium Header */}
+                <header className="flex justify-between items-start animate-float">
+                    <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2 mb-1">
+                            <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase text-gradient">Safe-Link</h1>
+                            <div className="flex items-center gap-1 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
+                                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                                <span className="text-[10px] text-blue-400 font-black tracking-widest leading-none">ADMIN HUB</span>
                             </div>
-                        )}
-                        {/* 역할 뱃지 */}
-                        <div className={`px-3 py-1.5 rounded-full font-bold text-xs border ${roleColor}`}>
-                            {roleDisplay || "Admin"}
                         </div>
-                        <button
-                            onClick={handleSignOut}
-                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-full text-xs font-bold transition-colors"
-                        >
+                        <p className="text-slate-400 font-bold text-lg leading-tight uppercase tracking-tight">
+                            {currentUser ? t.greeting(currentUser.name) : "Authenticating..."}
+                        </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-3">
+                        <div className={`px-4 py-2 glass rounded-full border border-white/5 shadow-xl text-xs font-black tracking-widest uppercase ${currentUser?.role === 'HQ_ADMIN' ? 'text-blue-400 border-blue-500/20' : 'text-amber-400 border-amber-500/20'
+                            }`}>
+                            {roleDisplay}
+                        </div>
+                        <button onClick={handleSignOut} className="text-[10px] font-black text-slate-500 hover:text-red-400 uppercase tracking-widest py-1 transition-colors">
                             {t.signOut}
                         </button>
                     </div>
                 </header>
 
-                <h2 className="text-3xl font-bold mb-2">{t.board}</h2>
-                <p className="text-slate-400 mb-6">{t.boardDesc}</p>
+                <div className="flex flex-col gap-2 relative">
+                    <h2 className="text-5xl font-black text-white text-gradient tracking-tighter uppercase">{t.board}</h2>
+                    <p className="text-slate-500 font-bold tracking-tight uppercase text-sm">{t.boardDesc}</p>
+                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* TBM 카드 */}
-                    <div className="p-8 bg-slate-800/80 rounded-[32px] border border-blue-500/30 hover:border-blue-500/60 transition-colors shadow-lg shadow-blue-900/10">
-                        <h3 className="font-bold text-2xl mb-4 text-slate-200">{t.tbmTitle}</h3>
-                        <p className="text-slate-400 mb-8">{t.tbmDesc}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* 📡 TBM Broadcast Card */}
+                    <section className="glass rounded-[48px] p-10 border-white/10 shadow-3xl relative overflow-hidden flex flex-col gap-10 group">
+                        <div className="absolute top-0 right-0 w-48 h-48 bg-blue-600/10 blur-[80px] rounded-full -mr-24 -mt-24 pointer-events-none group-hover:bg-blue-600/20 transition-all duration-1000" />
+
+                        <div className="flex flex-col gap-4 relative">
+                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-blue-500 mb-2">
+                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                </svg>
+                            </div>
+                            <h3 className="text-3xl font-black text-white tracking-tight italic">{t.tbmTitle}</h3>
+                            <p className="text-slate-400 font-bold leading-relaxed">{t.tbmDesc}</p>
+                        </div>
+
                         <button
                             onClick={() => router.push('/admin/tbm/create')}
-                            className="px-8 py-4 w-full text-lg font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-md transition-transform active:scale-95"
+                            className="mt-auto w-full py-6 bg-gradient-to-br from-blue-400 to-blue-600 text-slate-950 text-xl font-black rounded-[28px] shadow-[0_20px_40px_-15px_rgba(59,130,246,0.3)] transition-all tap-effect hover:scale-[1.02]"
                         >
-                            {t.tbmBtn}
+                            {t.tbmBtn.toUpperCase()}
                         </button>
-                    </div>
+                    </section>
 
-                    {/* 채팅 카드 */}
-                    <div className="p-8 bg-slate-800/80 rounded-[32px] border border-slate-700/50 hover:border-slate-600 transition-colors">
-                        <h3 className="font-bold text-2xl mb-4 text-slate-200">{t.chatTitle}</h3>
-                        <p className="text-slate-400 mb-8">{t.chatDesc}</p>
-                        <button className="px-8 py-4 w-full text-lg font-bold bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-transform active:scale-95">
-                            {t.chatBtn}
+                    {/* 💬 AI Chat Card */}
+                    <section className="glass rounded-[48px] p-10 border-white/5 opacity-40 grayscale-[0.8] relative overflow-hidden flex flex-col gap-10 group">
+                        <div className="flex flex-col gap-4">
+                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-slate-500 mb-2">
+                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                </svg>
+                            </div>
+                            <h3 className="text-3xl font-black text-white tracking-tight italic">{t.chatTitle}</h3>
+                            <p className="text-slate-500 font-bold leading-relaxed">{t.chatDesc}</p>
+                        </div>
+
+                        <button disabled className="mt-auto w-full py-6 bg-slate-800 text-slate-600 text-xl font-black rounded-[28px] flex items-center justify-center gap-3">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            {t.chatBtn.toUpperCase()}
                         </button>
-                    </div>
+                    </section>
 
-                    {/* 서명 현황 카드 */}
-                    <div
+                    {/* ✅ Big Signature Status Card */}
+                    <section
                         onClick={() => router.push('/admin/tbm/status')}
-                        className="md:col-span-2 p-8 bg-slate-800/80 rounded-[32px] border border-green-500/30 hover:border-green-500/60 transition-colors cursor-pointer group"
+                        className="md:col-span-2 glass rounded-[48px] p-10 border-white/10 hover:border-green-500/30 transition-all cursor-pointer tap-effect group shadow-2xl relative overflow-hidden"
                     >
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h3 className="font-bold text-2xl mb-2 text-slate-200">
-                                    {lang === "ko" ? "근로자 서명 현황" : lang === "zh" ? "工人签名状态" : "Worker Signature Status"}
-                                </h3>
-                                <p className="text-slate-400">
-                                    {lang === "ko" ? "TBM 수신 확인 및 서명 완료 여부를 실시간으로 확인합니다." : lang === "zh" ? "实时查看TBM确认及签名完成情况。" : "Check TBM acknowledgement and signature status in real time."}
+                        <div className="absolute top-0 right-0 w-96 h-96 bg-green-500/5 blur-[120px] rounded-full -mr-48 -mt-48 transition-all group-hover:bg-green-500/10" />
+
+                        <div className="flex items-center justify-between relative">
+                            <div className="flex flex-col gap-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-1.5 h-8 bg-green-500 rounded-full" />
+                                    <h3 className="text-4xl font-black text-white text-gradient uppercase italic">{t.statusTitle}</h3>
+                                </div>
+                                <p className="text-slate-400 font-bold max-w-xl text-lg leading-relaxed">
+                                    {t.statusDesc}
                                 </p>
                             </div>
-                            <svg className="w-8 h-8 text-green-400 group-hover:translate-x-1 transition-transform flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
+                            <div className="w-20 h-20 glass rounded-full flex items-center justify-center text-green-500 group-hover:translate-x-3 transition-all duration-500 shadow-green-500/20 shadow-2xl">
+                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                </svg>
+                            </div>
                         </div>
-                    </div>
+                    </section>
                 </div>
+
+                {/* 🛡️ Footer Brand */}
+                <footer className="mt-auto flex flex-col items-center gap-4 py-8">
+                    <div className="flex items-center gap-2 opacity-10">
+                        <div className="w-10 h-10 rounded-xl bg-white/20" />
+                        <span className="font-black text-2xl italic text-white uppercase tracking-tighter">Safe-Link Console</span>
+                    </div>
+                </footer>
             </div>
         </RoleGuard>
+    );
+}
+
+export default function AdminDashboard() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-mesh" />}>
+            <AdminDashboardContent />
+        </Suspense>
     );
 }

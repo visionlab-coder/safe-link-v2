@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import RoleGuard from "@/components/RoleGuard";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
 const workerUI: Record<string, any> = {
@@ -79,12 +79,15 @@ const isoMap: Record<string, string> = {
     ru: "ru", jp: "jp", fr: "fr", es: "es", ar: "sa", hi: "in",
 };
 
-export default function WorkerHome() {
+function WorkerHomeContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [profile, setProfile] = useState<any>(null);
     const [hasNewTBM, setHasNewTBM] = useState(false);
     const [newTBMTime, setNewTBMTime] = useState<string>("");
     const [isLoaded, setIsLoaded] = useState(false);
+
+    const urlLang = searchParams.get("lang");
 
     const triggerAlert = () => {
         if (typeof navigator !== "undefined" && navigator.vibrate) {
@@ -114,7 +117,16 @@ export default function WorkerHome() {
                     .select("*")
                     .eq("id", session.user.id)
                     .single();
-                setProfile(data);
+
+                if (urlLang && urlLang !== data?.preferred_lang) {
+                    await supabase
+                        .from("profiles")
+                        .update({ preferred_lang: urlLang })
+                        .eq("id", session.user.id);
+                    setProfile({ ...data, preferred_lang: urlLang });
+                } else {
+                    setProfile(data);
+                }
                 setIsLoaded(true);
             }
         };
@@ -136,9 +148,9 @@ export default function WorkerHome() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, []);
+    }, [urlLang]);
 
-    const lang = profile?.preferred_lang || "ko";
+    const lang = profile?.preferred_lang || urlLang || "ko";
     const t = getUI(lang);
     const iso = isoMap[lang] || "un";
 
@@ -163,7 +175,7 @@ export default function WorkerHome() {
                             </div>
                         </div>
                         <p className="text-slate-400 font-bold text-lg leading-tight uppercase tracking-tight">
-                            {profile ? t.greeting(profile.display_name || profile.display_name_en || "Worker") : "Connecting..."}
+                            {profile ? t.greeting(profile.display_name || "Worker") : "Connecting..."}
                         </p>
                     </div>
                     <div className="flex flex-col items-end gap-3">
@@ -268,5 +280,13 @@ export default function WorkerHome() {
 
             </div>
         </RoleGuard>
+    );
+}
+
+export default function WorkerHome() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-mesh" />}>
+            <WorkerHomeContent />
+        </Suspense>
     );
 }

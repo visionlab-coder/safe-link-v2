@@ -108,9 +108,8 @@ function AuthContent() {
     // 이미 로그인된 계정으로 계속 진행
     const handleContinueAsExisting = () => {
         if (!existingUser?.role) { router.push(`/auth/setup?lang=${lang}`); return; }
-        if (existingUser.role === "HQ_ADMIN" || existingUser.role === "SAFETY_OFFICER") router.push("/admin");
-        else if (existingUser.role === "WORKER") router.push("/worker");
-        else router.push(`/auth/setup?lang=${lang}`);
+        const path = (existingUser.role === "HQ_ADMIN" || existingUser.role === "SAFETY_OFFICER") ? "/admin" : "/worker";
+        router.push(`${path}?lang=${lang}`);
     };
 
     // 로그아웃 후 새 계정으로
