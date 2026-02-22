@@ -95,19 +95,18 @@ function WorkerChatContent() {
 
         // Fetch Admin ID (Prefer same site, fallback to any admin)
         const fetchAdmin = async (siteId: string | null) => {
-            const adminRoles = ["HQ_ADMIN", "SAFETY_OFFICER", "ADMIN"]; // Corrected typo
-            let q = supabase.from("profiles").select("id").in("role", adminRoles);
-            if (siteId) {
-                const { data: sAdmin } = await q.eq("site_id", siteId).limit(1);
-                if (sAdmin?.[0]?.id) return sAdmin[0].id;
+            const { data: admins } = await supabase
+                .from("profiles")
+                .select("id")
+                .or('role.ilike.ADMIN,role.ilike.SAFETY_OFFICER,role.ilike.HQ_ADMIN');
+
+            if (admins && admins.length > 0) {
+                // For simplicity, just pick the first one, or refine if site_id is available in profile
+                setAdminId(admins[0].id);
             }
-            // Fallback to any admin
-            const { data: anyAdmin } = await supabase.from("profiles").select("id").in("role", adminRoles).limit(1);
-            return anyAdmin?.[0]?.id || "";
         };
 
-        const aId = await fetchAdmin(profile?.site_id);
-        if (aId) setAdminId(aId);
+        await fetchAdmin(profile?.site_id);
     };
 
     useEffect(() => { load(); }, [urlLang]);
@@ -131,9 +130,11 @@ function WorkerChatContent() {
             .channel(`msg_realtime_${myId}`)
             .on(
                 "postgres_changes",
-                { event: "INSERT", schema: "public", table: "messages" },
+                { event: "*", schema: "public", table: "messages" },
                 (payload) => {
                     const msg = payload.new as Message;
+                    if (!msg || !msg.id) return;
+
                     if (msg.from_user === myId || msg.to_user === myId) {
                         setMessages(prev => {
                             if (prev.find(m => m.id === msg.id)) return prev;
@@ -147,7 +148,6 @@ function WorkerChatContent() {
                         });
                         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
 
-                        // If it's a new incoming message from an admin, update the adminId context
                         if (msg.from_user !== myId) {
                             setAdminId(msg.from_user);
 
@@ -169,7 +169,9 @@ function WorkerChatContent() {
                     }
                 }
             )
-            .subscribe();
+            .subscribe((status) => {
+                console.log(`[Realtime] Subscription Status for ${myId}: ${status}`);
+            });
 
         return () => { supabase.removeChannel(channel); };
     }, [myId, lang]);
@@ -247,7 +249,7 @@ function WorkerChatContent() {
             const supabase = createClient();
             const payload = {
                 from_user: myId,
-                to_user: adminId,
+                to_user: adminId || "00000000-0000-0000-0000-000000000000", // Fallback if no admin yet
                 source_lang: lang,
                 target_lang: "ko",
                 source_text: text.trim(),
@@ -297,7 +299,7 @@ function WorkerChatContent() {
                         </button>
                         <div className="flex flex-col">
                             <div className="flex items-center gap-2">
-                                <span className="text-2xl font-black tracking-tight text-slate-800 uppercase">{t.me.split(" ")[0]}</span>
+                                <span className="text-2xl font-black tracking-tight text-slate-800 uppercase">{t.me}</span>
                                 <span className="px-2 py-0.5 bg-green-500 text-[10px] font-black rounded text-white tracking-widest uppercase animate-pulse">Online</span>
                             </div>
                         </div>

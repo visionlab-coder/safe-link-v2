@@ -105,14 +105,15 @@ function AdminChatContent() {
             .channel(`admin_realtime_${myId}`)
             .on(
                 "postgres_changes",
-                { event: "INSERT", schema: "public", table: "messages" },
+                { event: "*", schema: "public", table: "messages" },
                 (payload) => {
                     const msg = payload.new as Message;
+                    if (!msg || !msg.id) return;
                     // Check if message belongs to the current conversation with activeWorker
                     if (activeWorker && ((msg.from_user === myId && msg.to_user === activeWorker.id) || (msg.from_user === activeWorker.id && msg.to_user === myId))) {
                         setMessages(prev => {
                             if (prev.find(m => m.id === msg.id)) return prev;
-                            const isDup = prev.findIndex(m => m.id.startsWith("temp-") && m.source_text === msg.source_text && m.from_user === msg.from_user);
+                            const isDup = prev.findIndex(m => String(m.id).startsWith("temp-") && m.source_text === msg.source_text && m.from_user === msg.from_user);
                             if (isDup !== -1) {
                                 const newArr = [...prev];
                                 newArr[isDup] = msg;
@@ -142,7 +143,9 @@ function AdminChatContent() {
                     }
                 }
             )
-            .subscribe();
+            .subscribe((status) => {
+                console.log(`[Realtime Admin] Subscription Status for ${myId} -> ${activeWorker?.id}: ${status}`);
+            });
 
         return () => { supabase.removeChannel(channel); };
     }, [activeWorker, myId]);
