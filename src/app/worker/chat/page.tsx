@@ -77,6 +77,7 @@ function WorkerChatContent() {
 
     const [myId, setMyId] = useState("");
     const [adminId, setAdminId] = useState("");
+    const [siteId, setSiteId] = useState<string | null>(null);
 
     const load = async () => {
         const supabase = createClient();
@@ -86,6 +87,7 @@ function WorkerChatContent() {
         setMyId(session.user.id);
 
         const { data: profile } = await supabase.from("profiles").select("preferred_lang, site_id").eq("id", session.user.id).single();
+        if (profile?.site_id) setSiteId(profile.site_id);
         let finalLang = profile?.preferred_lang || "ko";
         if (urlLang && urlLang !== profile?.preferred_lang) {
             await supabase.from("profiles").update({ preferred_lang: urlLang }).eq("id", session.user.id);
@@ -293,6 +295,7 @@ function WorkerChatContent() {
             }
 
             const payload = {
+                site_id: siteId, // Store site context from state
                 from_user: myId,
                 to_user: targetId || "00000000-0000-0000-0000-000000000000",
                 source_lang: lang,
@@ -305,12 +308,13 @@ function WorkerChatContent() {
                 }),
             };
 
+            console.log("[handleSend] Attempting Insert. Payload:", payload);
             const { error: msgInsertErr } = await supabase.from("messages").insert(payload);
             if (msgInsertErr) {
-                console.error("[handleSend] Insert Error:", msgInsertErr.message);
+                console.error("[handleSend] Insert Error:", msgInsertErr.message, msgInsertErr);
                 alert("Failed to send: " + msgInsertErr.message);
             } else {
-                // Only clear text on success
+                console.log("[handleSend] Insert Successful!");
                 setText("");
             }
 

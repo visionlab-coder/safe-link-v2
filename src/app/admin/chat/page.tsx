@@ -84,67 +84,58 @@ function AdminChatContent() {
         if (data) setWorkers(data);
     };
 
+    const fetchMessages = async () => {
+        if (!activeWorker || !myId) return;
+        const supabase = createClient();
+        const { data } = await supabase
+            .from("messages")
+            .select("*")
+            .or(`from_user.eq.${activeWorker.id},to_user.eq.${activeWorker.id}`)
+            .order("created_at", { ascending: true });
+        if (data) setMessages(data);
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    };
+
     useEffect(() => { load(); }, [urlLang]);
 
     useEffect(() => {
         if (!activeWorker || !myId) return;
         const supabase = createClient();
-
-        const fetchMessages = async () => {
-            const { data } = await supabase
-                .from("messages")
-                .select("*")
-                .or(`and(from_user.eq.${myId},to_user.eq.${activeWorker.id}),and(from_user.eq.${activeWorker.id},to_user.eq.${myId})`)
-                .order("created_at", { ascending: true });
-            if (data) setMessages(data);
-            setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-        };
         fetchMessages();
+        (window as any).refreshAdminChat = fetchMessages;
 
         const channel = supabase
-            .channel(`admin_realtime_${myId}`)
+            .channel(`admin_chat_monitor`)
             .on(
                 "postgres_changes",
                 { event: "*", schema: "public", table: "messages" },
                 (payload) => {
+                    console.log("[Realtime Global] Change Detected:", payload.eventType, payload.new);
                     const msg = payload.new as Message;
                     if (!msg || !msg.id) return;
-                    // Check if message belongs to the current conversation with activeWorker
-                    if (activeWorker && ((msg.from_user === myId && msg.to_user === activeWorker.id) || (msg.from_user === activeWorker.id && msg.to_user === myId))) {
+
+                    // Match logic: If message involves the active worker
+                    const involvesWorker = msg.from_user === activeWorker.id || msg.to_user === activeWorker.id;
+
+                    if (involvesWorker) {
                         setMessages(prev => {
                             if (prev.find(m => m.id === msg.id)) return prev;
-                            const isDup = prev.findIndex(m => String(m.id).startsWith("temp-") && m.source_text === msg.source_text && m.from_user === msg.from_user);
-                            if (isDup !== -1) {
+                            const tempIdx = prev.findIndex(m => String(m.id).startsWith("temp-") && m.source_text === msg.source_text && m.from_user === msg.from_user);
+                            if (tempIdx !== -1) {
                                 const newArr = [...prev];
-                                newArr[isDup] = msg;
+                                newArr[tempIdx] = msg;
                                 return newArr;
                             }
                             return [...prev, msg];
                         });
                         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
 
-                        // AUTO TTS for INCOMING message from worker (Admin hears Korean)
-                        if (msg.from_user === activeWorker.id) {
-                            let speakText = msg.translated_text as any;
-                            try {
-                                const p = typeof speakText === "string" ? JSON.parse(speakText) : speakText;
-                                speakText = p.text; // Korean
-                            } catch (e) {
-                                speakText = String(speakText);
-                            }
-                            if (speakText && typeof speakText === "string") {
-                                window.speechSynthesis.cancel();
-                                const utter = new SpeechSynthesisUtterance(speakText);
-                                utter.lang = getVoiceLang("ko");
-                                utter.rate = 0.95;
-                                window.speechSynthesis.speak(utter);
-                            }
-                        }
+                        // Removed Auto-TTS here as per request ("음성은 선택해서 들을 수 있음")
                     }
                 }
             )
             .subscribe((status) => {
-                console.log(`[Realtime Admin] Subscription Status for ${myId} -> ${activeWorker?.id}: ${status}`);
+                console.log(`[Realtime Admin] Status: ${status} | Tracking: ${activeWorker.display_name}`);
             });
 
         return () => { supabase.removeChannel(channel); };
@@ -291,6 +282,15 @@ function AdminChatContent() {
                             </div>
                         </div>
                     </div>
+                    {activeWorker && (
+                        <button
+                            onClick={() => fetchMessages()}
+                            className="p-2 rounded-full hover:bg-slate-100 text-blue-500 transition-all tap-effect border border-slate-100 shadow-sm"
+                            title="Refresh Chat"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        </button>
+                    )}
                 </header>
 
                 <main className="flex-1 flex w-full max-w-6xl mx-auto h-[calc(100vh-76px)] overflow-hidden bg-white shadow-xl md:my-4 md:h-[calc(100vh-100px)] md:rounded-[40px] border border-slate-100">
@@ -356,46 +356,22 @@ function AdminChatContent() {
 
                                         <div className={`p-5 rounded-3xl shadow-md border flex flex-col gap-3 ${isAdmin ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
 
-                                            {/* Source Text (Korean for Admin, Foreign for Worker) as Big Text */}
+                                            {/* Primary Text (What the user reads primarily: KO for Admin, Foreign for Worker) */}
                                             <p className="font-black text-xl md:text-2xl landscape:text-4xl whitespace-pre-wrap leading-snug drop-shadow-sm">
                                                 {isAdmin ? m.source_text : parsed.text}
                                             </p>
 
-                                            {/* Advanced AI Translation Area */}
-                                            {parsed.text && (
-                                                <div className={`pt-3 border-t flex flex-col gap-1.5 ${isAdmin ? 'border-blue-400/50' : 'border-slate-100'}`}>
-
-                                                    {isAdmin && parsed.norm && parsed.norm !== m.source_text && (
-                                                        <div className="flex items-center gap-1.5 opacity-90 mb-1">
-                                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${isAdmin ? 'bg-emerald-500/20 text-emerald-100' : 'bg-emerald-100 text-emerald-700'}`}>표준어</span>
-                                                            <span className={`text-sm font-bold ${isAdmin ? 'text-emerald-100' : 'text-emerald-700'}`}>{parsed.norm}</span>
-                                                        </div>
-                                                    )}
-
-                                                    <div className="flex items-center gap-1.5 opacity-90">
-                                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${isAdmin ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                                                            {isAdmin ? '현장용어' : '原文'}
-                                                        </span>
-                                                        <span className="font-bold text-lg landscape:text-2xl">
-                                                            {isAdmin ? parsed.text : m.source_text}
-                                                        </span>
-                                                    </div>
-
-                                                    {parsed.pron && (
-                                                        <div className="flex items-center gap-1.5 opacity-80 mt-1">
-                                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${isAdmin ? 'bg-white/10' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}>{t.pron}</span>
-                                                            <span className="text-sm font-medium italic landscape:text-xl tracking-wide">{parsed.pron}</span>
-                                                        </div>
-                                                    )}
-
-                                                    {parsed.rev && (
-                                                        <div className="flex items-start gap-1.5 opacity-80 mt-1">
-                                                            <span className={`px-1.5 py-0.5 mt-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${isAdmin ? 'bg-black/20 text-blue-100' : 'bg-amber-100 text-amber-700'}`}>{t.rev}</span>
-                                                            <span className="text-sm font-bold landscape:text-xl">{parsed.rev}</span>
-                                                        </div>
-                                                    )}
+                                            {/* Translation Detail Section */}
+                                            <div className={`pt-3 border-t flex flex-col gap-1.5 ${isAdmin ? 'border-blue-400/50' : 'border-slate-100'}`}>
+                                                <div className="flex items-center gap-1.5 opacity-90">
+                                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${isAdmin ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                                        {isAdmin ? '현장용어' : '原文'}
+                                                    </span>
+                                                    <span className="font-bold text-lg landscape:text-2xl">
+                                                        {isAdmin ? parsed.text : m.source_text}
+                                                    </span>
                                                 </div>
-                                            )}
+                                            </div>
                                         </div>
                                         <span className={`text-[10px] text-slate-400 font-bold mt-1 ${isAdmin ? 'mr-2' : 'ml-2'} landscape:text-base`}>
                                             {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
