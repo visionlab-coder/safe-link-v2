@@ -95,21 +95,26 @@ function WorkerChatContent() {
 
         // Fetch Admin ID (Prefer same site, fallback to any admin)
         const fetchAdmin = async (siteId: string | null) => {
-            const { data: admins, error: adminErr } = await supabase
+            let { data: admins, error: adminErr } = await supabase
                 .from("profiles")
-                .select("id, display_name")
+                .select("id, display_name, role")
                 .in("role", ["HQ_ADMIN", "SAFETY_OFFICER", "ADMIN"]);
 
-            if (adminErr) {
-                console.error("[fetchAdmin] Error Message:", adminErr.message);
-                console.error("[fetchAdmin] Error Detail:", adminErr);
+            if (adminErr || !admins || admins.length === 0) {
+                console.warn("[fetchAdmin] Explicit roles failed/empty. Trying fallback...");
+                const { data: fallback } = await supabase
+                    .from("profiles")
+                    .select("id, display_name, role")
+                    .neq("role", "WORKER")
+                    .limit(5);
+                if (fallback) admins = fallback;
             }
 
             if (admins && admins.length > 0) {
                 setAdminId(admins[0].id);
-                console.info(`[fetchAdmin] Connected to Admin: ${admins[0].display_name || "Admin"} (${admins[0].id})`);
+                console.info(`[fetchAdmin] Connected to Admin: ${admins[0].display_name} (${admins[0].id}, Role: ${admins[0].role})`);
             } else {
-                console.warn("[fetchAdmin] No admins found.");
+                console.error("[fetchAdmin] CRITICAL: No administrators found.");
             }
         };
 
