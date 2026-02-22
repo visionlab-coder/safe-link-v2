@@ -62,9 +62,10 @@ function AdminChatContent() {
     const [text, setText] = useState("");
     const [isSending, setIsSending] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
+    const [myId, setMyId] = useState("");
+    const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const recognitionRef = useRef<any>(null);
-    const [myId, setMyId] = useState("");
 
     const load = async () => {
         const supabase = createClient();
@@ -145,7 +146,24 @@ function AdminChatContent() {
         if (!text) return;
         window.speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(text);
-        utter.lang = getVoiceLang(langCode);
+        const voiceLang = getVoiceLang(langCode);
+        utter.lang = voiceLang;
+
+        // Try to pick a voice matching the selected gender
+        const voices = window.speechSynthesis.getVoices();
+        const targetVoice = voices.find(v => {
+            const lowName = v.name.toLowerCase();
+            const langMatch = v.lang.startsWith(langCode) || v.lang.includes(langCode.toUpperCase());
+            if (!langMatch) return false;
+
+            if (voiceGender === 'male') {
+                return lowName.includes('male') || lowName.includes('david') || lowName.includes('mark') || lowName.includes('minho') || lowName.includes('kyle') || lowName.includes('google 한국어');
+            } else {
+                return lowName.includes('female') || lowName.includes('zira') || lowName.includes('heami') || lowName.includes('yuri') || lowName.includes('juhye');
+            }
+        });
+
+        if (targetVoice) utter.voice = targetVoice;
         utter.rate = 0.95;
         window.speechSynthesis.speak(utter);
     };
@@ -281,15 +299,33 @@ function AdminChatContent() {
                             </div>
                         </div>
                     </div>
-                    {activeWorker && (
-                        <button
-                            onClick={() => fetchMessages()}
-                            className="p-2 rounded-full hover:bg-slate-100 text-blue-500 transition-all tap-effect border border-slate-100 shadow-sm"
-                            title="Refresh Chat"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                        </button>
-                    )}
+                    <div className="flex items-center gap-3">
+                        {/* Voice Gender Switch */}
+                        <div className="hidden md:flex items-center bg-slate-100 rounded-full p-1 border border-slate-200 shadow-inner">
+                            <button
+                                onClick={() => setVoiceGender('male')}
+                                className={`px-3 py-1 rounded-full text-[10px] font-black transition-all ${voiceGender === 'male' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                                MALE
+                            </button>
+                            <button
+                                onClick={() => setVoiceGender('female')}
+                                className={`px-3 py-1 rounded-full text-[10px] font-black transition-all ${voiceGender === 'female' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                                FEMALE
+                            </button>
+                        </div>
+
+                        {activeWorker && (
+                            <button
+                                onClick={() => fetchMessages()}
+                                className="p-2 rounded-full hover:bg-slate-100 text-blue-500 transition-all tap-effect border border-slate-100 shadow-sm"
+                                title="Refresh Chat"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                            </button>
+                        )}
+                    </div>
                 </header>
 
                 <main className="flex-1 flex w-full max-w-6xl mx-auto h-[calc(100vh-76px)] overflow-hidden bg-white shadow-xl md:my-4 md:h-[calc(100vh-100px)] md:rounded-[40px] border border-slate-100">
