@@ -80,6 +80,10 @@ function WorkerChatContent() {
     const [adminId, setAdminId] = useState("");
     const [siteId, setSiteId] = useState<string | null>(null);
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
+    const voiceGenderRef = useRef<'male' | 'female'>('female'); // ALWAYS holds latest — fixes stale closure
+
+    // Keep ref in sync with state
+    useEffect(() => { voiceGenderRef.current = voiceGender; }, [voiceGender]);
 
     const load = async () => {
         const supabase = createClient();
@@ -204,45 +208,44 @@ function WorkerChatContent() {
     const playAudio = (text: string, langCode: string) => {
         if (!text || typeof window === 'undefined') return;
 
-        console.log(`[playAudio] Text: "${text}", Lang: ${langCode}, Gender: ${voiceGender}`);
+        // CRITICAL FIX: Read from ref, NOT state. State inside closures is stale.
+        const currentGender = voiceGenderRef.current;
+        console.log(`[playAudio] Gender from ref: ${currentGender}, Lang: ${langCode}`);
 
         window.speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(text);
-        const voiceLang = getVoiceLang(langCode);
-        utter.lang = voiceLang;
+        utter.lang = getVoiceLang(langCode);
 
-        // Gender simulation via pitch (Extreme difference for visibility)
-        // Male: lower pitch (0.4 - 0.7), Female: higher pitch (1.4 - 2.0)
-        utter.pitch = voiceGender === 'male' ? 0.5 : 1.6;
+        // Primary gender differentiation via pitch
+        utter.pitch = currentGender === 'male' ? 0.5 : 1.6;
 
         const voices = window.speechSynthesis.getVoices();
-        // Expanded keywords for better matching across OSs
         const maleKeywords = ['male', 'david', 'mark', 'minho', 'kyle', 'paul', 'stefan', 'dae-ho', 'guy', 'sean', 'ravi'];
-        const femaleKeywords = ['female', 'zira', 'heami', 'yuri', 'juhye', 'sara', 'anna', 'hyunjun', 'girl', 'katherine', 'li-li'];
+        const femaleKeywords = ['female', 'zira', 'heami', 'yuri', 'juhye', 'sara', 'anna', 'hyunjun', 'girl', 'katherine'];
 
         let targetVoice = voices.find(v => {
             const lowName = v.name.toLowerCase();
             const langMatch = v.lang.toLowerCase().startsWith(langCode.toLowerCase()) || v.lang.includes(langCode.toUpperCase());
             if (!langMatch) return false;
-
-            const keywords = voiceGender === 'male' ? maleKeywords : femaleKeywords;
-            return keywords.some(k => lowName.includes(k.toLowerCase()));
+            const keywords = currentGender === 'male' ? maleKeywords : femaleKeywords;
+            return keywords.some(k => lowName.includes(k));
         });
 
-        // Fallback: Just match language if gender-specific voice not found
         if (!targetVoice) {
-            targetVoice = voices.find(v => (v.lang.startsWith(langCode) || v.lang.includes(langCode.toUpperCase())));
+            targetVoice = voices.find(v => v.lang.toLowerCase().startsWith(langCode.toLowerCase()) || v.lang.includes(langCode.toUpperCase()));
         }
 
         if (targetVoice) {
+            console.log(`[playAudio] Voice selected: ${targetVoice.name}`);
             utter.voice = targetVoice;
-            // If the voice name explicitly contains the other gender, force pitch harder
-            const lowVoiceName = targetVoice.name.toLowerCase();
-            if (voiceGender === 'male' && (lowVoiceName.includes('female') || lowVoiceName.includes('zira'))) utter.pitch = 0.5;
-            if (voiceGender === 'female' && (lowVoiceName.includes('male') || lowVoiceName.includes('david'))) utter.pitch = 1.6;
+            const low = targetVoice.name.toLowerCase();
+            if (currentGender === 'male' && maleKeywords.every(k => !low.includes(k))) utter.pitch = 0.4;
+            if (currentGender === 'female' && femaleKeywords.every(k => !low.includes(k))) utter.pitch = 2.0;
+        } else {
+            console.warn(`[playAudio] No voice found for lang: ${langCode}. Pitch-only mode.`);
         }
 
-        utter.rate = 0.95;
+        utter.rate = 1.0;
         window.speechSynthesis.speak(utter);
     };
 

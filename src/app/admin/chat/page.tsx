@@ -64,8 +64,12 @@ function AdminChatContent() {
     const [isRecording, setIsRecording] = useState(false);
     const [myId, setMyId] = useState("");
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
+    const voiceGenderRef = useRef<'male' | 'female'>('female'); // Ref always holds latest value (fixes stale closure)
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const recognitionRef = useRef<any>(null);
+
+    // Keep ref in sync with state
+    useEffect(() => { voiceGenderRef.current = voiceGender; }, [voiceGender]);
 
     const load = async () => {
         const supabase = createClient();
@@ -150,45 +154,41 @@ function AdminChatContent() {
     const playAudio = (text: string, langCode: string) => {
         if (!text || typeof window === 'undefined') return;
 
-        console.log(`[playAudio] Text: "${text}", Lang: ${langCode}, Gender: ${voiceGender}`);
+        // CRITICAL FIX: Read from ref, NOT state. State-reads inside closures are stale.
+        const currentGender = voiceGenderRef.current;
+        console.log(`[playAudio] Gender from ref: ${currentGender}, Lang: ${langCode}`);
 
         window.speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(text);
-        const voiceLang = getVoiceLang(langCode);
-        utter.lang = voiceLang;
+        utter.lang = getVoiceLang(langCode);
 
-        // Gender simulation via pitch (Extreme difference for visibility)
-        // Male: lower pitch (0.4 - 0.7), Female: higher pitch (1.4 - 2.0)
-        utter.pitch = voiceGender === 'male' ? 0.5 : 1.6;
+        // Primary gender differentiation via pitch
+        utter.pitch = currentGender === 'male' ? 0.5 : 1.6;
 
         const voices = window.speechSynthesis.getVoices();
-        // Expanded keywords for better matching across OSs
         const maleKeywords = ['male', 'david', 'mark', 'minho', 'kyle', 'paul', 'stefan', 'dae-ho', 'guy', 'sean', 'ravi'];
-        const femaleKeywords = ['female', 'zira', 'heami', 'yuri', 'juhye', 'sara', 'anna', 'hyunjun', 'girl', 'katherine', 'li-li'];
+        const femaleKeywords = ['female', 'zira', 'heami', 'yuri', 'juhye', 'sara', 'anna', 'hyunjun', 'girl', 'katherine'];
 
         let targetVoice = voices.find(v => {
             const lowName = v.name.toLowerCase();
             const langMatch = v.lang.toLowerCase().startsWith(langCode.toLowerCase()) || v.lang.includes(langCode.toUpperCase());
             if (!langMatch) return false;
-
-            const keywords = voiceGender === 'male' ? maleKeywords : femaleKeywords;
-            return keywords.some(k => lowName.includes(k.toLowerCase()));
+            const keywords = currentGender === 'male' ? maleKeywords : femaleKeywords;
+            return keywords.some(k => lowName.includes(k));
         });
 
         if (!targetVoice) {
-            console.log(`[playAudio] No gender-specific voice for ${langCode}, using fallback.`);
-            targetVoice = voices.find(v => (v.lang.toLowerCase().startsWith(langCode.toLowerCase()) || v.lang.includes(langCode.toUpperCase())));
+            targetVoice = voices.find(v => v.lang.toLowerCase().startsWith(langCode.toLowerCase()) || v.lang.includes(langCode.toUpperCase()));
         }
 
         if (targetVoice) {
-            console.log(`[playAudio] Selected voice: ${targetVoice.name} (${targetVoice.lang})`);
+            console.log(`[playAudio] Voice selected: ${targetVoice.name}`);
             utter.voice = targetVoice;
-            const lowVoiceName = targetVoice.name.toLowerCase();
-            // Final pitch correction if the voice name contradicts the desired gender
-            if (voiceGender === 'male' && maleKeywords.every(k => !lowVoiceName.includes(k))) utter.pitch = 0.4;
-            if (voiceGender === 'female' && femaleKeywords.every(k => !lowVoiceName.includes(k))) utter.pitch = 2.0;
+            const low = targetVoice.name.toLowerCase();
+            if (currentGender === 'male' && maleKeywords.every(k => !low.includes(k))) utter.pitch = 0.4;
+            if (currentGender === 'female' && femaleKeywords.every(k => !low.includes(k))) utter.pitch = 2.0;
         } else {
-            console.warn(`[playAudio] No voice found for ${langCode}`);
+            console.warn(`[playAudio] No voice found for lang: ${langCode}. Pitch-only mode.`);
         }
 
         utter.rate = 1.0;
