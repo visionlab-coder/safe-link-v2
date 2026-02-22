@@ -95,14 +95,18 @@ function WorkerChatContent() {
 
         // Fetch Admin ID (Prefer same site, fallback to any admin)
         const fetchAdmin = async (siteId: string | null) => {
-            const { data: admins } = await supabase
+            const { data: admins, error: adminErr } = await supabase
                 .from("profiles")
-                .select("id")
-                .or('role.ilike.ADMIN,role.ilike.SAFETY_OFFICER,role.ilike.HQ_ADMIN');
+                .select("id, display_name")
+                .or('role.eq.HQ_ADMIN,role.eq.SAFETY_OFFICER,role.eq.ADMIN');
+
+            if (adminErr) console.error("[fetchAdmin] Error:", adminErr);
 
             if (admins && admins.length > 0) {
-                // For simplicity, just pick the first one, or refine if site_id is available in profile
                 setAdminId(admins[0].id);
+                console.info(`[fetchAdmin] Connected to Admin: ${admins[0].display_name || "Admin"} (${admins[0].id})`);
+            } else {
+                console.warn("[fetchAdmin] No admins found.");
             }
         };
 
@@ -125,16 +129,19 @@ function WorkerChatContent() {
             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
         };
         fetchMessages();
+        (window as any).refreshWorkerChat = fetchMessages; // Expose to window for the button
 
         const channel = supabase
-            .channel(`msg_realtime_${myId}`)
+            .channel(`msg_realtime_${myId}_${Date.now()}`) // Unique channel ID for this session
             .on(
                 "postgres_changes",
                 { event: "*", schema: "public", table: "messages" },
                 (payload) => {
+                    console.log("[Realtime Payload Received]:", payload);
                     const msg = payload.new as Message;
                     if (!msg || !msg.id) return;
 
+                    // Broad check: Does this message involve the current user?
                     if (msg.from_user === myId || msg.to_user === myId) {
                         setMessages(prev => {
                             if (prev.find(m => m.id === msg.id)) return prev;
@@ -148,9 +155,8 @@ function WorkerChatContent() {
                         });
                         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
 
+                        // If message is from someone else, trigger TTS
                         if (msg.from_user !== myId) {
-                            setAdminId(msg.from_user);
-
                             let speakText = msg.translated_text as any;
                             try {
                                 const p = typeof speakText === "string" ? JSON.parse(speakText) : speakText;
@@ -170,10 +176,13 @@ function WorkerChatContent() {
                 }
             )
             .subscribe((status) => {
-                console.log(`[Realtime] Subscription Status for ${myId}: ${status}`);
+                console.info(`[Realtime Status] ${status} for channel: msg_realtime_${myId}`);
             });
 
-        return () => { supabase.removeChannel(channel); };
+        return () => {
+            console.log("[Realtime] Unsubscribing...");
+            supabase.removeChannel(channel);
+        };
     }, [myId, lang]);
 
     const playAudio = (text: string, langCode: string) => {
@@ -300,10 +309,17 @@ function WorkerChatContent() {
                         <div className="flex flex-col">
                             <div className="flex items-center gap-2">
                                 <span className="text-2xl font-black tracking-tight text-slate-800 uppercase">{t.me}</span>
-                                <span className="px-2 py-0.5 bg-green-500 text-[10px] font-black rounded text-white tracking-widest uppercase animate-pulse">Online</span>
+                                <span className="px-2 py-0.5 bg-green-500 text-[10px] font-black rounded text-white tracking-widest uppercase animate-pulse shadow-sm">Online</span>
                             </div>
                         </div>
                     </div>
+                    <button
+                        onClick={() => (window as any).refreshWorkerChat?.()}
+                        className="p-2 rounded-full hover:bg-slate-100 transition-colors tap-effect text-blue-500"
+                        title="Refresh Messages"
+                    >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    </button>
                 </header>
 
                 <main className="flex-1 flex flex-col w-full max-w-2xl mx-auto h-[calc(100vh-76px)] overflow-hidden relative bg-[#f8fafc]">
