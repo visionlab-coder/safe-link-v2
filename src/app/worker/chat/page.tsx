@@ -129,12 +129,14 @@ function WorkerChatContent() {
 
                         // AUTO TTS for INCOMING message (Admin speaks to Worker Native)
                         if (msg.from_user === adminId) {
-                            let speakText = msg.translated_text;
+                            let speakText = msg.translated_text as any;
                             try {
-                                const p = JSON.parse(msg.translated_text);
+                                const p = typeof speakText === "string" ? JSON.parse(speakText) : speakText;
                                 speakText = p.text;
-                            } catch (e) { }
-                            if (speakText) {
+                            } catch (e) {
+                                speakText = String(speakText);
+                            }
+                            if (speakText && typeof speakText === "string") {
                                 window.speechSynthesis.cancel();
                                 const utter = new SpeechSynthesisUtterance(speakText);
                                 utter.lang = getVoiceLang(lang);
@@ -240,9 +242,11 @@ function WorkerChatContent() {
     };
 
     const t = getUI(lang);
-    const parseMsg = (raw: string) => {
+    const parseMsg = (raw: any) => {
+        if (!raw) return { text: "", pron: "", rev: "" };
+        if (typeof raw === "object") return raw;
         try { return JSON.parse(raw); }
-        catch { return { text: raw, pron: "", rev: "" }; }
+        catch { return { text: String(raw), pron: "", rev: "" }; }
     };
 
     return (

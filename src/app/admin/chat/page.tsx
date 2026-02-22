@@ -113,12 +113,14 @@ function AdminChatContent() {
 
                         // AUTO TTS for INCOMING message from worker (Admin hears Korean)
                         if (msg.from_user === activeWorker.id) {
-                            let speakText = msg.translated_text;
+                            let speakText = msg.translated_text as any;
                             try {
-                                const p = JSON.parse(msg.translated_text);
+                                const p = typeof speakText === "string" ? JSON.parse(speakText) : speakText;
                                 speakText = p.text; // Korean
-                            } catch (e) { }
-                            if (speakText) {
+                            } catch (e) {
+                                speakText = String(speakText);
+                            }
+                            if (speakText && typeof speakText === "string") {
                                 window.speechSynthesis.cancel();
                                 const utter = new SpeechSynthesisUtterance(speakText);
                                 utter.lang = getVoiceLang("ko");
@@ -236,9 +238,11 @@ function AdminChatContent() {
     const filteredWorkers = workers.filter(w => (w.display_name || "").toLowerCase().includes(searchQuery.toLowerCase()));
 
     // Safe JSON parser for display
-    const parseMsg = (raw: string) => {
+    const parseMsg = (raw: any) => {
+        if (!raw) return { text: "", pron: "", rev: "" };
+        if (typeof raw === "object") return raw;
         try { return JSON.parse(raw); }
-        catch { return { text: raw, pron: "", rev: "" }; }
+        catch { return { text: String(raw), pron: "", rev: "" }; }
     };
 
     return (
