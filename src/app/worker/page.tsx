@@ -12,8 +12,8 @@ const workerUI: Record<string, any> = {
         tbmBtn: "확인 및 서명하기",
         newTBM: "🚨 새 안전 지침이 도착했습니다!",
         chatTitle: "실시간 대화",
-        chatDesc: "서명 완료 후 관리자와 대화할 수 있습니다.",
-        chatBtn: "준비 중",
+        chatDesc: "버튼을 눌러 관리자와 대화할 수 있습니다.",
+        chatBtn: "채널 열기",
         signOut: "로그아웃",
         safeWork: "오늘도 안전하게!",
         status: "작업 준비 상태"
@@ -25,8 +25,8 @@ const workerUI: Record<string, any> = {
         tbmBtn: "View & Sign",
         newTBM: "🚨 New Safety Alert!",
         chatTitle: "Live Chat",
-        chatDesc: "Sign the TBM to start chatting with admin.",
-        chatBtn: "Waiting",
+        chatDesc: "Tap to chat with admin.",
+        chatBtn: "Open Chat",
         signOut: "Sign out",
         safeWork: "Work Safe Today!",
         status: "Status"
@@ -38,8 +38,8 @@ const workerUI: Record<string, any> = {
         tbmBtn: "确认并签名",
         newTBM: "🚨 收到新的安全警报！",
         chatTitle: "实时聊天",
-        chatDesc: "完成签名后即可聊天。",
-        chatBtn: "大吉中",
+        chatDesc: "点击即可与管理员聊天。",
+        chatBtn: "打开频道",
         signOut: "退出",
         safeWork: "祝您今天工作安全！",
         status: "状态"
@@ -248,20 +248,24 @@ function WorkerHomeContent() {
                     </button>
                 </section>
 
-                {/* 💬 Communication Section (Locked) */}
-                <section className="glass rounded-[40px] p-8 border-white/5 opacity-40 grayscale-[0.8] relative overflow-hidden group">
-                    <div className="flex items-center gap-6 mb-8">
-                        <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-slate-500">
+                {/* 💬 Communication Section */}
+                <section
+                    onClick={() => router.push('/worker/chat')}
+                    className="glass rounded-[40px] p-8 border-white/10 hover:border-blue-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
+                >
+                    <div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors" />
+                    <div className="flex items-center gap-6 mb-8 relative">
+                        <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-blue-400 shadow-lg">
                             <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                             </svg>
                         </div>
                         <div className="flex flex-col">
                             <h2 className="text-2xl font-black text-white">{t.chatTitle}</h2>
-                            <p className="text-slate-500 font-bold text-sm tracking-tight">{t.chatDesc}</p>
+                            <p className="text-slate-400 font-bold text-sm tracking-tight">{t.chatDesc}</p>
                         </div>
                     </div>
-                    <button disabled className="w-full py-5 bg-slate-800 rounded-2xl text-slate-600 font-black flex items-center justify-center gap-3">
+                    <button className="w-full py-5 bg-blue-600/20 text-blue-300 font-black flex items-center justify-center gap-3 group-hover:bg-blue-600/30 transition-colors rounded-2xl relative z-10">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
