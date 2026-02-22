@@ -199,26 +199,30 @@ function WorkerChatContent() {
             console.log("[Realtime] Unsubscribing...");
             supabase.removeChannel(channel);
         };
-    }, [myId, lang]);
+    }, [myId, lang, voiceGender]); // Added voiceGender to fix stale closure in realtime TTS
 
     const playAudio = (text: string, langCode: string) => {
         if (!text || typeof window === 'undefined') return;
+
+        console.log(`[playAudio] Text: "${text}", Lang: ${langCode}, Gender: ${voiceGender}`);
+
         window.speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(text);
         const voiceLang = getVoiceLang(langCode);
         utter.lang = voiceLang;
 
-        // Gender simulation via pitch (Most reliable backup)
-        // Male: lower pitch (0.5 - 0.9), Female: higher pitch (1.1 - 1.5)
-        utter.pitch = voiceGender === 'male' ? 0.8 : 1.2;
+        // Gender simulation via pitch (Extreme difference for visibility)
+        // Male: lower pitch (0.4 - 0.7), Female: higher pitch (1.4 - 2.0)
+        utter.pitch = voiceGender === 'male' ? 0.5 : 1.6;
 
         const voices = window.speechSynthesis.getVoices();
-        const maleKeywords = ['male', 'david', 'mark', 'minho', 'kyle', 'paul', 'stefan', 'dae-ho'];
-        const femaleKeywords = ['female', 'zira', 'heami', 'yuri', 'juhye', 'sara', 'anna', 'hyunjun'];
+        // Expanded keywords for better matching across OSs
+        const maleKeywords = ['male', 'david', 'mark', 'minho', 'kyle', 'paul', 'stefan', 'dae-ho', 'guy', 'sean', 'ravi'];
+        const femaleKeywords = ['female', 'zira', 'heami', 'yuri', 'juhye', 'sara', 'anna', 'hyunjun', 'girl', 'katherine', 'li-li'];
 
         let targetVoice = voices.find(v => {
             const lowName = v.name.toLowerCase();
-            const langMatch = v.lang.startsWith(langCode) || v.lang.includes(langCode.toUpperCase());
+            const langMatch = v.lang.toLowerCase().startsWith(langCode.toLowerCase()) || v.lang.includes(langCode.toUpperCase());
             if (!langMatch) return false;
 
             const keywords = voiceGender === 'male' ? maleKeywords : femaleKeywords;
