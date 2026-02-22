@@ -113,14 +113,14 @@ function WorkerChatContent() {
     useEffect(() => { load(); }, [urlLang]);
 
     useEffect(() => {
-        if (!adminId || !myId) return;
+        if (!myId) return;
         const supabase = createClient();
 
         const fetchMessages = async () => {
             const { data } = await supabase
                 .from("messages")
                 .select("*")
-                .or(`and(from_user.eq.${myId},to_user.eq.${adminId}),and(from_user.eq.${adminId},to_user.eq.${myId})`)
+                .or(`from_user.eq.${myId},to_user.eq.${myId}`)
                 .order("created_at", { ascending: true });
             if (data) setMessages(data);
             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
@@ -134,11 +134,9 @@ function WorkerChatContent() {
                 { event: "INSERT", schema: "public", table: "messages" },
                 (payload) => {
                     const msg = payload.new as Message;
-                    // Filter: message involves ME (either as sender or receiver)
                     if (msg.from_user === myId || msg.to_user === myId) {
                         setMessages(prev => {
                             if (prev.find(m => m.id === msg.id)) return prev;
-                            // Match by temporary ID or text/user
                             const isDup = prev.findIndex(m => String(m.id).startsWith("temp-") && m.source_text === msg.source_text && m.from_user === msg.from_user);
                             if (isDup !== -1) {
                                 const newArr = [...prev];
@@ -149,8 +147,10 @@ function WorkerChatContent() {
                         });
                         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
 
-                        // AUTO TTS for INCOMING message (Admin speaks to Worker Native)
+                        // If it's a new incoming message from an admin, update the adminId context
                         if (msg.from_user !== myId) {
+                            setAdminId(msg.from_user);
+
                             let speakText = msg.translated_text as any;
                             try {
                                 const p = typeof speakText === "string" ? JSON.parse(speakText) : speakText;
@@ -172,7 +172,7 @@ function WorkerChatContent() {
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, [adminId, myId, lang]);
+    }, [myId, lang]);
 
     const playAudio = (text: string, langCode: string) => {
         if (!text) return;
