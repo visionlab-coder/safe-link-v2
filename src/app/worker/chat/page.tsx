@@ -284,20 +284,12 @@ function WorkerChatContent() {
                 if (transData[0]) {
                     const translitBlock = transData[0].find((item: any) => item[0] === null && item[2]);
                     if (translitBlock) pron = translitBlock[2];
-                    // For worker side, if translating to KO, pron should be Korean romanization
                     if (!pron && translitBlock && translitBlock[3]) pron = translitBlock[3];
                 }
 
-                // Convert to Hangul sounds if available
                 if (pron) {
                     pron = hangulize(pron, lang);
                 }
-
-                // 2. Reverse Trans (back to worker lang)
-                const revUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=${lang}&dt=t&q=${encodeURIComponent(translated)}`;
-                const revRes = await fetch(revUrl);
-                const revData = await revRes.json();
-                rev = revData[0].map((item: any) => item[0]).join("");
             }
 
             const payload = {
@@ -416,20 +408,6 @@ function WorkerChatContent() {
                                                         {isMe ? parsed.text : m.source_text}
                                                     </span>
                                                 </div>
-
-                                                {parsed.pron && (
-                                                    <div className="flex items-center gap-1.5 opacity-80 mt-1">
-                                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${isMe ? 'bg-white/10' : 'bg-slate-50 text-slate-400 border border-slate-200'}`}>{t.pron}</span>
-                                                        <span className="text-base font-medium italic landscape:text-2xl tracking-wide">{parsed.pron}</span>
-                                                    </div>
-                                                )}
-
-                                                {parsed.rev && (
-                                                    <div className="flex items-start gap-1.5 opacity-80 mt-1">
-                                                        <span className={`px-1.5 py-0.5 mt-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${isMe ? 'bg-black/20 text-blue-100' : 'bg-amber-100 text-amber-700'}`}>{t.rev}</span>
-                                                        <span className="text-base font-bold landscape:text-2xl">{parsed.rev}</span>
-                                                    </div>
-                                                )}
                                             </div>
                                         )}
                                     </div>
