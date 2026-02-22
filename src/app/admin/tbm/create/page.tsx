@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
-import { normalizeKoAsync, formatChanges } from "@/utils/normalize";
+import { normalizeKoAsync } from "@/utils/normalize";
 
 export default function AdminTBMCreate() {
     const router = useRouter();
@@ -14,18 +14,12 @@ export default function AdminTBMCreate() {
     const [history, setHistory] = useState<any[]>([]);
     const [isGeneratingAI, setIsGeneratingAI] = useState(false);
     const [aiTips, setAiTips] = useState<string[]>([]);
-    // 🔤 은어 정규화 결과
     const [normalizeResult, setNormalizeResult] = useState<{ normalized: string; changes: { from: string; to: string }[] } | null>(null);
 
-    // 🎤 음성 인식기를 기억해두는 메모장 (수동으로 끄기 위함)
     const recognitionRef = useRef<any>(null);
 
-    // 🤖 AI 안전 가이드 생성 (스마트 추천)
     const handleGenerateAI = () => {
         setIsGeneratingAI(true);
-
-        // [초보자 안내] 나중에 여기에 진짜 ChatGPT(Gemini) 같은 AI를 연결할 거예요.
-        // 지금은 똑똑한 척하는 가짜 데이터를 보여줍니다!
         setTimeout(() => {
             const mockTips = [
                 "🏗️ 금일 고소 작업 시 하부 통제 구역 설정을 다시 한번 확인해 주세요!",
@@ -34,10 +28,9 @@ export default function AdminTBMCreate() {
             ];
             setAiTips(mockTips);
             setIsGeneratingAI(false);
-        }, 1500);
+        }, 1200);
     };
 
-    // 📜 처음 들어왔을 때 + 데이터 보냈을 때 최근 5개를 가져옵니다.
     useEffect(() => {
         fetchHistory();
     }, []);
@@ -52,116 +45,71 @@ export default function AdminTBMCreate() {
         if (data) setHistory(data);
     };
 
-    // 🎤 음성 인식 (STT) 마법 함수 - 수동 정지 버전
     const toggleRecording = () => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
         if (!SpeechRecognition) {
-            alert("⚠️ 현재 브라우저(또는 기기)에서는 마이크 입력을 지원하지 않습니다. 크롬 최신 버전을 사용해주세요!");
+            alert("⚠️ STT is not supported on this browser.");
             return;
         }
 
         if (isRecording) {
-            // 녹음 중이었으면 수동으로 강제 종료!
-            if (recognitionRef.current) {
-                recognitionRef.current.stop();
-            }
+            if (recognitionRef.current) recognitionRef.current.stop();
             setIsRecording(false);
         } else {
-            // 녹음 시작!
             const recognition = new SpeechRecognition();
             recognition.lang = 'ko-KR';
-            recognition.continuous = true; // ✨ 내가 멈추기 전엔 절대 끊지 마!
+            recognition.continuous = true;
             recognition.interimResults = false;
-
-            // 앞으로 이 리모컨으로 끄기 위해 기억해둡니다.
             recognitionRef.current = recognition;
-
             recognition.start();
             setIsRecording(true);
 
-            // 말을 성공적으로 알아들었을 때!
             recognition.onresult = (event: any) => {
                 let currentTranscript = "";
-                // continuous 모드에서는 여러 뭉치의 말이 들어올 수 있으므로, 새로 들어온 말만 쏙 빼서 씁니다.
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
                     currentTranscript += event.results[i][0].transcript;
                 }
-
                 if (currentTranscript.trim()) {
                     setTbmText((prev) => prev ? prev + " " + currentTranscript.trim() : currentTranscript.trim());
                 }
             };
-
-            // 에러가 났을 때
-            recognition.onerror = (event: any) => {
-                console.error("음성 인식 에러:", event.error);
-                setIsRecording(false);
-            };
-
-            // 혹시라도 조용해서 꺼졌을 때를 대비
-            recognition.onend = () => {
-                setIsRecording(false);
-            };
+            recognition.onerror = () => setIsRecording(false);
+            recognition.onend = () => setIsRecording(false);
         }
     };
 
-    // ✨ 완벽한 스마트 시스템! TBM 텍스트를 수파베이스 DB 서랍장에 평생 저장합니다.
     const handleSendTBM = async () => {
-        if (!tbmText.trim()) {
-            alert("전파할 TBM 텍스트를 입력해주세요!");
-            return;
-        }
-
+        if (!tbmText.trim()) return;
         setIsSending(true);
 
         try {
             const supabase = createClient();
-
-            // 1. 현재 접속한 관리자가 누구인지 파악합니다.
             const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error("로그인 세션이 만료되었습니다. 다시 로그인 해 주세요.");
+            if (!session) return;
 
-            // 2. 관리자의 소속 권역(site_id)을 파악하기 위해 명함을 뒤져봅니다.
             const { data: profile } = await supabase
                 .from("profiles")
                 .select("site_id")
                 .eq("id", session.user.id)
                 .single();
 
-            // 3. normalize_ko: 은어→표준어 변환 후 저장
             const { normalized, changes } = await normalizeKoAsync(tbmText.trim());
             setNormalizeResult({ normalized, changes });
 
             const insertPayload: any = {
-                content_ko: normalized, // 표준어로 변환된 텍스트 저장
+                content_ko: normalized,
                 created_by: session.user.id,
             };
-            if (profile?.site_id) {
-                insertPayload.site_id = profile.site_id;
+            if (profile?.site_id) insertPayload.site_id = profile.site_id;
+
+            const { error } = await supabase.from("tbm_notices").insert(insertPayload);
+            if (!error) {
+                setTbmText("");
+                fetchHistory();
             }
-
-            const { error } = await supabase
-                .from("tbm_notices")
-                .insert(insertPayload);
-
-            if (error) {
-                console.error("TBM 저장 실패:", error.code, error.message);
-                // 에러 코드 23502 = NOT NULL 제약 위반 (site_id)
-                if (error.code === "23502") {
-                    alert("⚠️ site_id NOT NULL 오류\n\nSupabase > SQL Editor에서 아래 SQL을 실행해 주세요:\n\nALTER TABLE public.tbm_notices\nALTER COLUMN site_id DROP NOT NULL;");
-                } else {
-                    alert(`DB 오류: ${error.message} (코드: ${error.code})`);
-                }
-                return;
-            }
-
-            setTbmText("");
-            fetchHistory();
-
-        } catch (error: any) {
-            console.error("전파 중 알 수 없는 에러:", error);
-            alert("알 수 없는 에러가 발생했습니다.");
+        } catch (error) {
+            console.error(error);
         } finally {
             setIsSending(false);
         }
@@ -169,190 +117,160 @@ export default function AdminTBMCreate() {
 
     return (
         <RoleGuard allowedRole="admin">
-            <div className="min-h-screen bg-slate-900 text-white font-sans flex flex-col pb-6">
-                <header className="flex justify-between items-center p-6 bg-slate-900 border-b border-slate-800 shadow-md">
-                    <button
-                        onClick={() => router.back()}
-                        className="p-2 text-slate-400 hover:text-white transition-colors"
-                    >
-                        {/* 뒤로 가기 아이콘 */}
-                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                    </button>
-                    <h1 className="text-xl font-bold tracking-widest text-slate-300">SAFE-LINK Admin Mode</h1>
-                    <div className="w-8" /> {/* 밸런스를 맞추기 위한 빈 공간 (투명) */}
+            <div className="min-h-screen bg-mesh text-white font-sans flex flex-col selection:bg-blue-500/30">
+
+                {/* 💎 Admin Header */}
+                <header className="sticky top-0 z-50 glass border-b border-white/5 px-6 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors tap-effect text-slate-400">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                        <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xl font-black tracking-tight text-white uppercase italic">Safe-Link</span>
+                                <span className="px-2 py-0.5 bg-blue-500 text-[10px] font-black rounded text-white tracking-widest uppercase">Admin</span>
+                            </div>
+                        </div>
+                    </div>
                 </header>
 
-                <main className="flex-1 flex flex-col p-4 md:p-8 gap-6 max-w-3xl mx-auto w-full">
+                <main className="flex-1 flex flex-col p-4 md:p-8 gap-8 max-w-3xl mx-auto w-full pb-20">
 
                     <div className="flex flex-col gap-2">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-3xl font-extrabold text-blue-400">TBM 작성</h2>
-                            {/* 🤖 새로 생긴 마법의 AI 버튼! */}
+                        <h2 className="text-4xl font-black text-white text-gradient tracking-tighter">SAFETY BROADCAST</h2>
+                        <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Instantly Push to Workers</p>
+                    </div>
+
+                    {/* 🤖 AI Command Area */}
+                    <section className="glass rounded-[40px] p-8 border-white/10 shadow-2xl relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 blur-[60px] rounded-full -mr-16 -mt-16 group-hover:bg-purple-500/20 transition-all duration-1000" />
+
+                        <div className="flex justify-between items-center mb-8">
+                            <h3 className="text-lg font-black text-white flex items-center gap-3 italic font-mono">
+                                <span className="w-2 h-6 bg-purple-500 rounded-full" />
+                                SMART-ASSIST
+                            </h3>
                             <button
                                 onClick={handleGenerateAI}
                                 disabled={isGeneratingAI}
-                                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-sm font-bold shadow-lg active:scale-95 transition-all disabled:opacity-50"
+                                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl text-xs font-black shadow-lg tap-effect disabled:opacity-50 tracking-widest uppercase"
                             >
-                                {isGeneratingAI ? "AI가 뇌를 굴리는 중..." : "🤖 AI 안전 가이드 생성"}
+                                {isGeneratingAI ? "Processing..." : "Generate AI Tips"}
                             </button>
                         </div>
-                        <p className="text-slate-400">
-                            안전 수칙을 작성하면 15개국 언어로 번역되어 즉시 근로자 앱에 전파됩니다.
-                        </p>
-                    </div>
 
-                    {/* 🤖 AI 추천 문장들이 나타나는 곳 */}
-                    {aiTips.length > 0 && (
-                        <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-top-4 duration-500">
-                            <h3 className="text-sm font-bold text-slate-500 flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                                AI가 지금 상황에 맞춰 추천하는 문장입니다
-                            </h3>
-                            <div className="grid gap-2">
+                        {aiTips.length > 0 && (
+                            <div className="flex flex-col gap-3 animate-float">
                                 {aiTips.map((tip, idx) => (
                                     <button
                                         key={idx}
-                                        onClick={() => {
-                                            setTbmText(tip);
-                                            setAiTips([]); // 선택하면 깔끔하게 닫기
-                                        }}
-                                        className="text-left p-4 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-2xl text-blue-100 transition-all text-sm md:text-base active:scale-98"
+                                        onClick={() => { setTbmText(tip); setAiTips([]); }}
+                                        className="text-left p-5 glass rounded-2xl text-slate-300 hover:text-white hover:bg-white/5 border-white/5 transition-all text-sm md:text-base tap-effect leading-relaxed"
                                     >
                                         {tip}
                                     </button>
                                 ))}
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </section>
 
-                    <div className="flex flex-col flex-1 p-8 bg-slate-800/80 rounded-[32px] border border-blue-500/30 shadow-[0_0_30px_-10px_rgba(59,130,246,0.2)]">
-                        <label className="text-xl font-bold mb-4 text-slate-200">
-                            📝 전파 내용 (한국어)
-                        </label>
+                    {/* 📝 Editor Area */}
+                    <section className="flex flex-col flex-1 gap-6">
+                        <div className="glass rounded-[48px] p-8 border-white/10 shadow-3xl flex flex-col gap-6 relative min-h-[400px]">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">Korean Draft</h3>
+                                <button
+                                    onClick={toggleRecording}
+                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all tap-effect ${isRecording
+                                        ? "bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)]"
+                                        : "glass border-white/10 text-slate-400 hover:text-white"
+                                        }`}
+                                >
+                                    {isRecording ? "LISTENING..." : "VOICE INPUT"}
+                                </button>
+                            </div>
 
-                        <textarea
-                            value={tbmText}
-                            onChange={(e) => setTbmText(e.target.value)}
-                            placeholder="예: 금일 크레인 작업이 있습니다. 안전모와 방염 마스크를 반드시 착용해 주세요. 무리한 작업은 삼가세요."
-                            className="flex-1 w-full bg-slate-900/50 border border-slate-700 rounded-2xl p-6 text-xl focus:border-blue-500 outline-none transition-colors resize-none placeholder-slate-500"
-                        />
+                            <textarea
+                                value={tbmText}
+                                onChange={(e) => setTbmText(e.target.value)}
+                                placeholder="Enter daily safety rules..."
+                                className="flex-1 w-full bg-transparent text-2xl md:text-3xl font-bold text-white placeholder-slate-800 outline-none resize-none leading-snug tracking-tight"
+                            />
 
-                        {/* 이제 진짜 작동하는 STT 음성 인식 버튼! */}
-                        <div className="flex justify-end mt-4">
-                            <button
-                                onClick={toggleRecording}
-                                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all active:scale-95 ${isRecording
-                                    ? "bg-red-500/20 text-red-400 border border-red-500/50 animate-pulse"
-                                    : "bg-slate-700 hover:bg-slate-600 text-slate-300 border border-transparent"
-                                    }`}
-                            >
-                                {isRecording ? (
-                                    <>
-                                        {/* 녹음 중일 때 깜빡이는 아이콘 */}
-                                        <span className="flex h-3 w-3 relative">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                                        </span>
-                                        듣고 있습니다... 멈추려면 클릭
-                                    </>
-                                ) : (
-                                    <>
-                                        {/* 기본 마이크 아이콘 */}
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
-                                        버튼을 누르고 바로 말씀하세요
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* 고정된 큰 파란색 전송 버튼 */}
-                    <div className="pt-4">
-                        <button
-                            onClick={handleSendTBM}
-                            disabled={isSending || tbmText.length === 0}
-                            className="w-full py-8 bg-blue-600 hover:bg-blue-500 text-white font-black text-3xl md:text-4xl rounded-[32px] shadow-[0_20px_40px_-15px_rgba(37,99,235,0.6)] active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 flex justify-center items-center"
-                        >
-                            {isSending ? (
-                                <svg className="w-10 h-10 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                            ) : (
-                                "📡 TBM 전파하기"
-                            )}
-                        </button>
-                    </div>
-
-                    {/* 🔤 은어→표준어 변환 결과 패널 (전파 후 자동 표시) */}
-                    {normalizeResult && (
-                        <div className="p-5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex flex-col gap-3">
-                            <p className="text-amber-400 font-black text-sm flex items-center gap-2">
-                                🔤 현장 은어 정규화 완료
-                                {normalizeResult.changes.length > 0
-                                    ? <span className="font-normal text-amber-300">{normalizeResult.changes.length}개 변환됨</span>
-                                    : <span className="font-normal text-slate-500">변환 없음 (표준어 사용)</span>
-                                }
-                            </p>
-                            {normalizeResult.changes.length > 0 && (
-                                <div className="flex flex-col gap-1.5">
-                                    {normalizeResult.changes.map((c, i) => (
-                                        <div key={i} className="flex items-center gap-2 text-sm">
-                                            <span className="text-red-400 font-bold bg-red-500/10 px-2 py-0.5 rounded">"{c.from}"</span>
-                                            <span className="text-slate-500">→</span>
-                                            <span className="text-green-400 font-bold bg-green-500/10 px-2 py-0.5 rounded">"{c.to}"</span>
-                                        </div>
-                                    ))}
+                            {/* 🔤 Normalize Feedback */}
+                            {normalizeResult && (
+                                <div className="mt-4 p-5 glass rounded-[28px] border-amber-500/20 bg-amber-500/[0.03]">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Normalization Result</span>
+                                        <span className="text-[10px] text-slate-500 font-bold uppercase">{normalizeResult.changes.length} Changes</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {normalizeResult.changes.map((c, i) => (
+                                            <div key={i} className="flex items-center gap-1.5 bg-white/5 px-3 py-1.5 rounded-full border border-white/5 text-xs font-bold">
+                                                <span className="text-red-400/70 line-through decoration-red-500/50">{c.from}</span>
+                                                <span className="text-slate-600">→</span>
+                                                <span className="text-green-400">{c.to}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
-                            <p className="text-xs text-slate-500 border-t border-slate-700 pt-2 mt-1">
-                                전파된 내용: <span className="text-slate-300">{normalizeResult.normalized}</span>
-                            </p>
-                        </div>
-                    )}
 
-                    {/* 📜 최근 전파 기록 섹션 */}
-                    <div className="mt-8 flex flex-col gap-4">
-                        <div className="flex items-center gap-2">
-                            <h3 className="text-xl font-bold text-slate-300">📜 최근 전파 기록</h3>
-                            <span className="text-xs bg-slate-800 px-2 py-1 rounded text-slate-500">자동 저장됨</span>
-                        </div>
-
-                        {history.length === 0 ? (
-                            <div className="p-8 border-2 border-dashed border-slate-800 rounded-[32px] text-center">
-                                <p className="text-slate-500 italic">아직 전파 기록이 없습니다. 첫 TBM을 발송해보세요!</p>
+                            <div className="mt-auto pt-6 border-t border-white/5">
+                                <button
+                                    onClick={handleSendTBM}
+                                    disabled={isSending || tbmText.length === 0}
+                                    className="w-full py-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-[32px] text-2xl font-black text-slate-950 shadow-[0_20px_50px_-15px_rgba(59,130,246,0.4)] tap-effect flex items-center justify-center gap-4 disabled:opacity-30 disabled:grayscale transition-all"
+                                >
+                                    {isSending ? (
+                                        <div className="w-8 h-8 border-4 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                        <>
+                                            <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                                            </svg>
+                                            PUSH BROADCAST
+                                        </>
+                                    )}
+                                </button>
                             </div>
-                        ) : (
-                            <div className="flex flex-col gap-4">
-                                {history.map((tbm) => (
-                                    <div
-                                        key={tbm.id}
-                                        className="group p-6 bg-slate-800/40 hover:bg-slate-800/60 rounded-[24px] border border-slate-700/50 hover:border-blue-500/30 transition-all"
-                                    >
+                        </div>
+                    </section>
+
+                    {/* 📜 History Area */}
+                    <section className="mt-8 flex flex-col gap-6">
+                        <h3 className="text-xs font-black text-slate-600 uppercase tracking-[0.4em] px-4">Recent History</h3>
+                        <div className="flex flex-col gap-4">
+                            {history.length === 0 ? (
+                                <div className="p-12 glass rounded-[40px] border-dashed border-white/5 text-center text-slate-600 font-bold italic uppercase tracking-widest">
+                                    No Broadcast History
+                                </div>
+                            ) : (
+                                history.map((tbm) => (
+                                    <div key={tbm.id} className="glass p-6 rounded-[32px] border-white/5 hover:border-white/10 transition-all group flex flex-col gap-4">
                                         <div className="flex justify-between items-start gap-4">
-                                            <p className="text-lg text-slate-200 leading-relaxed flex-1">
-                                                {tbm.content_ko}
-                                            </p>
+                                            <p className="text-lg text-slate-300 font-bold leading-relaxed">{tbm.content_ko}</p>
                                             <button
-                                                onClick={() => {
-                                                    setTbmText(tbm.content_ko);
-                                                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                                                }}
-                                                className="flex-shrink-0 px-4 py-2 bg-blue-500/10 text-blue-400 rounded-xl text-sm font-bold hover:bg-blue-500 hover:text-white transition-all"
+                                                onClick={() => { setTbmText(tbm.content_ko); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                                className="w-12 h-12 glass rounded-2xl flex items-center justify-center text-blue-500 hover:bg-blue-500/10 transition-colors flex-shrink-0 tap-effect"
                                             >
-                                                불러오기 🔄
+                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                </svg>
                                             </button>
                                         </div>
-                                        <div className="mt-4 flex items-center gap-3 text-xs text-slate-500">
-                                            <span className="flex items-center gap-1">
-                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                                {new Date(tbm.created_at).toLocaleString('ko-KR')}
-                                            </span>
-                                            <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
-                                            <span>관리자 ID: {tbm.created_by.slice(0, 8)}...</span>
+                                        <div className="flex items-center gap-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">
+                                            <span>{new Date(tbm.created_at).toLocaleString()}</span>
+                                            <span className="w-1 h-1 bg-slate-800 rounded-full" />
+                                            <span className="text-blue-900">Push Successful</span>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                                ))
+                            )}
+                        </div>
+                    </section>
                 </main>
             </div>
         </RoleGuard>

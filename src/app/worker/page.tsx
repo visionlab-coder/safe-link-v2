@@ -6,59 +6,69 @@ import { createClient } from "@/utils/supabase/client";
 
 const workerUI: Record<string, any> = {
     ko: {
-        greeting: (name: string) => `안녕하세요, ${name}님`,
-        tbmBadge: "필수 확인 (TBM)",
-        tbmDesc: "금일 작업 전 안전 브리핑이 도착했습니다. 내용을 확인하고 반드시 서명해 주세요.",
-        tbmBtn: "내용 확인 및 서명하기",
-        newTBM: "🚨 새 TBM이 도착했습니다! 즉시 확인하세요!",
-        chatTitle: "1:1 실시간 번역 대화",
-        chatDesc: "TBM 서명을 완료해야 관리자와 통신할 수 있습니다.",
-        chatBtn: "대기중...",
+        greeting: (name: string) => `반갑습니다, ${name}님`,
+        tbmBadge: "금일 안전 지침 (TBM)",
+        tbmDesc: "작업 투입 전, 반드시 확인하고 서명해야 하는 안전 수칙이 도착했습니다.",
+        tbmBtn: "확인 및 서명하기",
+        newTBM: "🚨 새 안전 지침이 도착했습니다!",
+        chatTitle: "실시간 대화",
+        chatDesc: "서명 완료 후 관리자와 대화할 수 있습니다.",
+        chatBtn: "준비 중",
         signOut: "로그아웃",
+        safeWork: "오늘도 안전하게!",
+        status: "작업 준비 상태"
     },
     en: {
-        greeting: (name: string) => `Hello, ${name}`,
-        tbmBadge: "REQUIRED: Safety Briefing (TBM)",
-        tbmDesc: "A safety briefing has arrived. Please review and sign before starting work.",
+        greeting: (name: string) => `Welcome, ${name}`,
+        tbmBadge: "Today's Safety (TBM)",
+        tbmDesc: "Safety instructions have arrived. Please review and sign before starting work.",
         tbmBtn: "View & Sign",
-        newTBM: "🚨 New TBM arrived! Check it now!",
-        chatTitle: "1:1 Live Translation Chat",
-        chatDesc: "Complete TBM signing to communicate with admin.",
-        chatBtn: "Waiting...",
+        newTBM: "🚨 New Safety Alert!",
+        chatTitle: "Live Chat",
+        chatDesc: "Sign the TBM to start chatting with admin.",
+        chatBtn: "Waiting",
         signOut: "Sign out",
+        safeWork: "Work Safe Today!",
+        status: "Status"
     },
     zh: {
-        greeting: (name: string) => `您好，${name}`,
-        tbmBadge: "必须确认（TBM）",
-        tbmDesc: "今日工作前的安全简报已送达。请确认内容并签名。",
-        tbmBtn: "查看内容并签名",
-        newTBM: "🚨 收到新的TBM！请立即确认！",
-        chatTitle: "1对1实时翻译对话",
-        chatDesc: "完成TBM签名后，才能与管理员通信。",
-        chatBtn: "等待中...",
+        greeting: (name: string) => `您好, ${name}`,
+        tbmBadge: "今日安全 (TBM)",
+        tbmDesc: "安全简报已送达。请在开始工作前阅读并签名。",
+        tbmBtn: "确认并签名",
+        newTBM: "🚨 收到新的安全警报！",
+        chatTitle: "实时聊天",
+        chatDesc: "完成签名后即可聊天。",
+        chatBtn: "大吉中",
         signOut: "退出",
+        safeWork: "祝您今天工作安全！",
+        status: "状态"
     },
     vi: {
-        greeting: (name: string) => `Xin chào, ${name}`,
-        tbmBadge: "BẮT BUỘC: Thông báo an toàn (TBM)",
-        tbmDesc: "Thông báo an toàn đã đến. Vui lòng xác nhận và ký trước khi làm việc.",
+        greeting: (name: string) => `Chào mừng, ${name}`,
+        tbmBadge: "Chỉ dẫn an toàn (TBM)",
+        tbmDesc: "Đã có chỉ dẫn an toàn. Vui lòng xem và ký trước khi làm việc.",
         tbmBtn: "Xem và Ký",
-        newTBM: "🚨 TBM mới đã đến! Hãy kiểm tra ngay!",
-        chatTitle: "Trò chuyện 1:1",
-        chatDesc: "Hoàn tất ký TBM để liên lạc với quản trị viên.",
-        chatBtn: "Đang chờ...",
+        newTBM: "🚨 Cảnh báo an toàn mới!",
+        chatTitle: "Trò chuyện",
+        chatDesc: "Ký TBM để trò chuyện với quản trị viên.",
+        chatBtn: "Đang chờ",
         signOut: "Đăng xuất",
+        safeWork: "Làm việc an toàn hôm nay!",
+        status: "Trạng thái"
     },
     th: {
-        greeting: (name: string) => `สวัสดี, ${name}`,
-        tbmBadge: "จำเป็น: TBM",
-        tbmDesc: "มีสรุปความปลอดภัยก่อนทำงาน กรุณาตรวจสอบและลงนาม",
+        greeting: (name: string) => `ยินดีต้อนรับ, ${name}`,
+        tbmBadge: "คำแนะนำความปลอดภัย (TBM)",
+        tbmDesc: "มีคำแนะนำความปลอดภัยมาถึงแล้ว โปรดตรวจสอบและลงนามก่อนเริ่มงาน",
         tbmBtn: "ดูและลงนาม",
-        newTBM: "🚨 TBM ใหม่มาถึง! ตรวจสอบตอนนี้!",
-        chatTitle: "แชท 1:1",
-        chatDesc: "ลงนาม TBM ก่อนจึงจะสื่อสารได้",
-        chatBtn: "รอ...",
+        newTBM: "🚨 การแจ้งเตือนใหม่!",
+        chatTitle: "แชทสด",
+        chatDesc: "ลงนาม TBM เพื่อเริ่มแชท",
+        chatBtn: "กำลังรอ",
         signOut: "ออกจากระบบ",
+        safeWork: "ทำงานอย่างปลอดภัยวันนี้!",
+        status: "สถานะ"
     },
 };
 const getUI = (lang: string) => workerUI[lang] || workerUI["en"];
@@ -72,24 +82,20 @@ const isoMap: Record<string, string> = {
 export default function WorkerHome() {
     const router = useRouter();
     const [profile, setProfile] = useState<any>(null);
-    const [hasNewTBM, setHasNewTBM] = useState(false);     // 🔴 실시간 알림
-    const [newTBMTime, setNewTBMTime] = useState<string>(""); // 언제 도착했는지
-    const audioRef = useRef<AudioContext | null>(null);
+    const [hasNewTBM, setHasNewTBM] = useState(false);
+    const [newTBMTime, setNewTBMTime] = useState<string>("");
+    const [isLoaded, setIsLoaded] = useState(false);
 
-    // 진동 + 알림음 (모바일)
     const triggerAlert = () => {
-        // 진동
         if (typeof navigator !== "undefined" && navigator.vibrate) {
             navigator.vibrate([300, 100, 300, 100, 300]);
         }
-        // 간단한 비프음 (Web Audio API)
         try {
             const ctx = new AudioContext();
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.connect(gain);
             gain.connect(ctx.destination);
-            osc.type = "sine";
             osc.frequency.value = 880;
             gain.gain.setValueAtTime(0.3, ctx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
@@ -100,8 +106,6 @@ export default function WorkerHome() {
 
     useEffect(() => {
         const supabase = createClient();
-
-        // 1. 프로필 로드
         const fetchProfile = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
@@ -111,26 +115,23 @@ export default function WorkerHome() {
                     .eq("id", session.user.id)
                     .single();
                 setProfile(data);
+                setIsLoaded(true);
             }
         };
         fetchProfile();
 
-        // 2. ⚡ Supabase Realtime — tbm_notices INSERT 구독
         const channel = supabase
             .channel("worker_tbm_realtime")
             .on(
                 "postgres_changes",
                 { event: "INSERT", schema: "public", table: "tbm_notices" },
                 (payload) => {
-                    console.log("🚨 새 TBM 수신:", payload);
                     setHasNewTBM(true);
                     setNewTBMTime(new Date().toLocaleTimeString());
                     triggerAlert();
                 }
             )
-            .subscribe((status) => {
-                console.log("📡 Realtime 연결 상태:", status);
-            });
+            .subscribe();
 
         return () => {
             supabase.removeChannel(channel);
@@ -149,82 +150,122 @@ export default function WorkerHome() {
 
     return (
         <RoleGuard allowedRole="worker">
-            <div className="min-h-screen bg-slate-900 text-white p-4 md:p-8 flex flex-col gap-6">
-                {/* 헤더 */}
-                <header className="flex justify-between items-center mb-4">
-                    <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-2xl font-black tracking-wider text-green-400">SAFE-LINK</h1>
-                            {/* 📡 실시간 연결 표시 */}
-                            <div className="flex items-center gap-1">
-                                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                                <span className="text-[9px] text-green-600 font-black uppercase tracking-widest">LIVE</span>
+            <div className="min-h-screen bg-mesh text-white p-4 md:p-8 flex flex-col gap-8 pb-12 font-sans selection:bg-red-500/30">
+
+                {/* 💎 Premium Header */}
+                <header className="flex justify-between items-start animate-float">
+                    <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2 mb-1">
+                            <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase text-gradient">Safe-Link</h1>
+                            <div className="flex items-center gap-1 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-full">
+                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                <span className="text-[10px] text-green-400 font-black tracking-widest leading-none">LIVE</span>
                             </div>
                         </div>
-                        <p className="text-slate-400 text-sm font-bold">
-                            {profile ? t.greeting(profile.display_name || "") : "연결 중..."}
+                        <p className="text-slate-400 font-bold text-lg leading-tight uppercase tracking-tight">
+                            {profile ? t.greeting(profile.display_name || profile.display_name_en || "Worker") : "Connecting..."}
                         </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                        {profile?.preferred_lang && (
-                            <div className="flex items-center gap-1.5">
-                                <img src={`https://flagcdn.com/w40/${iso}.png`} alt={lang} className="w-7 h-5 object-cover rounded-sm" />
-                                <span className="text-[10px] text-slate-500 uppercase font-black">{lang}</span>
-                            </div>
-                        )}
-                        <div className="px-3 py-1.5 bg-green-500/20 text-green-300 rounded-full font-bold text-xs border border-green-500/30">
-                            Worker
+                    <div className="flex flex-col items-end gap-3">
+                        <div className="flex items-center gap-3 glass px-4 py-2 rounded-full border-white/5 shadow-xl">
+                            <img src={`https://flagcdn.com/w40/${iso}.png`} alt={lang} className="w-8 h-5.5 object-cover rounded-sm shadow-md" />
+                            <span className="text-xs text-white font-black">{lang.toUpperCase()}</span>
                         </div>
-                        <button onClick={handleSignOut} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-full text-xs font-bold transition-colors">
+                        <button onClick={handleSignOut} className="text-[10px] font-black text-slate-500 hover:text-red-400 uppercase tracking-widest py-1 transition-colors">
                             {t.signOut}
                         </button>
                     </div>
                 </header>
 
-                {/* 🚨 실시간 신규 TBM 알림 배너 */}
+                {/* 🚀 New Notification (High Impact) */}
                 {hasNewTBM && (
                     <div
-                        className="relative overflow-hidden p-5 bg-red-500 rounded-[24px] cursor-pointer animate-bounce shadow-[0_0_40px_rgba(239,68,68,0.6)]"
+                        className="relative overflow-hidden p-8 glass-red rounded-[40px] border-red-500 border-2 shadow-[0_0_60px_-15px_rgba(239,68,68,0.6)] cursor-pointer tap-effect group"
                         onClick={() => { setHasNewTBM(false); router.push("/worker/tbm/today"); }}
                     >
-                        <div className="absolute inset-0 bg-gradient-to-r from-red-600 to-orange-500 opacity-80" />
-                        <div className="relative flex items-center gap-4">
-                            <div className="w-5 h-5 rounded-full bg-white animate-ping flex-shrink-0" />
-                            <div>
-                                <p className="font-black text-xl text-white">{t.newTBM}</p>
-                                {newTBMTime && <p className="text-red-100 text-sm mt-0.5">{newTBMTime} 수신</p>}
+                        <div className="flex items-center gap-6 relative z-10">
+                            <div className="w-16 h-16 bg-white/10 rounded-3xl flex items-center justify-center text-white relative">
+                                <div className="absolute inset-0 bg-white rounded-3xl animate-ping opacity-20" />
+                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                </svg>
                             </div>
-                            <svg className="w-8 h-8 text-white ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
+                            <div className="flex-1">
+                                <h2 className="text-2xl font-black text-white italic lowercase tracking-tight">{t.newTBM}</h2>
+                                <p className="text-red-200/60 font-medium text-sm">Arrived at {newTBMTime}</p>
+                            </div>
+                            <div className="w-12 h-12 glass rounded-full flex items-center justify-center text-white group-hover:translate-x-1 transition-transform">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
+                                </svg>
+                            </div>
                         </div>
                     </div>
                 )}
 
-                {/* 기존 TBM 카드 */}
-                <div className="relative overflow-hidden p-8 bg-slate-800/80 rounded-[32px] border-2 border-red-500/50 shadow-[0_0_40px_-10px_rgba(239,68,68,0.3)]">
-                    <div className="absolute top-0 left-0 w-2 h-full bg-red-500" />
-                    <div className="flex items-center gap-4 mb-6">
-                        <div className="w-4 h-4 rounded-full bg-red-500 animate-ping" />
-                        <h2 className="text-2xl font-extrabold text-red-400">{t.tbmBadge}</h2>
+                {/* 🎯 Daily TBM (The Main Mission) */}
+                <section className="glass rounded-[48px] p-10 border-white/10 shadow-3xl relative overflow-hidden flex flex-col gap-10">
+                    <div className="absolute top-0 right-0 w-48 h-48 bg-red-600/10 blur-[80px] rounded-full -mr-24 -mt-24 pointer-events-none" />
+
+                    <div className="flex flex-col gap-4 relative">
+                        <div className="flex items-center gap-3">
+                            <div className="w-2.5 h-8 bg-red-500 rounded-full" />
+                            <h2 className="text-2xl font-black text-white text-gradient uppercase tracking-tighter">{t.tbmBadge}</h2>
+                        </div>
+                        <p className="text-xl font-bold text-slate-400 leading-snug">
+                            {t.tbmDesc}
+                        </p>
                     </div>
-                    <p className="text-lg font-bold mb-8 leading-relaxed text-slate-200">{t.tbmDesc}</p>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white/5 rounded-[32px] p-6 border border-white/5 flex flex-col gap-2">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.status}</span>
+                            <span className="text-xl font-black text-red-400 italic">WAITING</span>
+                        </div>
+                        <div className="bg-white/5 rounded-[32px] p-6 border border-white/5 flex flex-col gap-2 text-right">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Team Sign Rate</span>
+                            <span className="text-xl font-black text-blue-400 italic">82%</span>
+                        </div>
+                    </div>
+
                     <button
                         onClick={() => router.push("/worker/tbm/today")}
-                        className="w-full py-6 text-xl font-extrabold bg-green-500 hover:bg-green-400 text-slate-950 rounded-2xl shadow-lg transition-transform active:scale-95"
+                        className="w-full py-8 bg-gradient-to-br from-green-400 to-green-600 text-slate-950 text-2xl font-black rounded-[32px] shadow-[0_20px_50px_-15px_rgba(34,197,94,0.4)] transition-all tap-effect hover:scale-[1.02]"
                     >
-                        {t.tbmBtn}
+                        {t.tbmBtn.toUpperCase()}
                     </button>
-                </div>
+                </section>
 
-                {/* 채팅 (비활성) */}
-                <div className="p-8 bg-slate-800/40 rounded-[32px] border border-slate-700/50 opacity-50">
-                    <h2 className="text-xl font-bold mb-3 text-slate-400">{t.chatTitle}</h2>
-                    <p className="text-slate-500 mb-6">{t.chatDesc}</p>
-                    <button disabled className="w-full py-4 font-bold bg-slate-700 text-slate-500 rounded-xl cursor-not-allowed">
-                        {t.chatBtn}
+                {/* 💬 Communication Section (Locked) */}
+                <section className="glass rounded-[40px] p-8 border-white/5 opacity-40 grayscale-[0.8] relative overflow-hidden group">
+                    <div className="flex items-center gap-6 mb-8">
+                        <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-slate-500">
+                            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                        </div>
+                        <div className="flex flex-col">
+                            <h2 className="text-2xl font-black text-white">{t.chatTitle}</h2>
+                            <p className="text-slate-500 font-bold text-sm tracking-tight">{t.chatDesc}</p>
+                        </div>
+                    </div>
+                    <button disabled className="w-full py-5 bg-slate-800 rounded-2xl text-slate-600 font-black flex items-center justify-center gap-3">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        {t.chatBtn.toUpperCase()}
                     </button>
-                </div>
+                </section>
+
+                {/* 🛡️ Footer Brand */}
+                <footer className="mt-auto flex flex-col items-center gap-4 py-6">
+                    <div className="flex items-center gap-2 opacity-20">
+                        <div className="w-8 h-8 rounded-lg bg-white/20" />
+                        <span className="font-black text-xl italic text-white uppercase tracking-tighter">Safe-Link OS</span>
+                    </div>
+                    <p className="text-[10px] font-black text-slate-700 tracking-[0.4em] uppercase">{t.safeWork}</p>
+                </footer>
+
             </div>
         </RoleGuard>
     );

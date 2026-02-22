@@ -36,13 +36,12 @@ const translateKo = async (text: string, targetLang: string): Promise<string> =>
 
 // ── UI 텍스트 (다국어) ──
 const uiText: Record<string, any> = {
-    ko: { title: "안전 브리핑", original: "원문 (한국어)", translated: "번역본", voice: "음성으로 듣기", signHere: "이곳에 서명하세요", clear: "다시 쓰기", confirm: "✍️ 서명 완료하기", signed: "✓ 오늘 서명 완료!", translating: "번역 중...", noTBM: "오늘 전파된 브리핑이 없습니다.", mustSign: "서명 없이 나가시겠습니까?", alreadySigned: "이미 오늘 서명하셨습니다." },
-    en: { title: "Safety Briefing", original: "Original (Korean)", translated: "Translation", voice: "Listen", signHere: "Please sign here", clear: "Clear", confirm: "✍️ Confirm & Sign", signed: "✓ Signed!", translating: "Translating...", noTBM: "No briefing today.", mustSign: "Leave without signing?", alreadySigned: "Already signed today." },
-    vi: { title: "Thông báo an toàn", original: "Gốc (Tiếng Hàn)", translated: "Bản dịch", voice: "Nghe", signHere: "Ký tên ở đây", clear: "Xóa", confirm: "✍️ Xác nhận & Ký", signed: "✓ Đã ký!", translating: "Đang dịch...", noTBM: "Chưa có thông báo hôm nay.", mustSign: "Rời đi mà không ký?", alreadySigned: "Đã ký hôm nay rồi." },
-    th: { title: "สรุปความปลอดภัย", original: "ต้นฉบับ (เกาหลี)", translated: "คำแปล", voice: "ฟังเสียง", signHere: "ลงชื่อที่นี่", clear: "ล้าง", confirm: "✍️ ยืนยันและลงนาม", signed: "✓ ลงนามแล้ว!", translating: "กำลังแปล...", noTBM: "ยังไม่มีสรุปวันนี้", mustSign: "ออกโดยไม่ลงนาม?", alreadySigned: "ลงนามแล้ววันนี้" },
-    uz: { title: "Xavfsizlik brifing", original: "Asl (Koreys)", translated: "Tarjima", voice: "Tinglash", signHere: "Bu yerga imzo chekish", clear: "Tozalash", confirm: "✍️ Tasdiqlash va imzo", signed: "✓ Imzolandi!", translating: "Tarjima qilinmoqda...", noTBM: "Bugungi brifing yo'q.", mustSign: "Imzosiz chiqilsinmi?", alreadySigned: "Bugun allaqachon imzolandi." },
-    ru: { title: "Инструктаж", original: "Оригинал (Корейский)", translated: "Перевод", voice: "Слушать", signHere: "Подпишите здесь", clear: "Очистить", confirm: "✍️ Подтвердить и подписать", signed: "✓ Подписано!", translating: "Перевод...", noTBM: "Нет инструктажа сегодня.", mustSign: "Выйти без подписи?", alreadySigned: "Уже подписано сегодня." },
-    zh: { title: "安全简报", original: "原文（韩语）", translated: "翻译", voice: "语音播放", signHere: "请在此签名", clear: "清除", confirm: "✍️ 确认并签名", signed: "✓ 签名完成！", translating: "翻译中...", noTBM: "今天没有简报", mustSign: "不签名就离开？", alreadySigned: "今天已经签名了。" },
+    ko: { title: "안전 브리핑", original: "원문 (한국어)", translated: "번역본", voice: "음성으로 듣기", signHere: "이곳에 서명하세요", clear: "다시 쓰기", confirm: "✍️ 서명 완료하기", signed: "✓ 오늘 서명 완료!", translating: "번역 중...", noTBM: "오늘 전파된 브리핑이 없습니다.", mustSign: "서명 없이 나가시겠습니까?", alreadySigned: "이미 오늘 서명하셨습니다.", back: "뒤로" },
+    en: { title: "Safety Briefing", original: "Original (Korean)", translated: "Translation", voice: "Listen", signHere: "Please sign here", clear: "Clear", confirm: "✍️ Confirm & Sign", signed: "✓ Signed!", translating: "Translating...", noTBM: "No briefing today.", mustSign: "Leave without signing?", alreadySigned: "Already signed today.", back: "Back" },
+    vi: { title: "Thông báo an toàn", original: "Gốc (Tiếng Hàn)", translated: "Bản dịch", voice: "Nghe", signHere: "Ký tên ở đây", clear: "Xóa", confirm: "✍️ Xác nhận & Ký", signed: "✓ Đã ký!", translating: "Đang dịch...", noTBM: "Chưa có thông báo hôm nay.", mustSign: "Rời đi mà không ký?", alreadySigned: "Đã ký hôm nay rồi.", back: "Quay lại" },
+    th: { title: "สรุปความปลอดภัย", original: "ต้นฉบับ (เกาหลี)", translated: "คำแปล", voice: "ฟังเสียง", signHere: "ลงชื่อที่นี่", clear: "ล้าง", confirm: "✍️ ยืนยันและลงนาม", signed: "✓ ลงนามแล้ว!", translating: "กำลังแปล...", noTBM: "ยังไม่มีสรุปวันนี้", mustSign: "ออกโดยไม่ลงนาม?", alreadySigned: "ลงนามแล้ววันนี้", back: "กลับ" },
+    uz: { title: "Xavfsizlik brifing", original: "Asl (Koreys)", translated: "Tarjima", voice: "Tinglash", signHere: "Bu yerga imzo chekish", clear: "Tozalash", confirm: "✍️ Tasdiqlash va imzo", signed: "✓ Imzolandi!", translating: "Tarjima qilinmoqda...", noTBM: "Bugungi brifing yo'q.", mustSign: "Imzosiz chiqilsinmi?", alreadySigned: "Bugun allaqachon imzolandi.", back: "Orqaga" },
+    zh: { title: "安全简报", original: "原文（韩语）", translated: "翻译", voice: "语音播放", signHere: "请在此签名", clear: "清除", confirm: "✍️ 确认并签名", signed: "✓ 签名完成！", translating: "翻译中...", noTBM: "今天没有简报", mustSign: "不签名就离开？", alreadySigned: "今天已经签名了。", back: "返回" },
 };
 const getUI = (lang: string) => uiText[lang] || uiText["en"];
 
@@ -75,7 +74,6 @@ export default function WorkerTBMDetailPage() {
         const lang = profile?.preferred_lang || "ko";
         setPreferredLang(lang);
 
-        // tbmId가 있으면 해당 TBM, 없으면 최신 TBM
         let tbmData: any = null;
         if (tbmId && tbmId !== "today") {
             const { data } = await supabase
@@ -99,7 +97,6 @@ export default function WorkerTBMDetailPage() {
 
         setTbm(tbmData);
 
-        // 이미 서명했는지 확인
         if (tbmData) {
             const { data: ackData } = await supabase
                 .from("tbm_ack")
@@ -109,7 +106,6 @@ export default function WorkerTBMDetailPage() {
                 .single();
             if (ackData) setIsSigned(true);
 
-            // 번역
             if (tbmData.content_ko && lang !== "ko") {
                 setTranslating(true);
                 const translated = await translateKo(tbmData.content_ko, lang);
@@ -125,7 +121,6 @@ export default function WorkerTBMDetailPage() {
 
     useEffect(() => { loadTBM(); }, [loadTBM]);
 
-    // TTS 음성 듣기
     const handlePlayAudio = () => {
         if (!translatedText) return;
         window.speechSynthesis.cancel();
@@ -136,7 +131,6 @@ export default function WorkerTBMDetailPage() {
         window.speechSynthesis.speak(utter);
     };
 
-    // 서명 제출
     const handleSubmit = async () => {
         if (!tbm) return;
         if (isSigned) return;
@@ -151,19 +145,12 @@ export default function WorkerTBMDetailPage() {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) return;
 
-            const { data: profile } = await supabase
-                .from("profiles")
-                .select("display_name")
-                .eq("id", session.user.id)
-                .single();
-
-            // 서명 이미지 base64
             const signatureImage = signaturePadRef.current?.toDataURL("image/png");
 
             await supabase.from("tbm_ack").insert({
                 tbm_id: tbm.id,
                 worker_id: session.user.id,
-                worker_name: profile?.display_name || session.user.email,
+                worker_name: session.user.email,
                 signature_image: signatureImage,
                 ack_at: new Date().toISOString(),
             });
@@ -189,171 +176,209 @@ export default function WorkerTBMDetailPage() {
 
     return (
         <RoleGuard allowedRole="worker">
-            <div className="min-h-screen bg-slate-950 text-white flex flex-col font-sans">
+            <div className="min-h-screen bg-mesh text-slate-50 flex flex-col font-sans selection:bg-red-500/30">
 
-                {/* 헤더 */}
-                <header className="flex items-center gap-3 p-4 md:p-6 bg-slate-900/80 border-b border-slate-800 backdrop-blur-md flex-shrink-0">
-                    <button onClick={handleBack} className="p-2 text-slate-400 hover:text-white transition-colors flex-shrink-0">
-                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </button>
-                    <div className="flex items-center gap-3 flex-1">
-                        <h1 className="text-2xl font-black text-red-400">{t.title}</h1>
-                        <img src={`https://flagcdn.com/w40/${iso}.png`} alt={preferredLang} className="w-7 h-5 object-cover rounded-sm" />
+                {/* 💎 Header */}
+                <header className="sticky top-0 z-50 glass border-b border-white/5 px-4 md:px-8 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <button onClick={handleBack} className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors tap-effect text-slate-400">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                        <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xl font-black tracking-tight text-white uppercase italic">Safe-Link</span>
+                                <span className="px-2 py-0.5 bg-red-500 text-[10px] font-black rounded text-white animate-pulse">LIVE</span>
+                            </div>
+                            <span className="text-xs text-slate-500 font-bold tracking-widest uppercase truncate max-w-[150px]">
+                                {tbm?.site_name || "Field Center"}
+                            </span>
+                        </div>
                     </div>
-                    {/* 이미 서명 완료 뱃지 */}
-                    {isSigned && (
-                        <span className="px-3 py-1.5 bg-green-500/20 border border-green-500/40 text-green-300 rounded-full text-xs font-black flex-shrink-0">
-                            ✓ {t.signed}
-                        </span>
-                    )}
+
+                    <div className="flex items-center gap-3">
+                        <div className="flex flex-col items-end">
+                            <span className="text-xs font-black text-slate-500 uppercase tracking-tighter">Preferred Language</span>
+                            <span className="text-sm font-bold text-slate-300">{preferredLang.toUpperCase()}</span>
+                        </div>
+                        <img src={`https://flagcdn.com/w80/${iso}.png`} alt={preferredLang} className="w-10 h-7 object-cover rounded shadow-lg border border-white/10" />
+                    </div>
                 </header>
 
-                {/* 스크롤 영역 */}
-                <main className="flex-1 overflow-y-auto px-4 md:px-8 pb-48">
-                    <div className="max-w-2xl mx-auto flex flex-col gap-6 py-4">
+                <main className="flex-1 flex flex-col pt-8 pb-32 px-4 md:px-8 max-w-2xl mx-auto w-full gap-8">
 
-                        {loading ? (
-                            <div className="flex items-center justify-center py-32">
-                                <div className="w-14 h-14 border-4 border-red-500 border-t-transparent rounded-full animate-spin" />
-                            </div>
-                        ) : !tbm ? (
-                            <div className="flex flex-col items-center justify-center py-32 gap-6 text-slate-500">
-                                <svg className="w-24 h-24 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    {loading ? (
+                        <div className="flex-1 flex items-center justify-center">
+                            <div className="w-12 h-12 border-4 border-slate-700 border-t-red-500 rounded-full animate-spin" />
+                        </div>
+                    ) : !tbm ? (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center gap-6 glass rounded-[40px] p-12 border-white/5">
+                            <div className="w-24 h-24 bg-slate-800/50 rounded-full flex items-center justify-center text-slate-600">
+                                <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                <p className="text-2xl font-bold text-center">{t.noTBM}</p>
                             </div>
-                        ) : (
-                            <>
-                                {/* TBM 내용 카드 */}
-                                <div className="relative p-6 md:p-8 bg-slate-900/80 rounded-[32px] border-2 border-red-500 shadow-[0_0_60px_-20px_rgba(239,68,68,0.5)] backdrop-blur-md overflow-hidden">
-                                    {/* 배경 글로우 */}
-                                    <div className="absolute inset-0 bg-gradient-to-br from-red-950/30 via-transparent to-transparent pointer-events-none" />
+                            <h2 className="text-2xl font-black text-slate-400">{t.noTBM}</h2>
+                        </div>
+                    ) : (
+                        <>
+                            {/* 🎯 Main TBM Card */}
+                            <section className="glass rounded-[48px] p-8 border-white/10 shadow-2xl relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 blur-[60px] rounded-full -mr-16 -mt-16 group-hover:bg-red-500/20 transition-all duration-1000" />
 
-                                    {/* 날짜 + LIVE 뱃지 */}
-                                    <div className="flex justify-between items-center mb-5 relative">
-                                        <span className="text-sm text-slate-500">
-                                            {new Date(tbm.created_at).toLocaleDateString(preferredLang === "ko" ? "ko-KR" : "en-US", { year: "numeric", month: "long", day: "numeric" })}
-                                        </span>
-                                        <span className="flex items-center gap-1.5 bg-red-500/20 border border-red-500/40 text-red-300 px-3 py-1 rounded-full text-xs font-black">
-                                            <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse" />
-                                            LIVE
-                                        </span>
+                                <div className="flex justify-between items-start mb-10">
+                                    <div className="flex flex-col gap-1">
+                                        <h2 className="text-4xl font-black text-white text-gradient tracking-tight">{t.title}</h2>
+                                        <p className="text-slate-500 font-bold text-sm tracking-widest uppercase">
+                                            {new Date(tbm.created_at).toLocaleDateString(preferredLang === "ko" ? "ko-KR" : "en-US", { month: 'long', day: 'numeric', year: 'numeric' })}
+                                        </p>
                                     </div>
-
-                                    {/* 원문 (한국어, 작게) */}
-                                    <div className="p-4 bg-slate-800/60 rounded-2xl border border-slate-700/60 mb-5 relative">
-                                        <p className="text-xs text-slate-500 font-bold mb-1.5 uppercase tracking-wider">{t.original}</p>
-                                        <p className="text-base text-slate-400 leading-relaxed">{tbm.content_ko}</p>
+                                    <div className="w-14 h-14 glass rounded-2xl flex items-center justify-center text-red-500 shadow-lg border-red-500/20">
+                                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
                                     </div>
-
-                                    {/* 번역본 (크게, 메인) */}
-                                    <div className="p-6 bg-red-500/10 rounded-3xl border-2 border-red-500/30 mb-6 relative">
-                                        <p className="text-xs text-red-400 font-black mb-3 uppercase tracking-widest">{t.translated}</p>
-                                        {translating ? (
-                                            <div className="flex items-center gap-3 text-slate-400 py-4">
-                                                <div className="w-6 h-6 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-                                                <span className="text-xl">{t.translating}</span>
-                                            </div>
-                                        ) : (
-                                            <p className="text-3xl md:text-4xl font-black text-white leading-snug drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
-                                                {translatedText || tbm.content_ko}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    {/* TTS 버튼 */}
-                                    <button
-                                        onClick={handlePlayAudio}
-                                        disabled={isPlaying || translating}
-                                        className="w-full py-4 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50 relative"
-                                    >
-                                        {isPlaying ? (
-                                            <>
-                                                <span className="flex h-5 w-5 relative">
-                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                                                    <span className="relative inline-flex rounded-full h-5 w-5 bg-blue-500" />
-                                                </span>
-                                                <span className="text-xl font-bold text-blue-300">재생 중...</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                                                </svg>
-                                                <span className="text-xl font-bold text-blue-300">{t.voice}</span>
-                                            </>
-                                        )}
-                                    </button>
                                 </div>
 
-                                {/* 서명 영역 */}
-                                {!isSigned && (
-                                    <div className="flex flex-col gap-3">
-                                        <div className="flex justify-between items-center">
-                                            <h3 className="text-lg font-black text-slate-300">{t.signHere}</h3>
-                                            <button
-                                                onClick={() => signaturePadRef.current?.clear()}
-                                                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl text-sm font-bold transition-colors"
-                                            >
-                                                {t.clear}
-                                            </button>
+                                <div className="space-y-8">
+                                    {/* 번역본 (The King) */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-1.5 h-6 bg-red-500 rounded-full" />
+                                            <h3 className="text-sm font-black text-red-400 uppercase tracking-widest">{t.translated}</h3>
                                         </div>
-                                        <div className="bg-white rounded-3xl overflow-hidden border-4 border-slate-700 w-full shadow-inner" style={{ aspectRatio: "3/1", minHeight: "120px" }}>
-                                            <SignatureCanvas
-                                                ref={signaturePadRef}
-                                                penColor="black"
-                                                canvasProps={{ className: "w-full h-full cursor-crosshair" }}
-                                            />
-                                        </div>
+                                        {translating ? (
+                                            <div className="h-20 flex items-center gap-4 bg-white/5 rounded-3xl px-6 animate-pulse-soft">
+                                                <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                                                <span className="text-slate-400 font-bold">{t.translating}</span>
+                                            </div>
+                                        ) : (
+                                            <div className="relative group/text">
+                                                <p className="text-3xl md:text-5xl font-black text-white leading-[1.15] drop-shadow-sm transition-transform group-hover/text:scale-[1.01] duration-500">
+                                                    {translatedText || tbm.content_ko}
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
 
-                                {/* 이미 서명 완료 상태 */}
-                                {isSigned && (
-                                    <div className="p-6 bg-green-500/10 border-2 border-green-500/30 rounded-3xl flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-                                            <svg className="w-7 h-7 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                            </svg>
+                                    {/* 원문 (The Origin) */}
+                                    <div className="p-6 bg-white/[0.03] rounded-[32px] border border-white/5 group/orig transition-colors hover:bg-white/[0.05]">
+                                        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3">{t.original}</h3>
+                                        <p className="text-lg text-slate-400 font-medium leading-relaxed group-hover/orig:text-slate-300 transition-colors">{tbm.content_ko}</p>
+                                    </div>
+                                </div>
+
+                                {/* 🔊 TTS Button */}
+                                <button
+                                    onClick={handlePlayAudio}
+                                    disabled={isPlaying || translating}
+                                    className="mt-10 w-full py-6 glass rounded-block transition-all tap-effect flex items-center justify-center gap-4 border-blue-500/20 hover:border-blue-500/40 hover:bg-blue-500/5 group/btn"
+                                >
+                                    {isPlaying ? (
+                                        <>
+                                            <div className="flex gap-1 items-end h-6">
+                                                <div className="w-1.5 h-2 bg-blue-500 rounded-full animate-[bounce_1s_infinite]" />
+                                                <div className="w-1.5 h-6 bg-blue-500 rounded-full animate-[bounce_1.2s_infinite]" />
+                                                <div className="w-1.5 h-4 bg-blue-500 rounded-full animate-[bounce_0.8s_infinite]" />
+                                            </div>
+                                            <span className="text-xl font-black text-blue-400 uppercase italic">Playing...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500 group-hover/btn:scale-110 transition-transform">
+                                                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                                                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                                                </svg>
+                                            </div>
+                                            <span className="text-2xl font-black text-blue-100">{t.voice}</span>
+                                        </>
+                                    )}
+                                </button>
+                            </section>
+
+                            {/* ✍️ Signature Section */}
+                            {!isSigned && (
+                                <section className="flex flex-col gap-6 animate-float">
+                                    <div className="flex justify-between items-end px-4">
+                                        <div className="flex flex-col gap-1">
+                                            <h3 className="text-xl font-black text-white">{t.signHere}</h3>
+                                            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest tracking-tighter">Your signature will be stored legally</p>
                                         </div>
-                                        <div>
-                                            <p className="text-xl font-black text-green-300">{t.signed}</p>
-                                            <p className="text-sm text-green-500/70">{t.alreadySigned}</p>
+                                        <button
+                                            onClick={() => signaturePadRef.current?.clear()}
+                                            className="px-5 py-2 glass rounded-xl text-xs font-black text-slate-400 hover:text-white transition-all tap-effect"
+                                        >
+                                            {t.clear.toUpperCase()}
+                                        </button>
+                                    </div>
+                                    <div className="bg-white rounded-[40px] border-[6px] border-slate-900 shadow-2xl overflow-hidden aspect-[3/1] relative">
+                                        <SignatureCanvas
+                                            ref={signaturePadRef}
+                                            penColor="#0f172a"
+                                            canvasProps={{ className: "w-full h-full cursor-crosshair" }}
+                                        />
+                                        <div className="absolute inset-x-0 bottom-4 pointer-events-none flex justify-center">
+                                            <div className="w-48 h-0.5 bg-slate-200 rounded-full opacity-50" />
                                         </div>
                                     </div>
-                                )}
-                            </>
-                        )}
-                    </div>
+                                </section>
+                            )}
+
+                            {/* ✅ Status Result (If already signed) */}
+                            {isSigned && (
+                                <div className="glass rounded-[40px] p-12 border-green-500/20 flex flex-col items-center text-center gap-6 shadow-[0_0_50px_-20px_rgba(34,197,94,0.3)]">
+                                    <div className="w-24 h-24 bg-green-500/20 rounded-full flex items-center justify-center text-green-500 animate-bounce">
+                                        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <h2 className="text-3xl font-black text-white">{t.signed}</h2>
+                                        <p className="text-slate-500 font-medium">Safe operations today!</p>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </main>
 
-                {/* 하단 고정 서명 버튼 */}
+                {/* 🚀 Sticky CTA Button */}
                 {!loading && tbm && (
-                    <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent">
-                        <div className="max-w-2xl mx-auto">
+                    <div className="fixed bottom-0 inset-x-0 p-6 md:p-10 pointer-events-none">
+                        <div className="max-w-2xl mx-auto pointer-events-auto">
                             <button
                                 onClick={handleSubmit}
                                 disabled={isSigned || isSubmitting}
-                                className={`w-full py-6 text-2xl font-black rounded-[28px] shadow-2xl transition-all active:scale-95 ${isSigned
-                                        ? "bg-green-700/50 text-green-300 cursor-not-allowed"
-                                        : "bg-green-500 hover:bg-green-400 text-slate-900 shadow-[0_0_40px_rgba(34,197,94,0.5)]"
+                                className={`w-full py-7 rounded-[32px] text-2xl font-black tracking-tight shadow-3xl transition-all tap-effect flex items-center justify-center gap-4 ${isSigned
+                                        ? "bg-slate-900 text-slate-600 border border-white/5"
+                                        : "bg-gradient-to-br from-green-400 to-green-600 text-slate-950 shadow-green-500/20"
                                     }`}
                             >
                                 {isSubmitting ? (
-                                    <span className="flex items-center justify-center gap-3">
-                                        <svg className="w-7 h-7 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    <div className="w-8 h-8 border-4 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                                ) : isSigned ? (
+                                    <>
+                                        <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
                                         </svg>
-                                        저장 중...
-                                    </span>
-                                ) : isSigned ? t.signed : t.confirm}
+                                        SIGNED
+                                    </>
+                                ) : (
+                                    <>
+                                        {t.confirm.split(' ')[0]}
+                                        <span className="uppercase tracking-tighter">{t.confirm.split(' ').slice(1).join(' ')}</span>
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>
                 )}
+
+                <style jsx global>{`
+                    .rounded-block { border-radius: 28px; }
+                `}</style>
             </div>
         </RoleGuard>
     );
