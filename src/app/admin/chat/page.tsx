@@ -49,6 +49,22 @@ const getVoiceLang = (c: string) => {
 type WorkerProfile = { id: string; display_name: string; preferred_lang: string; };
 type Message = { id: string; from_user: string; to_user: string; source_text: string; translated_text: string; created_at: string; };
 
+/** translated_text 컬럼을 파싱. 항상 안전하게 객체를 반환 */
+const parseMsg = (raw: string | null | undefined): { norm: string; text: string; pron: string; rev: string } => {
+    if (!raw) return { norm: '', text: '', pron: '', rev: '' };
+    try {
+        const p = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        return {
+            norm: p.norm || '',
+            text: p.text || '',
+            pron: p.pron || '',
+            rev: p.rev || '',
+        };
+    } catch {
+        return { norm: '', text: raw, pron: '', rev: '' };
+    }
+};
+
 function AdminChatContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
