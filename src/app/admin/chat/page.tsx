@@ -11,10 +11,11 @@ const ui: Record<string, any> = {
         selectWorker: "대화할 근로자를 선택하세요.",
         search: "이름 검색...",
         noWorkers: "현장에 등록된 근로자가 없습니다.",
-        chatPlaceholder: "메시지 입력 (자동 번역됨)...",
-        send: "전송",
+        chatPlaceholder: "메시지 입력 (자동 번역/TTS)...",
         listening: "듣고 있습니다...",
         admin: "나 (관리자)",
+        pron: "발음",
+        rev: "역번역",
     },
     en: {
         title: "Live Translation Chat",
@@ -22,10 +23,11 @@ const ui: Record<string, any> = {
         selectWorker: "Select a worker to chat with.",
         search: "Search name...",
         noWorkers: "No workers registered on site.",
-        chatPlaceholder: "Type message (auto-translated)...",
-        send: "Send",
+        chatPlaceholder: "Type message (auto-translate/TTS)...",
         listening: "Listening...",
         admin: "Me (Admin)",
+        pron: "Pronunciation",
+        rev: "Reverse Trans",
     },
 };
 
@@ -35,6 +37,11 @@ const isoMap: Record<string, string> = {
     ko: "kr", en: "us", vi: "vn", zh: "cn", th: "th", uz: "uz", ph: "ph",
     km: "kh", id: "id", mn: "mn", my: "mm", ne: "np", bn: "bd", kk: "kz",
     ru: "ru", jp: "jp", fr: "fr", es: "es", ar: "sa", hi: "in",
+};
+
+const getVoiceLang = (c: string) => {
+    const map: any = { ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", th: "th-TH", uz: "uz-UZ", id: "id-ID", jp: "ja-JP", ph: "tl-PH" };
+    return map[c] || c;
 };
 
 type WorkerProfile = { id: string; display_name: string; preferred_lang: string; };
@@ -69,7 +76,6 @@ function AdminChatContent() {
             setAdminLang(finalLang);
         }
 
-        // Load workers
         const { data } = await supabase.from("profiles").select("id, display_name, preferred_lang").eq("role", "WORKER");
         if (data) setWorkers(data);
     };
@@ -80,7 +86,6 @@ function AdminChatContent() {
         if (!activeWorker || !myId) return;
         const supabase = createClient();
 
-        // Initial fetch
         const fetchMessages = async () => {
             const { data } = await supabase
                 .from("messages")
@@ -92,7 +97,6 @@ function AdminChatContent() {
         };
         fetchMessages();
 
-        // Subscribe to real-time messages
         const channel = supabase
             .channel(`admin_chat_${activeWorker.id}`)
             .on(
@@ -103,6 +107,22 @@ function AdminChatContent() {
                     if ((msg.from_user === myId && msg.to_user === activeWorker.id) || (msg.from_user === activeWorker.id && msg.to_user === myId)) {
                         setMessages(prev => [...prev, msg]);
                         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+
+                        // AUTO TTS for INCOMING message
+                        if (msg.from_user === activeWorker.id) {
+                            let speakText = msg.translated_text;
+                            try {
+                                const p = JSON.parse(msg.translated_text);
+                                speakText = p.text;
+                            } catch (e) { }
+                            if (speakText) {
+                                window.speechSynthesis.cancel();
+                                const utter = new SpeechSynthesisUtterance(speakText);
+                                utter.lang = getVoiceLang("ko");
+                                utter.rate = 0.95;
+                                window.speechSynthesis.speak(utter);
+                            }
+                        }
                     }
                 }
             )
@@ -115,25 +135,35 @@ function AdminChatContent() {
         if (!text.trim() || !activeWorker || !myId) return;
         setIsSending(true);
         try {
-            const supabase = createClient();
-
-            // translate to activeWorker's language
-            // For MVP client-side API call (in production, use robust backend)
             let translated = text.trim();
+            let pron = "";
+            let rev = "";
+
             if (activeWorker.preferred_lang !== "ko") {
-                const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=${activeWorker.preferred_lang}&dt=t&q=${encodeURIComponent(text.trim())}`;
-                const res = await fetch(url);
-                const data = await res.json();
-                translated = data[0].map((item: any) => item[0]).join("");
+                // 1. Target Trans + Pron
+                const dtUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=${activeWorker.preferred_lang}&dt=t&dt=rm&q=${encodeURIComponent(text.trim())}`;
+                const transRes = await fetch(dtUrl);
+                const transData = await transRes.json();
+                translated = transData[0].map((item: any) => item[0]).join("");
+
+                const pronParts = transData[0].map((item: any) => item[1]).filter(Boolean);
+                if (pronParts.length > 0) pron = pronParts.join(" ");
+
+                // 2. Reverse Trans
+                const revUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${activeWorker.preferred_lang}&tl=ko&dt=t&q=${encodeURIComponent(translated)}`;
+                const revRes = await fetch(revUrl);
+                const revData = await revRes.json();
+                rev = revData[0].map((item: any) => item[0]).join("");
             }
 
+            const supabase = createClient();
             const payload = {
                 from_user: myId,
                 to_user: activeWorker.id,
                 source_lang: "ko",
                 target_lang: activeWorker.preferred_lang,
                 source_text: text.trim(),
-                translated_text: translated,
+                translated_text: JSON.stringify({ text: translated, pron, rev }),
             };
 
             await supabase.from("messages").insert(payload);
@@ -149,39 +179,47 @@ function AdminChatContent() {
     const t = getUI(adminLang);
     const filteredWorkers = workers.filter(w => (w.display_name || "").toLowerCase().includes(searchQuery.toLowerCase()));
 
+    // Safe JSON parser for display
+    const parseMsg = (raw: string) => {
+        try { return JSON.parse(raw); }
+        catch { return { text: raw, pron: "", rev: "" }; }
+    };
+
     return (
         <RoleGuard allowedRole="admin">
-            <div className="min-h-screen bg-mesh text-white font-sans flex flex-col selection:bg-blue-500/30">
-                <header className="sticky top-0 z-50 glass border-b border-white/5 px-4 md:px-6 py-4 flex items-center justify-between">
+            {/* White/Bright Theme applied to root */}
+            <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col selection:bg-blue-200">
+                <header className="sticky top-0 z-50 bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex items-center justify-between shadow-sm">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => { if (activeWorker) setActiveWorker(null); else router.back(); }} className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors tap-effect text-slate-400">
+                        <button onClick={() => { if (activeWorker) setActiveWorker(null); else router.back(); }} className="p-2 -ml-2 rounded-full hover:bg-slate-100 transition-colors tap-effect text-slate-500">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
                             </svg>
                         </button>
                         <div className="flex flex-col">
                             <div className="flex items-center gap-2">
-                                <span className="text-xl font-black tracking-tight text-white uppercase italic">{activeWorker ? activeWorker.display_name : "AI Chat"}</span>
-                                <span className="px-2 py-0.5 bg-blue-500 text-[10px] font-black rounded text-white tracking-widest uppercase">Live</span>
+                                <span className="text-xl font-black tracking-tight text-slate-800 uppercase">{activeWorker ? activeWorker.display_name : t.title}</span>
+                                <span className="px-2 py-0.5 bg-red-500 text-[10px] font-black rounded text-white tracking-widest uppercase animate-pulse">Live</span>
                             </div>
                         </div>
                     </div>
                 </header>
 
-                <main className="flex-1 flex w-full max-w-5xl mx-auto h-[calc(100vh-76px)] overflow-hidden">
-                    {/* Worker List (Sidebar on desktop, full on mobile if none selected) */}
-                    <div className={`${activeWorker ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col border-r border-white/5 bg-slate-900/40 p-4 h-full overflow-y-auto`}>
-                        <div className="mb-6 z-10 sticky top-0 bg-[#020617]/80 backdrop-blur-md pb-4 pt-2">
-                            <h2 className="text-2xl font-black text-white text-gradient uppercase tracking-tight mb-4">{t.title}</h2>
+                <main className="flex-1 flex w-full max-w-6xl mx-auto h-[calc(100vh-76px)] overflow-hidden bg-white shadow-xl md:my-4 md:h-[calc(100vh-100px)] md:rounded-[40px] border border-slate-100">
+
+                    {/* Worker Sidebar */}
+                    <div className={`${activeWorker ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col border-r border-slate-100 bg-slate-50/50 p-4 h-full overflow-y-auto`}>
+                        <div className="mb-6 z-10 sticky top-0 bg-slate-50/90 backdrop-blur-md pb-4 pt-2 border-b border-slate-100">
+                            <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-4">{t.title}</h2>
                             <div className="relative">
                                 <input
                                     type="text"
                                     placeholder={t.search}
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full bg-slate-800 border border-slate-700 rounded-full px-5 py-3 text-sm font-bold placeholder-slate-500 outline-none focus:border-blue-500 transition-colors"
+                                    className="w-full bg-white border border-slate-200 rounded-full px-5 py-3 text-sm font-bold placeholder-slate-400 text-slate-800 outline-none focus:border-blue-500 transition-all shadow-inner"
                                 />
-                                <svg className="w-5 h-5 absolute right-4 top-1/2 -translate-y-1/2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5 absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                             </div>
@@ -189,20 +227,20 @@ function AdminChatContent() {
 
                         <div className="flex flex-col gap-2">
                             {filteredWorkers.length === 0 ? (
-                                <div className="text-center py-10 text-slate-600 font-bold italic">{t.noWorkers}</div>
+                                <div className="text-center py-10 text-slate-400 font-bold italic">{t.noWorkers}</div>
                             ) : (
                                 filteredWorkers.map(w => (
                                     <button
                                         key={w.id}
                                         onClick={() => setActiveWorker(w)}
-                                        className={`flex items-center gap-4 p-4 rounded-3xl transition-all tap-effect border ${activeWorker?.id === w.id ? 'glass border-blue-500/30 shadow-[0_0_30px_-10px_rgba(59,130,246,0.3)]' : 'border-transparent hover:bg-white/5'}`}
+                                        className={`flex items-center gap-4 p-4 rounded-3xl transition-all tap-effect border ${activeWorker?.id === w.id ? 'bg-blue-50 border-blue-200 shadow-md transform scale-[1.02]' : 'bg-white border-transparent shadow-sm hover:shadow hover:bg-slate-50'}`}
                                     >
                                         <div className="relative flex-shrink-0">
-                                            <img src={`https://flagcdn.com/w40/${isoMap[w.preferred_lang] || "un"}.png`} alt={w.preferred_lang} className="w-10 h-10 object-cover rounded-full shadow border-2 border-slate-800" />
+                                            <img src={`https://flagcdn.com/w40/${isoMap[w.preferred_lang] || "un"}.png`} alt={w.preferred_lang} className="w-10 h-10 object-cover rounded-full shadow border-2 border-slate-100" />
                                         </div>
                                         <div className="flex flex-col items-start flex-1 overflow-hidden">
-                                            <span className="font-black text-slate-100 truncate w-full text-left">{w.display_name}</span>
-                                            <span className="text-[10px] uppercase font-black tracking-widest text-slate-500">{w.preferred_lang}</span>
+                                            <span className={`font-black truncate w-full text-left ${activeWorker?.id === w.id ? 'text-blue-700' : 'text-slate-700'}`}>{w.display_name}</span>
+                                            <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">{w.preferred_lang}</span>
                                         </div>
                                     </button>
                                 ))
@@ -211,26 +249,50 @@ function AdminChatContent() {
                     </div>
 
                     {/* Chat Area */}
-                    <div className={`${!activeWorker ? 'hidden' : 'flex'} flex-col flex-1 bg-black/20 h-full relative`}>
-                        {/* Messages */}
-                        <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col gap-6">
+                    <div className={`${!activeWorker ? 'hidden' : 'flex'} flex-col flex-1 bg-[#f8fafc] h-full relative`}>
+                        <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col gap-6" style={{ backgroundImage: 'radial-gradient(circle at center, #e2e8f0 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
                             {messages.map((m, i) => {
                                 const isAdmin = m.from_user === myId;
+                                const parsed = parseMsg(m.translated_text);
+
                                 return (
-                                    <div key={m.id || i} className={`flex flex-col max-w-[85%] ${isAdmin ? 'self-end items-end' : 'self-start items-start'}`}>
-                                        <span className={`text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ${isAdmin ? 'mr-2' : 'ml-2'}`}>
+                                    <div key={m.id || i} className={`flex flex-col max-w-[85%] md:max-w-[70%] ${isAdmin ? 'self-end items-end' : 'self-start items-start'} landscape:max-w-[95%]`}>
+                                        <span className={`text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ${isAdmin ? 'mr-2' : 'ml-2'}`}>
                                             {isAdmin ? t.admin : activeWorker?.display_name}
                                         </span>
-                                        <div className={`p-5 rounded-3xl shadow-xl border ${isAdmin ? 'bg-blue-600 border-blue-500 rounded-tr-sm text-blue-50' : 'glass border-white/10 rounded-tl-sm text-slate-200'}`}>
-                                            <p className="font-bold text-lg whitespace-pre-wrap leading-relaxed">{m.source_text}</p>
-                                            {m.translated_text && m.source_text !== m.translated_text && (
-                                                <div className={`mt-3 pt-3 border-t text-sm font-medium italic opacity-80 ${isAdmin ? 'border-blue-500/50' : 'border-white/10'}`}>
-                                                    {m.translated_text}
+                                        <div className={`p-5 rounded-3xl shadow-md border flex flex-col gap-3 ${isAdmin ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
+
+                                            {/* Source Text (Landscape Mode scales it drastically up) */}
+                                            <p className="font-black text-xl md:text-2xl landscape:text-4xl whitespace-pre-wrap leading-snug drop-shadow-sm">
+                                                {m.source_text}
+                                            </p>
+
+                                            {/* Advanced AI Translation Area */}
+                                            {parsed.text && m.source_text !== parsed.text && (
+                                                <div className={`pt-3 border-t flex flex-col gap-1 ${isAdmin ? 'border-blue-400/50' : 'border-slate-100'}`}>
+                                                    <div className="flex items-center gap-1.5 opacity-90">
+                                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${isAdmin ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>A/文</span>
+                                                        <span className="font-bold text-lg landscape:text-2xl">{parsed.text}</span>
+                                                    </div>
+
+                                                    {parsed.pron && (
+                                                        <div className="flex items-center gap-1.5 opacity-80 mt-1">
+                                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${isAdmin ? 'bg-white/10' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}>{t.pron}</span>
+                                                            <span className="text-sm font-medium italic landscape:text-xl tracking-wide">{parsed.pron}</span>
+                                                        </div>
+                                                    )}
+
+                                                    {parsed.rev && (
+                                                        <div className="flex items-start gap-1.5 opacity-80 mt-1">
+                                                            <span className={`px-1.5 py-0.5 mt-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${isAdmin ? 'bg-black/20 text-blue-100' : 'bg-amber-100 text-amber-700'}`}>{t.rev}</span>
+                                                            <span className="text-sm font-bold landscape:text-xl">{parsed.rev}</span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
-                                        <span className={`text-[10px] text-slate-600 font-bold mt-1 ${isAdmin ? 'mr-2' : 'ml-2'}`}>
-                                            {new Date(m.created_at).toLocaleTimeString()}
+                                        <span className={`text-[10px] text-slate-400 font-bold mt-1 ${isAdmin ? 'mr-2' : 'ml-2'} landscape:text-base`}>
+                                            {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
                                 );
@@ -239,13 +301,13 @@ function AdminChatContent() {
                         </div>
 
                         {/* Input Area */}
-                        <div className="p-4 md:p-6 glass border-t border-white/10 shrink-0">
-                            <div className="relative flex items-center bg-slate-900 border border-slate-700 rounded-[32px] overflow-hidden focus-within:border-blue-500 transition-colors shadow-inner">
+                        <div className="p-4 md:p-6 bg-white border-t border-slate-200 shrink-0 z-10 shadow-[0_-10px_30px_rgba(0,0,0,0.03)]">
+                            <div className="relative flex items-center bg-slate-50 border-2 border-slate-200 rounded-[36px] overflow-hidden focus-within:border-blue-500 focus-within:bg-white transition-all shadow-inner">
                                 <textarea
                                     value={text}
                                     onChange={(e) => setText(e.target.value)}
                                     placeholder={t.chatPlaceholder}
-                                    className="w-full bg-transparent p-4 pl-6 text-white font-bold outline-none resize-none max-h-32 min-h-[56px]"
+                                    className="w-full bg-transparent p-5 pl-8 text-slate-800 text-lg landscape:text-2xl font-black outline-none resize-none max-h-32 min-h-[64px] placeholder-slate-400"
                                     rows={1}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
@@ -254,36 +316,42 @@ function AdminChatContent() {
                                 <button
                                     onClick={handleSend}
                                     disabled={!text.trim() || isSending}
-                                    className="mr-3 glass p-3 rounded-full text-blue-400 hover:text-white hover:bg-blue-600 transition-all disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-blue-400 tap-effect"
+                                    className="mr-3 bg-blue-600 text-white p-4 rounded-full transition-all disabled:opacity-40 disabled:bg-slate-300 tap-effect shadow-md flex items-center justify-center"
                                 >
                                     {isSending ? (
-                                        <div className="w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                        <div className="w-7 h-7 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                     ) : (
-                                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
+                                        <svg className="w-7 h-7 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
                                     )}
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    {/* Placeholder when no worker selected (Desktop) */}
                     {!activeWorker && (
-                        <div className="hidden md:flex flex-col flex-1 items-center justify-center p-8 text-center gap-6 glass/10 opacity-60">
-                            <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center text-slate-600 border border-white/5">
-                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" /></svg>
+                        <div className="hidden md:flex flex-col flex-1 items-center justify-center p-8 text-center gap-6 bg-[#f8fafc]">
+                            <div className="w-32 h-32 bg-slate-100 rounded-full flex items-center justify-center text-slate-300 shadow-inner">
+                                <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" /></svg>
                             </div>
                             <h2 className="text-2xl font-black text-slate-400">{t.selectWorker}</h2>
                         </div>
                     )}
                 </main>
             </div>
+
+            <style jsx global>{`
+                /* Hide scrollbar for a cleaner look */
+                ::-webkit-scrollbar { width: 6px; }
+                ::-webkit-scrollbar-track { background: transparent; }
+                ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
+            `}</style>
         </RoleGuard>
     );
 }
 
 export default function AdminChat() {
     return (
-        <Suspense fallback={<div className="min-h-screen bg-mesh" />}>
+        <Suspense fallback={<div className="min-h-screen bg-white" />}>
             <AdminChatContent />
         </Suspense>
     );
