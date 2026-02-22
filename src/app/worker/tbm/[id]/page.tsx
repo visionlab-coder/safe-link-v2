@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
+import { Suspense } from "react";
 import SignatureCanvas from "react-signature-canvas";
 
 // ── 언어 코드 매핑 ──
@@ -45,10 +46,12 @@ const uiText: Record<string, any> = {
 };
 const getUI = (lang: string) => uiText[lang] || uiText["en"];
 
-export default function WorkerTBMDetailPage() {
+function WorkerTBMDetailContent() {
     const router = useRouter();
     const params = useParams();
+    const searchParams = useSearchParams();
     const tbmId = params?.id as string | undefined;
+    const urlLang = searchParams.get("lang");
     const signaturePadRef = useRef<SignatureCanvas | null>(null);
 
     const [tbm, setTbm] = useState<any>(null);
@@ -71,7 +74,13 @@ export default function WorkerTBMDetailPage() {
             .eq("id", session.user.id)
             .single();
 
-        const lang = profile?.preferred_lang || "ko";
+        let lang = profile?.preferred_lang || "ko";
+
+        if (urlLang && urlLang !== profile?.preferred_lang) {
+            await supabase.from("profiles").update({ preferred_lang: urlLang }).eq("id", session.user.id);
+            lang = urlLang;
+        }
+
         setPreferredLang(lang);
 
         let tbmData: any = null;
@@ -117,7 +126,7 @@ export default function WorkerTBMDetailPage() {
         }
 
         setLoading(false);
-    }, [tbmId]);
+    }, [tbmId, urlLang]);
 
     useEffect(() => { loadTBM(); }, [loadTBM]);
 
@@ -352,8 +361,8 @@ export default function WorkerTBMDetailPage() {
                                 onClick={handleSubmit}
                                 disabled={isSigned || isSubmitting}
                                 className={`w-full py-7 rounded-[32px] text-2xl font-black tracking-tight shadow-3xl transition-all tap-effect flex items-center justify-center gap-4 ${isSigned
-                                        ? "bg-slate-900 text-slate-600 border border-white/5"
-                                        : "bg-gradient-to-br from-green-400 to-green-600 text-slate-950 shadow-green-500/20"
+                                    ? "bg-slate-900 text-slate-600 border border-white/5"
+                                    : "bg-gradient-to-br from-green-400 to-green-600 text-slate-950 shadow-green-500/20"
                                     }`}
                             >
                                 {isSubmitting ? (
@@ -381,5 +390,13 @@ export default function WorkerTBMDetailPage() {
                 `}</style>
             </div>
         </RoleGuard>
+    );
+}
+
+export default function WorkerTBMDetailPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-mesh" />}>
+            <WorkerTBMDetailContent />
+        </Suspense>
     );
 }
