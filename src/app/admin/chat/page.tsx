@@ -102,16 +102,16 @@ function AdminChatContent() {
         fetchMessages();
 
         const channel = supabase
-            .channel(`admin_chat_${activeWorker.id}`)
+            .channel(`admin_realtime_${myId}`)
             .on(
                 "postgres_changes",
                 { event: "INSERT", schema: "public", table: "messages" },
                 (payload) => {
                     const msg = payload.new as Message;
-                    if ((msg.from_user === myId && msg.to_user === activeWorker.id) || (msg.from_user === activeWorker.id && msg.to_user === myId)) {
+                    // Check if message belongs to the current conversation with activeWorker
+                    if (activeWorker && ((msg.from_user === myId && msg.to_user === activeWorker.id) || (msg.from_user === activeWorker.id && msg.to_user === myId))) {
                         setMessages(prev => {
                             if (prev.find(m => m.id === msg.id)) return prev;
-                            // Replace optimistic message if it matches text and is from same user
                             const isDup = prev.findIndex(m => m.id.startsWith("temp-") && m.source_text === msg.source_text && m.from_user === msg.from_user);
                             if (isDup !== -1) {
                                 const newArr = [...prev];

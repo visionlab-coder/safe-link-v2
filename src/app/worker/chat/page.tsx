@@ -95,13 +95,14 @@ function WorkerChatContent() {
 
         // Fetch Admin ID (Prefer same site, fallback to any admin)
         const fetchAdmin = async (siteId: string | null) => {
-            let q = supabase.from("profiles").select("id").ilike("role", "admin");
+            const adminRoles = ["HQ_ADMIN", "SAFETY_OFFICER", "ADMIN"]; // Corrected typo
+            let q = supabase.from("profiles").select("id").in("role", adminRoles);
             if (siteId) {
                 const { data: sAdmin } = await q.eq("site_id", siteId).limit(1);
                 if (sAdmin?.[0]?.id) return sAdmin[0].id;
             }
             // Fallback to any admin
-            const { data: anyAdmin } = await supabase.from("profiles").select("id").ilike("role", "admin").limit(1);
+            const { data: anyAdmin } = await supabase.from("profiles").select("id").in("role", adminRoles).limit(1);
             return anyAdmin?.[0]?.id || "";
         };
 
@@ -127,15 +128,17 @@ function WorkerChatContent() {
         fetchMessages();
 
         const channel = supabase
-            .channel(`worker_chat_${myId}`)
+            .channel(`msg_realtime_${myId}`)
             .on(
                 "postgres_changes",
                 { event: "INSERT", schema: "public", table: "messages" },
                 (payload) => {
                     const msg = payload.new as Message;
-                    if ((msg.from_user === myId && msg.to_user === adminId) || (msg.from_user === adminId && msg.to_user === myId)) {
+                    // Filter: message involves ME (either as sender or receiver)
+                    if (msg.from_user === myId || msg.to_user === myId) {
                         setMessages(prev => {
                             if (prev.find(m => m.id === msg.id)) return prev;
+                            // Match by temporary ID or text/user
                             const isDup = prev.findIndex(m => String(m.id).startsWith("temp-") && m.source_text === msg.source_text && m.from_user === msg.from_user);
                             if (isDup !== -1) {
                                 const newArr = [...prev];
@@ -147,7 +150,7 @@ function WorkerChatContent() {
                         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
 
                         // AUTO TTS for INCOMING message (Admin speaks to Worker Native)
-                        if (msg.from_user === adminId) {
+                        if (msg.from_user !== myId) {
                             let speakText = msg.translated_text as any;
                             try {
                                 const p = typeof speakText === "string" ? JSON.parse(speakText) : speakText;
@@ -294,7 +297,7 @@ function WorkerChatContent() {
                         </button>
                         <div className="flex flex-col">
                             <div className="flex items-center gap-2">
-                                <span className="text-2xl font-black tracking-tight text-slate-800 uppercase">{t.adminName}</span>
+                                <span className="text-2xl font-black tracking-tight text-slate-800 uppercase">{t.me.split(" ")[0]}</span>
                                 <span className="px-2 py-0.5 bg-green-500 text-[10px] font-black rounded text-white tracking-widest uppercase animate-pulse">Online</span>
                             </div>
                         </div>
