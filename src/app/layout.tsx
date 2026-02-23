@@ -1,3 +1,4 @@
+export const runtime = "edge";
 import type { Metadata } from "next";
 import { Noto_Sans, Noto_Sans_KR, Noto_Sans_SC, Noto_Sans_TC, Noto_Sans_JP, Noto_Sans_Thai, Noto_Sans_Arabic, Noto_Sans_Devanagari } from "next/font/google";
 import "./globals.css";
