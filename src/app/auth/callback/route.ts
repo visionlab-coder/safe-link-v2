@@ -1,24 +1,34 @@
 import { NextResponse } from 'next/server'
-// The client you created from the Server-Side Auth instructions
 import { createServerClient } from '@supabase/ssr'
 
 export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url)
     const code = searchParams.get('code')
-    // if "next" is in param, use it as the redirect URL
-    const next = searchParams.get('next') ?? '/worker'
+    // Default to /auth/setup if next is missing, to ensure role check happens
+    const next = searchParams.get('next') ?? '/auth/setup'
 
     if (code) {
+        const response = NextResponse.next();
         const supabase = createServerClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
             {
                 cookies: {
                     getAll() {
-                        return [] // We don't have cookies on this route handler yet
+                        const cookieStore = (request as any).cookies;
+                        if (typeof cookieStore?.getAll === 'function') {
+                            return cookieStore.getAll()
+                        }
+                        return []
                     },
                     setAll(cookiesToSet) {
-                        // Do nothing
+                        try {
+                            cookiesToSet.forEach(({ name, value, options }) => {
+                                response.cookies.set(name, value, options)
+                            })
+                        } catch (e) {
+                            // Can happen in some environments
+                        }
                     },
                 },
             }
@@ -29,6 +39,5 @@ export async function GET(request: Request) {
         }
     }
 
-    // return the user to an error page with instructions
-    return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+    return NextResponse.redirect(`${origin}/auth`)
 }

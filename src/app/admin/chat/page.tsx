@@ -5,6 +5,14 @@ import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
 import { normalizeKoAsync } from "@/utils/normalize";
 import { hangulize } from "@/utils/hangulize";
+import { motion, AnimatePresence } from "framer-motion";
+import { analyzeMessageWithAI, AIAnalysisResult } from "@/utils/ai/watchdog";
+import { ShieldAlert, ShieldCheck } from "lucide-react";
+import { playPremiumAudio } from "@/utils/tts";
+import { transcribeAudio, createSTTRecorder } from "@/utils/stt";
+import { playNotificationSound } from "@/utils/notifications";
+import { formalizeKo } from "@/utils/politeness";
+import { Trash2, QrCode } from "lucide-react";
 
 const ui: Record<string, any> = {
     ko: {
@@ -79,10 +87,13 @@ function AdminChatContent() {
     const [isSending, setIsSending] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [myId, setMyId] = useState("");
+    const [aiAnalyses, setAiAnalyses] = useState<Record<string, AIAnalysisResult>>({});
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const voiceGenderRef = useRef<'male' | 'female'>('female'); // Immediately updated
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const recognitionRef = useRef<any>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
 
     // Helper to change gender: updates ref immediately (no async delay) + state for UI
     const changeGender = (g: 'male' | 'female') => {
@@ -105,8 +116,23 @@ function AdminChatContent() {
             setAdminLang(finalLang);
         }
 
-        const { data } = await supabase.from("profiles").select("id, display_name, preferred_lang").eq("role", "WORKER");
+        const { data } = await supabase.from("profiles")
+            .select("id, display_name, preferred_lang, role")
+            .eq("role", "WORKER")
+            .not("role", "eq", "ROOT"); // ROOT는 어떤 리스트에서도 제외
         if (data) setWorkers(data);
+
+        // 🆕 새로운 근로자 가입 시 사이드바 실시간 업데이트
+        const profileSubscription = supabase
+            .channel('sidebar_updates')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
+                if (payload.eventType === 'INSERT' && (payload.new as any).role === 'WORKER') {
+                    setWorkers(prev => [...prev, payload.new as WorkerProfile]);
+                }
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(profileSubscription); };
     };
 
     const fetchMessages = async () => {
@@ -121,130 +147,108 @@ function AdminChatContent() {
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     };
 
+    const activeWorkerRef = useRef<WorkerProfile | null>(null);
+    useEffect(() => {
+        activeWorkerRef.current = activeWorker;
+        if (activeWorker) {
+            setUnreadWorkers(prev => {
+                const next = new Set(prev);
+                next.delete(activeWorker.id);
+                return next;
+            });
+            fetchMessages();
+        }
+    }, [activeWorker]);
+
     useEffect(() => { load(); }, [urlLang]);
 
+    // 🆕 글로벌 메시지 리스너 (알림 및 읽지 않음 표시용)
+    const [unreadWorkers, setUnreadWorkers] = useState<Set<string>>(new Set());
+
     useEffect(() => {
-        if (!activeWorker || !myId) return;
+        if (!myId) return;
         const supabase = createClient();
-        fetchMessages();
-
-        const loadVoices = () => { window.speechSynthesis.getVoices(); };
-        window.speechSynthesis.onvoiceschanged = loadVoices;
-        loadVoices();
-
-        (window as any).refreshAdminChat = fetchMessages;
 
         const channel = supabase
-            .channel(`admin_chat_monitor`)
-            .on(
-                "postgres_changes",
-                { event: "*", schema: "public", table: "messages" },
-                (payload) => {
-                    console.log("[Realtime Global] Change Detected:", payload.eventType, payload.new);
-                    const msg = payload.new as Message;
-                    if (!msg || !msg.id || !activeWorker) return;
+            .channel('global_admin_monitor')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+                const msg = payload.new as Message;
+                if (!msg || msg.from_user === myId) return;
 
-                    // Match logic: If message involves the active worker
-                    const involvesWorker = msg.from_user === activeWorker.id || msg.to_user === activeWorker.id;
-
-                    if (involvesWorker) {
-                        setMessages(prev => {
-                            if (prev.find(m => m.id === msg.id)) return prev;
-                            const tempIdx = prev.findIndex(m => String(m.id).startsWith("temp-") && m.source_text === msg.source_text && m.from_user === msg.from_user);
-                            if (tempIdx !== -1) {
-                                const newArr = [...prev];
-                                newArr[tempIdx] = msg;
-                                return newArr;
-                            }
-                            return [...prev, msg];
-                        });
-                        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-
-                        // Removed Auto-TTS here as per request ("음성은 선택해서 들을 수 있음")
-                    }
+                // 1. 현재 대화 중인 근로자의 메시지라면 메시지 목록 업데이트
+                if (activeWorkerRef.current && msg.from_user === activeWorkerRef.current.id) {
+                    setMessages(prev => {
+                        if (prev.find(m => m.id === msg.id)) return prev;
+                        return [...prev, msg];
+                    });
+                    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+                } else {
+                    // 2. 다른 근로자의 메시지라면 사이드바에 알림 표시
+                    setUnreadWorkers(prev => new Set(prev).add(msg.from_user));
                 }
-            )
-            .subscribe((status) => {
-                console.log(`[Realtime Admin] Status: ${status} | Tracking: ${activeWorker.display_name}`);
-            });
+
+                // 3. AI 분석 수행
+                analyzeMessageWithAI(msg.source_text).then(result => {
+                    setAiAnalyses(prev => ({ ...prev, [msg.id]: result }));
+                });
+
+                // 4. 무조건 알림음 및 음성 발생
+                playNotificationSound();
+                const p = parseMsg(msg.translated_text);
+                if (p.text) playPremiumAudio(p.text, "ko", voiceGenderRef.current);
+            })
+            .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, [activeWorker, myId, voiceGender]); // Added voiceGender to dependencies to fix stale closure
+    }, [myId]); // activeWorker에 의존하지 않음
 
     const playAudio = (text: string, langCode: string) => {
-        if (!text || typeof window === 'undefined') return;
-
-        // CRITICAL FIX: Read from ref, NOT state. State-reads inside closures are stale.
         const currentGender = voiceGenderRef.current;
-        console.log(`[playAudio] Gender from ref: ${currentGender}, Lang: ${langCode}`);
-
-        window.speechSynthesis.cancel();
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.lang = getVoiceLang(langCode);
-
-        // Primary gender differentiation via pitch
-        utter.pitch = currentGender === 'male' ? 0.5 : 1.6;
-
-        const voices = window.speechSynthesis.getVoices();
-        const maleKeywords = ['male', 'david', 'mark', 'minho', 'kyle', 'paul', 'stefan', 'dae-ho', 'guy', 'sean', 'ravi'];
-        const femaleKeywords = ['female', 'zira', 'heami', 'yuri', 'juhye', 'sara', 'anna', 'hyunjun', 'girl', 'katherine'];
-
-        let targetVoice = voices.find(v => {
-            const lowName = v.name.toLowerCase();
-            const langMatch = v.lang.toLowerCase().startsWith(langCode.toLowerCase()) || v.lang.includes(langCode.toUpperCase());
-            if (!langMatch) return false;
-            const keywords = currentGender === 'male' ? maleKeywords : femaleKeywords;
-            return keywords.some(k => lowName.includes(k));
-        });
-
-        if (!targetVoice) {
-            targetVoice = voices.find(v => v.lang.toLowerCase().startsWith(langCode.toLowerCase()) || v.lang.includes(langCode.toUpperCase()));
-        }
-
-        if (targetVoice) {
-            console.log(`[playAudio] Voice selected: ${targetVoice.name}`);
-            utter.voice = targetVoice;
-            const low = targetVoice.name.toLowerCase();
-            if (currentGender === 'male' && maleKeywords.every(k => !low.includes(k))) utter.pitch = 0.4;
-            if (currentGender === 'female' && femaleKeywords.every(k => !low.includes(k))) utter.pitch = 2.0;
-        } else {
-            console.warn(`[playAudio] No voice found for lang: ${langCode}. Pitch-only mode.`);
-        }
-
-        utter.rate = 1.0;
-        window.speechSynthesis.speak(utter);
+        playPremiumAudio(text, langCode, currentGender);
     };
 
-    const toggleRecording = () => {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SpeechRecognition) { alert("Not supported in this browser."); return; }
-
+    const toggleRecording = async () => {
         if (isRecording) {
-            if (recognitionRef.current) recognitionRef.current.stop();
+            if (mediaRecorderRef.current) {
+                mediaRecorderRef.current.stop();
+            }
             setIsRecording(false);
         } else {
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'ko-KR';
-            recognition.continuous = true;
-            recognition.interimResults = false;
-            recognitionRef.current = recognition;
-            recognition.start();
-            setIsRecording(true);
-            recognition.onresult = (event: any) => {
-                let txt = "";
-                for (let i = event.resultIndex; i < event.results.length; ++i) txt += event.results[i][0].transcript;
-                if (txt.trim()) setText((prev) => prev ? prev + " " + txt.trim() : txt.trim());
-            };
-            recognition.onerror = () => setIsRecording(false);
-            recognition.onend = () => setIsRecording(false);
+            try {
+                audioChunksRef.current = [];
+                const recorder = await createSTTRecorder((blob) => {
+                    audioChunksRef.current.push(blob);
+                });
+
+                recorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm;codecs=opus' });
+                    // Premium STT Processing
+                    const result = await transcribeAudio(audioBlob, 'ko-KR');
+                    if (result.trim()) {
+                        setText(result.trim());
+                        // Auto-send for high-speed voice bridge experience
+                        setTimeout(() => handleSend(result.trim()), 100);
+                    }
+                };
+
+                mediaRecorderRef.current = recorder;
+                recorder.start();
+                setIsRecording(true);
+            } catch (err) {
+                console.error("STT Start Error:", err);
+                alert("Microphone access denied or error occurred.");
+            }
         }
     };
 
-    const handleSend = async () => {
-        if (!text.trim() || !activeWorker || !myId) return;
+    const handleSend = async (overrideText?: string | React.MouseEvent) => {
+        // overrideText가 string으로 들어오면 (음성 전송), 그렇지 않으면(버튼 클릭) 기존 text 사용
+        const messageText = typeof overrideText === 'string' ? overrideText : text;
+
+        if (!messageText.trim() || !activeWorker || !myId) return;
         setIsSending(true);
         try {
-            const { normalized, changes } = await normalizeKoAsync(text.trim());
+            const { normalized, changes } = await normalizeKoAsync(messageText.trim());
 
             let translated = normalized;
             let pron = "";
@@ -288,26 +292,25 @@ function AdminChatContent() {
                 to_user: activeWorker.id,
                 source_lang: "ko",
                 target_lang: activeWorker.preferred_lang,
-                source_text: text.trim(), // 원문 저장
+                source_text: text.trim(),
                 translated_text: JSON.stringify({
                     norm: normalized,
-                    text: foreignSlang, // 외국 현장 은어 적용본 
+                    text: foreignSlang,
                     pron,
                     rev
                 }),
             };
 
-            await supabase.from("messages").insert(payload);
-            // Optimistic update
+            // 🚀 Optimistic Update
             setMessages(prev => [...prev, { ...payload, id: `temp-${Date.now()}`, created_at: new Date().toISOString() } as any]);
             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
 
+            await supabase.from("messages").insert(payload);
             setText("");
             if (isRecording) toggleRecording();
 
-            // Auto TTS for outgoing message (Admin's phone speaks the foreign language so the worker next to them can hear)
             if (translated && activeWorker.preferred_lang !== "ko") {
-                playAudio(translated, activeWorker.preferred_lang);
+                playPremiumAudio(translated, activeWorker.preferred_lang, voiceGenderRef.current);
             }
         } catch (e) {
             console.error(e);
@@ -317,16 +320,44 @@ function AdminChatContent() {
         }
     };
 
-    const t = getUI(adminLang);
-    const filteredWorkers = workers.filter(w => (w.display_name || "").toLowerCase().includes(searchQuery.toLowerCase()));
+    const [hiddenWorkers, setHiddenWorkers] = useState<Set<string>>(new Set());
+    const [showQR, setShowQR] = useState(false);
+
+    useEffect(() => {
+        const saved = localStorage.getItem("adm_hidden_workers");
+        if (saved) setHiddenWorkers(new Set(JSON.parse(saved)));
+    }, []);
+
+    const hideWorker = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        const next = new Set(hiddenWorkers).add(id);
+        setHiddenWorkers(next);
+        localStorage.setItem("adm_hidden_workers", JSON.stringify(Array.from(next)));
+        if (activeWorker?.id === id) setActiveWorker(null);
+    };
 
     // Safe JSON parser for display
-    const parseMsg = (raw: any) => {
-        if (!raw) return { text: "", pron: "", rev: "" };
-        if (typeof raw === "object") return raw;
-        try { return JSON.parse(raw); }
-        catch { return { text: String(raw), pron: "", rev: "" }; }
+    const parseMsg = (raw: any): { norm: string; text: string; pron: string; rev: string } => {
+        if (!raw) return { norm: '', text: '', pron: '', rev: '' };
+        if (typeof raw === 'object') return { norm: raw.norm || '', text: raw.text || '', pron: raw.pron || '', rev: raw.rev || '' };
+        try {
+            const p = JSON.parse(raw);
+            return {
+                norm: p.norm || '',
+                text: p.text || '',
+                pron: p.pron || '',
+                rev: p.rev || '',
+            };
+        } catch {
+            return { norm: '', text: String(raw), pron: '', rev: '' };
+        }
     };
+
+    const t = getUI(adminLang);
+    // ROOT 제외 + 숨긴 근로자 제외
+    const filteredWorkers = workers
+        .filter(w => !hiddenWorkers.has(w.id))
+        .filter(w => (w.display_name || "").toLowerCase().includes(searchQuery.toLowerCase()));
 
     return (
         <RoleGuard allowedRole="admin">
@@ -347,30 +378,39 @@ function AdminChatContent() {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        {/* Voice Gender Switch */}
-                        <div className="hidden md:flex items-center bg-slate-100 rounded-full p-1 border border-slate-200 shadow-inner">
+                        {/* Voice Gender Switch - Always visible to ensure use in 1:1 and mobile */}
+                        <div className="flex items-center bg-slate-100 rounded-full p-1 border border-slate-200 shadow-inner">
                             <button
                                 onClick={() => changeGender('male')}
-                                className={`px-3 py-1 rounded-full text-[10px] font-black transition-all ${voiceGender === 'male' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                                className={`px-2 py-1 md:px-3 rounded-full text-[9px] md:text-[10px] font-black transition-all ${voiceGender === 'male' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                             >
                                 MALE
                             </button>
                             <button
                                 onClick={() => changeGender('female')}
-                                className={`px-3 py-1 rounded-full text-[10px] font-black transition-all ${voiceGender === 'female' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                                className={`px-2 py-1 md:px-3 rounded-full text-[9px] md:text-[10px] font-black transition-all ${voiceGender === 'female' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                             >
                                 FEMALE
                             </button>
                         </div>
 
                         {activeWorker && (
-                            <button
-                                onClick={() => fetchMessages()}
-                                className="p-2 rounded-full hover:bg-slate-100 text-blue-500 transition-all tap-effect border border-slate-100 shadow-sm"
-                                title="Refresh Chat"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                            </button>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => setShowQR(true)}
+                                    className="p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-all border border-slate-100"
+                                    title="Add Friend QR"
+                                >
+                                    <QrCode className="w-5 h-5" />
+                                </button>
+                                <button
+                                    onClick={() => fetchMessages()}
+                                    className="p-2 rounded-full hover:bg-slate-100 text-blue-500 transition-all tap-effect border border-slate-100 shadow-sm"
+                                    title="Refresh Chat"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                </button>
+                            </div>
                         )}
                     </div>
                 </header>
@@ -403,87 +443,163 @@ function AdminChatContent() {
                                     <button
                                         key={w.id}
                                         onClick={() => setActiveWorker(w)}
-                                        className={`flex items-center gap-4 p-4 rounded-3xl transition-all tap-effect border ${activeWorker?.id === w.id ? 'bg-blue-50 border-blue-200 shadow-md transform scale-[1.02]' : 'bg-white border-transparent shadow-sm hover:shadow hover:bg-slate-50'}`}
+                                        className={`group/btn flex items-center gap-4 p-4 rounded-3xl transition-all tap-effect border ${activeWorker?.id === w.id ? 'bg-blue-50 border-blue-200 shadow-md transform scale-[1.02]' : 'bg-white border-transparent shadow-sm hover:shadow hover:bg-slate-50'}`}
                                     >
                                         <div className="relative flex-shrink-0">
                                             <img src={`https://flagcdn.com/w40/${isoMap[w.preferred_lang] || "un"}.png`} alt={w.preferred_lang} className="w-10 h-10 object-cover rounded-full shadow border-2 border-slate-100" />
+                                            {unreadWorkers.has(w.id) && (
+                                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-bounce" />
+                                            )}
                                         </div>
                                         <div className="flex flex-col items-start flex-1 overflow-hidden">
                                             <span className={`font-black truncate w-full text-left ${activeWorker?.id === w.id ? 'text-blue-700' : 'text-slate-700'}`}>{w.display_name}</span>
                                             <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">{w.preferred_lang}</span>
                                         </div>
+                                        <button
+                                            onClick={(e) => hideWorker(e, w.id)}
+                                            className="p-2 rounded-full opacity-0 group-hover/btn:opacity-100 hover:bg-red-50 text-red-300 hover:text-red-500 transition-all"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
                                     </button>
                                 ))
                             )}
                         </div>
                     </div>
 
+                    {/* QR Modal */}
+                    <AnimatePresence>
+                        {showQR && (
+                            <motion.div
+                                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+                                onClick={() => setShowQR(false)}
+                            >
+                                <motion.div
+                                    initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+                                    className="bg-white rounded-[40px] p-8 max-w-sm w-full shadow-2xl flex flex-col items-center gap-6"
+                                    onClick={e => e.stopPropagation()}
+                                >
+                                    <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">친구 추가 QR</h3>
+                                    <div className="bg-slate-50 p-6 rounded-[32px] border-4 border-slate-100 shadow-inner">
+                                        <img
+                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${window.location.origin}/worker/chat?add_friend=${myId}`)}`}
+                                            alt="Add Friend QR"
+                                            className="w-48 h-48 md:w-64 md:h-64"
+                                        />
+                                    </div>
+                                    <p className="text-center text-slate-500 font-bold leading-tight">
+                                        이 관리자를 근로자의 대화 목록에<br />추가하려면 QR 코드를 스캔하세요.
+                                    </p>
+                                    <button
+                                        onClick={() => setShowQR(false)}
+                                        className="w-full py-4 bg-slate-900 text-white rounded-full font-black uppercase tracking-widest hover:bg-slate-800 transition-all"
+                                    >
+                                        닫기
+                                    </button>
+                                </motion.div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
                     {/* Chat Area */}
                     <div className={`${!activeWorker ? 'hidden' : 'flex'} flex-col flex-1 bg-[#f8fafc] h-full relative`}>
                         <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col gap-6" style={{ backgroundImage: 'radial-gradient(circle at center, #e2e8f0 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
-                            {messages.map((m, i) => {
-                                const isAdmin = m.from_user === myId;
-                                const parsed = parseMsg(m.translated_text);
+                            <AnimatePresence initial={false}>
+                                {messages.map((m, i) => {
+                                    const isAdmin = m.from_user === myId;
+                                    const parsed = parseMsg(m.translated_text);
 
-                                return (
-                                    <div key={m.id || i} className={`flex flex-col max-w-[85%] md:max-w-[70%] ${isAdmin ? 'self-end items-end' : 'self-start items-start'} landscape:max-w-[95%]`}>
-                                        <div className={`flex items-center gap-2 mb-1 ${isAdmin ? 'mr-2' : 'ml-2'}`}>
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                                {isAdmin ? t.admin : activeWorker?.display_name}
-                                            </span>
-                                            <button onClick={() => playAudio(isAdmin ? parsed.text : parsed.text, isAdmin ? activeWorker?.preferred_lang || "ko" : "ko")} className="text-blue-500 hover:text-blue-600 tap-effect bg-white outline-none rounded-full p-1 shadow-sm border border-slate-200">
-                                                <svg className="w-3.5 h-3.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-                                            </button>
-                                        </div>
-
-                                        <div className={`p-5 rounded-3xl shadow-md border flex flex-col gap-3 ${isAdmin ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
-
-                                            {/* Primary Text (What the user reads primarily: KO for Admin, Foreign for Worker) */}
-                                            <p className="font-black text-xl md:text-2xl landscape:text-4xl whitespace-pre-wrap leading-snug drop-shadow-sm">
-                                                {isAdmin ? m.source_text : parsed.text}
-                                            </p>
-
-                                            {/* Translation Detail Section */}
-                                            <div className={`pt-3 border-t flex flex-col gap-2 ${isAdmin ? 'border-blue-400/50' : 'border-slate-100'}`}>
-
-                                                {isAdmin ? (
-                                                    // ── 관리자 메시지: 번역문(외국어) + 발음 + 역번역 ──
-                                                    <>
-                                                        {/* 번역: 외국어 번역 결과 */}
-                                                        <div className="flex items-start gap-1.5 opacity-90">
-                                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5">번역</span>
-                                                            <span className="font-bold text-lg landscape:text-2xl">{parsed.text}</span>
-                                                        </div>
-                                                        {/* 발음: 외국어 번역문의 한글 독음 (관리자가 읽는 용) */}
-                                                        {parsed.pron && (
-                                                            <div className="flex items-start gap-1.5">
-                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5">{t.pron}</span>
-                                                                <span className="font-bold text-base opacity-90">{parsed.pron}</span>
-                                                            </div>
-                                                        )}
-                                                        {/* 역번역: 번역 검증 */}
-                                                        {parsed.rev && (
-                                                            <div className="flex items-start gap-1.5">
-                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5">{t.rev}</span>
-                                                                <span className="font-bold text-base opacity-80">{parsed.rev}</span>
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                ) : (
-                                                    // ── 근로자 메시지: 원문(외국어)만 표시. 발음 불필요(관리자는 한국어 사용자) ──
-                                                    <div className="flex items-start gap-1.5">
-                                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-500 shrink-0 mt-0.5">原文</span>
-                                                        <span className="font-bold text-lg landscape:text-2xl text-slate-600">{m.source_text}</span>
-                                                    </div>
-                                                )}
+                                    return (
+                                        <motion.div
+                                            key={m.id || i}
+                                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                            className={`flex flex-col max-w-[85%] md:max-w-[70%] ${isAdmin ? 'self-end items-end' : 'self-start items-start'} landscape:max-w-[95%]`}
+                                        >
+                                            <div className={`flex items-center gap-2 mb-1 ${isAdmin ? 'mr-2' : 'ml-2'}`}>
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                    {isAdmin ? t.admin : activeWorker?.display_name}
+                                                </span>
+                                                <button onClick={() => playAudio(isAdmin ? parsed.text : parsed.text, isAdmin ? activeWorker?.preferred_lang || "ko" : "ko")} className="text-blue-500 hover:text-blue-600 tap-effect bg-white outline-none rounded-full p-1 shadow-sm border border-slate-200">
+                                                    <svg className="w-3.5 h-3.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                                                </button>
                                             </div>
-                                        </div>
-                                        <span className={`text-[10px] text-slate-400 font-bold mt-1 ${isAdmin ? 'mr-2' : 'ml-2'} landscape:text-base`}>
-                                            {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </span>
-                                    </div>
-                                );
-                            })}
+
+                                            <div className={`p-5 rounded-3xl shadow-md border flex flex-col gap-3 ${isAdmin ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
+
+                                                {/* Primary Text (What the user reads primarily: KO for Admin, Foreign for Worker) */}
+                                                <p className="font-black text-xl md:text-2xl landscape:text-4xl whitespace-pre-wrap leading-snug drop-shadow-sm">
+                                                    {isAdmin ? m.source_text : parsed.text}
+                                                </p>
+
+                                                {/* Translation Detail Section */}
+                                                <div className={`pt-3 border-t flex flex-col gap-2 ${isAdmin ? 'border-blue-400/50' : 'border-slate-100'}`}>
+
+                                                    {isAdmin ? (
+                                                        // ── 관리자 메시지: 번역문(외국어) + 발음 + 역번역 ──
+                                                        <>
+                                                            {/* 번역: 외국어 번역 결과 */}
+                                                            <div className="flex items-start gap-1.5 opacity-90">
+                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5">번역</span>
+                                                                <span className="font-bold text-lg landscape:text-2xl">{parsed.text}</span>
+                                                            </div>
+                                                            {/* 발음: 외국어 번역문의 한글 독음 (관리자가 읽는 용) */}
+                                                            {parsed.pron && (
+                                                                <div className="flex items-start gap-1.5">
+                                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5">{t.pron}</span>
+                                                                    <span className="font-bold text-base opacity-90">{parsed.pron}</span>
+                                                                </div>
+                                                            )}
+                                                            {/* 역번역: 번역 검증 */}
+                                                            {parsed.rev && (
+                                                                <div className="flex items-start gap-1.5">
+                                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5">{t.rev}</span>
+                                                                    <span className="font-bold text-base opacity-80">{parsed.rev}</span>
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    ) : (
+                                                        // ── 근로자 메시지: 원문(외국어)만 표시. 발음 불필요(관리자는 한국어 사용자) ──
+                                                        <div className="flex flex-col gap-2">
+                                                            <div className="flex items-start gap-1.5 border-b border-slate-50 pb-2 mb-1">
+                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-500 shrink-0 mt-0.5">原文</span>
+                                                                <span className="font-bold text-lg landscape:text-2xl text-slate-600">{m.source_text}</span>
+                                                            </div>
+                                                            {/* AI Insight Badge */}
+                                                            {aiAnalyses[m.id] && (
+                                                                <motion.div
+                                                                    initial={{ opacity: 0, x: -5 }}
+                                                                    animate={{ opacity: 1, x: 0 }}
+                                                                    className={`flex items-start gap-2 p-2.5 rounded-2xl border ${aiAnalyses[m.id].is_emergency
+                                                                        ? 'bg-red-50 border-red-100 text-red-700'
+                                                                        : 'bg-emerald-50 border-emerald-100 text-emerald-700'
+                                                                        }`}
+                                                                >
+                                                                    {aiAnalyses[m.id].is_emergency ? <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" /> : <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />}
+                                                                    <div className="flex flex-col gap-0.5">
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <span className="text-[10px] font-black uppercase tracking-widest">AI Safety Insight</span>
+                                                                            <span className="text-[10px] font-bold opacity-60">Score: {aiAnalyses[m.id].safety_score}%</span>
+                                                                        </div>
+                                                                        <p className="text-[11px] font-bold leading-tight">{aiAnalyses[m.id].summary_ko}</p>
+                                                                        {aiAnalyses[m.id].recommended_action && (
+                                                                            <p className="text-[10px] font-black mt-1 uppercase text-red-600">Action: {aiAnalyses[m.id].recommended_action}</p>
+                                                                        )}
+                                                                    </div>
+                                                                </motion.div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <span className={`text-[10px] text-slate-400 font-bold mt-1 ${isAdmin ? 'mr-2' : 'ml-2'} landscape:text-base`}>
+                                                {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        </motion.div>
+                                    );
+                                })}
+                            </AnimatePresence>
                             <div ref={messagesEndRef} />
                         </div>
 

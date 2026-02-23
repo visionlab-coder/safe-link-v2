@@ -107,8 +107,18 @@ function AuthContent() {
 
     // 이미 로그인된 계정으로 계속 진행
     const handleContinueAsExisting = () => {
-        if (!existingUser?.role) { router.push(`/auth/setup?lang=${lang}`); return; }
-        const path = (existingUser.role === "HQ_ADMIN" || existingUser.role === "SAFETY_OFFICER") ? "/admin" : "/worker";
+        const targetRole = searchParams.get("role");
+        const siteId = searchParams.get("site_id");
+        if (!existingUser?.role) {
+            router.push(`/auth/setup?lang=${lang}${targetRole ? `&role=${targetRole}` : ""}${siteId ? `&site_id=${siteId}` : ""}`);
+            return;
+        }
+
+        let path = "/worker";
+        if (existingUser.role === "ROOT" || existingUser.role === "HQ_OFFICER") path = "/system";
+        else if (existingUser.role === "HQ_ADMIN") path = "/control";
+        else if (existingUser.role === "SAFETY_OFFICER") path = "/admin";
+
         router.push(`${path}?lang=${lang}`);
     };
 
@@ -128,10 +138,16 @@ function AuthContent() {
         if (session) {
             const { data: profile } = await supabase
                 .from("profiles").select("role").eq("id", session.user.id).single();
-            // 현장 소장 + 안전관리자 모두 /admin으로
-            if (profile?.role === "HQ_ADMIN" || profile?.role === "SAFETY_OFFICER") router.push("/admin");
+
+            if (profile?.role === "ROOT" || profile?.role === "HQ_OFFICER") router.push("/system");
+            else if (profile?.role === "HQ_ADMIN") router.push("/control");
+            else if (profile?.role === "SAFETY_OFFICER") router.push("/admin");
             else if (profile?.role === "WORKER") router.push("/worker");
-            else router.push(`/auth/setup?lang=${lang}`);
+            else {
+                const targetRole = searchParams.get("role");
+                const siteId = searchParams.get("site_id");
+                router.push(`/auth/setup?lang=${lang}${targetRole ? `&role=${targetRole}` : ""}${siteId ? `&site_id=${siteId}` : ""}`);
+            }
         }
         setLoading(false);
     };

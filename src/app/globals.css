@@ -11,7 +11,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-noto-kr), var(--font-noto-sans), system-ui, sans-serif;
+  --font-sans: var(--font-noto-kr), var(--font-noto-sc), var(--font-noto-tc), var(--font-noto-jp), var(--font-noto-thai), var(--font-noto-arabic), var(--font-noto-devanagari), var(--font-noto-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 
@@ -52,15 +52,59 @@ body {
 .text-gradient {
   background: linear-gradient(to bottom right, #ffffff, #94a3b8);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .bg-mesh {
   background-color: #020617;
-  background-image: 
-    radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
-    radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
-    radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+  background-image:
+    radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
+    radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
+    radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
+  animation: bg-pan 20s ease-in-out infinite alternate;
+  background-attachment: fixed;
+}
+
+/* 💎 Specialized Glass Variants */
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+.glass-blue {
+  background: rgba(59, 130, 246, 0.1);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  box-shadow: 0 4px 15px 0 rgba(0, 0, 0, 0.3);
+}
+
+.tech-border {
+  position: relative;
+}
+
+.tech-border::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  pointer-events: none;
+  clip-path: polygon(0 0, 10% 0, 10% 2px, 90% 2px, 90% 0, 100% 0, 100% 10%, 98% 10%, 98% 90%, 100% 90%, 100% 100%, 90% 100%, 90% 98%, 10% 98%, 10% 100%, 0 100%, 0 90%, 2px 90%, 2px 10%, 0 10%);
+}
+
+@keyframes bg-pan {
+  0% {
+    background-position: 0% 0%;
+  }
+
+  100% {
+    background-position: 100% 100%;
+  }
 }
 
 /* ─────────────────────────────────────────────────────
@@ -68,9 +112,17 @@ body {
    ───────────────────────────────────────────────────── */
 
 @keyframes float {
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
-  100% { transform: translateY(0px); }
+  0% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+
+  100% {
+    transform: translateY(0px);
+  }
 }
 
 .animate-float {
@@ -78,9 +130,20 @@ body {
 }
 
 @keyframes pulse-soft {
-  0% { opacity: 1; }
-  50% { opacity: 0.7; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scale(0.98);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .animate-pulse-soft {

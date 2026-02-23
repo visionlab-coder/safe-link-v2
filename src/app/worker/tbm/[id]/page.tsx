@@ -7,6 +7,7 @@ import RoleGuard from "@/components/RoleGuard";
 import { Suspense } from "react";
 import SignatureCanvas from "react-signature-canvas";
 import { hangulize } from "@/utils/hangulize";
+import { playPremiumAudio } from "@/utils/tts";
 
 // ── 언어 코드 매핑 ──
 const googleLangCode: Record<string, string> = {
@@ -59,10 +60,21 @@ const uiText: Record<string, any> = {
     uz: { title: "Xavfsizlik brifing", original: "Asl (Koreys)", translated: "Tarjima", voice: "Tinglash", signHere: "Bu yerga imzo chekish", clear: "Tozalash", confirm: "✍️ Tasdiqlash va imzo", signed: "✓ Imzolandi!", translating: "Tarjima qilinmoqda...", noTBM: "Bugungi brifing yo'q.", mustSign: "Imzosiz chiqilsinmi?", alreadySigned: "Bugun allaqachon imzolandi.", back: "Orqaga", pron: "Talaffuz", rev: "Teskari tarjima" },
     zh: { title: "安全简报", original: "原文（韩语）", translated: "翻译", voice: "语音播放", signHere: "请在此签名", clear: "清除", confirm: "✍️ 确认并签名", signed: "✓ 签名完成！", translating: "翻译中...", noTBM: "今天没有简报", mustSign: "不签名就离开？", alreadySigned: "今天已经签名了。", back: "返回", pron: "发音", rev: "回译" },
 };
+// ── 텍스트 클리닝 (중법 괄호 및 반복 제거) ──
+const cleanupText = (text: string): string => {
+    if (!text) return "";
+    let count = 0;
+    // 괄호와 그 안의 내용을 과감하게 정리하되, 처음 한 번만 남기고 나머지는 제거합니다.
+    return text.replace(/[(\（][^)\）]+[)\）]/g, (match) => {
+        count++;
+        return count === 1 ? match : "";
+    }).split('\n').map(line => line.trim()).filter(Boolean).join('\n').replace(/\s{2,}/g, ' ').trim();
+};
+
 const getUI = (lang: string) => {
     const d = uiText[lang] || uiText["en"];
-    if (!d.pron) d.pron = "Pronunciation";
-    if (!d.rev) d.rev = "Reverse Trans";
+    if (!d.pron) d.pron = "발음";
+    if (!d.rev) d.rev = "역번역";
     return d;
 };
 
@@ -82,6 +94,14 @@ function WorkerTBMDetailContent() {
     const [isSigned, setIsSigned] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
+    const voiceGenderRef = useRef<'male' | 'female'>('female');
+    const hasAutoPlayed = useRef(false);
+
+    const changeGender = (g: 'male' | 'female') => {
+        voiceGenderRef.current = g;
+        setVoiceGender(g);
+    };
 
     const loadTBM = useCallback(async () => {
         const supabase = createClient();
@@ -112,15 +132,12 @@ function WorkerTBMDetailContent() {
                 .single();
             tbmData = data;
         } else {
-            let query = supabase
+            // 항상 최신 TBM을 가져옴 (site_id 필터 미적용 - 시연용)
+            const { data } = await supabase
                 .from("tbm_notices")
                 .select("*")
                 .order("created_at", { ascending: false })
                 .limit(1);
-            if (profile?.site_id) {
-                query = (query as any).eq("site_id", profile.site_id);
-            }
-            const { data } = await (query as any);
             tbmData = data?.[0] || null;
         }
 
@@ -139,10 +156,15 @@ function WorkerTBMDetailContent() {
                 setTranslating(true);
                 const result = await translateKo(tbmData.content_ko, lang);
 
-                // Apply hangulize for TBM pronunciation too
-                if (result.pron) {
+                // 1. 발음은 중국어일 경우 한글 독음으로 변환 (한어병음 제거)
+                if (lang === 'zh' && result.pron) {
+                    // 괄호 정리 전 한어병음을 한글로 변역
                     result.pron = hangulize(result.pron, lang);
                 }
+
+                // 2. 본문 및 발음에서 불필요한 중복 괄호 제거
+                result.text = cleanupText(result.text);
+                result.pron = cleanupText(result.pron);
 
                 setTransData(result);
                 setTranslating(false);
@@ -156,14 +178,35 @@ function WorkerTBMDetailContent() {
 
     useEffect(() => { loadTBM(); }, [loadTBM]);
 
+    // 🔊 Automatic Voice Guidance
+    useEffect(() => {
+        if (!loading && !translating && transData.text && !hasAutoPlayed.current) {
+            hasAutoPlayed.current = true;
+            // Delay slightly for smooth transition
+            setTimeout(() => {
+                handlePlayAudio();
+            }, 1000);
+        }
+    }, [loading, translating, transData.text]);
+
+    // 새 TBM 발송 시 자동 갱신
+    useEffect(() => {
+        const supabase = createClient();
+        const channel = supabase
+            .channel('tbm_detail_realtime')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tbm_notices' }, () => {
+                console.log('[TBM] New TBM received, reloading...');
+                loadTBM();
+            })
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [loadTBM]);
+
+
     const handlePlayAudio = () => {
         if (!transData.text) return;
-        window.speechSynthesis.cancel();
-        const utter = new SpeechSynthesisUtterance(transData.text);
-        utter.lang = googleLangCode[preferredLang] || preferredLang;
-        utter.onstart = () => setIsPlaying(true);
-        utter.onend = () => setIsPlaying(false);
-        window.speechSynthesis.speak(utter);
+        setIsPlaying(true);
+        playPremiumAudio(transData.text, preferredLang, voiceGenderRef.current, () => setIsPlaying(false));
     };
 
     const handleSubmit = async () => {
@@ -182,13 +225,18 @@ function WorkerTBMDetailContent() {
 
             const signatureImage = signaturePadRef.current?.toDataURL("image/png");
 
-            await supabase.from("tbm_ack").insert({
+            const { error: ackError } = await supabase.from("tbm_ack").insert({
                 tbm_id: tbm.id,
                 worker_id: session.user.id,
-                worker_name: session.user.email,
-                signature_image: signatureImage,
+                signature_data: signatureImage,
                 ack_at: new Date().toISOString(),
             });
+
+            if (ackError) {
+                console.error("서명 저장 실패:", ackError.message);
+                alert("서명 저장에 실패했습니다: " + ackError.message);
+                return;
+            }
 
             setIsSigned(true);
             setTimeout(() => router.replace("/worker"), 1200);
@@ -232,12 +280,28 @@ function WorkerTBMDetailContent() {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className="flex flex-col items-end">
-                            <span className="text-xs font-black text-slate-500 uppercase tracking-tighter">Preferred Language</span>
-                            <span className="text-sm font-bold text-slate-300">{preferredLang.toUpperCase()}</span>
+                    <div className="flex items-center gap-2">
+                        {/* 🔊 Voice Gender Switch - High Visibility */}
+                        <div className="flex items-center bg-white/15 backdrop-blur-md rounded-full p-1 border border-white/20 shadow-lg">
+                            <button
+                                onClick={() => changeGender('male')}
+                                className={`px-2 py-1 md:px-3 rounded-full text-[9px] md:text-[10px] font-black transition-all ${voiceGender === 'male' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                MALE
+                            </button>
+                            <button
+                                onClick={() => changeGender('female')}
+                                className={`px-3 py-1 md:px-3 rounded-full text-[9px] md:text-[10px] font-black transition-all ${voiceGender === 'female' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                FEMALE
+                            </button>
                         </div>
-                        <img src={`https://flagcdn.com/w80/${iso}.png`} alt={preferredLang} className="w-10 h-7 object-cover rounded shadow-lg border border-white/10" />
+
+                        <div className="hidden sm:flex flex-col items-end">
+                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter">Voice Lang</span>
+                            <span className="text-[10px] font-bold text-slate-300">{preferredLang.toUpperCase()}</span>
+                        </div>
+                        <img src={`https://flagcdn.com/w80/${iso}.png`} alt={preferredLang} className="w-8 h-6 md:w-10 md:h-7 object-cover rounded shadow border border-white/10" />
                     </div>
                 </header>
 
@@ -330,28 +394,34 @@ function WorkerTBMDetailContent() {
                                 <button
                                     onClick={handlePlayAudio}
                                     disabled={isPlaying || translating}
-                                    className="mt-10 w-full py-6 glass rounded-block transition-all tap-effect flex items-center justify-center gap-4 border-blue-500/20 hover:border-blue-500/40 hover:bg-blue-500/5 group/btn"
+                                    className="mt-10 w-full py-6 glass rounded-block transition-all tap-effect flex flex-col items-center justify-center gap-2 border-blue-500/20 hover:border-blue-500/40 hover:bg-blue-500/5 group/btn"
                                 >
-                                    {isPlaying ? (
-                                        <>
-                                            <div className="flex gap-1 items-end h-6">
-                                                <div className="w-1.5 h-2 bg-blue-500 rounded-full animate-[bounce_1s_infinite]" />
-                                                <div className="w-1.5 h-6 bg-blue-500 rounded-full animate-[bounce_1.2s_infinite]" />
-                                                <div className="w-1.5 h-4 bg-blue-500 rounded-full animate-[bounce_0.8s_infinite]" />
-                                            </div>
-                                            <span className="text-xl font-black text-blue-400 uppercase italic">Playing...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500 group-hover/btn:scale-110 transition-transform">
-                                                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                                                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-                                                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-                                                </svg>
-                                            </div>
-                                            <span className="text-2xl font-black text-blue-100">{t.voice}</span>
-                                        </>
-                                    )}
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <span className="px-2 py-0.5 bg-blue-500 rounded-md text-[9px] font-black text-white animate-pulse">PREMIUM VOICE ACTOR</span>
+                                        <span className="text-[9px] font-bold text-slate-500 italic uppercase">Neural Engine 3.1</span>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        {isPlaying ? (
+                                            <>
+                                                <div className="flex gap-1 items-end h-6">
+                                                    <div className="w-1.5 h-2 bg-blue-500 rounded-full animate-[bounce_1s_infinite]" />
+                                                    <div className="w-1.5 h-6 bg-blue-500 rounded-full animate-[bounce_1.2s_infinite]" />
+                                                    <div className="w-1.5 h-4 bg-blue-500 rounded-full animate-[bounce_0.8s_infinite]" />
+                                                </div>
+                                                <span className="text-xl font-black text-blue-400 uppercase italic">Playing...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500 group-hover/btn:scale-110 transition-transform">
+                                                    <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                                                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                                                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                                                    </svg>
+                                                </div>
+                                                <span className="text-2xl font-black text-blue-100">{t.voice}</span>
+                                            </>
+                                        )}
+                                    </div>
                                 </button>
                             </section>
 
@@ -370,7 +440,7 @@ function WorkerTBMDetailContent() {
                                             {t.clear.toUpperCase()}
                                         </button>
                                     </div>
-                                    <div className="bg-white rounded-[40px] border-[6px] border-slate-900 shadow-2xl overflow-hidden aspect-[3/1] relative">
+                                    <div className="bg-white rounded-[40px] border-[6px] border-slate-900 shadow-2xl overflow-hidden aspect-[2/1] relative">
                                         <SignatureCanvas
                                             ref={signaturePadRef}
                                             penColor="#0f172a"

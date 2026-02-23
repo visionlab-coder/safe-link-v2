@@ -220,9 +220,14 @@ function WorkerHomeContent() {
                             <img src={`https://flagcdn.com/w40/${iso}.png`} alt={lang} className="w-8 h-5.5 object-cover rounded-sm shadow-md" />
                             <span className="text-xs text-white font-black">{lang.toUpperCase()}</span>
                         </div>
-                        <button onClick={handleSignOut} className="text-[10px] font-black text-slate-500 hover:text-red-400 uppercase tracking-widest py-1 transition-colors">
-                            {t.signOut}
-                        </button>
+                        <div className="flex gap-4">
+                            <button onClick={() => router.push('/auth/setup')} className="text-[10px] font-black text-blue-400 hover:text-blue-200 uppercase tracking-widest py-1 transition-colors">
+                                Profile Edit
+                            </button>
+                            <button onClick={handleSignOut} className="text-[10px] font-black text-slate-500 hover:text-red-400 uppercase tracking-widest py-1 transition-colors">
+                                {t.signOut}
+                            </button>
+                        </div>
                     </div>
                 </header>
 
@@ -240,7 +245,7 @@ function WorkerHomeContent() {
                                 </svg>
                             </div>
                             <div className="flex-1">
-                                <h2 className="text-2xl font-black text-white italic lowercase tracking-tight">{t.newTBM}</h2>
+                                <h2 className="text-2xl font-bold text-white italic lowercase tracking-tight">{t.newTBM}</h2>
                                 <p className="text-red-200/60 font-medium text-sm">Arrived at {newTBMTime}</p>
                             </div>
                             <div className="w-12 h-12 glass rounded-full flex items-center justify-center text-white group-hover:translate-x-1 transition-transform">
@@ -265,7 +270,7 @@ function WorkerHomeContent() {
                                 </svg>
                             </div>
                             <div className="flex-1">
-                                <h2 className="text-2xl font-black text-white tracking-tight leading-none mb-1">{t.newChat}</h2>
+                                <h2 className="text-2xl font-bold text-white tracking-tight leading-none mb-1">{t.newChat}</h2>
                                 <p className="text-blue-100/80 font-bold text-sm">Requested at {newChatTime}</p>
                             </div>
                             <div className="w-12 h-12 bg-white text-blue-600 rounded-full flex items-center justify-center shadow-lg hover:bg-blue-50 transition-colors">

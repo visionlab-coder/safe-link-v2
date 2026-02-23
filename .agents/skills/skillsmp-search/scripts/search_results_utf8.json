@@ -1,0 +1,114 @@
+﻿
+============================================================
+Search Type: KEYWORD
+============================================================
+
+Page 1 of 220 (Total: 1097 skills)
+
+1. studio-testing
+   Description: Testing strategy for Supabase Studio. Use when writing tests, deciding what type of test to write, extracting logic from components into testable utility functions, or reviewing test coverage. Covers unit tests, component tests, and E2E test selection criteria.
+   Author: supabase
+   Stars: 97991
+   URL: https://skillsmp.com/skills/supabase-supabase-claude-skills-studio-testing-skill-md
+
+2. e2e-studio-tests
+   Description: Run e2e tests in the Studio app. Use when asked to run e2e tests, run studio tests, playwright tests, or test the feature.
+   Author: supabase
+   Stars: 97991
+   URL: https://skillsmp.com/skills/supabase-supabase-claude-skills-e2e-studio-tests-skill-md
+
+3. vercel-composition-patterns
+   Description: React composition patterns that scale. Use when refactoring components with boolean prop proliferation, building flexible component libraries, or designing reusable APIs. Triggers on tasks involving compound components, render props, context providers, or component architecture. Includes React 19 API changes.
+   Author: supabase
+   Stars: 97991
+   URL: https://skillsmp.com/skills/supabase-supabase-claude-skills-vercel-composition-patterns-skill-md
+
+4. vitest
+   Description: Vitest fast unit testing framework powered by Vite with Jest-compatible API. Use when writing tests, mocking, configuring coverage, or working with test filtering and fixtures.
+   Author: supabase
+   Stars: 97991
+   URL: https://skillsmp.com/skills/supabase-supabase-agents-skills-vitest-skill-md
+
+5. postgres-patterns
+   Description: PostgreSQL database patterns for query optimization, schema design, indexing, and security. Based on Supabase best practices.
+   Author: affaan-m
+   Stars: 49248
+   URL: https://skillsmp.com/skills/affaan-m-everything-claude-code-docs-ja-jp-skills-postgres-patterns-skill-md
+
+
+============================================================
+RAW JSON RESPONSE:
+============================================================
+{
+  "success": true,
+  "data": {
+    "skills": [
+      {
+        "id": "supabase-supabase-claude-skills-studio-testing-skill-md",
+        "name": "studio-testing",
+        "author": "supabase",
+        "description": "Testing strategy for Supabase Studio. Use when writing tests, deciding what type of test to write, extracting logic from components into testable utility functions, or reviewing test coverage. Covers unit tests, component tests, and E2E test selection criteria.",
+        "githubUrl": "https://github.com/supabase/supabase/tree/master/.claude/skills/studio-testing",
+        "skillUrl": "https://skillsmp.com/skills/supabase-supabase-claude-skills-studio-testing-skill-md",
+        "stars": 97991,
+        "updatedAt": 1771517895
+      },
+      {
+        "id": "supabase-supabase-claude-skills-e2e-studio-tests-skill-md",
+        "name": "e2e-studio-tests",
+        "author": "supabase",
+        "description": "Run e2e tests in the Studio app. Use when asked to run e2e tests, run studio tests, playwright tests, or test the feature.",
+        "githubUrl": "https://github.com/supabase/supabase/tree/master/.claude/skills/e2e-studio-tests",
+        "skillUrl": "https://skillsmp.com/skills/supabase-supabase-claude-skills-e2e-studio-tests-skill-md",
+        "stars": 97991,
+        "updatedAt": 1769777864
+      },
+      {
+        "id": "supabase-supabase-claude-skills-vercel-composition-patterns-skill-md",
+        "name": "vercel-composition-patterns",
+        "author": "supabase",
+        "description": "React composition patterns that scale. Use when refactoring components with boolean prop proliferation, building flexible component libraries, or designing reusable APIs. Triggers on tasks involving compound components, render props, context providers, or component architecture. Includes React 19 API changes.",
+        "githubUrl": "https://github.com/supabase/supabase/tree/master/.claude/skills/vercel-composition-patterns",
+        "skillUrl": "https://skillsmp.com/skills/supabase-supabase-claude-skills-vercel-composition-patterns-skill-md",
+        "stars": 97991,
+        "updatedAt": 1771517895
+      },
+      {
+        "id": "supabase-supabase-agents-skills-vitest-skill-md",
+        "name": "vitest",
+        "author": "supabase",
+        "description": "Vitest fast unit testing framework powered by Vite with Jest-compatible API. Use when writing tests, mocking, configuring coverage, or working with test filtering and fixtures.",
+        "githubUrl": "https://github.com/supabase/supabase/tree/master/.agents/skills/vitest",
+        "skillUrl": "https://skillsmp.com/skills/supabase-supabase-agents-skills-vitest-skill-md",
+        "stars": 97991,
+        "updatedAt": 1770799811
+      },
+      {
+        "id": "affaan-m-everything-claude-code-docs-ja-jp-skills-postgres-patterns-skill-md",
+        "name": "postgres-patterns",
+        "author": "affaan-m",
+        "description": "PostgreSQL database patterns for query optimization, schema design, indexing, and security. Based on Supabase best practices.",
+        "githubUrl": "https://github.com/affaan-m/everything-claude-code/tree/main/docs/ja-JP/skills/postgres-patterns",
+        "skillUrl": "https://skillsmp.com/skills/affaan-m-everything-claude-code-docs-ja-jp-skills-postgres-patterns-skill-md",
+        "stars": 49248,
+        "updatedAt": 1771578690
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 5,
+      "total": 1097,
+      "totalPages": 220,
+      "hasNext": true,
+      "hasPrev": false
+    },
+    "filters": {
+      "search": "supabase",
+      "sortBy": "stars"
+    }
+  },
+  "meta": {
+    "requestId": "01d6e233-7be1-460e-92e3-2d9f10de6b1a",
+    "responseTimeMs": 21
+  }
+}

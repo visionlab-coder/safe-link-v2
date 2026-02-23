@@ -77,6 +77,13 @@ function AdminTBMCreateContent() {
     const [aiTips, setAiTips] = useState<string[]>([]);
     const [normalizeResult, setNormalizeResult] = useState<{ normalized: string; changes: { from: string; to: string }[] } | null>(null);
     const [adminLang, setAdminLang] = useState("ko");
+    const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
+    const voiceGenderRef = useRef<'male' | 'female'>('female');
+
+    const changeGender = (g: 'male' | 'female') => {
+        voiceGenderRef.current = g;
+        setVoiceGender(g);
+    };
 
     const recognitionRef = useRef<any>(null);
     const urlLang = searchParams.get("lang");
@@ -124,30 +131,56 @@ function AdminTBMCreateContent() {
         }, 1200);
     };
 
+    const getSTTLang = (c: string) => {
+        const map: Record<string, string> = {
+            ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN",
+            th: "th-TH", uz: "uz-UZ", id: "id-ID", jp: "ja-JP", ph: "fil-PH"
+        };
+        return map[c] || c;
+    };
+
     const toggleRecording = () => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SpeechRecognition) return;
+        if (!SpeechRecognition) {
+            alert("This browser does not support Speech Recognition.");
+            return;
+        }
 
         if (isRecording) {
             if (recognitionRef.current) recognitionRef.current.stop();
             setIsRecording(false);
         } else {
+            console.log(`[Admin STT] Starting with: ${getSTTLang(adminLang)}`);
             const recognition = new SpeechRecognition();
-            recognition.lang = 'ko-KR';
+            recognition.lang = getSTTLang(adminLang);
             recognition.continuous = true;
-            recognition.interimResults = false;
+            recognition.interimResults = true;
             recognitionRef.current = recognition;
-            recognition.start();
-            setIsRecording(true);
+
+            recognition.onstart = () => setIsRecording(true);
+
             recognition.onresult = (event: any) => {
-                let text = "";
+                let finalTranscript = "";
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    text += event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    }
                 }
-                if (text.trim()) setTbmText((prev) => prev ? prev + " " + text.trim() : text.trim());
+                if (finalTranscript.trim()) {
+                    setTbmText((prev) => {
+                        const base = prev.trim();
+                        return base ? base + " " + finalTranscript.trim() : finalTranscript.trim();
+                    });
+                }
             };
-            recognition.onerror = () => setIsRecording(false);
+
+            recognition.onerror = (e: any) => {
+                console.error("[Admin STT Error]", e);
+                setIsRecording(false);
+            };
+
             recognition.onend = () => setIsRecording(false);
+            recognition.start();
         }
     };
 
@@ -158,11 +191,11 @@ function AdminTBMCreateContent() {
             const supabase = createClient();
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) return;
-            const { data: profile } = await supabase.from("profiles").select("site_id").eq("id", session.user.id).single();
+            const { data: profile } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
             const { normalized, changes } = await normalizeKoAsync(tbmText.trim());
             setNormalizeResult({ normalized, changes });
             const payload: any = { content_ko: normalized, created_by: session.user.id };
-            if (profile?.site_id) payload.site_id = profile.site_id;
+            if ((profile as any)?.site_id) payload.site_id = (profile as any).site_id;
             const { error } = await supabase.from("tbm_notices").insert(payload);
             if (!error) {
                 setTbmText("");
@@ -192,6 +225,22 @@ function AdminTBMCreateContent() {
                                 <span className="text-xl font-black tracking-tight text-white uppercase italic">Safe-Link</span>
                                 <span className="px-2 py-0.5 bg-blue-500 text-[10px] font-black rounded text-white tracking-widest uppercase">Admin</span>
                             </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center bg-white/5 rounded-full p-1 border border-white/10 shadow-inner">
+                            <button
+                                onClick={() => changeGender('male')}
+                                className={`px-3 py-1 rounded-full text-[10px] font-black transition-all ${voiceGender === 'male' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
+                            >
+                                MALE
+                            </button>
+                            <button
+                                onClick={() => changeGender('female')}
+                                className={`px-3 py-1 rounded-full text-[10px] font-black transition-all ${voiceGender === 'female' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
+                            >
+                                FEMALE
+                            </button>
                         </div>
                     </div>
                 </header>
@@ -232,7 +281,12 @@ function AdminTBMCreateContent() {
                                     {isRecording ? t.listening : t.voiceInput}
                                 </button>
                             </div>
-                            <textarea value={tbmText} onChange={(e) => setTbmText(e.target.value)} placeholder={t.placeholder} className="flex-1 w-full bg-transparent text-2xl md:text-3xl font-bold text-white placeholder-slate-800 outline-none resize-none leading-snug tracking-tight" />
+                            <textarea
+                                value={tbmText}
+                                onChange={(e) => setTbmText(e.target.value)}
+                                placeholder={isRecording ? `${t.listening} [${getSTTLang(adminLang)}]` : t.placeholder}
+                                className="flex-1 w-full bg-transparent text-2xl md:text-3xl font-bold text-white placeholder-slate-800 outline-none resize-none leading-snug tracking-tight"
+                            />
 
                             {normalizeResult && (
                                 <div className="mt-4 p-5 glass rounded-[28px] border-amber-500/20 bg-amber-500/[0.03]">
@@ -252,9 +306,23 @@ function AdminTBMCreateContent() {
                                 </div>
                             )}
 
-                            <div className="mt-auto pt-6 border-t border-white/5">
+                            <div className="mt-auto pt-6 border-t border-white/5 flex flex-col gap-3">
                                 <button onClick={handleSendTBM} disabled={isSending || tbmText.length === 0} className="w-full py-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-[32px] text-2xl font-black text-slate-950 shadow-[0_20px_50px_-15px_rgba(59,130,246,0.4)] tap-effect flex items-center justify-center gap-4 disabled:opacity-30 disabled:grayscale transition-all">
                                     {isSending ? <div className="w-8 h-8 border-4 border-slate-950 border-t-transparent rounded-full animate-spin" /> : <><svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>{t.pushBtn}</>}
+                                </button>
+                                <button
+                                    onClick={() => router.push("/admin/chat")}
+                                    className="w-full py-5 glass rounded-[28px] border-white/10 text-slate-300 hover:text-white hover:border-green-500/30 hover:bg-green-500/5 transition-all tap-effect flex items-center justify-center gap-3 group"
+                                >
+                                    <svg className="w-6 h-6 text-green-400 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                    </svg>
+                                    <span className="font-black text-lg tracking-tight">
+                                        {adminLang === "ko" ? "1:1 대화 바로가기" : adminLang === "zh" ? "进入1对1对话" : "Go to 1:1 Chat"}
+                                    </span>
+                                    <svg className="w-5 h-5 text-slate-600 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                                    </svg>
                                 </button>
                             </div>
                         </div>

@@ -9,7 +9,7 @@ export default function RoleGuard({
     allowedRole
 }: {
     children: React.ReactNode,
-    allowedRole: "admin" | "worker"
+    allowedRole: "admin" | "worker" | "hq" | "system"
 }) {
     const router = useRouter();
     const supabase = createClient();
@@ -50,14 +50,21 @@ export default function RoleGuard({
             }
 
             // 역할 vs allowedRole 비교
-            // 현장 소장(HQ_ADMIN) + 안전관리자(SAFETY_OFFICER) 모두 admin 페이지 접근 가능
+            // ✨ ROOT와 HQ_OFFICER는 통합 관제(system) 권한을 가집니다.
             const isAllowed =
+                profile.role === "ROOT" ||
+                (allowedRole === "system" && (profile.role === "ROOT" || profile.role === "HQ_OFFICER")) ||
                 (allowedRole === "admin" && (profile.role === "HQ_ADMIN" || profile.role === "SAFETY_OFFICER")) ||
+                (allowedRole === "hq" && profile.role === "HQ_ADMIN") ||
                 (allowedRole === "worker" && profile.role === "WORKER");
 
             if (!isAllowed) {
                 // 실제 역할에 맞는 경로로 안내
-                if (profile.role === "HQ_ADMIN" || profile.role === "SAFETY_OFFICER") {
+                if (profile.role === "ROOT" || profile.role === "HQ_OFFICER") {
+                    router.replace("/system");
+                } else if (profile.role === "HQ_ADMIN") {
+                    router.replace("/control"); // 현장소장 전용 페이지가 있다면 이동
+                } else if (profile.role === "SAFETY_OFFICER") {
                     router.replace("/admin");
                 } else if (profile.role === "WORKER") {
                     router.replace("/worker");

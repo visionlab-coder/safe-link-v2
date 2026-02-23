@@ -1,0 +1,33 @@
+{
+  "success": true,
+  "data": {
+    "skills": [
+      {
+        "id": "madeyexz-ian-skills-agents-skills-book-translation-guide-skill-md",
+        "name": "book-translation-guide",
+        "author": "madeyexz",
+        "description": "Workflow for translating entire books using AI agents. Split markdown books into chapters, batch translate 5 at a time, and verify completeness. Works with any language pair.",
+        "githubUrl": "https://github.com/madeyexz/ian-skills-agents/tree/main/skills/book-translation-guide",
+        "skillUrl": "https://skillsmp.com/skills/madeyexz-ian-skills-agents-skills-book-translation-guide-skill-md",
+        "stars": 2,
+        "updatedAt": 1771656054
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 1,
+      "total": 5,
+      "totalPages": 5,
+      "hasNext": true,
+      "hasPrev": false
+    },
+    "filters": {
+      "search": "book-translation",
+      "sortBy": "recent"
+    }
+  },
+  "meta": {
+    "requestId": "0c1dce7e-140b-472e-b2e9-7cfc9f9e64d9",
+    "responseTimeMs": 29
+  }
+}
