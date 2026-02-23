@@ -1,9 +1,9 @@
 import { createBrowserClient } from '@supabase/ssr'
 
 export function createClient() {
-    // 클라이언트(브라우저)에서 안심하고 쓸 수 있는 Supabase 친구를 만듭니다!
-    return createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+    // 빌드 타임(환경 변수가 없을 때)에 크래시가 나지 않도록 방어합니다.
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
+
+    return createBrowserClient(url, key);
 }
