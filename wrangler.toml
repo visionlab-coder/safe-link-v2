@@ -1,4 +1,14 @@
+#:schema node_modules/wrangler/config-schema.json
 name = "safe-link-v2"
+main = ".open-next/worker.js"
 compatibility_date = "2024-12-30"
 compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = ".vercel/output/static"
+
+# 환경변수는 Cloudflare 대시보드에서 설정하거나 아래에 추가
+[vars]
+NEXT_PUBLIC_SUPABASE_URL = "https://wzmzpuxpcpuvuacwmslj.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXpwdXhwY3B1dnVhY3dtc2xqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2ODk3MTEsImV4cCI6MjA4NjI2NTcxMX0.hkql2QVn_IIRIrb3pbialLHpDiNDzAE2NQNjgxUTUv0"
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"

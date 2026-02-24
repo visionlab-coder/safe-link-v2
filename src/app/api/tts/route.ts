@@ -1,7 +1,5 @@
 import { NextRequest } from 'next/server';
 
-export const runtime = 'edge';
-
 /**
  * [V3.0] Official Google Cloud Text-to-Speech Engine
  * Uses high-fidelity Neural2 & WaveNet voices.
