@@ -13,7 +13,10 @@ import {
     Cpu,
     Activity,
     Plus,
-    ArrowRight
+    ArrowRight,
+    Edit3,
+    Trash2,
+    X
 } from "lucide-react";
 
 type Site = {
@@ -53,6 +56,14 @@ const systemUI: Record<string, any> = {
             link: "현장 콘솔로 전환",
             more: "더 많은 현장이 준비 중입니다 (22개 현장 숨김)",
             viewAll: "모든 현장 목록 보기",
+            addTitle: "신규 현장 개설",
+            editTitle: "현장 정보 수정",
+            deleteTitle: "현장 삭제",
+            deleteConfirm: "정말 이 현장을 삭제하시겠습니까? 관련 데이터가 모두 삭제됩니다.",
+            namePlaceholder: "현장명을 입력하세요",
+            addrPlaceholder: "현장 주소를 입력하세요",
+            save: "저장하기",
+            cancel: "취소"
         },
         ai: {
             tower: "AI 에이전트 커맨드 타워",
@@ -99,6 +110,14 @@ const systemUI: Record<string, any> = {
             link: "Switch to Field Console",
             more: "More sites are being prepared (22 sites hidden)",
             viewAll: "View all sites",
+            addTitle: "Open New Site",
+            editTitle: "Edit Site Info",
+            deleteTitle: "Delete Site",
+            deleteConfirm: "Are you sure you want to delete this site? All related data will be removed.",
+            namePlaceholder: "Enter site name",
+            addrPlaceholder: "Enter site address",
+            save: "Save",
+            cancel: "Cancel"
         },
         ai: {
             tower: "AI Agent Command Tower",
@@ -125,6 +144,9 @@ export default function SystemAdminPage() {
     const [activeTab, setActiveTab] = useState("sites");
     const [lang, setLang] = useState("ko");
     const [currentUser, setCurrentUser] = useState<any>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingSite, setEditingSite] = useState<Site | null>(null);
+    const [siteForm, setSiteForm] = useState({ name: "", address: "" });
     const t = systemUI[lang];
 
     useEffect(() => {
@@ -170,6 +192,54 @@ export default function SystemAdminPage() {
         const supabase = createClient();
         await supabase.auth.signOut();
         window.location.href = "/auth";
+    };
+
+    const handleOpenAddModal = () => {
+        setEditingSite(null);
+        setSiteForm({ name: "", address: "" });
+        setIsModalOpen(true);
+    };
+
+    const handleOpenEditModal = (site: Site) => {
+        setEditingSite(site);
+        setSiteForm({ name: site.name, address: site.address });
+        setIsModalOpen(true);
+    };
+
+    const handleSaveSite = async () => {
+        if (!siteForm.name) return;
+        const supabase = createClient();
+        setLoading(true);
+
+        if (editingSite) {
+            // Update
+            const { error } = await supabase
+                .from("sites")
+                .update({ name: siteForm.name, address: siteForm.address })
+                .eq("id", editingSite.id);
+            if (error) alert(error.message);
+        } else {
+            // Create
+            const { error } = await supabase
+                .from("sites")
+                .insert([{ name: siteForm.name, address: siteForm.address }]);
+            if (error) alert(error.message);
+        }
+
+        setIsModalOpen(false);
+        await fetchSites();
+    };
+
+    const handleDeleteSite = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        if (!confirm(t.site.deleteConfirm)) return;
+
+        const supabase = createClient();
+        setLoading(true);
+        const { error } = await supabase.from("sites").delete().eq("id", id);
+        if (error) alert(error.message);
+
+        await fetchSites();
     };
 
     return (
@@ -279,6 +349,7 @@ export default function SystemAdminPage() {
                             <motion.button
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
+                                onClick={handleOpenAddModal}
                                 className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2 shadow-xl shadow-blue-500/20 transition-all text-sm"
                             >
                                 <Plus className="w-5 h-5" />
@@ -343,6 +414,21 @@ export default function SystemAdminPage() {
                                                     </div>
                                                 ))}
                                             </div>
+                                        </div>
+
+                                        <div className="absolute top-6 right-6 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleOpenEditModal(site); }}
+                                                className="w-10 h-10 rounded-full bg-white/10 hover:bg-blue-500/20 flex items-center justify-center border border-white/10 text-slate-400 hover:text-blue-400 transition-all"
+                                            >
+                                                <Edit3 className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => handleDeleteSite(e, site.id)}
+                                                className="w-10 h-10 rounded-full bg-white/10 hover:bg-red-500/20 flex items-center justify-center border border-white/10 text-slate-400 hover:text-red-400 transition-all"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-4 mt-8">
@@ -440,6 +526,77 @@ export default function SystemAdminPage() {
                                     </div>
                                 </div>
                             </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Site Add/Edit Modal */}
+                    <AnimatePresence>
+                        {isModalOpen && (
+                            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    onClick={() => setIsModalOpen(false)}
+                                    className="absolute inset-0 bg-black/80 backdrop-blur-md"
+                                />
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                    className="relative w-full max-w-lg bg-[#0d0d15] border border-white/10 rounded-[32px] p-8 shadow-2xl overflow-hidden"
+                                >
+                                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-1 bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
+
+                                    <div className="flex justify-between items-start mb-8">
+                                        <div>
+                                            <h3 className="text-2xl font-black italic tracking-tight">{editingSite ? t.site.editTitle : t.site.addTitle}</h3>
+                                            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">SAFE-LINK FIELD MANAGEMENT</p>
+                                        </div>
+                                        <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/5 rounded-full transition-colors">
+                                            <X className="w-6 h-6 text-slate-500" />
+                                        </button>
+                                    </div>
+
+                                    <div className="space-y-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Field Name</label>
+                                            <input
+                                                type="text"
+                                                value={siteForm.name}
+                                                onChange={e => setSiteForm({ ...siteForm, name: e.target.value })}
+                                                placeholder={t.site.namePlaceholder}
+                                                className="w-full bg-slate-900/50 border border-white/5 rounded-2xl p-4 text-white focus:border-blue-500 focus:bg-slate-900 transition-all outline-none font-bold"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Location/Address</label>
+                                            <input
+                                                type="text"
+                                                value={siteForm.address}
+                                                onChange={e => setSiteForm({ ...siteForm, address: e.target.value })}
+                                                placeholder={t.site.addrPlaceholder}
+                                                className="w-full bg-slate-900/50 border border-white/5 rounded-2xl p-4 text-white focus:border-blue-500 focus:bg-slate-900 transition-all outline-none font-bold"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-4 mt-10">
+                                        <button
+                                            onClick={() => setIsModalOpen(false)}
+                                            className="flex-1 py-4 bg-white/5 hover:bg-white/10 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+                                        >
+                                            {t.site.cancel}
+                                        </button>
+                                        <button
+                                            onClick={handleSaveSite}
+                                            className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-500/20 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+                                        >
+                                            {t.site.save}
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            </div>
                         )}
                     </AnimatePresence>
                 </main>

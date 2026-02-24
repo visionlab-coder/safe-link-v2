@@ -1,0 +1,72 @@
+﻿
+Cloudflare collects anonymous telemetry about your usage of Wrangler. Learn more at https://github.com/cloudflare/workers-sdk/tree/main/packages/wrangler/telemetry.md
+
+ ?낉툘 wrangler 3.114.17 (update available 4.68.0)
+-----------------------------------------------
+
+node.exe : [33m??[43;33m[[43;30mWARNIN
+G[43;33m][0m [1mThe version of Wrangle
+r you are using is now out-of-date.[0m
+위치 줄:1 문자:1
++ & "C:\Program Files\nodejs/node.exe" "C
+:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecifi 
+   ed: ([33m??[43;33m...ut-of-date.[  
+  0m:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeComm 
+   andError
+ 
+
+  Please update to the latest version to 
+prevent critical errors.
+  Run `npm install --save-dev wrangler@4`
+ to update to the latest version.
+  After installation, run Wrangler with `
+npx wrangler`.
+
+
+?? Building list of assets...
+?? Starting asset upload...
+?? Found 25 new or modified static assets to upload. Proceeding with upload...
++ /BUILD_ID
++ /_next/static/chunks/pages/_app-42ef6f0c9ee99f63.js
++ /_next/static/chunks/webpack-dd21d80139d31efd.js
++ /_next/static/chunks/app/control/page-e49096f971bc3b6a.js
++ /_next/static/chunks/958-46825b6ef8471951.js
++ /_next/static/chunks/app/page-3fa45803e565472c.js
++ /_next/static/chunks/app/worker/chat/page-84e9d46f6d0838d2.js
++ /_next/static/chunks/app/admin/tbm/create/page-ecd93f3b99655a1a.js
++ /_next/static/chunks/main-58a5f005052a422c.js
++ /_next/static/chunks/main-app-60d616b9495e9ec5.js
++ /_next/static/1X67tVbv1A_t-a9FdZI0Z/_buildManifest.js
++ /_next/static/chunks/218.57a830a2c55ba802.js
++ /_next/static/chunks/app/admin/qrcode/page-e348e72fed69b342.js
++ /_next/static/chunks/app/auth/page-8d9a55e62b056a0b.js
++ /_next/static/chunks/app/auth/setup/page-c3546b5d68329b22.js
++ /_next/static/chunks/app/worker/tbm/[id]/page-bf20666f8c9f7d00.js
++ /_next/static/chunks/app/admin/glossary/page-3616d477db17b632.js
++ /_next/static/chunks/203.2b4c1ee4fbe3a7cf.js
++ /_next/static/chunks/app/layout-68ea77fa8328ee9f.js
++ /_next/static/chunks/pages/_error-f44bc0d037a5fda4.js
++ /_next/static/chunks/app/admin/tbm/status/page-21f22ce0b82a3abb.js
++ /_next/static/chunks/app/worker/page-ec88e8174db2654a.js
++ /_next/static/chunks/app/admin/page-f1d1b43183fb0b97.js
++ /_next/static/chunks/app/system/page-03999b0a7eabe24d.js
++ /_next/static/chunks/app/admin/chat/page-6436294dad2b3c7a.js
+Uploaded 9 of 25 assets
+Uploaded 17 of 25 assets
+Uploaded 25 of 25 assets
+??Success! Uploaded 25 files (500 already uploaded) (3.24 sec)
+
+Total Upload: 4779.76 KiB / gzip: 966.21 KiB
+Worker Startup Time: 38 ms
+Your worker has access to the following bindings:
+- Vars:
+  - NEXT_PUBLIC_SUPABASE_URL: "https://wzmzpuxpcpuvuacwmslj.supabase..."
+  - NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...."
+Uploaded safe-link-v2 (14.91 sec)
+Deployed safe-link-v2 triggers (0.54 sec)
+  https://safe-link-v2.visionlab.workers.dev
+Current Version ID: 3c0e8f90-e866-4ad1-bb26-309a5599583c
