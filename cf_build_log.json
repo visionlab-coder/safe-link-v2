@@ -1,0 +1,1 @@
+﻿"--a1e7c4463d5f91fbc1fd50106c01c4b2e4a5d53a87b8fe2b17181e473ed4\r\nContent-Disposition: form-data; name=\"worker.js\"\r\n\r\nexport default {\n  async fetch(request, env) {\n    return new Response(\"Hello world\")\n  }\n}\r\n--a1e7c4463d5f91fbc1fd50106c01c4b2e4a5d53a87b8fe2b17181e473ed4--\r\n"

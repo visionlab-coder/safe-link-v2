@@ -1,0 +1,50 @@
+﻿{
+    "result":  {
+                   "id":  "safe-link-v2",
+                   "default_environment":  {
+                                               "environment":  "production",
+                                               "script_tag":  "ed7dfc9b827e47218a849f577a643e4c",
+                                               "created_on":  "2026-02-23T14:31:26.082757Z",
+                                               "modified_on":  "2026-02-23T14:31:27.28724Z",
+                                               "script":  {
+                                                              "created_on":  "2026-02-23T14:31:26.082757Z",
+                                                              "modified_on":  "2026-02-23T14:31:27.28724Z",
+                                                              "id":  "safe-link-v2",
+                                                              "tag":  "ed7dfc9b827e47218a849f577a643e4c",
+                                                              "tags":  [
+
+                                                                       ],
+                                                              "deployment_id":  "",
+                                                              "tail_consumers":  null,
+                                                              "logpush":  false,
+                                                              "has_assets":  false,
+                                                              "has_modules":  true,
+                                                              "etag":  "1f5a1635a10452898289e7f085b175e66e2d7e369b0c8328d98cc0c8fc106352",
+                                                              "handlers":  [
+                                                                               "fetch"
+                                                                           ],
+                                                              "last_deployed_from":  "dash_template",
+                                                              "compatibility_date":  "2026-02-23",
+                                                              "usage_model":  "standard"
+                                                          }
+                                           },
+                   "created_on":  "2026-02-23T14:31:26.082757Z",
+                   "modified_on":  "2026-02-23T14:31:27.28724Z",
+                   "usage_model":  "",
+                   "environments":  [
+                                        {
+                                            "environment":  "production",
+                                            "script_tag":  "ed7dfc9b827e47218a849f577a643e4c",
+                                            "created_on":  "2026-02-23T14:31:26.082757Z",
+                                            "modified_on":  "2026-02-23T14:31:27.28724Z"
+                                        }
+                                    ]
+               },
+    "success":  true,
+    "errors":  [
+
+               ],
+    "messages":  [
+
+                 ]
+}
