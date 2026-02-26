@@ -118,18 +118,32 @@ function AdminTBMCreateContent() {
         if (data) setHistory(data);
     };
 
-    const handleGenerateAI = () => {
+    const handleGenerateAI = async () => {
         setIsGeneratingAI(true);
-        setTimeout(() => {
-            const mockTips = [
-                "🏗️ 금일 고소 작업 시 하부 통제 구역 설정을 다시 한번 확인해 주시기 바랍니다.",
-                "⛈️ 오늘 오후 비 소식이 있습니다. 전기 가설물 덮개 및 접지 상태를 점검해 주세요.",
-                "🧤 장비 협착 사고 예방을 위해 회전 기구 작업 시 면장갑 대신 전용 장갑을 반드시 착용해 주십시오."
-            ];
-            setAiTips(mockTips);
+        setAiTips([]);
+        try {
+            const contextText = tbmText.trim();
+            const res = await fetch("/api/tbm/ai-tips", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ context: contextText }),
+            });
+            const data = await res.json();
+            if (data.error) {
+                console.error("[AI-Tips] API Error:", data.error);
+                alert(`AI 서비스 오류: ${data.error}`);
+                setAiTips([]);
+            } else {
+                setAiTips(data.tips || []);
+            }
+        } catch (e: any) {
+            console.error("[AI-Tips] Fetch failed:", e);
+            alert("AI 연결에 실패했습니다. 인터넷 연결을 확인해주세요.");
+        } finally {
             setIsGeneratingAI(false);
-        }, 1200);
+        }
     };
+
 
     const getSTTLang = (c: string) => {
         const map: Record<string, string> = {
