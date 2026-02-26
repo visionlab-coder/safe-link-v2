@@ -5,9 +5,8 @@ import { NextRequest } from 'next/server';
  * Gemini AI 기반 건설 현장 TBM 안전 수칙 3개 생성
  */
 export async function POST(request: NextRequest) {
-    // [TROUBLESHOOTING] Cloudflare environment variable may not be loading correctly.
-    // Hardcoding the key as a fallback temporarily.
-    const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim() || "AIzaSyDhxBRv72pj3KNpMBTJsAzx6KZWKfikozQ";
+    const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();
+
 
 
     let context = "";

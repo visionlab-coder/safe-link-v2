@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
-    const GOOGLE_API_KEY = process.env.GOOGLE_CLOUD_API_KEY?.trim() || "AIzaSyDhxBRv72pj3KNpMBTJsAzx6KZWKfikozQ";
+    const GOOGLE_API_KEY = process.env.GOOGLE_CLOUD_API_KEY?.trim();
+
 
 
     if (!GOOGLE_API_KEY) {
