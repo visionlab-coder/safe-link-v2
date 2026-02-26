@@ -8,7 +8,8 @@ export async function GET(request: NextRequest) {
     const text = request.nextUrl.searchParams.get('text') ?? '';
     const lang = request.nextUrl.searchParams.get('lang') ?? 'ko';
     const gender = request.nextUrl.searchParams.get('gender') ?? 'female';
-    const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();
+    const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim() || "AIzaSyDhxBRv72pj3KNpMBTJsAzx6KZWKfikozQ";
+
 
     if (!text) return new Response('Missing text', { status: 400 });
 
