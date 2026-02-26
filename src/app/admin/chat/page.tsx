@@ -256,31 +256,24 @@ function AdminChatContent() {
             let foreignSlang = "";
 
             if (activeWorker.preferred_lang !== "ko") {
-                // 1. Target Trans + Pron
-                const dtUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=${activeWorker.preferred_lang}&dt=t&dt=rm&q=${encodeURIComponent(normalized)}`;
-                const transRes = await fetch(dtUrl);
-                const transData = await transRes.json();
-                translated = transData[0].map((item: any) => item[0]).join("");
+                const transRes = await fetch('/api/translate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: normalized,
+                        sl: 'ko',
+                        tl: activeWorker.preferred_lang
+                    })
+                });
 
-                // Correct Pronunciation (Transliteration) logic: find block where segment[0] is null
-                if (transData[0]) {
-                    const translitBlock = transData[0].find((item: any) => item[0] === null && item[2]);
-                    if (translitBlock) pron = translitBlock[2];
-                    // Fallback to source translit if target not found (rare)
-                    if (!pron && translitBlock && translitBlock[3]) pron = translitBlock[3];
+                if (transRes.ok) {
+                    const transData = await transRes.json();
+                    translated = transData.translated || normalized;
+                    pron = transData.pronunciation || "";
+                    rev = transData.reverse_translated || "";
+                } else {
+                    console.error("AI Translation failed:", await transRes.text());
                 }
-
-                // Convert Romanized Pronunciation to Hangul sounds
-                if (pron) {
-                    pron = hangulize(pron, activeWorker.preferred_lang);
-                }
-
-                // 2. Reverse Trans
-                const revUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${activeWorker.preferred_lang}&tl=ko&dt=t&q=${encodeURIComponent(translated)}`;
-                const revRes = await fetch(revUrl);
-                const revData = await revRes.json();
-                rev = revData[0].map((item: any) => item[0]).join("");
-
                 foreignSlang = translated;
             } else {
                 foreignSlang = translated;

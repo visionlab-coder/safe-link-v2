@@ -100,6 +100,19 @@ export default function RootLayout({
           fontFamily: `var(--font-noto-kr), var(--font-noto-sc), var(--font-noto-tc), var(--font-noto-jp), var(--font-noto-thai), var(--font-noto-arabic), var(--font-noto-devanagari), var(--font-noto-sans), system-ui, sans-serif`,
         }}
       >
+        {/* 카카오톡 등 인앱 브라우저 외부 실행 스크립트 */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                var userAgent = navigator.userAgent.toLowerCase();
+                if (userAgent.indexOf("kakaotalk") > -1) {
+                  location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href);
+                }
+              })();
+            `,
+          }}
+        />
         {children}
       </body>
     </html>

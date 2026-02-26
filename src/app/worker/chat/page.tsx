@@ -235,13 +235,22 @@ function WorkerChatContent() {
             let pron = "";
 
             if (lang !== "ko") {
-                const dtUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${lang}&tl=ko&dt=t&dt=rm&q=${encodeURIComponent(originalText)}`;
-                const transRes = await fetch(dtUrl);
-                const transData = await transRes.json();
-                if (transData?.[0]) {
-                    translated = formalizeKo(transData[0].map((item: any) => item[0]).join(""));
-                    const translitBlock = transData[0].find((item: any) => item[0] === null && (item[2] || item[3]));
-                    if (translitBlock) pron = hangulize(translitBlock[2] || translitBlock[3], lang);
+                const dtUrl = await fetch('/api/translate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: originalText,
+                        sl: lang,
+                        tl: 'ko'
+                    })
+                });
+
+                if (dtUrl.ok) {
+                    const transData = await dtUrl.json();
+                    translated = formalizeKo(transData.translated || originalText);
+                    pron = transData.pronunciation || "";
+                } else {
+                    console.error("AI Translation failed");
                 }
             }
 

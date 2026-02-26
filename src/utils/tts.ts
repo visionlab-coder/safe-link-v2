@@ -91,7 +91,11 @@ export const playPremiumAudio = (
 /** 브라우저 내장 음성 (최후의 보루) */
 const playBrowserNativeAudio = (text: string, langCode: string, gender: VoiceGender, onEnd?: () => void) => {
     const targetLang = getVoiceLang(langCode);
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+        console.warn("[PremiumTTS] speechSynthesis is not supported in this browser.");
+        if (onEnd) onEnd();
+        return;
+    }
 
     // 🔊 세션 내 에러 발생 음성 블랙리스트 관리
     if (!(window as any)._tts_blacklist) (window as any)._tts_blacklist = new Set<string>();
@@ -188,7 +192,7 @@ export const playProxyAudio = (text: string, lang: string, gender: VoiceGender, 
     nextStream();
 };
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis) {
     const loadVoices = () => { window.speechSynthesis.getVoices(); };
     loadVoices();
     if (window.speechSynthesis.onvoiceschanged !== undefined) {
