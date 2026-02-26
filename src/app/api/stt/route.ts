@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 
-const GOOGLE_API_KEY = process.env.GOOGLE_CLOUD_API_KEY;
-
 export async function POST(req: Request) {
+    const GOOGLE_API_KEY = process.env.GOOGLE_CLOUD_API_KEY?.trim();
+
     if (!GOOGLE_API_KEY) {
+        console.error("[STT API] Missing GOOGLE_CLOUD_API_KEY in environment");
         return NextResponse.json({ error: "Missing API Key" }, { status: 500 });
     }
+
 
     try {
         const { audio, lang } = await req.json();
