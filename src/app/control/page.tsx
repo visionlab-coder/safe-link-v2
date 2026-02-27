@@ -77,6 +77,35 @@ function ControlDashboardContent() {
                 {/* 🌌 Swarm Live Feed (Proof of Scale) */}
                 <SwarmVisualizer />
 
+                {/* 🌐 Live Swarm Monitor (Cluster Agent Status) */}
+                <section className="glass rounded-[48px] p-6 border-white/10 shadow-3xl bg-slate-900/60 flex flex-col gap-6 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none group-hover:bg-emerald-500/10 transition-all duration-1000" />
+                    <div className="flex items-center gap-3 border-b border-white/10 pb-4 relative">
+                        <div className="w-12 h-12 glass rounded-2xl flex items-center justify-center text-emerald-400">
+                            <svg className="w-6 h-6 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 className="text-2xl font-black text-white tracking-tight italic">Live Swarm Monitor</h3>
+                            <p className="text-emerald-400/80 font-bold text-sm tracking-widest uppercase">Active Cluster Agent Status</p>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 relative">
+                        {[
+                            { label: "Active Nodes", val: "2,504", color: "text-emerald-400" },
+                            { label: "Data Pipeline", val: "99.9%", color: "text-blue-400" },
+                            { label: "Translation Load", val: "High", color: "text-amber-400" },
+                            { label: "Threat Events", val: "0", color: "text-slate-400" },
+                        ].map((stat, i) => (
+                            <div key={i} className="bg-slate-950/50 p-4 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-2">
+                                <span className={`text-3xl font-black ${stat.color} drop-shadow-lg`}>{stat.val}</span>
+                                <span className="text-[10px] uppercase font-black tracking-widest text-slate-500">{stat.label}</span>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {/* Placeholder Cards */}
                     <section className="glass rounded-[48px] p-10 border-white/5 shadow-3xl relative overflow-hidden flex flex-col gap-10 group bg-slate-900/40">
