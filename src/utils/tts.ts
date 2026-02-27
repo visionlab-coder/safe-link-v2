@@ -55,7 +55,7 @@ const chunkText = (text: string): string[] => {
  * 성우급 오디오 재생 (Microsoft/Google Online Natural voices 선호)
  */
 /**
- * 💎 Elite TTS Engine - Priorities cloud-first for "Voice Actor" quality.
+ * 💎 Elite TTS Engine - Browser-native first (zero latency), cloud API as fallback.
  */
 export const playPremiumAudio = (
     text: string,
@@ -74,18 +74,24 @@ export const playPremiumAudio = (
         return;
     }
 
-    console.log(`[PremiumTTS] Initializing for ${langCode} (${gender})...`);
+    const targetLang = getVoiceLang(langCode);
+    const targetLangBase = targetLang.split('-')[0].toLowerCase();
+    const voices = window.speechSynthesis?.getVoices() ?? [];
+    const hasBrowserVoice = voices.some(v => v.lang.toLowerCase().startsWith(targetLangBase));
 
-    // 1. [Primary] High-Fidelity Cloud API (Google Neural2/WaveNet)
-    // 브라우저마다 제각각인 품질 대신, 서버에서 보장하는 프리미엄 품질을 먼저 시도합니다.
-    playProxyAudio(cleanText, langCode, gender, (success) => {
-        if (success) {
-            if (onEnd) onEnd();
-        } else {
-            console.warn(`[PremiumTTS] Cloud API failed or no token. Falling back to Browser Native.`);
-            playBrowserNativeAudio(cleanText, langCode, gender, onEnd);
-        }
-    });
+    if (hasBrowserVoice) {
+        // 1. [Primary] Browser native - zero latency
+        playBrowserNativeAudio(cleanText, langCode, gender, onEnd);
+    } else {
+        // 2. [Fallback] Cloud API proxy for languages without browser voice support
+        playProxyAudio(cleanText, langCode, gender, (success) => {
+            if (success) {
+                if (onEnd) onEnd();
+            } else {
+                playBrowserNativeAudio(cleanText, langCode, gender, onEnd);
+            }
+        });
+    }
 };
 
 /** 브라우저 내장 음성 (최후의 보루) */

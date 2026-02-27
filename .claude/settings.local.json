@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(do:*)",
+      "Bash(git diff:*)",
+      "Bash(rm:*)",
+      "Bash(Remove-Item:*)",
+      "Bash(find .next:*)",
+      "Bash(npx vercel:*)"
+    ]
+  }
+}

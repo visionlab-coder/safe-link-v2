@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, Suspense } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 
 const workerUI: Record<string, any> = {
     ko: {
@@ -348,6 +349,9 @@ function WorkerHomeContent() {
                     </div>
                     <p className="text-[10px] font-black text-slate-700 tracking-[0.4em] uppercase">{t.safeWork}</p>
                 </footer>
+
+                {/* 🤖 Tier 3 Ambient Edge Agent */}
+                <SwarmAgentHUD />
 
             </div>
         </RoleGuard>

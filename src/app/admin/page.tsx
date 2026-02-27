@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { motion } from "framer-motion";
 import { MapPin } from "lucide-react";
+import SiteAgentBriefing from "@/components/agents/SiteAgentBriefing";
 
 // 관리자 모드: 한국어 / 영어 / 중국어 3개 (그 외 언어는 영어 fallback)
 const adminUI: Record<string, any> = {
@@ -163,8 +164,14 @@ function AdminDashboardContent() {
                             </button>
                         </div>
                         {currentUser?.role === 'ROOT' && (
-                            <button onClick={() => router.push('/system')} className="px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/5 rounded-full text-[9px] font-black text-blue-400 uppercase tracking-widest transition-all">
+                            <button onClick={() => router.push('/system')} className="px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/5 rounded-full text-[9px] font-black text-blue-400 uppercase tracking-widest transition-all mt-1">
                                 ← Return to Global HQ
+                            </button>
+                        )}
+                        {currentUser?.role === 'HQ_ADMIN' && (
+                            <button onClick={() => router.push('/control')} className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 rounded-full text-[10px] font-black text-blue-300 uppercase tracking-widest transition-all mt-1 shadow-lg flex items-center gap-1.5">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                                Enterprise Control Center
                             </button>
                         )}
                     </div>
@@ -179,6 +186,15 @@ function AdminDashboardContent() {
                     <h2 className="text-5xl font-black text-white text-gradient tracking-tighter uppercase">{t.board}</h2>
                     <p className="text-slate-500 font-bold tracking-tight uppercase text-sm">{t.boardDesc}</p>
                 </motion.div>
+
+                {/* 🤖 Tier 2: Site Agent Briefing (Role-specific) */}
+                {currentUser && (
+                    <SiteAgentBriefing
+                        role={currentUser.role}
+                        siteId={siteId}
+                        lang={currentUser.prefLang}
+                    />
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
                     {/* 📡 TBM Broadcast Card */}

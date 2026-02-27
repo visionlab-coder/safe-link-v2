@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import RoleGuard from "@/components/RoleGuard";
 import { Suspense } from "react";
 import SignatureCanvas from "react-signature-canvas";
@@ -96,11 +97,20 @@ function WorkerTBMDetailContent() {
     const [isPlaying, setIsPlaying] = useState(false);
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const voiceGenderRef = useRef<'male' | 'female'>('female');
-    const hasAutoPlayed = useRef(false);
+    const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
+        if (typeof window === 'undefined') return true;
+        return localStorage.getItem('sl_voice_enabled') !== 'false';
+    });
 
     const changeGender = (g: 'male' | 'female') => {
         voiceGenderRef.current = g;
         setVoiceGender(g);
+    };
+
+    const toggleVoice = () => {
+        const next = !voiceEnabled;
+        setVoiceEnabled(next);
+        localStorage.setItem('sl_voice_enabled', String(next));
     };
 
     const loadTBM = useCallback(async () => {
@@ -177,17 +187,6 @@ function WorkerTBMDetailContent() {
     }, [tbmId, urlLang]);
 
     useEffect(() => { loadTBM(); }, [loadTBM]);
-
-    // 🔊 Automatic Voice Guidance
-    useEffect(() => {
-        if (!loading && !translating && transData.text && !hasAutoPlayed.current) {
-            hasAutoPlayed.current = true;
-            // Delay slightly for smooth transition
-            setTimeout(() => {
-                handlePlayAudio();
-            }, 1000);
-        }
-    }, [loading, translating, transData.text]);
 
     // 새 TBM 발송 시 자동 갱신
     useEffect(() => {
@@ -281,6 +280,15 @@ function WorkerTBMDetailContent() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {/* 🔊 Voice On/Off Toggle */}
+                        <button onClick={toggleVoice} className="flex flex-col items-center gap-0.5">
+                            <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ${voiceEnabled ? 'bg-blue-500' : 'bg-slate-600'}`}>
+                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200 ${voiceEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                            </div>
+                            <span className={`text-[8px] font-black tracking-widest uppercase transition-colors ${voiceEnabled ? 'text-blue-400' : 'text-slate-500'}`}>
+                                {voiceEnabled ? 'VOC ON' : 'VOC OFF'}
+                            </span>
+                        </button>
                         {/* 🔊 Voice Gender Switch - High Visibility */}
                         <div className="flex items-center bg-white/15 backdrop-blur-md rounded-full p-1 border border-white/20 shadow-lg">
                             <button
@@ -393,8 +401,8 @@ function WorkerTBMDetailContent() {
                                 {/* 🔊 TTS Button */}
                                 <button
                                     onClick={handlePlayAudio}
-                                    disabled={isPlaying || translating}
-                                    className="mt-10 w-full py-6 glass rounded-block transition-all tap-effect flex flex-col items-center justify-center gap-2 border-blue-500/20 hover:border-blue-500/40 hover:bg-blue-500/5 group/btn"
+                                    disabled={isPlaying || translating || !voiceEnabled}
+                                    className={`mt-10 w-full py-6 glass rounded-block transition-all tap-effect flex flex-col items-center justify-center gap-2 group/btn ${voiceEnabled ? 'border-blue-500/20 hover:border-blue-500/40 hover:bg-blue-500/5' : 'opacity-40 cursor-not-allowed border-slate-700'}`}
                                 >
                                     <div className="flex items-center gap-1.5 mb-1">
                                         <span className="px-2 py-0.5 bg-blue-500 rounded-md text-[9px] font-black text-white animate-pulse">PREMIUM VOICE ACTOR</span>
@@ -506,6 +514,9 @@ function WorkerTBMDetailContent() {
                 <style jsx global>{`
                     .rounded-block { border-radius: 28px; }
                 `}</style>
+
+                {/* 🤖 Tier 3 Ambient Edge Agent */}
+                <SwarmAgentHUD />
             </div>
         </RoleGuard>
     );

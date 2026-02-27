@@ -19,59 +19,65 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Missing required texts" }, { status: 400 });
         }
 
-        // 건설 현장 용어집 로드
-        const glossary = await fetchGlossaryFromDB();
-        const glossaryStr = Object.entries(glossary).map(([slang, std]) => `${slang}=${std}`).join(', ');
+        // 건설 현장 용어집: 출발어가 한국어일 때만 적용
+        let glossaryNote = "";
+        if (sl === 'ko') {
+            const glossary = await fetchGlossaryFromDB();
+            const glossaryStr = Object.entries(glossary).map(([slang, std]) => `"${slang}"→"${std}"`).join(', ');
+            glossaryNote = `\nIf the Korean source text contains any of these slang terms, use the standard meaning for translation: ${glossaryStr}\n`;
+        }
 
-        const prompt = `You are a professional construction site supervisor and interpreter.
-Translate the following text from [${sl}] to [${tl}].
-Be aware that the text may contain Korean construction slang (e.g., Japanese remnants like 공구리, 다루끼).
-Here is a reference dictionary of slang:
-{ ${glossaryStr} }
+        const pronInstruction = tl === 'ko'
+            ? `Write the Korean Hangul pronunciation of the ORIGINAL ${sl} text (e.g. '你好'→'니하오', 'Hello'→'헬로').`
+            : `Write the Korean Hangul pronunciation of the TRANSLATED ${tl} text (so a Korean reader can pronounce it).`;
 
-Instructions:
-1. 'translated': Translate naturally into the target language ([${tl}]). Recognize slang from the dictionary (e.g., '공구리' means 'concrete') and translate its STANDARD meaning to the target language context perfectly.
-2. 'pronunciation': The phonetic reading of the 'translated' text. 
-   - IF [${sl}] is 'ko', you MUST write the pronunciation strictly in Korean Hangul (e.g., "베똥" instead of "bê tông").
-   - IF [${tl}] is 'ko', write the pronunciation in the [${sl}] native alphabet or English Romanization so the foreign worker can read the Korean sounds.
-3. 'reverse_translated': Translate the 'translated' text back to [${sl}] strictly based on its literal meaning array to verify accuracy.
-
-Respond EXACTLY in this JSON format ONLY (No markdown formatting or backticks around it):
+        const prompt = `You are a professional translator. Translate the given text accurately and naturally.
+Source language: ${sl}
+Target language: ${tl}
+${glossaryNote}
+Return ONLY a JSON object with exactly these three fields:
 {
-    "translated": "...",
-    "pronunciation": "...",
-    "reverse_translated": "..."
+  "translated": "<accurate translation of the source text into ${tl}>",
+  "pronunciation": "<${pronInstruction}>",
+  "reverse_translated": "<translate 'translated' back into ${sl}>"
 }
 
-Text to translate:
-"${text}"
-`;
+Source text: "${text}"`;
 
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     contents: [{ parts: [{ text: prompt }] }],
                     generationConfig: {
-                        responseMimeType: "application/json",
-                        temperature: 0.1, // 현장 용어이므로 사실 관계를 위해 낮은 temperature
+                        temperature: 0.2,
                     }
                 })
             }
         );
 
         if (!response.ok) {
-            console.error("Gemini API Error:", await response.text());
-            return NextResponse.json({ error: "Translation API failed" }, { status: 500 });
+            const errorText = await response.text();
+            console.error("Gemini API Error:", errorText);
+            // Fallback to basic passthrough if critical failure
+            return NextResponse.json({
+                translated: text,
+                pronunciation: "",
+                reverse_translated: text,
+                error: "API_FAILURE"
+            });
         }
 
         const data = await response.json();
         const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!textContent) throw new Error("Empty Gemini response");
 
-        const parsed = JSON.parse(textContent);
+        // JSON 블록 추출 (```json ... ``` 또는 { ... } 형태 모두 처리)
+        const jsonMatch = textContent.match(/```json\s*([\s\S]*?)```/) || textContent.match(/(\{[\s\S]*\})/);
+        if (!jsonMatch) throw new Error("No JSON in response");
+        const parsed = JSON.parse(jsonMatch[1]);
 
         return NextResponse.json({
             translated: parsed.translated || text,

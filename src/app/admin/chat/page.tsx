@@ -433,10 +433,13 @@ function AdminChatContent() {
                                 <div className="text-center py-10 text-slate-400 font-bold italic">{t.noWorkers}</div>
                             ) : (
                                 filteredWorkers.map(w => (
-                                    <button
+                                    <div
                                         key={w.id}
                                         onClick={() => setActiveWorker(w)}
-                                        className={`group/btn flex items-center gap-4 p-4 rounded-3xl transition-all tap-effect border ${activeWorker?.id === w.id ? 'bg-blue-50 border-blue-200 shadow-md transform scale-[1.02]' : 'bg-white border-transparent shadow-sm hover:shadow hover:bg-slate-50'}`}
+                                        role="button"
+                                        tabIndex={0}
+                                        onKeyDown={(e) => e.key === 'Enter' && setActiveWorker(w)}
+                                        className={`group/btn flex items-center gap-4 p-4 rounded-3xl transition-all tap-effect border cursor-pointer ${activeWorker?.id === w.id ? 'bg-blue-50 border-blue-200 shadow-md transform scale-[1.02]' : 'bg-white border-transparent shadow-sm hover:shadow hover:bg-slate-50'}`}
                                     >
                                         <div className="relative flex-shrink-0">
                                             <img src={`https://flagcdn.com/w40/${isoMap[w.preferred_lang] || "un"}.png`} alt={w.preferred_lang} className="w-10 h-10 object-cover rounded-full shadow border-2 border-slate-100" />
@@ -454,7 +457,7 @@ function AdminChatContent() {
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>
-                                    </button>
+                                    </div>
                                 ))
                             )}
                         </div>

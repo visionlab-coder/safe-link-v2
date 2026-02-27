@@ -12,12 +12,11 @@ export default function RoleGuard({
     allowedRole: "admin" | "worker" | "hq" | "system"
 }) {
     const router = useRouter();
-    const supabase = createClient();
     const [isAuthorized, setIsAuthorized] = useState(false);
 
     useEffect(() => {
         const checkAuth = async () => {
-            // 1. 브라우저에서 사용할 수파베이스 친구(클라이언트)를 불러옵니다.
+            const supabase = createClient();
             const { data: { session } } = await supabase.auth.getSession();
 
             // 2. 만약 로그인 세션이 없다면? -> 로그인 창으로 쫓아냅니다!
@@ -78,7 +77,7 @@ export default function RoleGuard({
         };
 
         checkAuth();
-    }, [router, supabase, allowedRole]); // (allowedRole도 깐깐하게 추가했어요)
+    }, [router, allowedRole]); // (allowedRole도 깐깐하게 추가했어요)
 
     if (!isAuthorized) {
         return (

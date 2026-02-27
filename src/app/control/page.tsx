@@ -3,6 +3,8 @@ import { useEffect, useState, Suspense } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import HQCommandSwarm from "@/components/agents/HQCommandSwarm";
+import SwarmVisualizer from "@/components/agents/SwarmVisualizer";
 
 function ControlDashboardContent() {
     const router = useRouter();
@@ -69,7 +71,13 @@ function ControlDashboardContent() {
                     <p className="text-slate-500 font-bold tracking-tight uppercase text-sm">Monitor overall site status and download evidence logs.</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+                {/* 🤖 Tier 1: HQ Command Swarm Intelligence */}
+                <HQCommandSwarm lang={currentUser?.prefLang || 'ko'} />
+
+                {/* 🌌 Swarm Live Feed (Proof of Scale) */}
+                <SwarmVisualizer />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {/* Placeholder Cards */}
                     <section className="glass rounded-[48px] p-10 border-white/5 shadow-3xl relative overflow-hidden flex flex-col gap-10 group bg-slate-900/40">
                         <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-600/10 blur-[80px] rounded-full -mr-24 -mt-24 pointer-events-none group-hover:bg-indigo-600/20 transition-all duration-1000" />

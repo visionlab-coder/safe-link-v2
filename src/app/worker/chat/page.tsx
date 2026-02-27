@@ -2,6 +2,7 @@
 import { useEffect, useState, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import RoleGuard from "@/components/RoleGuard";
 import { hangulize } from "@/utils/hangulize";
 import { analyzeMessageWithAI } from "@/utils/ai/watchdog";
@@ -86,6 +87,10 @@ function WorkerChatContent() {
     const [showSidebar, setShowSidebar] = useState(false);
     const [unreadAdmins, setUnreadAdmins] = useState<Set<string>>(new Set());
     const activeAdminRef = useRef<AdminProfile | null>(null);
+    const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
+        if (typeof window === 'undefined') return true;
+        return localStorage.getItem('sl_voice_enabled') !== 'false';
+    });
 
     // Friend list persistence
     const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
@@ -93,6 +98,12 @@ function WorkerChatContent() {
     const changeGender = (g: 'male' | 'female') => {
         voiceGenderRef.current = g;
         setVoiceGender(g);
+    };
+
+    const toggleVoice = () => {
+        const next = !voiceEnabled;
+        setVoiceEnabled(next);
+        localStorage.setItem('sl_voice_enabled', String(next));
     };
 
     const load = async () => {
@@ -193,10 +204,8 @@ function WorkerChatContent() {
                     });
                     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
 
-                    // 🔊 Audio Feedback for incoming admin messages
+                    // 🔔 Notification sound only - user can press play button for voice
                     playNotificationSound();
-                    const p = parseMsg(msg.translated_text);
-                    if (p.text) playPremiumAudio(p.text, lang, voiceGenderRef.current);
                 }
             })
             .subscribe();
@@ -233,6 +242,7 @@ function WorkerChatContent() {
             const supabase = createClient();
             let translated = originalText;
             let pron = "";
+            let rev = "";
 
             if (lang !== "ko") {
                 const dtUrl = await fetch('/api/translate', {
@@ -249,6 +259,7 @@ function WorkerChatContent() {
                     const transData = await dtUrl.json();
                     translated = formalizeKo(transData.translated || originalText);
                     pron = transData.pronunciation || "";
+                    rev = transData.reverse_translated || "";
                 } else {
                     console.error("AI Translation failed");
                 }
@@ -261,7 +272,7 @@ function WorkerChatContent() {
                 source_lang: lang,
                 target_lang: "ko",
                 source_text: originalText,
-                translated_text: JSON.stringify({ text: translated, pron }),
+                translated_text: JSON.stringify({ text: translated, pron, rev }),
                 ai_analysis: await analyzeMessageWithAI(translated),
             };
 
@@ -349,6 +360,15 @@ function WorkerChatContent() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        {/* 🔊 Voice On/Off Toggle */}
+                        <button onClick={toggleVoice} className="flex flex-col items-center gap-0.5">
+                            <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ${voiceEnabled ? 'bg-blue-500' : 'bg-slate-300'}`}>
+                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200 ${voiceEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                            </div>
+                            <span className={`text-[8px] font-black tracking-widest uppercase transition-colors ${voiceEnabled ? 'text-blue-500' : 'text-slate-400'}`}>
+                                {voiceEnabled ? 'VOC ON' : 'VOC OFF'}
+                            </span>
+                        </button>
                         <div className="flex items-center bg-slate-100 rounded-full p-1 border border-slate-200">
                             <button onClick={() => changeGender('male')} className={`px-2 py-1 rounded-full text-[9px] font-black transition-all ${voiceGender === 'male' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>MALE</button>
                             <button onClick={() => changeGender('female')} className={`px-2 py-1 rounded-full text-[9px] font-black transition-all ${voiceGender === 'female' ? 'bg-pink-500 text-white' : 'text-slate-400'}`}>FEMALE</button>
@@ -408,15 +428,22 @@ function WorkerChatContent() {
                                                 <motion.div key={m.id || i} initial={{ opacity: 0, scale: 0.9, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} className={`flex flex-col max-w-[85%] ${isMe ? 'self-end items-end' : 'self-start items-start'}`}>
                                                     <div className={`flex items-center gap-2 mb-1 ${isMe ? 'mr-3' : 'ml-3'}`}>
                                                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{isMe ? t.me : activeAdmin.display_name}</span>
-                                                        <button onClick={() => playPremiumAudio(isMe ? m.source_text : parsed.text, isMe ? lang : "ko", voiceGenderRef.current)} className="p-1 rounded-full bg-white border border-slate-200 text-blue-500 shadow-sm"><svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg></button>
+                                                        <button onClick={() => voiceEnabled && playPremiumAudio(isMe ? m.source_text : parsed.text, lang, voiceGenderRef.current)} className={`p-1 rounded-full border shadow-sm transition-colors ${voiceEnabled ? 'bg-white border-slate-200 text-blue-500' : 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed'}`}><svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg></button>
                                                     </div>
                                                     <div className={`p-5 rounded-[32px] shadow-lg border-2 flex flex-col gap-3 ${isMe ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
+
                                                         <p className="font-black text-2xl md:text-3xl leading-snug whitespace-pre-wrap">{isMe ? m.source_text : (parsed.text || m.source_text)}</p>
-                                                        {parsed.text && (
-                                                            <div className={`pt-3 border-t flex flex-col gap-1.5 ${isMe ? 'border-blue-400/50' : 'border-slate-100'}`}>
-                                                                <div className="flex items-center gap-1.5 opacity-90"><span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${isMe ? 'bg-white/20' : 'bg-slate-100 text-slate-500'}`}>{isMe ? "A/文" : "原文"}</span><span className="font-bold text-lg">{isMe ? parsed.text : m.source_text}</span></div>
-                                                            </div>
-                                                        )}
+
+                                                        <div className={`pt-3 border-t flex flex-col gap-1.5 ${isMe ? 'border-blue-400/50' : 'border-slate-100'}`}>
+                                                            {isMe ? (
+                                                                <div className="flex items-center gap-1.5 opacity-90"><span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white">A/文</span><span className="font-bold text-lg">{parsed.text || m.source_text}</span></div>
+                                                            ) : (
+                                                                <div className="flex items-start gap-1.5">
+                                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-400 shrink-0 mt-0.5">KO</span>
+                                                                    <span className="font-bold text-base text-slate-500">{m.source_text}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <span className="text-[10px] text-slate-400 font-bold mt-1.5">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                 </motion.div>
@@ -446,6 +473,9 @@ function WorkerChatContent() {
                 </main>
             </div>
             <style jsx global>{`::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }`}</style>
+
+            {/* 🤖 Tier 3 Ambient Edge Agent */}
+            <SwarmAgentHUD />
         </RoleGuard>
     );
 }
