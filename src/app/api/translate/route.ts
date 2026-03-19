@@ -71,7 +71,7 @@ Source text: ${JSON.stringify(text)}`;
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10초 타임아웃
 
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-001:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -79,6 +79,7 @@ Source text: ${JSON.stringify(text)}`;
                     contents: [{ parts: [{ text: prompt }] }],
                     generationConfig: {
                         temperature: 0.2,
+                        thinkingConfig: { thinkingBudget: 0 },
                     }
                 }),
                 signal: controller.signal,
