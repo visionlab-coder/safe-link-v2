@@ -75,20 +75,43 @@ export async function POST(request: NextRequest) {
             return await geminiFullFallback(apiKey, processedText, sl, tl);
         }
 
-        // 번역 + 역번역을 Cloud Translation으로 병렬 실행 (초고속)
-        const reverseResult = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ q: translatedText, source: targetLang, target: sourceLang, format: 'text' }),
-        }).then(r => r.json() as Promise<CloudTranslateResponse>);
+        // 역번역 + 발음용 영어 번역을 병렬 실행
+        const pronTarget = tl === 'ko' ? processedText : translatedText;
+        const pronLang = tl === 'ko' ? sl : tl;
+        const isLatinScript = /^[a-zA-Z\s\-.,!?'"()0-9\u00C0-\u024F\u1E00-\u1EFF]+$/.test(
+            pronTarget.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        );
+
+        const [reverseResult, pronEnglish] = await Promise.all([
+            // 역번역
+            fetch(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ q: translatedText, source: targetLang, target: sourceLang, format: 'text' }),
+            }).then(r => r.json() as Promise<CloudTranslateResponse>),
+
+            // 비-Latin 스크립트는 영어로 번역 후 hangulize
+            isLatinScript
+                ? Promise.resolve(null)
+                : fetch(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ q: pronTarget, source: (tl === 'ko' ? sourceLang : targetLang), target: 'en', format: 'text' }),
+                }).then(r => r.json() as Promise<CloudTranslateResponse>),
+        ]);
 
         const reverseTranslated = reverseResult.data?.translations?.[0]?.translatedText || "";
 
-        // 한글 발음 생성 (로컬 처리, 지연 0ms)
-        // tl이 한국어면 원문의 발음, 아니면 번역문의 발음
-        const pronTarget = tl === 'ko' ? processedText : translatedText;
-        const pronLang = tl === 'ko' ? sl : tl;
-        const pronunciation = hangulize(pronTarget, pronLang);
+        // 한글 발음 생성
+        let pronunciation: string;
+        if (isLatinScript) {
+            // Latin 스크립트 → 직접 hangulize
+            pronunciation = hangulize(pronTarget, pronLang);
+        } else {
+            // 비-Latin → 영어 중간 번역 → hangulize
+            const englishText = pronEnglish?.data?.translations?.[0]?.translatedText || "";
+            pronunciation = englishText ? hangulize(englishText, 'en') : "";
+        }
 
         return NextResponse.json({
             translated: translatedText,

@@ -168,17 +168,14 @@ function WorkerTBMDetailContent() {
                 setTranslating(true);
                 const result = await translateKo(tbmData.content_ko, lang);
 
-                // 1. 발음이 없거나 비어있으면 hangulize로 생성
+                // API가 한글 발음을 반환 (서버에서 hangulize 처리됨)
+                // fallback: API 발음이 비어있으면 클라이언트에서 생성
                 if (!result.pron || result.pron.trim() === "") {
                     result.pron = hangulize(result.text, lang);
-                } else if (lang === 'zh') {
-                    // 중국어는 한어병음을 한글로 변환
-                    result.pron = hangulize(result.pron, lang);
                 }
 
-                // 2. 본문 및 발음에서 불필요한 중복 괄호 제거
+                // 본문 클리닝 (발음은 정리하지 않음 — 한글이 깨질 수 있음)
                 result.text = cleanupText(result.text);
-                result.pron = cleanupText(result.pron);
 
                 setTransData(result);
                 setTranslating(false);
@@ -275,7 +272,11 @@ function WorkerTBMDetailContent() {
             }
 
             setIsSigned(true);
-            setTimeout(() => router.replace("/worker"), 1200);
+            // 서명 완료 후 화면 클리어 → 근로자 메인으로 이동
+            setTransData({ text: "", pron: "", rev: "" });
+            signaturePadRef.current?.clear();
+            playNotificationSound();
+            setTimeout(() => router.replace("/worker"), 2000);
         } catch (e) {
             console.error("서명 저장 실패:", e);
         } finally {
