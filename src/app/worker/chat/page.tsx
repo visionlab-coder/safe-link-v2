@@ -509,7 +509,7 @@ function WorkerChatContent() {
 
                                                         <div className="flex flex-col gap-1">
                                                             <p className="font-black text-2xl md:text-3xl leading-snug whitespace-pre-wrap">
-                                                                {isMe ? (parsed.text || m.source_text) : (parsed.text || m.source_text)}
+                                                                {isMe ? m.source_text : (parsed.text || m.source_text)}
                                                             </p>
                                                             {/* Read Indicator (Kakao-style '1') */}
                                                             {isMe && m.is_read === false && (
@@ -520,8 +520,8 @@ function WorkerChatContent() {
                                                         <div className={`pt-3 border-t flex flex-col gap-1.5 ${isMe ? 'border-blue-400/50' : 'border-slate-100'}`}>
                                                             {isMe ? (
                                                                 <div className="flex items-start gap-1.5 pt-1">
-                                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">原文</span>
-                                                                    <span className="font-bold text-lg">{m.source_text}</span>
+                                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">번역</span>
+                                                                    <span className="font-bold text-lg">{parsed.text || m.source_text}</span>
                                                                 </div>
                                                             ) : (
                                                                 <div className="flex items-start gap-1.5 pt-1">
