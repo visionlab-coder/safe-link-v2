@@ -125,13 +125,10 @@ function AuthContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 자동 로그인 제거 — 기존 세션이 있어도 사용자가 직접 "이 계정으로 계속" 버튼을 눌러야 진입
   useEffect(() => {
-    if (!existingUser) return;
-    const activeLang = lang || "ko";
-    const timer = setTimeout(() => { redirectByRoleString(existingUser.role, activeLang); }, 1200);
-    return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [existingUser, lang]);
+    if (existingUser) setMode("role");
+  }, [existingUser]);
 
   const redirectByRoleString = useCallback((role: string | null, activeLang: string) => {
     const targetRole = searchParams.get("role");
