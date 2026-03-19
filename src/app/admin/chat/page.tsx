@@ -167,13 +167,14 @@ function AdminChatContent() {
         if (data) setMessages(data);
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
 
-        // Mark as read
-        await supabase
+        // Mark as read (is_read 컬럼이 없어도 에러 무시)
+        supabase
             .from("messages")
             .update({ is_read: true })
             .eq("from_user", activeWorker.id)
             .eq("to_user", myId)
-            .eq("is_read", false);
+            .eq("is_read", false)
+            .then(() => {});
     }, [activeWorker, myId]);
 
     const activeWorkerRef = useRef<WorkerProfile | null>(null);

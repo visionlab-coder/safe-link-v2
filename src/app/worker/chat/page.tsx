@@ -200,13 +200,14 @@ function WorkerChatContent() {
                 // Mark existing messages as processed so they don't play on reload
                 data.forEach(m => processedAudioIds.current.add(m.id));
 
-                // Mark as read
+                // Mark as read (is_read 컬럼이 없어도 에러 무시)
                 supabase
                     .from("messages")
                     .update({ is_read: true })
                     .eq("from_user", activeAdmin.id)
                     .eq("to_user", myId)
-                    .eq("is_read", false).then();
+                    .eq("is_read", false)
+                    .then(() => {});
             }
             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 200);
         };
