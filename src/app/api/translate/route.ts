@@ -74,17 +74,20 @@ export async function POST(request: NextRequest) {
             return await geminiFullFallback(apiKey, processedText, sl, tl);
         }
 
-        // 역번역 + 발음을 병렬로 요청
+        // 역번역 + 발음을 병렬로 요청 (발음은 1.5초 타임아웃)
         const [reverseResult, pronResult] = await Promise.all([
-            // 역번역: Cloud Translation
+            // 역번역: Cloud Translation (초고속)
             fetch(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ q: translatedText, source: targetLang, target: sourceLang, format: 'text' }),
             }).then(r => r.json() as Promise<CloudTranslateResponse>),
 
-            // 발음: Gemini (한국어 한글 발음 생성)
-            generatePronunciation(apiKey, translatedText, text, sl, tl),
+            // 발음: Gemini (1.5초 내 응답 못하면 빈 값)
+            Promise.race([
+                generatePronunciation(apiKey, translatedText, text, sl, tl),
+                new Promise<string>(resolve => setTimeout(() => resolve(""), 1500)),
+            ]),
         ]);
 
         const reverseTranslated = reverseResult.data?.translations?.[0]?.translatedText || "";
