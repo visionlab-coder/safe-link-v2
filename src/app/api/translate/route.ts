@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchGlossaryFromDB } from '@/utils/normalize';
 import { getErrorMessage } from '@/utils/errors';
 import { hangulize } from '@/utils/hangulize';
+import pinyin from 'tiny-pinyin';
 
 interface CloudTranslateResponse {
     data?: { translations?: Array<{ translatedText?: string }> };
@@ -75,9 +76,10 @@ export async function POST(request: NextRequest) {
             return await geminiFullFallback(apiKey, processedText, sl, tl);
         }
 
-        // 역번역 + 발음용 영어 번역을 병렬 실행
+        // 역번역 + 발음 생성을 병렬 실행
         const pronTarget = tl === 'ko' ? processedText : translatedText;
         const pronLang = tl === 'ko' ? sl : tl;
+        const isChinese = pronLang === 'zh' || pronLang === 'zh-CN';
         const isLatinScript = /^[a-zA-Z\s\-.,!?'"()0-9\u00C0-\u024F\u1E00-\u1EFF]+$/.test(
             pronTarget.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
         );
@@ -90,25 +92,31 @@ export async function POST(request: NextRequest) {
                 body: JSON.stringify({ q: translatedText, source: targetLang, target: sourceLang, format: 'text' }),
             }).then(r => r.json() as Promise<CloudTranslateResponse>),
 
-            // 비-Latin 스크립트는 영어로 번역 후 hangulize
-            isLatinScript
-                ? Promise.resolve(null)
-                : fetch(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, {
+            // 비-Latin, 비-중국어 스크립트만 영어 경유
+            (!isLatinScript && !isChinese)
+                ? fetch(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ q: pronTarget, source: (tl === 'ko' ? sourceLang : targetLang), target: 'en', format: 'text' }),
-                }).then(r => r.json() as Promise<CloudTranslateResponse>),
+                }).then(r => r.json() as Promise<CloudTranslateResponse>)
+                : Promise.resolve(null),
         ]);
 
         const reverseTranslated = reverseResult.data?.translations?.[0]?.translatedText || "";
 
         // 한글 발음 생성
         let pronunciation: string;
-        if (isLatinScript) {
-            // Latin 스크립트 → 직접 hangulize
+        if (isChinese) {
+            // 중국어: tiny-pinyin으로 병음 변환 → hangulizePinyin (최고 품질)
+            const py = pinyin.isSupported()
+                ? pinyin.convertToPinyin(pronTarget, ' ', true)
+                : pronTarget;
+            pronunciation = hangulize(py, 'zh');
+        } else if (isLatinScript) {
+            // Latin 스크립트 (베트남어 등) → 직접 hangulize
             pronunciation = hangulize(pronTarget, pronLang);
         } else {
-            // 비-Latin → 영어 중간 번역 → hangulize
+            // 비-Latin (태국어, 아랍어 등) → 영어 경유 hangulize
             const englishText = pronEnglish?.data?.translations?.[0]?.translatedText || "";
             pronunciation = englishText ? hangulize(englishText, 'en') : "";
         }
