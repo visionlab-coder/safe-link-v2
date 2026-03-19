@@ -79,7 +79,6 @@ Source text: ${JSON.stringify(text)}`;
                     contents: [{ parts: [{ text: prompt }] }],
                     generationConfig: {
                         temperature: 0.2,
-                        thinkingConfig: { thinkingBudget: 0 },
                     }
                 }),
                 signal: controller.signal,
