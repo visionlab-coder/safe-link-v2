@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/utils/supabase/client";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
+import { playNotificationSound } from "@/utils/notifications";
 
 const workerUI: Record<string, any> = {
     ko: {
@@ -167,6 +168,7 @@ function WorkerHomeContent() {
     const urlLang = searchParams.get("lang");
 
     const triggerAlert = () => {
+        playNotificationSound();
         if (typeof navigator !== "undefined" && navigator.vibrate) {
             navigator.vibrate([300, 100, 300, 100, 300]);
         }
