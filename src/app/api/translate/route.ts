@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGlossaryFromDB } from '@/utils/normalize';
 import { getErrorMessage } from '@/utils/errors';
+import { hangulize } from '@/utils/hangulize';
 
 interface CloudTranslateResponse {
     data?: { translations?: Array<{ translatedText?: string }> };
@@ -83,9 +84,15 @@ export async function POST(request: NextRequest) {
 
         const reverseTranslated = reverseResult.data?.translations?.[0]?.translatedText || "";
 
+        // 한글 발음 생성 (로컬 처리, 지연 0ms)
+        // tl이 한국어면 원문의 발음, 아니면 번역문의 발음
+        const pronTarget = tl === 'ko' ? processedText : translatedText;
+        const pronLang = tl === 'ko' ? sl : tl;
+        const pronunciation = hangulize(pronTarget, pronLang);
+
         return NextResponse.json({
             translated: translatedText,
-            pronunciation: "",
+            pronunciation,
             reverse_translated: reverseTranslated,
         });
     } catch (error: unknown) {
