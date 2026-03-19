@@ -68,7 +68,7 @@ Return ONLY a JSON object with exactly these three fields:
 Source text: ${JSON.stringify(text)}`;
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10초 타임아웃
+        const timeoutId = setTimeout(() => controller.abort(), 25000); // 25초 타임아웃
 
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
