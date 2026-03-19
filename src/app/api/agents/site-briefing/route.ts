@@ -1,5 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { getErrorMessage } from '@/utils/errors';
+
+interface SiteBriefingRequest {
+    role?: string;
+    lang?: string;
+}
+
+interface GeminiBriefingResponse {
+    candidates?: Array<{
+        content?: {
+            parts?: Array<{
+                text?: string;
+            }>;
+        };
+    }>;
+}
 
 /**
  * 🟡 Site Briefing Agent API (Tier 2)
@@ -10,12 +26,25 @@ export async function POST(request: NextRequest) {
     if (!apiKey) return NextResponse.json({ error: "Missing API Key" }, { status: 500 });
 
     try {
-        const { site_id, role, lang = "ko" } = await request.json();
+        const { lang = "ko" } = await request.json() as SiteBriefingRequest;
         const supabase = await createClient();
 
-        // 1. 현장 데이터 취합 (최근 24시간)
-        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        // 인증 + 서버 측 role 확인 (클라이언트 제공 role 무시)
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+        if (!profile) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+        const role = profile.role as string;
 
+        // 1. 현장 데이터 취합 (최근 24시간)
         // [TBM 현황]
         const { count: totalWorkers } = await supabase
             .from('profiles')
@@ -74,12 +103,12 @@ Respond ONLY in 3 lines, very professional and direct. Use honorifics.
             }
         );
 
-        const data = await response.json();
+        const data = await response.json() as GeminiBriefingResponse;
         const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
         return NextResponse.json({ briefing: textContent || "데이터 분석 중입니다..." });
 
-    } catch (e: any) {
-        return NextResponse.json({ error: e.message }, { status: 500 });
+    } catch (error: unknown) {
+        return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
     }
 }

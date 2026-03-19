@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 /**
  * 📡 Swarm Status API (Phase 4)
  * 2,500개 이상의 에이전트 상태를 시뮬레이션 및 집계하여 시각화 컴포넌트에 전달합니다.
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
     // 실제 환경에서는 DB의 profiles 및 agent_logs에서 통계를 가져오지만,
     // 시연을 위해 25개 현장과 총 2,500개의 노드 상태를 즉시 생성합니다.
 
@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
         totalSwarmNodes: sites.reduce((acc, s) => acc + s.totalNodes, 0),
         activeSwarmNodes: sites.reduce((acc, s) => acc + s.activeNodes, 0),
         globalRiskLevel: "LOW",
-        sites
+        sites,
+        _simulated: true, // TODO: replace with real DB query from profiles + agent_logs
     });
 }

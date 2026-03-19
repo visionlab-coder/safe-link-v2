@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, Suspense } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -6,6 +7,8 @@ import { createClient } from "@/utils/supabase/client";
 import { motion } from "framer-motion";
 import { MapPin } from "lucide-react";
 import SiteAgentBriefing from "@/components/agents/SiteAgentBriefing";
+import { playNotificationSound } from "@/utils/notifications";
+import SystemHealthCheck from "@/components/SystemHealthCheck";
 
 // 관리자 모드: 한국어 / 영어 / 중국어 3개 (그 외 언어는 영어 fallback)
 const adminUI: Record<string, any> = {
@@ -60,6 +63,57 @@ const adminUI: Record<string, any> = {
         roleLabel: { HQ_ADMIN: "现场主管", SAFETY_OFFICER: "安全管理员", WORKER: "工人" },
         greeting: (name: string) => `您好, ${name}`,
     },
+    vi: {
+        board: "Bảng điều khiển thời gian thực",
+        boardDesc: "Theo dõi tình trạng TBM và liên lạc của công nhân.",
+        tbmTitle: "Phát sóng TBM",
+        tbmDesc: "Viết hướng dẫn an toàn và gửi cho công nhân bằng tiếng mẹ đẻ.",
+        tbmBtn: "Phát sóng mới",
+        chatTitle: "Trò chuyện AI 1:1",
+        chatDesc: "Tự động dịch thời gian thực khi giao tiếp với công nhân.",
+        chatBtn: "Mở kênh",
+        statusTitle: "Tình trạng ký tên",
+        statusDesc: "Kiểm tra việc xác nhận TBM và ký tên pháp lý của công nhân.",
+        glossaryTitle: "Quản lý từ điển",
+        glossaryDesc: "Quản lý tiếng lóng tại hiện trường và chuyển đổi thuật ngữ.",
+        signOut: "Đăng xuất",
+        roleLabel: { HQ_ADMIN: "Giám đốc hiện trường", SAFETY_OFFICER: "Cán bộ an toàn", WORKER: "Công nhân" },
+        greeting: (name: string) => `Chào mừng, ${name}`,
+    },
+    th: {
+        board: "กระดานควบคุมเรียลไทม์",
+        boardDesc: "ตรวจสอบสถานะ TBM และการสื่อสารของคนงาน",
+        tbmTitle: "กระจายข่าว TBM",
+        tbmDesc: "เขียนคำแนะนำความปลอดภัยและส่งให้คนงานในภาษาแม่",
+        tbmBtn: "กระจายข่าวใหม่",
+        chatTitle: "แชท AI 1:1",
+        chatDesc: "แปลอัตโนมัติแบบเรียลไทม์เพื่อสื่อสารกับคนงาน",
+        chatBtn: "เปิดช่องแชท",
+        statusTitle: "สถานะการลงนาม",
+        statusDesc: "ตรวจสอบการยืนยัน TBM และการลงนามทางกฎหมาย",
+        glossaryTitle: "จัดการพจนานุกรม",
+        glossaryDesc: "จัดการคำแสลงในไซต์งานและการแปลงคำศัพท์",
+        signOut: "ออกจากระบบ",
+        roleLabel: { HQ_ADMIN: "ผู้จัดการไซต์", SAFETY_OFFICER: "เจ้าหน้าที่ความปลอดภัย", WORKER: "คนงาน" },
+        greeting: (name: string) => `ยินดีต้อนรับ, ${name}`,
+    },
+    uz: {
+        board: "Real vaqt rejimidagi boshqaruv paneli",
+        boardDesc: "TBM holatini va ishchilar bilan muloqotni kuzatib boring.",
+        tbmTitle: "TBM translyatsiyasi",
+        tbmDesc: "Xavfsizlik yo'riqnomalarini yozing va ishchilarga ona tilida yuboring.",
+        tbmBtn: "Yangi translyatsiya",
+        chatTitle: "1:1 AI chat",
+        chatDesc: "Ishchilar bilan muloqotda real vaqtda avtomatik tarjima.",
+        chatBtn: "Kanalni ochish",
+        statusTitle: "Imzo holati",
+        statusDesc: "Ishchilarning TBM tasdiqlashi va imzosini tekshiring.",
+        glossaryTitle: "Lug'at boshqaruvi",
+        glossaryDesc: "Sayt terminlari va standart so'zlarni boshqarish.",
+        signOut: "Chiqish",
+        roleLabel: { HQ_ADMIN: "Sayt menejeri", SAFETY_OFFICER: "Xavfsizlik xodimi", WORKER: "Ishchi" },
+        greeting: (name: string) => `Xush kelibsiz, ${name}`,
+    },
 };
 const getUI = (lang: string) => adminUI[lang] || adminUI["en"];
 
@@ -112,6 +166,31 @@ function AdminDashboardContent() {
         };
         load();
     }, [urlLang]);
+
+    const [newChatCount, setNewChatCount] = useState(0);
+
+    // 🆕 Global Message Monitor (For Unread Notifications on Dashboard)
+    useEffect(() => {
+        const loadMonitor = async () => {
+            const supabase = createClient();
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+
+            const adminChannel = supabase
+                .channel(`admin_global_dash_${session.user.id}`)
+                .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+                    const msg = payload.new;
+                    if (!msg || msg.from_user === session.user.id) return;
+
+                    setNewChatCount(prev => prev + 1);
+                    playNotificationSound();
+                })
+                .subscribe();
+
+            return () => { supabase.removeChannel(adminChannel); };
+        };
+        loadMonitor();
+    }, []);
 
     const handleSignOut = async () => {
         const supabase = createClient();
@@ -187,6 +266,9 @@ function AdminDashboardContent() {
                     <p className="text-slate-500 font-bold tracking-tight uppercase text-sm">{t.boardDesc}</p>
                 </motion.div>
 
+                {/* 🚨 Pre-flight Health Check (Critical for Monday Demo) */}
+                <SystemHealthCheck />
+
                 {/* 🤖 Tier 2: Site Agent Briefing (Role-specific) */}
                 {currentUser && (
                     <SiteAgentBriefing
@@ -233,10 +315,15 @@ function AdminDashboardContent() {
                     >
                         <div className="absolute top-0 left-0 w-48 h-48 bg-blue-500/10 blur-[80px] rounded-full -ml-24 -mt-24 pointer-events-none group-hover:bg-blue-500/20 transition-all duration-1000" />
                         <div className="flex flex-col gap-4 relative">
-                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-blue-400 mb-2 shadow-lg">
+                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-blue-400 mb-2 shadow-lg relative">
                                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                 </svg>
+                                {newChatCount > 0 && (
+                                    <span className="absolute -top-2 -right-2 min-w-[22px] h-[22px] px-1 bg-red-500 rounded-full border-[3px] border-white text-white text-[10px] font-black flex items-center justify-center shadow-md">
+                                        {newChatCount}
+                                    </span>
+                                )}
                             </div>
                             <h3 className="text-3xl font-black text-white tracking-tight italic">{t.chatTitle}</h3>
                             <p className="text-slate-400 font-bold leading-relaxed">{t.chatDesc}</p>

@@ -3,6 +3,7 @@
  * Priority: 1. Browser "Natural/Online" Neural Voices (Real Voice Actor quality)
  *           2. Internal API Proxy fallback (/api/tts) - Bypasses CORS browser blocks
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 export type VoiceGender = 'male' | 'female';
 
@@ -29,6 +30,8 @@ const stripForSpeech = (text: string): string => {
             result += char;
         }
     }
+    // Remove emojis so TTS doesn't read them out loud
+    result = result.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '');
     return result.replace(/\s{2,}/g, ' ').trim();
 };
 
@@ -148,10 +151,13 @@ const playBrowserNativeAudio = (text: string, langCode: string, gender: VoiceGen
         const utter = new SpeechSynthesisUtterance(currentChunk);
         utter.voice = bestVoice;
         utter.lang = targetLang;
-        utter.rate = 0.95;
+
+        // 🚀 중국어 발화 속도 최적화 (너무 느리다는 피드백 반영)
+        utter.rate = targetLang.startsWith('zh') ? 1.15 : 0.95;
+
         utter.onend = speakNext;
         utter.onerror = (err) => {
-            console.error(`[PremiumTTS] Browser Native Runtime Error: ${bestVoice.name}`, err);
+            console.warn(`[PremiumTTS] Browser Native Runtime Fallback: ${bestVoice.name}`, err);
             // ❌ 에러 발생 시 해당 음성 블랙리스트 추가
             voiceBlacklist.add(bestVoice.name);
             window.speechSynthesis.cancel();
@@ -183,15 +189,15 @@ export const playProxyAudio = (text: string, lang: string, gender: VoiceGender, 
         const url = `/api/tts?text=${encodeURIComponent(chunk)}&lang=${tl}&gender=${gender}`;
         const audio = new Audio(url);
 
-        audio.onplay = () => console.log(`[PremiumTTS] Streaming Cloud Audio (${gender}): ${chunk.substring(0, 20)}...`);
+        audio.onplay = () => {};
         audio.onended = nextStream;
         audio.onerror = (e) => {
-            console.error("[PremiumTTS] Proxy Audio Error:", e);
+            console.warn("[PremiumTTS] Proxy Audio Error:", e);
             if (onDone) onDone(false);
         };
 
         audio.play().catch(err => {
-            console.error("[PremiumTTS] Audio Play Denied:", err);
+            console.warn("[PremiumTTS] Audio Play Denied:", err);
             if (onDone) onDone(false);
         });
     };

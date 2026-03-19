@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useState } from "react";
 import RoleGuard from "@/components/RoleGuard";
@@ -140,7 +141,7 @@ const systemUI: Record<string, any> = {
 
 export default function SystemAdminPage() {
     const [sites, setSites] = useState<Site[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState("sites");
     const [lang, setLang] = useState("ko");
     const [currentUser, setCurrentUser] = useState<any>(null);
@@ -220,9 +221,10 @@ export default function SystemAdminPage() {
             if (error) alert(error.message);
         } else {
             // Create
+            const newCode = `ST-${Date.now().toString().slice(-6)}`;
             const { error } = await supabase
                 .from("sites")
-                .insert([{ name: siteForm.name, address: siteForm.address }]);
+                .insert([{ name: siteForm.name, address: siteForm.address, code: newCode }]);
             if (error) alert(error.message);
         }
 
@@ -492,8 +494,8 @@ export default function SystemAdminPage() {
                                         <p className="text-blue-400 font-bold">[AGENT] Scanning 25 sites across South Korea...</p>
                                         <p className="text-white">[AGENT] Site #1 (Seoul): Detected slight deviation in TBM signature pattern. Analyzing...</p>
                                         <p className="text-emerald-400">[AGENT] Site #1 (Seoul): Resolved. 98 workers verified.</p>
-                                        <p className="text-amber-400 font-bold">[ALERT] Site #3 (Incheon): High frequency of "Slippery" keyword in Vietnamese chat. Calculating risk level...</p>
-                                        <p className="text-red-400 font-black">[ACTION] Site #3 (Incheon): Auto-pushed "Caution: Wet Surface" guidance to all active workers.</p>
+                                        <p className="text-amber-400 font-bold">[ALERT] Site #3 (Incheon): High frequency of &quot;Slippery&quot; keyword in Vietnamese chat. Calculating risk level...</p>
+                                        <p className="text-red-400 font-black">[ACTION] Site #3 (Incheon): Auto-pushed &quot;Caution: Wet Surface&quot; guidance to all active workers.</p>
                                         <p className="opacity-40 animate-pulse mt-2">_ {t.ai.thinking}</p>
                                     </div>
 

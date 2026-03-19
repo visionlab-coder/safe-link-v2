@@ -1,7 +1,9 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useRef, useState, useEffect, useCallback } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@/utils/supabase/client";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import RoleGuard from "@/components/RoleGuard";
@@ -9,8 +11,10 @@ import { Suspense } from "react";
 import SignatureCanvas from "react-signature-canvas";
 import { hangulize } from "@/utils/hangulize";
 import { playPremiumAudio } from "@/utils/tts";
+import { playNotificationSound } from "@/utils/notifications";
 
-// ── 언어 코드 매핑 ──
+// ── 언어 코드 매핑 ── (미사용 — 향후 TTS 연동 예정)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const googleLangCode: Record<string, string> = {
     ko: "ko", en: "en", vi: "vi", th: "th",
     uz: "uz", ph: "tl", km: "km", id: "id",
@@ -24,29 +28,23 @@ const isoMap: Record<string, string> = {
     ru: "ru", jp: "jp", fr: "fr", es: "es", ar: "sa", hi: "in",
 };
 
-// ── 번역 함수 ──
+// ── 번역 함수 (Gemini AI 기반) ──
 interface TransResult { text: string; pron: string; rev: string; }
 const translateKo = async (text: string, targetLang: string): Promise<TransResult> => {
     if (targetLang === "ko") return { text, pron: "", rev: "" };
-    const gl = googleLangCode[targetLang] || targetLang;
     try {
-        // 1. Target Trans + Pron
-        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=${gl}&dt=t&dt=rm&q=${encodeURIComponent(text)}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        const translated = data[0].map((item: any) => item[0]).join("");
-
-        let pron = "";
-        const translitBlock = data[0].find((item: any) => item[0] === null && item[2]);
-        if (translitBlock) pron = translitBlock[2];
-
-        // 2. Reverse Trans
-        const revUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${gl}&tl=ko&dt=t&q=${encodeURIComponent(translated)}`;
-        const revRes = await fetch(revUrl);
-        const revData = await revRes.json();
-        const rev = revData[0].map((item: any) => item[0]).join("");
-
-        return { text: translated, pron, rev };
+        const res = await fetch('/api/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, sl: 'ko', tl: targetLang }),
+        });
+        if (!res.ok) return { text, pron: "", rev: "" };
+        const data = await res.json() as { translated?: string; pronunciation?: string; reverse_translated?: string };
+        return {
+            text: data.translated || text,
+            pron: data.pronunciation || "",
+            rev: data.reverse_translated || "",
+        };
     } catch {
         return { text, pron: "", rev: "" };
     }
@@ -54,22 +52,25 @@ const translateKo = async (text: string, targetLang: string): Promise<TransResul
 
 // ── UI 텍스트 (다국어) ──
 const uiText: Record<string, any> = {
-    ko: { title: "안전 브리핑", original: "원문 (한국어)", translated: "번역본", voice: "음성으로 듣기", signHere: "이곳에 서명하세요", clear: "다시 쓰기", confirm: "✍️ 서명 완료하기", signed: "✓ 오늘 서명 완료!", translating: "번역 중...", noTBM: "오늘 전파된 브리핑이 없습니다.", mustSign: "서명 없이 나가시겠습니까?", alreadySigned: "이미 오늘 서명하셨습니다.", back: "뒤로", pron: "발음", rev: "역번역" },
-    en: { title: "Safety Briefing", original: "Original (Korean)", translated: "Translation", voice: "Listen", signHere: "Please sign here", clear: "Clear", confirm: "✍️ Confirm & Sign", signed: "✓ Signed!", translating: "Translating...", noTBM: "No briefing today.", mustSign: "Leave without signing?", alreadySigned: "Already signed today.", back: "Back", pron: "Pronunciation", rev: "Reverse Trans" },
-    vi: { title: "Thông báo an toàn", original: "Gốc (Tiếng Hàn)", translated: "Bản dịch", voice: "Nghe", signHere: "Ký tên ở đây", clear: "Xóa", confirm: "✍️ Xác nhận & Ký", signed: "✓ Đã ký!", translating: "Đang dịch...", noTBM: "Chưa có thông báo hôm nay.", mustSign: "Rời đi mà không ký?", alreadySigned: "Đã ký hôm nay rồi.", back: "Quay lại", pron: "Phát âm", rev: "Dịch ngược" },
+    ko: { title: "안전 브리핑", original: "원문 (한국어)", translated: "번역본", voice: "음성으로 듣기", signHere: "이곳에 서명하세요", clear: "다시 쓰기", confirm: "✍️ 서명 완료하기", signed: "✓ 오늘 서명 완료!", translating: "번역 중...", noTBM: "오늘 전파된 브리핑이 없습니다.", mustSign: "서명 없이 나가시겠습니까?", alreadySigned: "이미 오늘 서명하셨습니다.", back: "뒤로", pron: "발음", rev: "역번역", listenFirst: "먼저 브리핑 음성을 끝까지 들어주세요.", listenStatus: "브리핑 청취" },
+    en: { title: "Safety Briefing", original: "Original (Korean)", translated: "Translation", voice: "Listen", signHere: "Please sign here", clear: "Clear", confirm: "✍️ Confirm & Sign", signed: "✓ Signed!", translating: "Translating...", noTBM: "No briefing today.", mustSign: "Leave without signing?", alreadySigned: "Already signed today.", back: "Back", pron: "Pronunciation", rev: "Reverse Trans", listenFirst: "Please listen to the full audio briefing first.", listenStatus: "Briefing Status" },
+    vi: { title: "Thông báo an toàn", original: "Gốc (Tiếng Hàn)", translated: "Bản dịch", voice: "Nghe", signHere: "Ký tên ở đây", clear: "Xóa", confirm: "✍️ Xác nhận & Ký", signed: "✓ Đã ký!", translating: "Đang dịch...", noTBM: "Chưa có thông báo hôm nay.", mustSign: "Rời đi mà không ký?", alreadySigned: "Đã ký hôm nay rồi.", back: "Quay lại", pron: "Phát âm", rev: "Dịch ngược", listenFirst: "Vui lòng nghe hết bản tin an toàn trước.", listenStatus: "Trạng thái nghe" },
     th: { title: "สรุปความปลอดภัย", original: "ต้นฉบับ (เกาหลี)", translated: "คำแปล", voice: "ฟังเสียง", signHere: "ลงชื่อที่นี่", clear: "ล้าง", confirm: "✍️ ยืนยันและลงนาม", signed: "✓ ลงนามแล้ว!", translating: "กำลังแปล...", noTBM: "ยังไม่มีสรุปวันนี้", mustSign: "ออกโดยไม่ลงนาม?", alreadySigned: "ลงนามแล้ววันนี้", back: "กลับ", pron: "การออกเสียง", rev: "แปลย้อนกลับ" },
-    uz: { title: "Xavfsizlik brifing", original: "Asl (Koreys)", translated: "Tarjima", voice: "Tinglash", signHere: "Bu yerga imzo chekish", clear: "Tozalash", confirm: "✍️ Tasdiqlash va imzo", signed: "✓ Imzolandi!", translating: "Tarjima qilinmoqda...", noTBM: "Bugungi brifing yo'q.", mustSign: "Imzosiz chiqilsinmi?", alreadySigned: "Bugun allaqachon imzolandi.", back: "Orqaga", pron: "Talaffuz", rev: "Teskari tarjima" },
-    zh: { title: "安全简报", original: "原文（韩语）", translated: "翻译", voice: "语音播放", signHere: "请在此签名", clear: "清除", confirm: "✍️ 确认并签名", signed: "✓ 签名完成！", translating: "翻译中...", noTBM: "今天没有简报", mustSign: "不签名就离开？", alreadySigned: "今天已经签名了。", back: "返回", pron: "发音", rev: "回译" },
+    uz: { title: "Xavfsizlik brifing", original: "Asl (Koreys)", translated: "Tarjima", voice: "Tinglash", signHere: "Bu yerga imzo chekish", clear: "Tozalash", confirm: "✍️ Tasdiqlash va imzo", signed: "✓ Imzolandi!", translating: "Tarjima qilinmoqda...", noTBM: "Bugungi brifing yo'q.", mustSign: "Imzosiz chiqilsinmi?", alreadySigned: "Bugun allaqachon imzolandi.", back: "Orqaga", pron: "Talaffuz", rev: "Teskari tarjima", listenFirst: "Iltimos, avval brifingni oxirigacha tinglang.", listenStatus: "Eshitish holati" },
+    zh: { title: "安全简报", original: "原文（韩语）", translated: "翻译", voice: "语音播放", signHere: "请在此签名", clear: "清除", confirm: "✍️ 确认并签名", signed: "✓ 签名完成！", translating: "翻译中...", noTBM: "今天没有简报", mustSign: "不签名就离开？", alreadySigned: "今天已经签名了。", back: "返回", pron: "发音", rev: "回译", listenFirst: "请先完整听取简报语音。", listenStatus: "听取状态" },
 };
 // ── 텍스트 클리닝 (중법 괄호 및 반복 제거) ──
 const cleanupText = (text: string): string => {
     if (!text) return "";
     let count = 0;
     // 괄호와 그 안의 내용을 과감하게 정리하되, 처음 한 번만 남기고 나머지는 제거합니다.
-    return text.replace(/[(\（][^)\）]+[)\）]/g, (match) => {
+    let clean = text.replace(/[(\（][^)\）]+[)\）]/g, (match) => {
         count++;
         return count === 1 ? match : "";
-    }).split('\n').map(line => line.trim()).filter(Boolean).join('\n').replace(/\s{2,}/g, ' ').trim();
+    });
+    // Remove emojis completely
+    clean = clean.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '');
+    return clean.split('\n').map(line => line.trim()).filter(Boolean).join('\n').replace(/\s{2,}/g, ' ').trim();
 };
 
 const getUI = (lang: string) => {
@@ -94,6 +95,7 @@ function WorkerTBMDetailContent() {
     const [transData, setTransData] = useState<{ text: string, pron: string, rev: string }>({ text: "", pron: "", rev: "" });
     const [isSigned, setIsSigned] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isAudioFinished, setIsAudioFinished] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const voiceGenderRef = useRef<'male' | 'female'>('female');
@@ -188,14 +190,21 @@ function WorkerTBMDetailContent() {
 
     useEffect(() => { loadTBM(); }, [loadTBM]);
 
-    // 새 TBM 발송 시 자동 갱신
+    const [hasNewTBM, setHasNewTBM] = useState(false);
+
+    // 새 TBM 발송 시 자동 갱신 및 소리 알림
     useEffect(() => {
         const supabase = createClient();
         const channel = supabase
             .channel('tbm_detail_realtime')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tbm_notices' }, () => {
-                console.log('[TBM] New TBM received, reloading...');
+                console.log('[TBM] New TBM received, alerting and reloading...');
+                setHasNewTBM(true);
+                playNotificationSound();
                 loadTBM();
+
+                // 3초 후 플래시 배너 닫기
+                setTimeout(() => setHasNewTBM(false), 3000);
             })
             .subscribe();
         return () => { supabase.removeChannel(channel); };
@@ -205,14 +214,25 @@ function WorkerTBMDetailContent() {
     const handlePlayAudio = () => {
         if (!transData.text) return;
         setIsPlaying(true);
-        playPremiumAudio(transData.text, preferredLang, voiceGenderRef.current, () => setIsPlaying(false));
+        playPremiumAudio(transData.text, preferredLang, voiceGenderRef.current, () => {
+            setIsPlaying(false);
+            setIsAudioFinished(true);
+        });
     };
 
     const handleSubmit = async () => {
         if (!tbm) return;
         if (isSigned) return;
+
+        const t = getUI(preferredLang);
+
+        if (!isAudioFinished) {
+            alert(t.listenFirst);
+            return;
+        }
+
         if (signaturePadRef.current?.isEmpty()) {
-            alert(getUI(preferredLang).signHere + " !");
+            alert(t.signHere + " !");
             return;
         }
 
@@ -309,7 +329,14 @@ function WorkerTBMDetailContent() {
                             <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter">Voice Lang</span>
                             <span className="text-[10px] font-bold text-slate-300">{preferredLang.toUpperCase()}</span>
                         </div>
-                        <img src={`https://flagcdn.com/w80/${iso}.png`} alt={preferredLang} className="w-8 h-6 md:w-10 md:h-7 object-cover rounded shadow border border-white/10" />
+                        <Image
+                            src={`https://flagcdn.com/w80/${iso}.png`}
+                            alt={preferredLang}
+                            width={80}
+                            height={56}
+                            className="w-8 h-6 md:w-10 md:h-7 object-cover rounded shadow border border-white/10"
+                            unoptimized
+                        />
                     </div>
                 </header>
 
@@ -330,9 +357,18 @@ function WorkerTBMDetailContent() {
                         </div>
                     ) : (
                         <>
+                            {/* 🚨 NEW TBM ARRIVED ALERT */}
+                            {hasNewTBM && (
+                                <div className="animate-in slide-in-from-top-4 fade-in duration-500 w-full mb-6 relative overflow-hidden p-6 glass-red rounded-3xl border-red-500 border-2 shadow-[0_0_60px_-15px_rgba(239,68,68,0.6)] flex items-center justify-center gap-4 text-white z-50">
+                                    <svg className="w-8 h-8 animate-pulse text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                                    <span className="text-xl md:text-2xl font-black italic tracking-tight">{t.newTBM || "🚨 New Safety Alert!"}</span>
+                                </div>
+                            )}
+
                             {/* 🎯 Main TBM Card */}
                             <section className="glass rounded-[48px] p-8 border-white/10 shadow-2xl relative overflow-hidden group">
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 blur-[60px] rounded-full -mr-16 -mt-16 group-hover:bg-red-500/20 transition-all duration-1000" />
+
 
                                 <div className="flex justify-between items-start mb-10">
                                     <div className="flex flex-col gap-1">
@@ -435,25 +471,38 @@ function WorkerTBMDetailContent() {
 
                             {/* ✍️ Signature Section */}
                             {!isSigned && (
-                                <section className="flex flex-col gap-6 animate-float">
+                                <section className={`flex flex-col gap-6 transition-all duration-700 ${isAudioFinished ? 'animate-float opacity-100' : 'opacity-60 grayscale'}`}>
                                     <div className="flex justify-between items-end px-4">
                                         <div className="flex flex-col gap-1">
-                                            <h3 className="text-xl font-black text-white">{t.signHere}</h3>
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-xl font-black text-white">{t.signHere}</h3>
+                                                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${isAudioFinished ? 'bg-green-500 text-white' : 'bg-red-500 text-white animate-pulse'}`}>
+                                                    {isAudioFinished ? '✅ READY' : '⚠️ ' + t.listenStatus}
+                                                </span>
+                                            </div>
                                             <p className="text-xs text-slate-500 font-bold uppercase tracking-widest tracking-tighter">Your signature will be stored legally</p>
                                         </div>
                                         <button
                                             onClick={() => signaturePadRef.current?.clear()}
-                                            className="px-5 py-2 glass rounded-xl text-xs font-black text-slate-400 hover:text-white transition-all tap-effect"
+                                            disabled={!isAudioFinished}
+                                            className="px-5 py-2 glass rounded-xl text-xs font-black text-slate-400 hover:text-white transition-all tap-effect disabled:opacity-30"
                                         >
                                             {t.clear.toUpperCase()}
                                         </button>
                                     </div>
-                                    <div className="bg-white rounded-[40px] border-[6px] border-slate-900 shadow-2xl overflow-hidden aspect-[2/1] relative">
+                                    <div className={`bg-white rounded-[40px] border-[6px] transition-all duration-500 overflow-hidden aspect-[2/1] relative ${isAudioFinished ? 'border-slate-900 shadow-2xl' : 'border-slate-800 opacity-50 pointer-events-none'}`}>
                                         <SignatureCanvas
                                             ref={signaturePadRef}
                                             penColor="#0f172a"
                                             canvasProps={{ className: "w-full h-full cursor-crosshair" }}
                                         />
+                                        {!isAudioFinished && (
+                                            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center p-6 text-center">
+                                                <p className="text-white text-sm font-black uppercase tracking-widiest leading-relaxed drop-shadow-lg">
+                                                    🔒 {t.listenFirst}
+                                                </p>
+                                            </div>
+                                        )}
                                         <div className="absolute inset-x-0 bottom-4 pointer-events-none flex justify-center">
                                             <div className="w-48 h-0.5 bg-slate-200 rounded-full opacity-50" />
                                         </div>
@@ -485,10 +534,10 @@ function WorkerTBMDetailContent() {
                         <div className="max-w-2xl mx-auto pointer-events-auto">
                             <button
                                 onClick={handleSubmit}
-                                disabled={isSigned || isSubmitting}
+                                disabled={isSigned || isSubmitting || !isAudioFinished}
                                 className={`w-full py-7 rounded-[32px] text-2xl font-black tracking-tight shadow-3xl transition-all tap-effect flex items-center justify-center gap-4 ${isSigned
                                     ? "bg-slate-900 text-slate-600 border border-white/5"
-                                    : "bg-gradient-to-br from-green-400 to-green-600 text-slate-950 shadow-green-500/20"
+                                    : (!isAudioFinished ? "bg-slate-800 text-slate-500 border border-white/5 opacity-50" : "bg-gradient-to-br from-green-400 to-green-600 text-slate-950 shadow-green-500/20")
                                     }`}
                             >
                                 {isSubmitting ? (
@@ -498,8 +547,10 @@ function WorkerTBMDetailContent() {
                                         <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
                                             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
                                         </svg>
-                                        SIGNED
+                                        <span>{t.signed}</span>
                                     </>
+                                ) : !isAudioFinished ? (
+                                    <span>🔒 {t.listenStatus}</span>
                                 ) : (
                                     <>
                                         {t.confirm.split(' ')[0]}

@@ -1,7 +1,9 @@
 "use client";
-import { useEffect, useState, useRef, Suspense } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useEffect, useState, Suspense } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@/utils/supabase/client";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 
@@ -81,6 +83,66 @@ const workerUI: Record<string, any> = {
         newChat: "🚨 ผู้ดูแลระบบขอแชท!",
         openChat: "เข้าสู่แชท",
     },
+    uz: {
+        greeting: (name: string) => `Xush kelibsiz, ${name}`,
+        tbmBadge: "Bugungi tahlika (TBM)",
+        tbmDesc: "Xavfsizlik yo'riqnomalari keldi. Iltimos, ish boshlashdan oldin ko'rib chiqing va imzolang.",
+        tbmBtn: "Ko'rish va imzolash",
+        newTBM: "🚨 Yangi xavfsizlik ogohlantirishi!",
+        chatTitle: "Jonli chat",
+        chatDesc: "Admin bilan suhbatlashish uchun bosing.",
+        chatBtn: "Chatni ochish",
+        signOut: "Chiqish",
+        safeWork: "Bugun xavfsiz ishlang!",
+        status: "Holat",
+        newChat: "🚨 Admin chat so'radi!",
+        openChat: "Chatga kirish",
+    },
+    ph: {
+        greeting: (name: string) => `Maligayang pagdating, ${name}`,
+        tbmBadge: "Kaligtasan Ngayon (TBM)",
+        tbmDesc: "Dumating na ang mga tagubilin sa kaligtasan. Mangyaring suriin at lagdaan bago magsimulang magtrabaho.",
+        tbmBtn: "Tingnan at Pirmahan",
+        newTBM: "🚨 Bagong Alert sa Kaligtasan!",
+        chatTitle: "Live Chat",
+        chatDesc: "I-tap para makipag-chat sa admin.",
+        chatBtn: "Buksan ang Chat",
+        signOut: "Mag-sign out",
+        safeWork: "Magtrabaho nang Ligtas Ngayon!",
+        status: "Katayuan",
+        newChat: "🚨 Humiling ng chat ang Admin!",
+        openChat: "Pumasok sa Chat",
+    },
+    ru: {
+        greeting: (name: string) => `Добро пожаловать, ${name}`,
+        tbmBadge: "Безопасность сегодня (TBM)",
+        tbmDesc: "Пришли инструкции по технике безопасности. Пожалуйста, прочтите и подпишите перед началом работы.",
+        tbmBtn: "Посмотреть и подписать",
+        newTBM: "🚨 Новое оповещение по безопасности!",
+        chatTitle: "Живой чат",
+        chatDesc: "Нажмите, чтобы пообщаться с админом.",
+        chatBtn: "Открыть чат",
+        signOut: "Выйти",
+        safeWork: "Работайте безопасно сегодня!",
+        status: "Статус",
+        newChat: "🚨 Админ запрашивает чат!",
+        openChat: "Войти в чат",
+    },
+    jp: {
+        greeting: (name: string) => `ようこそ、${name}さん`,
+        tbmBadge: "本日の安全指示 (TBM)",
+        tbmDesc: "安全指示が届きました。作業開始前に確認し、署名してください。",
+        tbmBtn: "確認して署名する",
+        newTBM: "🚨 新しい安全アラート！",
+        chatTitle: "ライブチャット",
+        chatDesc: "タップして管理者とチャットします。",
+        chatBtn: "チャットを開く",
+        signOut: "ログアウト",
+        safeWork: "今日も一日安全に！",
+        status: "ステータス",
+        newChat: "🚨 管理者がチャットをリクエストしました！",
+        openChat: "チャットに入る",
+    },
 };
 const getUI = (lang: string) => workerUI[lang] || workerUI["en"];
 
@@ -98,10 +160,9 @@ function WorkerHomeContent() {
     const [newTBMTime, setNewTBMTime] = useState<string>("");
 
     // 신규 채팅 알림 관련 상태
-    const [hasNewChat, setHasNewChat] = useState(false);
+    const [newChatCount, setNewChatCount] = useState(0);
     const [newChatTime, setNewChatTime] = useState<string>("");
 
-    const [isLoaded, setIsLoaded] = useState(false);
 
     const urlLang = searchParams.get("lang");
 
@@ -143,7 +204,6 @@ function WorkerHomeContent() {
                 } else {
                     setProfile(data);
                 }
-                setIsLoaded(true);
             }
         };
         fetchProfile();
@@ -153,7 +213,7 @@ function WorkerHomeContent() {
             .on(
                 "postgres_changes",
                 { event: "INSERT", schema: "public", table: "tbm_notices" },
-                (payload) => {
+                () => {
                     setHasNewTBM(true);
                     setNewTBMTime(new Date().toLocaleTimeString());
                     triggerAlert();
@@ -171,7 +231,7 @@ function WorkerHomeContent() {
                     const msg = payload.new as any;
                     const { data: { session } } = await supabase.auth.getSession();
                     if (session && msg.to_user === session.user.id) {
-                        setHasNewChat(true);
+                        setNewChatCount(prev => prev + 1);
                         setNewChatTime(new Date().toLocaleTimeString());
                         triggerAlert();
 
@@ -218,7 +278,14 @@ function WorkerHomeContent() {
                     </div>
                     <div className="flex flex-col items-end gap-3">
                         <div className="flex items-center gap-3 glass px-4 py-2 rounded-full border-white/5 shadow-xl">
-                            <img src={`https://flagcdn.com/w40/${iso}.png`} alt={lang} className="w-8 h-5.5 object-cover rounded-sm shadow-md" />
+                            <Image
+                                src={`https://flagcdn.com/w40/${iso}.png`}
+                                alt={lang}
+                                width={40}
+                                height={30}
+                                className="w-8 h-5.5 object-cover rounded-sm shadow-md"
+                                unoptimized
+                            />
                             <span className="text-xs text-white font-black">{lang.toUpperCase()}</span>
                         </div>
                         <div className="flex gap-4">
@@ -258,10 +325,10 @@ function WorkerHomeContent() {
                     </div>
                 )}
                 {/* 💬 신규 채팅 알림 (강제 팝업 형태) */}
-                {hasNewChat && (
+                {newChatCount > 0 && (
                     <div
                         className="relative overflow-hidden p-8 bg-blue-600/90 backdrop-blur-md rounded-[40px] border-blue-400 border-2 shadow-[0_0_60px_-15px_rgba(59,130,246,0.8)] cursor-pointer tap-effect animate-float z-50 transform transition-all hover:scale-[1.02]"
-                        onClick={() => { setHasNewChat(false); router.push("/worker/chat"); }}
+                        onClick={() => { setNewChatCount(0); router.push("/worker/chat"); }}
                     >
                         <div className="flex items-center gap-6 relative z-10">
                             <div className="w-16 h-16 bg-white/20 rounded-3xl flex items-center justify-center text-white relative shadow-inner">
@@ -323,10 +390,15 @@ function WorkerHomeContent() {
                 >
                     <div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors" />
                     <div className="flex items-center gap-6 mb-8 relative">
-                        <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-blue-400 shadow-lg">
+                        <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-blue-400 shadow-lg relative">
                             <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                             </svg>
+                            {newChatCount > 0 && (
+                                <span className="absolute -top-2 -right-2 min-w-[22px] h-[22px] px-1 bg-red-500 rounded-full border-[3px] border-white text-white text-[10px] font-black flex items-center justify-center shadow-md">
+                                    {newChatCount}
+                                </span>
+                            )}
                         </div>
                         <div className="flex flex-col">
                             <h2 className="text-2xl font-black text-white">{t.chatTitle}</h2>

@@ -1,14 +1,28 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
+type CookieOptions = {
+    domain?: string
+    expires?: Date
+    httpOnly?: boolean
+    maxAge?: number
+    path?: string
+    sameSite?: true | false | 'lax' | 'strict' | 'none'
+    secure?: boolean
+    priority?: 'low' | 'medium' | 'high'
+    partitioned?: boolean
+}
+
 export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url)
     const code = searchParams.get('code')
-    const next = searchParams.get('next') ?? '/auth/setup'
+    const rawNext = searchParams.get('next') ?? '/auth/setup'
+    // 오픈 리다이렉트 방지: 반드시 /로 시작하고 //로 시작하지 않아야 함
+    const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/auth/setup'
 
     if (code) {
         const cookieHeader = request.headers.get('cookie') ?? '';
-        const responseCookies: { name: string; value: string; options: any }[] = [];
+        const responseCookies: { name: string; value: string; options: CookieOptions }[] = [];
 
         const supabase = createServerClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,

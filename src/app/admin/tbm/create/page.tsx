@@ -1,6 +1,7 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
@@ -88,7 +89,7 @@ function AdminTBMCreateContent() {
     const recognitionRef = useRef<any>(null);
     const urlLang = searchParams.get("lang");
 
-    const loadProfile = async () => {
+    const loadProfile = useCallback(async () => {
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
@@ -101,14 +102,9 @@ function AdminTBMCreateContent() {
             }
             setAdminLang(finalLang);
         }
-    };
-
-    useEffect(() => {
-        loadProfile();
-        fetchHistory();
     }, [urlLang]);
 
-    const fetchHistory = async () => {
+    const fetchHistory = useCallback(async () => {
         const supabase = createClient();
         const { data } = await supabase
             .from("tbm_notices")
@@ -116,7 +112,12 @@ function AdminTBMCreateContent() {
             .order("created_at", { ascending: false })
             .limit(5);
         if (data) setHistory(data);
-    };
+    }, []);
+
+    useEffect(() => {
+        loadProfile();
+        fetchHistory();
+    }, [loadProfile, fetchHistory]);
 
     const handleGenerateAI = async () => {
         setIsGeneratingAI(true);
@@ -156,23 +157,22 @@ function AdminTBMCreateContent() {
     const toggleRecording = () => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (!SpeechRecognition) {
-            alert("This browser does not support Speech Recognition.");
+            alert("이 브라우저는 음성 인식을 지원하지 않습니다.");
             return;
         }
 
         if (isRecording) {
-            if (recognitionRef.current) recognitionRef.current.stop();
+            if (recognitionRef.current) {
+                recognitionRef.current.stop();
+            }
             setIsRecording(false);
         } else {
-            console.log(`[Admin STT] Starting with: ${getSTTLang(adminLang)}`);
             const recognition = new SpeechRecognition();
             recognition.lang = getSTTLang(adminLang);
-            recognition.continuous = true;
+            recognition.continuous = true; // 대화와 달리 브리핑은 길게 입력되도록 설정
             recognition.interimResults = true;
-            recognitionRef.current = recognition;
 
             recognition.onstart = () => setIsRecording(true);
-
             recognition.onresult = (event: any) => {
                 let finalTranscript = "";
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
@@ -187,13 +187,13 @@ function AdminTBMCreateContent() {
                     });
                 }
             };
-
             recognition.onerror = (e: any) => {
-                console.error("[Admin STT Error]", e);
+                console.error("[TBM STT Error]", e);
                 setIsRecording(false);
             };
-
             recognition.onend = () => setIsRecording(false);
+
+            recognitionRef.current = recognition;
             recognition.start();
         }
     };

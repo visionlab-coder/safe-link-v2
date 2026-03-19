@@ -49,3 +49,5 @@ whoami_output.txt
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel

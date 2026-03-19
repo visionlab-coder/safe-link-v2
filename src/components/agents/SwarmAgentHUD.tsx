@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Activity, Mic, MicOff, Sun, Moon, Maximize2, ShieldAlert } from "lucide-react";
+import { Activity, Mic, MicOff, ShieldAlert } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 /**
@@ -47,8 +47,11 @@ export default function SwarmAgentHUD() {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
             streamRef.current = stream;
 
-            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-            const audioCtx = new AudioContext();
+            const AudioContextCtor = window.AudioContext || (window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+            if (!AudioContextCtor) {
+                throw new Error("AudioContext not supported");
+            }
+            const audioCtx = new AudioContextCtor();
             audioContextRef.current = audioCtx;
 
             const analyser = audioCtx.createAnalyser();

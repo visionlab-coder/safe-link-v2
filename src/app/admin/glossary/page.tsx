@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter } from "next/navigation";
@@ -112,6 +113,159 @@ export default function GlossaryPage() {
         setTestResult(result.normalized);
     };
 
+    const uploadToGoogleSheets = async (token: string, data: any[][]) => {
+        try {
+            const response = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    properties: {
+                        title: `SafeLink_Glossary_${new Date().toISOString().split('T')[0]}`,
+                    },
+                    sheets: [
+                        {
+                            data: [
+                                {
+                                    startRow: 0,
+                                    startColumn: 0,
+                                    rowData: data.map(row => ({
+                                        values: row.map(cell => ({ userEnteredValue: { stringValue: String(cell) } }))
+                                    }))
+                                }
+                            ]
+                        }
+                    ]
+                }),
+            });
+            const result = await response.json();
+            if (response.ok) {
+                window.open(`https://docs.google.com/spreadsheets/d/${result.spreadsheetId}`, '_blank');
+                alert("구글 스프레드시트에 성공적으로 생성되었습니다!");
+            } else {
+                throw new Error(result.error?.message || "Sheets API Error");
+            }
+        } catch (err: any) {
+            console.error(err);
+            alert("스프레드시트 전송 실패: " + err.message);
+        }
+    };
+
+    const uploadToGoogleDrive = async (token: string, csvContent: string) => {
+        try {
+            const metadata = {
+                name: `SafeLink_Glossary_${new Date().toISOString().split('T')[0]}.csv`,
+                mimeType: 'text/csv',
+            };
+
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append('file', new Blob([csvContent], { type: 'text/csv' }));
+
+            const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: form,
+            });
+
+            if (response.ok) {
+                alert("구글 드라이브에 성공적으로 업로드되었습니다!");
+            } else {
+                const result = await response.json();
+                throw new Error(result.error?.message || "Drive API Error");
+            }
+        } catch (err: any) {
+            console.error(err);
+            alert("드라이브 전송 실패: " + err.message);
+        }
+    };
+
+    const escapeHtml = (str: string) =>
+        str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
+    const handleExport = async (mode: 'print' | 'sheets' | 'drive' = 'print') => {
+        if (terms.length === 0) return;
+
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        const providerToken = (session as any)?.provider_token;
+
+        if (mode === 'print') {
+            const printContent = `
+                <html>
+                <head>
+                    <title>현장 용어 사전 리포트 - ${new Date().toLocaleDateString()}</title>
+                    <style>
+                        body { font-family: 'Inter', sans-serif; padding: 40px; color: #1e293b; }
+                        h1 { color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+                        th { background: #f1f5f9; font-weight: bold; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Safe-Link 현장 용어 사전 (Glossary)</h1>
+                    <p><strong>생성일:</strong> ${new Date().toLocaleString()}</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>카테고리</th>
+                                <th>은어 (현장 용어)</th>
+                                <th>표준어</th>
+                                <th>상태</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${terms.map(t => `
+                                <tr>
+                                    <td>${escapeHtml(t.category)}</td>
+                                    <td style="font-weight: bold;">${escapeHtml(t.slang)}</td>
+                                    <td>${escapeHtml(t.standard)}</td>
+                                    <td>${t.is_active ? '활성' : '비활성'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+            const win = window.open('', '_blank');
+            if (win) {
+                win.document.write(printContent);
+                win.document.close();
+                win.print();
+            }
+        } else if (mode === 'sheets' || mode === 'drive') {
+            const csvRows = [
+                ["카테고리", "은어", "표준어", "활성상태"],
+                ...terms.map(t => [t.category, t.slang, t.standard, t.is_active ? "활성" : "비활성"])
+            ];
+            const csvContent = "\uFEFF" + csvRows.map(e => e.join(",")).join("\n");
+
+            if (providerToken) {
+                if (mode === 'sheets') {
+                    await uploadToGoogleSheets(providerToken, csvRows);
+                } else {
+                    await uploadToGoogleDrive(providerToken, csvContent);
+                }
+            } else {
+                // provider_token이 없으면 수동 다운로드 진행 및 안내
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", `Glossary_Export_${new Date().toISOString().split('T')[0]}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                alert("구글 계정으로 로그인되어 있지 않아 수동 다운로드를 진행했습니다. 자동 연동을 원하시면 로그아웃 후 '구글로 로그인'을 이용해 주세요.");
+            }
+        }
+    };
+
     return (
         <RoleGuard allowedRole="admin">
             <div className="min-h-screen bg-mesh text-white p-4 md:p-8 flex flex-col gap-8 pb-12 font-sans selection:bg-blue-500/30">
@@ -125,6 +279,17 @@ export default function GlossaryPage() {
                         <div className="flex flex-col">
                             <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase text-gradient">Glossary</h1>
                             <p className="text-slate-400 font-bold tracking-tight uppercase text-sm">현장 용어 및 표준어 관리</p>
+                        </div>
+                    </div>
+                    <div className="relative group/export">
+                        <button className="glass px-6 py-3 rounded-full text-xs font-black text-blue-400 hover:bg-blue-500/10 transition-all tap-effect uppercase tracking-widest flex items-center gap-2 shadow-xl">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2-2H7a2 2 0 00-2 2v4h12z" /></svg>
+                            내보내기
+                        </button>
+                        <div className="absolute right-0 mt-2 w-56 glass rounded-2xl border border-white/10 shadow-2xl opacity-0 invisible group-hover/export:opacity-100 group-hover/export:visible transition-all z-[60] overflow-hidden">
+                            <button onClick={() => handleExport('print')} className="w-full px-4 py-4 text-left text-[11px] font-black hover:bg-white/5 text-slate-300 transition-colors border-b border-white/5 uppercase tracking-widest flex items-center gap-2">🖨️ 인쇄 / PDF 저장</button>
+                            <button onClick={() => handleExport('sheets')} className="w-full px-4 py-4 text-left text-[11px] font-black hover:bg-white/5 text-slate-300 transition-colors border-b border-white/5 uppercase tracking-widest flex items-center gap-2">📊 구글 스프레드시트 (CSV)</button>
+                            <button onClick={() => handleExport('drive')} className="w-full px-4 py-4 text-left text-[11px] font-black hover:bg-white/5 text-slate-300 transition-colors uppercase tracking-widest flex items-center gap-2">☁️ 구글 드라이브 보관</button>
                         </div>
                     </div>
                 </header>

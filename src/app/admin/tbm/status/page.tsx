@@ -1,6 +1,9 @@
 "use client";
-import { useEffect, useState, Suspense } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useEffect, useState, Suspense, useCallback } from "react";
+import { Shield } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
 
@@ -16,6 +19,7 @@ type WorkerStatus = {
     preferred_lang: string;
     signed: boolean;
     signed_at?: string;
+    signature_data?: string;
 };
 
 const ui: Record<string, any> = {
@@ -81,10 +85,182 @@ function TBMStatusPageContent() {
     const [latestTBM, setLatestTBM] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [adminLang, setAdminLang] = useState("ko");
+    const [selectedSignature, setSelectedSignature] = useState<string | null>(null);
+    const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
 
     const urlLang = searchParams.get("lang");
 
-    const load = async () => {
+    const handleDownload = (data: string, name: string) => {
+        const link = document.createElement("a");
+        link.href = data;
+        link.download = `signature_${name}_${new Date().toISOString().split('T')[0]}.png`;
+        link.click();
+    };
+
+    const uploadToGoogleSheets = async (token: string, data: any[][]) => {
+        try {
+            const response = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    properties: {
+                        title: `TBM_Report_${latestTBM.site_name || "Field"}_${new Date().toISOString().split('T')[0]}`,
+                    },
+                    sheets: [
+                        {
+                            data: [
+                                {
+                                    startRow: 0,
+                                    startColumn: 0,
+                                    rowData: data.map(row => ({
+                                        values: row.map(cell => ({ userEnteredValue: { stringValue: String(cell) } }))
+                                    }))
+                                }
+                            ]
+                        }
+                    ]
+                }),
+            });
+            const result = await response.json();
+            if (response.ok) {
+                window.open(`https://docs.google.com/spreadsheets/d/${result.spreadsheetId}`, '_blank');
+                alert("구글 스프레드시트에 성공적으로 생성되었습니다!");
+            } else {
+                throw new Error(result.error?.message || "Sheets API Error");
+            }
+        } catch (err: any) {
+            console.error(err);
+            alert("스프레드시트 전송 실패: " + err.message);
+        }
+    };
+
+    const uploadToGoogleDrive = async (token: string, csvContent: string) => {
+        try {
+            const metadata = {
+                name: `TBM_Report_${latestTBM.site_name || "Field"}_${new Date().toISOString().split('T')[0]}.csv`,
+                mimeType: 'text/csv',
+            };
+
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append('file', new Blob([csvContent], { type: 'text/csv' }));
+
+            const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: form,
+            });
+
+            if (response.ok) {
+                alert("구글 드라이브에 성공적으로 업로드되었습니다!");
+            } else {
+                const result = await response.json();
+                throw new Error(result.error?.message || "Drive API Error");
+            }
+        } catch (err: any) {
+            console.error(err);
+            alert("드라이브 전송 실패: " + err.message);
+        }
+    };
+
+    const escapeHtml = (str: string) =>
+        str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
+    const handleExport = async (mode: 'print' | 'sheets' | 'drive' = 'print') => {
+        if (!latestTBM) return;
+
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        const providerToken = (session as any)?.provider_token;
+
+        if (mode === 'print') {
+            const printContent = `
+                <html>
+                <head>
+                    <title>TBM 안전 보건 일지 - ${new Date().toLocaleDateString()}</title>
+                    <style>
+                        body { font-family: 'Inter', sans-serif; padding: 40px; color: #1e293b; }
+                        h1 { color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+                        .header { margin-bottom: 30px; }
+                        .briefing { background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 30px; border: 1px solid #e2e8f0; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+                        th { background: #f1f5f9; font-weight: bold; }
+                        .signature-img { height: 40px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>Safe-Link TBM 안전 보건 일지</h1>
+                        <p><strong>현장명:</strong> ${escapeHtml(latestTBM.site_name || "현장 센터")}</p>
+                        <p><strong>일시:</strong> ${escapeHtml(new Date(latestTBM.created_at).toLocaleString())}</p>
+                    </div>
+                    <div class="briefing">
+                        <h3>안전 지침 내용 (한국어)</h3>
+                        <p>${escapeHtml(latestTBM.content_ko)}</p>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>근로자 성명</th>
+                                <th>설정 언어</th>
+                                <th>서명 시각</th>
+                                <th>서명 데이터</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${workers.map(w => `
+                                <tr>
+                                    <td>${escapeHtml(w.display_name)}</td>
+                                    <td>${escapeHtml(w.preferred_lang.toUpperCase())}</td>
+                                    <td>${w.signed ? escapeHtml(new Date(w.signed_at!).toLocaleString()) : '미서명'}</td>
+                                    <td>${w.signed && w.signature_data ? `<img src="${escapeHtml(w.signature_data)}" class="signature-img" />` : '-'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+            const win = window.open('', '_blank');
+            if (win) {
+                win.document.write(printContent);
+                win.document.close();
+                win.print();
+            }
+        } else if (mode === 'sheets' || mode === 'drive') {
+            const csvRows = [
+                ["성명", "언어", "서명여부", "서명시각"],
+                ...workers.map(w => [w.display_name, w.preferred_lang, w.signed ? "완료" : "미달", w.signed_at || ""])
+            ];
+            const csvContent = "\uFEFF" + csvRows.map(e => e.join(",")).join("\n");
+
+            if (providerToken) {
+                if (mode === 'sheets') {
+                    await uploadToGoogleSheets(providerToken, csvRows);
+                } else {
+                    await uploadToGoogleDrive(providerToken, csvContent);
+                }
+            } else {
+                // provider_token이 없으면 수동 다운로드 진행 및 안내
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", `TBM_Report_${latestTBM.site_name || "Field"}_${new Date().toISOString().split('T')[0]}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                alert("구글 계정으로 로그인되어 있지 않아 수동 다운로드를 진행했습니다. 자동 연동을 원하시면 로그아웃 후 '구글로 로그인'을 이용해 주세요.");
+            }
+        }
+    };
+
+    const load = useCallback(async () => {
         setLoading(true);
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
@@ -107,21 +283,22 @@ function TBMStatusPageContent() {
             setLoading(false);
             return;
         }
-        const { data: ackData } = await supabase.from("tbm_ack").select("worker_id, ack_at").eq("tbm_id", tbm.id);
-        const ackMap = new Map((ackData || []).map(a => [a.worker_id, a.ack_at]));
+        const { data: ackData } = await supabase.from("tbm_ack").select("worker_id, ack_at, signature_data").eq("tbm_id", tbm.id);
+        const ackMap = new Map((ackData || []).map(a => [a.worker_id, { at: a.ack_at, sig: a.signature_data }]));
         const statusList: WorkerStatus[] = workerProfiles.map(w => ({
             id: w.id,
             display_name: w.display_name || "Anonymous",
             preferred_lang: w.preferred_lang || "ko",
             signed: ackMap.has(w.id),
-            signed_at: ackMap.get(w.id),
+            signed_at: ackMap.get(w.id)?.at,
+            signature_data: ackMap.get(w.id)?.sig,
         }));
         statusList.sort((a, b) => Number(a.signed) - Number(b.signed));
         setWorkers(statusList);
         setLoading(false);
-    };
+    }, [urlLang]);
 
-    useEffect(() => { load(); }, [urlLang]);
+    useEffect(() => { load(); }, [load]);
 
     const signedCount = workers.filter(w => w.signed).length;
     const totalCount = workers.length;
@@ -145,9 +322,23 @@ function TBMStatusPageContent() {
                             </div>
                         </div>
                     </div>
-                    <button onClick={load} className="glass px-5 py-2 rounded-full text-xs font-black text-slate-400 hover:text-white transition-all tap-effect uppercase tracking-widest">
-                        {t.refreshBtn}
-                    </button>
+                    <div className="flex items-center gap-3">
+                        {/* 내보내기 드롭다운 스타일 버튼 */}
+                        <div className="relative group/export">
+                            <button className="glass px-5 py-2 rounded-full text-xs font-black text-blue-400 hover:bg-blue-500/10 transition-all tap-effect uppercase tracking-widest flex items-center gap-2">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2-2H7a2 2 0 00-2 2v4h12z" /></svg>
+                                내보내기
+                            </button>
+                            <div className="absolute right-0 mt-2 w-48 glass rounded-2xl border border-white/10 shadow-2xl opacity-0 invisible group-hover/export:opacity-100 group-hover/export:visible transition-all z-[60] overflow-hidden">
+                                <button onClick={() => handleExport('print')} className="w-full px-4 py-3 text-left text-[10px] font-black hover:bg-white/5 text-slate-300 transition-colors border-b border-white/5 uppercase tracking-widest">🖨️ 인쇄 / PDF 저장</button>
+                                <button onClick={() => handleExport('sheets')} className="w-full px-4 py-3 text-left text-[10px] font-black hover:bg-white/5 text-slate-300 transition-colors border-b border-white/5 uppercase tracking-widest">📊 구글 스프레드시트 (CSV)</button>
+                                <button onClick={() => handleExport('drive')} className="w-full px-4 py-3 text-left text-[10px] font-black hover:bg-white/5 text-slate-300 transition-colors uppercase tracking-widest">☁️ 구글 드라이브 보관</button>
+                            </div>
+                        </div>
+                        <button onClick={load} className="glass px-5 py-2 rounded-full text-xs font-black text-slate-400 hover:text-white transition-all tap-effect uppercase tracking-widest">
+                            {t.refreshBtn}
+                        </button>
+                    </div>
                 </header>
 
                 <main className="flex-1 flex flex-col p-4 md:p-8 gap-8 max-w-3xl mx-auto w-full pb-20">
@@ -187,7 +378,7 @@ function TBMStatusPageContent() {
                                 <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{t.activeDispatch}</h3>
                                 <span className="text-[10px] text-slate-700 font-bold">{new Date(latestTBM.created_at).toLocaleString()}</span>
                             </div>
-                            <p className="text-slate-400 font-bold leading-relaxed line-clamp-2 italic">"{latestTBM.content_ko}"</p>
+                            <p className="text-slate-400 font-bold leading-relaxed line-clamp-2 italic">&quot;{latestTBM.content_ko}&quot;</p>
                         </div>
                     )}
 
@@ -206,7 +397,14 @@ function TBMStatusPageContent() {
                                     <div key={worker.id} className={`glass p-5 rounded-[32px] border-white/5 transition-all tap-effect flex items-center justify-between group ${!worker.signed ? "hover:border-red-500/20" : "hover:border-green-500/20"}`}>
                                         <div className="flex items-center gap-5">
                                             <div className="relative">
-                                                <img src={`https://flagcdn.com/w80/${isoMap[worker.preferred_lang] || "un"}.png`} alt={worker.preferred_lang} className="w-12 h-8.5 object-cover rounded-xl shadow-lg border border-white/10" />
+                                                <Image
+                                                    src={`https://flagcdn.com/w80/${isoMap[worker.preferred_lang] || "un"}.png`}
+                                                    alt={worker.preferred_lang}
+                                                    width={80}
+                                                    height={56}
+                                                    className="w-12 h-8.5 object-cover rounded-xl shadow-lg border border-white/10"
+                                                    unoptimized
+                                                />
                                                 {!worker.signed && <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-slate-950 animate-pulse" />}
                                             </div>
                                             <div className="flex flex-col">
@@ -217,9 +415,24 @@ function TBMStatusPageContent() {
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${worker.signed ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20 animate-pulse"}`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full ${worker.signed ? "bg-green-500" : "bg-red-500"}`} />
-                                            {worker.signed ? t.signed : t.unsigned}
+                                        <div className="flex items-center gap-3">
+                                            {worker.signed && worker.signature_data && (
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedSignature(worker.signature_data!);
+                                                        setSelectedWorker(worker.display_name);
+                                                    }}
+                                                    className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all shadow-lg"
+                                                >
+                                                    <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                    </svg>
+                                                </button>
+                                            )}
+                                            <div className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${worker.signed ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20 animate-pulse"}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${worker.signed ? "bg-green-500" : "bg-red-500"}`} />
+                                                {worker.signed ? t.signed : t.unsigned}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -227,6 +440,45 @@ function TBMStatusPageContent() {
                         )}
                     </section>
                 </main>
+
+                {/* ✍️ Signature Preview Modal */}
+                {selectedSignature && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl transition-all" onClick={() => setSelectedSignature(null)}>
+                        <div className="relative glass p-1 rounded-[40px] border border-white/20 shadow-2xl animate-float max-w-lg w-full" onClick={e => e.stopPropagation()}>
+                            <div className="bg-white rounded-[38px] overflow-hidden p-8 flex flex-col gap-6 items-center">
+                                <div className="flex justify-between w-full items-center">
+                                    <h3 className="text-slate-950 font-black italic tracking-tighter uppercase">Worker Digital Signature</h3>
+                                    <button onClick={() => setSelectedSignature(null)} className="text-slate-400 hover:text-slate-950 transition-colors">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                <Image
+                                    src={selectedSignature}
+                                    alt="Signature"
+                                    width={1200}
+                                    height={500}
+                                    className="w-full h-auto object-contain border-y border-slate-100 py-4"
+                                    unoptimized
+                                />
+                                <div className="flex justify-between w-full items-center">
+                                    <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        <Shield className="w-3 h-3" />
+                                        Verified & Legally Binding
+                                    </div>
+                                    <button
+                                        onClick={() => handleDownload(selectedSignature, selectedWorker || "worker")}
+                                        className="bg-slate-950 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-colors flex items-center gap-2"
+                                    >
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                        Download Image
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </RoleGuard>
     );

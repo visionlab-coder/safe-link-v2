@@ -1,15 +1,27 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { motion } from "framer-motion";
-import { Users, Activity, ShieldCheck } from "lucide-react";
+import { Activity, ShieldCheck } from "lucide-react";
+
+interface SwarmSite {
+    name: string;
+    totalNodes: number;
+    activeNodes: number;
+    alerts: number;
+}
+
+interface SwarmStatus {
+    activeSwarmNodes: number;
+    totalSwarmNodes: number;
+    sites: SwarmSite[];
+}
 
 /**
  * 🌌 Swarm Visualizer (Phase 4)
  * 2,500개 이상의 에이전트 노드를 고성능으로 시각화하여 대규모 군집을 증명합니다.
  */
 export default function SwarmVisualizer() {
-    const [data, setData] = useState<any>(null);
+    const [data, setData] = useState<SwarmStatus | null>(null);
     const [loading, setLoading] = useState(true);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -44,13 +56,13 @@ export default function SwarmVisualizer() {
         const spacing = 6;
         const siteCols = 5;
 
-        data.sites.forEach((site: any, sIdx: number) => {
+        data.sites.forEach((site: SwarmSite, sIdx: number) => {
             const sX = (sIdx % siteCols) * (width / siteCols) + 20;
             const sY = Math.floor(sIdx / siteCols) * (height / 5) + 20;
 
             for (let n = 0; n < site.totalNodes; n++) {
-                const col = n % 10;
-                const row = Math.floor(n / 10);
+                const col = n % Math.sqrt(nodesPerSite);
+                const row = Math.floor(n / Math.sqrt(nodesPerSite));
                 const x = sX + col * spacing;
                 const y = sY + row * spacing;
 

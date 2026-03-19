@@ -17,7 +17,16 @@ export default function RoleGuard({
     useEffect(() => {
         const checkAuth = async () => {
             const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
+            let session;
+            try {
+                const { data } = await supabase.auth.getSession();
+                session = data.session;
+            } catch {
+                // Invalid/expired refresh token — clear and redirect
+                await supabase.auth.signOut();
+                router.replace("/auth");
+                return;
+            }
 
             // 2. 만약 로그인 세션이 없다면? -> 로그인 창으로 쫓아냅니다!
             if (!session) {

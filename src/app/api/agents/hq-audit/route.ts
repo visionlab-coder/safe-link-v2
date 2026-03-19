@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { getErrorMessage } from '@/utils/errors';
+
+interface GeminiAuditResponse {
+    candidates?: Array<{
+        content?: {
+            parts?: Array<{
+                text?: string;
+            }>;
+        };
+    }>;
+}
 
 /**
  * 🔴 HQ Global Audit Agent API (Tier 1)
@@ -13,6 +24,21 @@ export async function POST(request: NextRequest) {
     try {
         const { lang = "ko" } = await request.json();
         const supabase = await createClient();
+
+        // 인증 + 권한 확인 (HQ_OFFICER, SITE_MANAGER만 허용)
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+        const allowedRoles = ['HQ_OFFICER', 'SITE_MANAGER', 'ROOT'];
+        if (!profile || !allowedRoles.includes(profile.role)) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
 
         // 1. 전사 데이터 샘플링
         // [전체 현장 요약]
@@ -35,7 +61,7 @@ export async function POST(request: NextRequest) {
 Data Context:
 - Active Sites: ${Object.keys(siteCounts).length}
 - Worker Distribution: ${JSON.stringify(siteCounts)}
-- Recent Chat Snippets: ${recentMsgs?.map(m => m.source_text).join(' | ')}
+- Recent Chat Snippets: ${JSON.stringify(recentMsgs?.map(m => m.source_text) ?? [])}
 
 Task: Provide a high-level command briefing for the HQ Control Center in [${lang}].
 Focus on broad risks, compliance gaps across all sites, and resource allocation.
@@ -59,12 +85,12 @@ Use professional, decisive, and authoritative tone. Respond in 3 sections.
             }
         );
 
-        const data = await response.json();
+        const data = await response.json() as GeminiAuditResponse;
         const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
         return NextResponse.json({ audit: textContent || "본사 관제 데이터를 분석 중입니다..." });
 
-    } catch (e: any) {
-        return NextResponse.json({ error: e.message }, { status: 500 });
+    } catch (error: unknown) {
+        return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
     }
 }

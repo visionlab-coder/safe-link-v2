@@ -2,6 +2,7 @@
  * SAFE-LINK Notification Sound Utility
  * Uses Web Audio API to generate a clean, premium notification chime.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 export const playNotificationSound = () => {
     if (typeof window === 'undefined') return;

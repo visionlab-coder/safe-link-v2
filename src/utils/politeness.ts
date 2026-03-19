@@ -20,9 +20,9 @@ const politeEndings = [
 export function ensurePoliteKo(text: string): string {
     if (!text || text.length === 0) return text;
 
-    let trimmed = text.trim();
+    const trimmed = text.trim();
     // Already polite check
-    if (trimmed.endsWith("요") || trimmed.endsWith("까") || trimmed.endsWith("죠") || trimmed.endsWith("다") && trimmed.length > 2 && trimmed.endsWith("습니다")) {
+    if (trimmed.endsWith("요") || trimmed.endsWith("까") || trimmed.endsWith("죠") || trimmed.endsWith("습니다")) {
         return trimmed;
     }
 

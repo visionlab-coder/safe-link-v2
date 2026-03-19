@@ -3,7 +3,7 @@
  * Uses Google Cloud Speech-to-Text via internal Proxy
  */
 
-export const transcribeAudio = async (blob: Blob, lang: string = 'ko-KR'): Promise<string> => {
+export const transcribeAudio = async (blob: Blob, lang: string = 'ko-KR', mimeType?: string): Promise<string> => {
     try {
         const reader = new FileReader();
         const base64Promise = new Promise<string>((resolve) => {
@@ -17,7 +17,7 @@ export const transcribeAudio = async (blob: Blob, lang: string = 'ko-KR'): Promi
 
         const response = await fetch('/api/stt', {
             method: 'POST',
-            body: JSON.stringify({ audio: audioBase64, lang }),
+            body: JSON.stringify({ audio: audioBase64, lang, mimeType }),
             headers: { 'Content-Type': 'application/json' },
         });
 
@@ -35,7 +35,12 @@ export const transcribeAudio = async (blob: Blob, lang: string = 'ko-KR'): Promi
  */
 export const createSTTRecorder = async (onData: (blob: Blob) => void) => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+
+    // Check for supported mime types
+    const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'];
+    const mimeType = types.find(t => MediaRecorder.isTypeSupported(t)) || 'audio/webm';
+
+    const recorder = new MediaRecorder(stream, { mimeType });
 
     recorder.ondataavailable = (e) => {
         if (e.data.size > 0) onData(e.data);

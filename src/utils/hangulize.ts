@@ -69,7 +69,7 @@ function hangulizePinyin(pinyin: string): string {
 
     return cleaned.split(/\s+/).map(word => {
         let remaining = word;
-        let resArr: string[] = [];
+        const resArr: string[] = [];
 
         while (remaining.length > 0) {
             let found = false;

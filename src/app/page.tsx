@@ -1,25 +1,56 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { HardHat, ShieldCheck } from 'lucide-react';
 import { languages } from '@/constants';
 
 const startBtnText: Record<string, string> = {
-  vi: "Bắt đầu", zh: "开始", th: "เริ่ม",
-  uz: "Boshlash", ph: "Simulan", km: "ចាប់ផ្តើម",
-  id: "Mulai", mn: "Эхлэх", my: "စတင်ရန်",
-  ne: "सुरु गर्नुहोस्", bn: "شুরু করুন", kk: "Бастау",
-  ru: "Начать", en: "Start", ko: "시스템 시작하기",
-  jp: "スタート", fr: "Démarrer", es: "Iniciar",
-  ar: "ابدأ", hi: "शुरू करें",
+  ko: "시스템 시작하기",
+  vi: "Bắt đầu hệ thống",
+  zh: "启动系统",
+  th: "เริ่มระบบ",
+  uz: "Tizimni boshlash",
+  ph: "Simulan ang System",
+  km: "ចាប់ផ្តើមប្រព័ន្ធ",
+  id: "Mulai Sistem",
+  mn: "Системийг эхлүүлэх",
+  my: "စနစ်စတင်ရန်",
+  ne: "प्रणाली सुरु गर्नुहोस्",
+  bn: "সিস্টেম শুরু করুন",
+  kk: "Жүйені іске қосу",
+  ru: "Запустить систему",
+  en: "Start System",
+  jp: "システムを開始",
+  fr: "Démarrer le système",
+  es: "Iniciar sistema",
+  ar: "بدء النظام",
+  hi: "सिस्टम शुरू करें",
 };
 
 const roleTexts: Record<string, any> = {
   ko: { admin: "관리자 (Admin)", worker: "현장 근로자 (Worker)", selectRole: "시작할 역할을 선택해주세요" },
   en: { admin: "Administrator", worker: "Field Worker", selectRole: "Select your role to start" },
-  vi: { admin: "Quản trị viên", worker: "Công nhân", selectRole: "Chọn vai trò của bạn" },
-  zh: { admin: "管理员", worker: "现场工人", selectRole: "选择您的角色" },
-  th: { admin: "ผู้ดูแล ระบบ", worker: "คนงานภาคสนาม", selectRole: "เลือกบทบาทของคุณ" },
+  vi: { admin: "Quản trị viên", worker: "Công nhân hiện trường", selectRole: "Vui lòng chọn vai trò của bạn" },
+  zh: { admin: "管理员", worker: "现场工人", selectRole: "请选择您的角色" },
+  th: { admin: "ผู้ดูแลระบบ", worker: "คนงานในสนาม", selectRole: "โปรดเลือกบทบาทของคุณ" },
+  uz: { admin: "Admin", worker: "Dala ishchisi", selectRole: "Rolingizni tanlang" },
+  ph: { admin: "Admin", worker: "Worker sa Field", selectRole: "Pumili ng iyong role" },
+  km: { admin: "អ្នកគ្រប់គ្រង", worker: "កម្មករវាល", selectRole: "សូមជ្រើសរើសតួនាទីរបស់អ្នក" },
+  id: { admin: "Admin", worker: "Pekerja Lapangan", selectRole: "Pilih peran Anda" },
+  mn: { admin: "Админ", worker: "Талбайн ажилтан", selectRole: "Үүргээ сонгоно уу" },
+  my: { admin: "မန်နေဂျာ", worker: "ကွင်းဆင်းအလုပ်သမား", selectRole: "သင်၏အခန်းကဏ္ဍကိုရွေးချယ်ပါ" },
+  ne: { admin: "प्रशासक", worker: "फिल्ड कार्यकर्ता", selectRole: "आफ्नो भूमिका चयन गर्नुहोस्" },
+  bn: { admin: "প্রশাসক", worker: "ফিল্ড কর্মী", selectRole: "আপনার ভূমিকা নির্বাচন করুন" },
+  kk: { admin: "Админ", worker: "Дала жұмысшысы", selectRole: "Рөліңізді таңдаңыз" },
+  ru: { admin: "Админ", worker: "Полевой рабочий", selectRole: "Выберите вашу роль" },
+  jp: { admin: "管理者", worker: "現場作業員", selectRole: "役割を選択してください" },
+  fr: { admin: "Administrateur", worker: "Ouvrier de chantier", selectRole: "Sélectionnez votre rôle" },
+  es: { admin: "Administrador", worker: "Trabajador de campo", selectRole: "Seleccione su rol" },
+  ar: { admin: "مسؤول", worker: "عامل ميداني", selectRole: "اختر دورك للبدء" },
+  hi: { admin: "प्रशासक", worker: "क्षेत्र कार्यकर्ता", selectRole: "अपनी भूमिका चुनें" },
 };
 
 export default function LandingPage() {
@@ -83,11 +114,14 @@ export default function LandingPage() {
                     }
                   `}>
                     <div className="w-14 h-10 md:w-16 md:h-12 rounded-[21px] overflow-hidden bg-slate-900 border border-black/20">
-                      <img
+                      <Image
                         src={`https://flagcdn.com/w160/${lang.iso}.png`}
                         alt={lang.name}
+                        width={160}
+                        height={120}
                         className="w-full h-full object-cover block"
                         loading="lazy"
+                        unoptimized
                       />
                     </div>
                   </div>
@@ -115,27 +149,59 @@ export default function LandingPage() {
               </svg>
             </button>
           ) : (
-            <div className="w-full max-w-sm flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <p className="text-center text-[10px] font-black text-blue-400 tracking-widest uppercase mb-2">
+            <div className="w-full max-w-sm flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <p className="text-center text-[10px] font-black text-blue-400/70 tracking-[0.4em] uppercase mb-1">
                 {rt.selectRole}
               </p>
+
+              {/* Admin role card */}
               <button
                 onClick={() => router.push(`/auth?lang=${selectedLang}&role=admin`)}
-                className="group w-full py-5 glass rounded-2xl border-white/10 hover:border-blue-500/50 bg-white/5 hover:bg-blue-600/10 transition-all flex items-center justify-center gap-4"
+                className="group w-full glass-card rounded-2xl p-5 transition-all duration-300 hover:border-blue-500/40 hover:bg-blue-600/5 hover:shadow-[0_8px_32px_rgba(59,130,246,0.15)] tap-effect"
               >
-                <span className="text-lg font-black text-white group-hover:text-blue-400 transition-colors">{rt.admin}</span>
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 group-hover:shadow-[0_0_20px_rgba(59,130,246,0.3)]"
+                    style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.25)" }}>
+                    <ShieldCheck className="w-6 h-6 text-blue-400" />
+                  </div>
+                  <div className="text-left">
+                    <span className="text-base font-black text-white group-hover:text-blue-300 transition-colors block">{rt.admin}</span>
+                    <span className="text-xs text-slate-600 group-hover:text-slate-500 transition-colors">Admin · Safety Officer</span>
+                  </div>
+                  <svg className="w-4 h-4 text-slate-700 group-hover:text-blue-400 ml-auto transition-all duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
               </button>
+
+              {/* Worker role card */}
               <button
                 onClick={() => router.push(`/auth?lang=${selectedLang}&role=worker`)}
-                className="group w-full py-5 glass rounded-2xl border-white/10 hover:border-emerald-500/50 bg-white/5 hover:bg-emerald-600/10 transition-all flex items-center justify-center gap-4"
+                className="group w-full glass-card rounded-2xl p-5 transition-all duration-300 hover:border-emerald-500/40 hover:bg-emerald-600/5 hover:shadow-[0_8px_32px_rgba(16,185,129,0.15)] tap-effect"
               >
-                <span className="text-lg font-black text-white group-hover:text-emerald-400 transition-colors">{rt.worker}</span>
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 group-hover:shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+                    style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.25)" }}>
+                    <HardHat className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <div className="text-left">
+                    <span className="text-base font-black text-white group-hover:text-emerald-300 transition-colors block">{rt.worker}</span>
+                    <span className="text-xs text-slate-600 group-hover:text-slate-500 transition-colors">Field Worker · 현장 근로자</span>
+                  </div>
+                  <svg className="w-4 h-4 text-slate-700 group-hover:text-emerald-400 ml-auto transition-all duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
               </button>
+
               <button
                 onClick={() => setShowRoles(false)}
-                className="text-[10px] text-slate-500 font-bold hover:text-white transition-colors uppercase mt-2"
+                className="flex items-center justify-center gap-1.5 text-xs text-slate-600 font-semibold hover:text-slate-300 transition-colors mt-1 mx-auto"
               >
-                ← Back to Language
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to Language
               </button>
             </div>
           )}

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { Shield, Users, ArrowLeft, Download, QrCode } from "lucide-react";
 
@@ -17,8 +18,8 @@ export default function QRDistributionPage() {
     }, []);
 
     const qrData = {
-        admin: `${baseUrl}/auth?role=admin`,
-        worker: `${baseUrl}/auth?role=worker`,
+        admin: `${baseUrl}/?role=admin`,
+        worker: `${baseUrl}/?role=worker`,
     };
 
     const qrs = [
@@ -81,10 +82,13 @@ export default function QRDistributionPage() {
                             {/* QR Code Mirror */}
                             <div className="flex flex-col items-center gap-6 bg-white/5 p-10 rounded-[40px] border border-white/5 relative group-hover:bg-white/10 transition-colors">
                                 <div className="bg-white p-6 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-                                    <img
+                                    <Image
                                         src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr.url)}`}
                                         alt="QR Code"
+                                        width={300}
+                                        height={300}
                                         className="w-full h-auto"
+                                        unoptimized
                                     />
                                 </div>
                                 <div className="flex flex-col items-center gap-2">

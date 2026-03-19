@@ -1,19 +1,33 @@
 "use client";
-import { useEffect, useState, Suspense, useRef } from "react";
+import { useEffect, useState, Suspense, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import RoleGuard from "@/components/RoleGuard";
-import { hangulize } from "@/utils/hangulize";
 import { analyzeMessageWithAI } from "@/utils/ai/watchdog";
-import { ShieldAlert, ShieldCheck, Users, QrCode } from "lucide-react";
+import { Users, QrCode } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { playPremiumAudio } from "@/utils/tts";
-import { transcribeAudio, createSTTRecorder } from "@/utils/stt";
+import { playPremiumAudio, playProxyAudio } from "@/utils/tts";
 import { playNotificationSound } from "@/utils/notifications";
 import { formalizeKo } from "@/utils/politeness";
 
-const ui: Record<string, any> = {
+type ParsedMessage = { text: string; pron: string; rev: string };
+type SpeechRecognitionEventLike = { results: ArrayLike<ArrayLike<{ transcript: string }>> };
+type SpeechRecognitionLike = {
+    lang: string;
+    continuous: boolean;
+    interimResults: boolean;
+    onstart: (() => void) | null;
+    onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+    onerror: ((event: Event) => void) | null;
+    onend: (() => void) | null;
+    start: () => void;
+    stop: () => void;
+};
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+type RealtimeMessagePayload = { new: Message };
+
+const ui: Record<string, Record<string, string>> = {
     ko: {
         title: "관리자 선택",
         chatPlaceholder: "메시지 입력 (자동 번역/TTS)...",
@@ -59,7 +73,7 @@ const getSTTLang = (c: string) => {
 };
 
 type AdminProfile = { id: string; display_name: string; role: string; site_id: string | null; };
-type Message = { id: string; from_user: string; to_user: string; source_text: string; translated_text: string; created_at: string; };
+type Message = { id: string; from_user: string; to_user: string; source_text: string; translated_text: string; created_at: string; is_read?: boolean; };
 
 function WorkerChatContent() {
     const router = useRouter();
@@ -73,9 +87,7 @@ function WorkerChatContent() {
     const [isSending, setIsSending] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const recognitionRef = useRef<any>(null);
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const audioChunksRef = useRef<Blob[]>([]);
+    const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
     const processedAudioIds = useRef<Set<string>>(new Set());
 
     const [myId, setMyId] = useState("");
@@ -85,7 +97,7 @@ function WorkerChatContent() {
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const voiceGenderRef = useRef<'male' | 'female'>('female');
     const [showSidebar, setShowSidebar] = useState(false);
-    const [unreadAdmins, setUnreadAdmins] = useState<Set<string>>(new Set());
+    const [unreadAdmins, setUnreadAdmins] = useState<Record<string, number>>({});
     const activeAdminRef = useRef<AdminProfile | null>(null);
     const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
         if (typeof window === 'undefined') return true;
@@ -100,13 +112,22 @@ function WorkerChatContent() {
         setVoiceGender(g);
     };
 
+    const playAudio = (text: string, langCode: string) => {
+        const currentGender = voiceGenderRef.current;
+        playProxyAudio(text, langCode, currentGender, (success) => {
+            if (!success) {
+                playPremiumAudio(text, langCode, currentGender);
+            }
+        });
+    };
+
     const toggleVoice = () => {
         const next = !voiceEnabled;
         setVoiceEnabled(next);
         localStorage.setItem('sl_voice_enabled', String(next));
     };
 
-    const load = async () => {
+    const load = useCallback(async () => {
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
@@ -150,23 +171,19 @@ function WorkerChatContent() {
             });
             setAdmins(prioritized);
 
-            // Auto-select if there's only one or a friend is active
-            if (prioritized.length > 0 && !activeAdmin) {
-                const autoTarget = prioritized.find(a => currentFriends.has(a.id)) || prioritized[0];
-                setActiveAdmin(autoTarget);
-            }
+            // Auto-select removed - User must select an admin from the list first
         }
-    };
+    }, [urlLang, addFriendId]);
 
-    useEffect(() => { load(); }, [urlLang, addFriendId]);
+    useEffect(() => { load(); }, [load]);
 
     useEffect(() => {
         activeAdminRef.current = activeAdmin;
         if (activeAdmin) {
             setUnreadAdmins(prev => {
-                const next = new Set(prev);
-                next.delete(activeAdmin.id);
-                return next;
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { [activeAdmin.id]: _, ...rest } = prev;
+                return rest;
             });
         }
         if (!myId || !activeAdmin) return;
@@ -182,6 +199,14 @@ function WorkerChatContent() {
                 setMessages(data);
                 // Mark existing messages as processed so they don't play on reload
                 data.forEach(m => processedAudioIds.current.add(m.id));
+
+                // Mark as read
+                supabase
+                    .from("messages")
+                    .update({ is_read: true })
+                    .eq("from_user", activeAdmin.id)
+                    .eq("to_user", myId)
+                    .eq("is_read", false).then();
             }
             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 200);
         };
@@ -190,7 +215,7 @@ function WorkerChatContent() {
         const monitorId = `msg_wrk_${myId}_${activeAdmin.id}`;
         const channel = supabase
             .channel(monitorId)
-            .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload: any) => {
+            .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload: RealtimeMessagePayload) => {
                 const msg = payload.new as Message;
                 if (!msg || processedAudioIds.current.has(msg.id)) return;
 
@@ -200,13 +225,18 @@ function WorkerChatContent() {
                     processedAudioIds.current.add(msg.id);
                     setMessages(prev => {
                         if (prev.find(m => m.id === msg.id)) return prev;
-                        return [...prev, msg];
+                        return [...prev, ({ ...msg, is_read: true } as Message)];
                     });
-                    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
 
-                    // 🔔 Notification sound only - user can press play button for voice
+                    // 읽음 처리
+                    supabase.from("messages").update({ is_read: true }).eq("id", msg.id).then();
+                    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
                     playNotificationSound();
                 }
+            })
+            .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, (payload) => {
+                const updated = payload.new as Message;
+                setMessages(prev => prev.map(m => m.id === updated.id ? { ...m, is_read: updated.is_read } : m));
             })
             .subscribe();
 
@@ -225,7 +255,7 @@ function WorkerChatContent() {
 
                 // If message is for me but not from the active admin, mark as unread
                 if (msg.to_user === myId && (!activeAdminRef.current || msg.from_user !== activeAdminRef.current.id)) {
-                    setUnreadAdmins(prev => new Set(prev).add(msg.from_user));
+                    setUnreadAdmins(prev => ({ ...prev, [msg.from_user]: (prev[msg.from_user] || 0) + 1 }));
                     playNotificationSound();
                 }
             })
@@ -234,10 +264,29 @@ function WorkerChatContent() {
     }, [myId]);
 
     const handleSend = async (overrideText?: string | React.MouseEvent) => {
+        if (isRecording && typeof overrideText !== 'string') {
+            toggleRecording();
+            return;
+        }
+
         const messageText = typeof overrideText === 'string' ? overrideText : text;
-        if (!messageText.trim() || !myId || !activeAdmin) return;
-        setIsSending(true);
+        if (!messageText.trim() || !myId || !activeAdmin || isSending) return;
+
         const originalText = messageText.trim();
+        const tempId = `temp-${Date.now()}`;
+
+        // 🚀 즉시 표시 (번역 전)
+        setText("");
+        setIsSending(true);
+        setMessages(prev => [...prev, {
+            id: tempId, from_user: myId, to_user: activeAdmin.id,
+            source_lang: lang, target_lang: "ko",
+            source_text: originalText,
+            translated_text: JSON.stringify({ text: originalText, pron: "", rev: "" }),
+            created_at: new Date().toISOString(),
+        }]);
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+
         try {
             const supabase = createClient();
             let translated = originalText;
@@ -245,23 +294,20 @@ function WorkerChatContent() {
             let rev = "";
 
             if (lang !== "ko") {
-                const dtUrl = await fetch('/api/translate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        text: originalText,
-                        sl: lang,
-                        tl: 'ko'
-                    })
-                });
-
-                if (dtUrl.ok) {
-                    const transData = await dtUrl.json();
-                    translated = formalizeKo(transData.translated || originalText);
-                    pron = transData.pronunciation || "";
-                    rev = transData.reverse_translated || "";
-                } else {
-                    console.error("AI Translation failed");
+                try {
+                    const transRes = await fetch('/api/translate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: originalText, sl: lang, tl: 'ko' })
+                    });
+                    if (transRes.ok) {
+                        const transData = await transRes.json() as { translated?: string; pronunciation?: string; reverse_translated?: string };
+                        translated = formalizeKo(transData.translated || originalText);
+                        pron = transData.pronunciation || "";
+                        rev = transData.reverse_translated || "";
+                    }
+                } catch (e) {
+                    console.warn("[Chat] 번역 실패 - 원문 전송:", e);
                 }
             }
 
@@ -276,59 +322,68 @@ function WorkerChatContent() {
                 ai_analysis: await analyzeMessageWithAI(translated),
             };
 
-            // 🚀 Optimistic Update
-            setMessages(prev => [...prev, { ...payload, id: `temp-${Date.now()}`, created_at: new Date().toISOString() } as any]);
-            setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-
-            const { error: msgErr } = await supabase.from("messages").insert(payload);
-            if (!msgErr) {
-                setText("");
-                if (isRecording) toggleRecording();
-                // Play Korean for admin nearby
-                if (translated) playPremiumAudio(translated, "ko", voiceGenderRef.current);
+            const { data: inserted, error: msgErr } = await supabase.from("messages").insert(payload).select().single();
+            if (!msgErr && inserted) {
+                // 임시 메시지를 실제 DB 메시지로 교체
+                setMessages(prev => prev.map(m => m.id === tempId ? inserted as Message : m));
+            } else {
+                // 실패 시 임시 메시지 제거
+                setMessages(prev => prev.filter(m => m.id !== tempId));
             }
-        } catch (e) { console.error(e); }
-        finally { setIsSending(false); }
+        } catch (e) {
+            console.error(e);
+            setMessages(prev => prev.filter(m => m.id !== tempId));
+        } finally {
+            setIsSending(false);
+        }
     };
 
-    const toggleRecording = async () => {
+    const toggleRecording = () => {
+        const speechWindow = window as Window & typeof globalThis & {
+            SpeechRecognition?: SpeechRecognitionConstructor;
+            webkitSpeechRecognition?: SpeechRecognitionConstructor;
+        };
+        const SpeechRecognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert("이 브라우저는 음성 인식을 지원하지 않습니다.");
+            return;
+        }
+
         if (isRecording) {
-            if (mediaRecorderRef.current) mediaRecorderRef.current.stop();
+            if (recognitionRef.current) {
+                recognitionRef.current.stop();
+            }
             setIsRecording(false);
         } else {
-            try {
-                audioChunksRef.current = [];
-                const recorder = await createSTTRecorder((blob) => {
-                    audioChunksRef.current.push(blob);
-                });
+            const recognition = new SpeechRecognition();
+            recognition.lang = getSTTLang(lang);
+            recognition.continuous = false;
+            recognition.interimResults = false;
 
-                recorder.onstop = async () => {
-                    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm;codecs=opus' });
-                    // Use getSTTLang to convert local code (bi, zh) to Google format (vi-VN, zh-CN)
-                    const sttLang = getSTTLang(lang);
-                    const result = await transcribeAudio(audioBlob, sttLang);
-                    if (result.trim()) {
-                        setText(result.trim());
-                        // Auto-send for premium experience
-                        setTimeout(() => handleSend(result.trim()), 100);
-                    }
-                };
+            recognition.onstart = () => setIsRecording(true);
+            recognition.onresult = (event: SpeechRecognitionEventLike) => {
+                const result = event.results[0][0].transcript;
+                if (result && result.trim()) {
+                    setText(result.trim());
+                    handleSend(result.trim());
+                }
+            };
+            recognition.onerror = (event: Event) => {
+                console.error("STT Error:", event);
+                setIsRecording(false);
+            };
+            recognition.onend = () => setIsRecording(false);
 
-                mediaRecorderRef.current = recorder;
-                recorder.start();
-                setIsRecording(true);
-            } catch (err) {
-                console.error("STT Start Error:", err);
-                alert("Microphone access denied.");
-            }
+            recognitionRef.current = recognition;
+            recognition.start();
         }
     };
 
     const t = getUI(lang);
-    const parseMsg = (raw: any) => {
+    const parseMsg = (raw: unknown): ParsedMessage => {
         if (!raw) return { text: "", pron: "", rev: "" };
-        if (typeof raw === "object") return raw;
-        try { return JSON.parse(raw); } catch { return { text: String(raw), pron: "", rev: "" }; }
+        if (typeof raw === "object") return raw as ParsedMessage;
+        try { return JSON.parse(raw as string) as ParsedMessage; } catch { return { text: String(raw), pron: "", rev: "" }; }
     };
 
     // Filter admins based on user criteria: ROOT excluded, friends/site prioritized
@@ -373,7 +428,14 @@ function WorkerChatContent() {
                             <button onClick={() => changeGender('male')} className={`px-2 py-1 rounded-full text-[9px] font-black transition-all ${voiceGender === 'male' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>MALE</button>
                             <button onClick={() => changeGender('female')} className={`px-2 py-1 rounded-full text-[9px] font-black transition-all ${voiceGender === 'female' ? 'bg-pink-500 text-white' : 'text-slate-400'}`}>FEMALE</button>
                         </div>
-                        <button onClick={() => setShowSidebar(!showSidebar)} className="p-2 rounded-full hover:bg-slate-100 text-slate-500"><Users className="w-6 h-6" /></button>
+                        <button onClick={() => setShowSidebar(!showSidebar)} className="p-2 rounded-full hover:bg-slate-100 text-slate-500 relative transition-all">
+                            <Users className="w-6 h-6" />
+                            {Object.values(unreadAdmins).reduce((a, b) => a + b, 0) > 0 && (
+                                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 rounded-full border-[2px] border-white text-white text-[10px] font-black flex items-center justify-center">
+                                    {Object.values(unreadAdmins).reduce((a, b) => a + b, 0)}
+                                </span>
+                            )}
+                        </button>
                     </div>
                 </header>
 
@@ -397,8 +459,10 @@ function WorkerChatContent() {
                                     >
                                         <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-black text-xs shrink-0 relative">
                                             {a.display_name[0]}
-                                            {unreadAdmins.has(a.id) && (
-                                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-bounce" />
+                                            {(unreadAdmins[a.id] || 0) > 0 && (
+                                                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 rounded-full border-2 border-white text-white text-[10px] font-black flex items-center justify-center">
+                                                    {unreadAdmins[a.id]}
+                                                </span>
                                             )}
                                         </div>
                                         <div className="flex flex-col items-start overflow-hidden text-left">
@@ -428,19 +492,40 @@ function WorkerChatContent() {
                                                 <motion.div key={m.id || i} initial={{ opacity: 0, scale: 0.9, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} className={`flex flex-col max-w-[85%] ${isMe ? 'self-end items-end' : 'self-start items-start'}`}>
                                                     <div className={`flex items-center gap-2 mb-1 ${isMe ? 'mr-3' : 'ml-3'}`}>
                                                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{isMe ? t.me : activeAdmin.display_name}</span>
-                                                        <button onClick={() => voiceEnabled && playPremiumAudio(isMe ? m.source_text : parsed.text, lang, voiceGenderRef.current)} className={`p-1 rounded-full border shadow-sm transition-colors ${voiceEnabled ? 'bg-white border-slate-200 text-blue-500' : 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed'}`}><svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg></button>
+                                                        <button onClick={() => {
+                                                                if (!voiceEnabled) return;
+                                                                if (isMe) {
+                                                                    playAudio(m.source_text, lang);
+                                                                } else {
+                                                                    // 관리자 메시지: 번역문(근로자 언어)이 있으면 번역 재생, 없으면 원문(한국어) 재생
+                                                                    const audioText = parsed.text || m.source_text;
+                                                                    const audioLang = parsed.text ? lang : 'ko';
+                                                                    playAudio(audioText, audioLang);
+                                                                }
+                                                            }} className={`p-1 rounded-full border shadow-sm transition-colors ${voiceEnabled ? 'bg-white border-slate-200 text-blue-500' : 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed'}`}><svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg></button>
                                                     </div>
                                                     <div className={`p-5 rounded-[32px] shadow-lg border-2 flex flex-col gap-3 ${isMe ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
 
-                                                        <p className="font-black text-2xl md:text-3xl leading-snug whitespace-pre-wrap">{isMe ? m.source_text : (parsed.text || m.source_text)}</p>
+                                                        <div className="flex flex-col gap-1">
+                                                            <p className="font-black text-2xl md:text-3xl leading-snug whitespace-pre-wrap">
+                                                                {isMe ? (parsed.text || m.source_text) : (parsed.text || m.source_text)}
+                                                            </p>
+                                                            {/* Read Indicator (Kakao-style '1') */}
+                                                            {isMe && m.is_read === false && (
+                                                                <span className="text-[10px] font-black text-amber-300 self-end mr-2 leading-none">1</span>
+                                                            )}
+                                                        </div>
 
                                                         <div className={`pt-3 border-t flex flex-col gap-1.5 ${isMe ? 'border-blue-400/50' : 'border-slate-100'}`}>
                                                             {isMe ? (
-                                                                <div className="flex items-center gap-1.5 opacity-90"><span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white">A/文</span><span className="font-bold text-lg">{parsed.text || m.source_text}</span></div>
+                                                                <div className="flex items-start gap-1.5 pt-1">
+                                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">原文</span>
+                                                                    <span className="font-bold text-lg">{m.source_text}</span>
+                                                                </div>
                                                             ) : (
-                                                                <div className="flex items-start gap-1.5">
-                                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-400 shrink-0 mt-0.5">KO</span>
-                                                                    <span className="font-bold text-base text-slate-500">{m.source_text}</span>
+                                                                <div className="flex items-start gap-1.5 pt-1">
+                                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-400 shrink-0 mt-0.5 font-black">原文</span>
+                                                                    <span className="font-bold text-lg text-slate-500">{m.source_text}</span>
                                                                 </div>
                                                             )}
                                                         </div>
