@@ -10,6 +10,7 @@ import { analyzeMessageWithAI } from "@/utils/ai/watchdog";
 import { playPremiumAudio, playProxyAudio } from "@/utils/tts";
 import { playNotificationSound } from "@/utils/notifications";
 import { Trash2, QrCode } from "lucide-react";
+import { hangulize } from "@/utils/hangulize";
 
 type ParsedMessage = { norm: string; text: string; pron: string; rev: string };
 type SpeechRecognitionEventLike = { results: ArrayLike<ArrayLike<{ transcript: string }>> };
@@ -651,12 +652,15 @@ function AdminChatContent() {
                                                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">{t.trans}</span>
                                                                 <span className="font-bold text-lg landscape:text-2xl">{parsed.text}</span>
                                                             </div>
-                                                            {parsed.pron && (
-                                                                <div className="flex items-start gap-1.5">
-                                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">{t.pron}</span>
-                                                                    <span className="font-bold text-base opacity-90">{parsed.pron}</span>
-                                                                </div>
-                                                            )}
+                                                            {(() => {
+                                                                const pron = parsed.pron || hangulize(parsed.text, activeWorker?.preferred_lang || "en");
+                                                                return pron ? (
+                                                                    <div className="flex items-start gap-1.5">
+                                                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">{t.pron}</span>
+                                                                        <span className="font-bold text-base opacity-90">{pron}</span>
+                                                                    </div>
+                                                                ) : null;
+                                                            })()}
                                                             {parsed.rev && (
                                                                 <div className="flex items-start gap-1.5">
                                                                     <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">{t.rev}</span>

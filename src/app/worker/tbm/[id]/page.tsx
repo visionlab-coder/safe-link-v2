@@ -168,9 +168,11 @@ function WorkerTBMDetailContent() {
                 setTranslating(true);
                 const result = await translateKo(tbmData.content_ko, lang);
 
-                // 1. 발음은 중국어일 경우 한글 독음으로 변환 (한어병음 제거)
-                if (lang === 'zh' && result.pron) {
-                    // 괄호 정리 전 한어병음을 한글로 변역
+                // 1. 발음이 없거나 비어있으면 hangulize로 생성
+                if (!result.pron || result.pron.trim() === "") {
+                    result.pron = hangulize(result.text, lang);
+                } else if (lang === 'zh') {
+                    // 중국어는 한어병음을 한글로 변환
                     result.pron = hangulize(result.pron, lang);
                 }
 
