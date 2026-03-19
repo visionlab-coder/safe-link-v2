@@ -3,6 +3,7 @@ import { fetchGlossaryFromDB } from '@/utils/normalize';
 import { getErrorMessage } from '@/utils/errors';
 import { hangulize } from '@/utils/hangulize';
 import pinyin from 'tiny-pinyin';
+import { preProcessWithGlossary } from '@/utils/construction-glossary';
 
 interface CloudTranslateResponse {
     data?: { translations?: Array<{ translatedText?: string }> };
@@ -38,13 +39,17 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Text too long (max 5000 characters)" }, { status: 400 });
         }
 
-        // 건설 현장 용어집: 출발어가 한국어일 때만 적용 (은어→표준어 치환)
+        // 건설 현장 용어집 전처리
         let processedText = text;
         if (sl === 'ko') {
+            // 한국어 출발: 은어→표준어 치환
             const glossary = await fetchGlossaryFromDB();
             for (const [slang, std] of Object.entries(glossary)) {
                 processedText = processedText.replace(new RegExp(slang, 'g'), std as string);
             }
+        } else if (tl === 'ko') {
+            // 외국어→한국어: 건설 전문 용어를 한국어로 치환 후 번역 (품질 향상)
+            processedText = preProcessWithGlossary(text, sl);
         }
 
         // 언어 코드 매핑 (앱 내부 코드 → Google API 코드)
