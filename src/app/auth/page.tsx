@@ -94,6 +94,7 @@ function AuthContent() {
   const [countryCode, setCountryCode] = useState(DIAL_CODES[urlLang || "ko"] || "+82");
   const [hoveredLang, setHoveredLang] = useState<string | null>(null);
   const [adminSignupMode, setAdminSignupMode] = useState(false);
+  const [adminEmail, setAdminEmail] = useState("");
 
   useEffect(() => {
     const savedLang = localStorage.getItem("safe-link-lang");
@@ -200,30 +201,27 @@ function AuthContent() {
   };
 
   const handleAdminLogin = async () => {
-    if (!phone || !password) return;
+    if (!adminEmail || !password) return;
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: getVirtualEmail(phone), password });
+    const { error } = await supabase.auth.signInWithPassword({ email: adminEmail, password });
     if (error) { alert(error.message); setLoading(false); return; }
-    saveSession(phone, rememberMe);
     const { data: { session } } = await supabase.auth.getSession();
     if (session) await redirectByRole(session.user.id);
     setLoading(false);
   };
 
   const handleAdminSignup = async () => {
-    if (!phone || !password || !passConfirm) return;
+    if (!adminEmail || !password || !passConfirm) return;
     if (password !== passConfirm) { alert(t.noMatch); return; }
     setLoading(true);
     const activeLang = lang || "ko";
-    const email = getVirtualEmail(phone);
     const { error: signUpErr } = await supabase.auth.signUp({
-      email, password,
-      options: { data: { backup_email: backupEmail || null, phone_number: phone.replace(/[^0-9]/g, "") } },
+      email: adminEmail, password,
+      options: { data: { backup_email: backupEmail || null } },
     });
     if (signUpErr) { alert(signUpErr.message); setLoading(false); return; }
-    const { error: loginErr } = await supabase.auth.signInWithPassword({ email, password });
+    const { error: loginErr } = await supabase.auth.signInWithPassword({ email: adminEmail, password });
     if (loginErr) { alert(loginErr.message); setLoading(false); return; }
-    saveSession(phone, rememberMe);
     const targetRole = searchParams.get("role");
     const siteId = searchParams.get("site_id");
     router.push(`/auth/setup?lang=${activeLang}${targetRole ? `&role=${targetRole}` : ""}${siteId ? `&site_id=${siteId}` : ""}`);
@@ -501,20 +499,11 @@ function AuthContent() {
                   </div>
                 </div>
 
-                {/* Phone */}
-                <div className="flex items-center overflow-hidden" style={fieldBox}>
-                  <select value={countryCode} onChange={e => setCountryCode(e.target.value)}
-                    className="bg-transparent text-xs font-bold text-slate-400 outline-none px-3 py-3.5"
-                    style={{ borderRight: "1px solid rgba(255,255,255,0.07)", minWidth: 66 }}>
-                    {languages.map(l => (
-                      <option key={l.code} value={DIAL_CODES[l.code] || "+82"} style={{ background: "#0d0e18" }}>
-                        {DIAL_CODES[l.code] || "+82"}
-                      </option>
-                    ))}
-                  </select>
-                  <input type="tel" placeholder={t.phone} value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    className="flex-1 bg-transparent text-white text-sm placeholder-slate-700 outline-none px-3 py-3.5" />
+                {/* Email */}
+                <div style={fieldBox}>
+                  <input type="email" placeholder="Email" value={adminEmail}
+                    onChange={e => setAdminEmail(e.target.value)}
+                    className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
                 </div>
 
                 {/* Password */}
@@ -574,7 +563,7 @@ function AuthContent() {
 
                 {/* CTA */}
                 <button onClick={adminSignupMode ? handleAdminSignup : handleAdminLogin}
-                  disabled={loading || !phone || !password || (adminSignupMode && !passConfirm)}
+                  disabled={loading || !adminEmail || !password || (adminSignupMode && !passConfirm)}
                   className="w-full py-3.5 font-black text-sm text-white rounded-xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: "linear-gradient(135deg,#2563EB 0%,#3B82F6 100%)", boxShadow: "0 4px 24px rgba(59,130,246,0.28)" }}>
                   {loading ? <Spinner /> : adminSignupMode ? t.doSignup : t.doLogin}
