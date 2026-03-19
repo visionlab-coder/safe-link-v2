@@ -244,6 +244,15 @@ function WorkerTBMDetailContent() {
 
             const signatureImage = signaturePadRef.current?.toDataURL("image/png");
 
+            // 중복 서명 체크 (이미 서명한 경우 성공 처리)
+            const { data: existingAck } = await supabase.from("tbm_ack")
+                .select("id").eq("tbm_id", tbm.id).eq("worker_id", session.user.id).single();
+            if (existingAck) {
+                setIsSigned(true);
+                setTimeout(() => router.replace("/worker"), 1200);
+                return;
+            }
+
             const { error: ackError } = await supabase.from("tbm_ack").insert({
                 tbm_id: tbm.id,
                 worker_id: session.user.id,
@@ -252,6 +261,12 @@ function WorkerTBMDetailContent() {
             });
 
             if (ackError) {
+                // unique constraint 에러는 이미 서명된 것이므로 성공 처리
+                if (ackError.message.includes('duplicate') || ackError.message.includes('unique')) {
+                    setIsSigned(true);
+                    setTimeout(() => router.replace("/worker"), 1200);
+                    return;
+                }
                 console.error("서명 저장 실패:", ackError.message);
                 alert("서명 저장에 실패했습니다: " + ackError.message);
                 return;
