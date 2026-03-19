@@ -95,39 +95,6 @@ export async function POST(request: NextRequest) {
     }
 }
 
-/** Gemini로 한글 발음 생성 (경량 요청) */
-async function generatePronunciation(apiKey: string, translatedText: string, originalText: string, sl: string, tl: string): Promise<string> {
-    try {
-        const pronTarget = tl === 'ko' ? originalText : translatedText;
-        const pronLang = tl === 'ko' ? sl : tl;
-        const prompt = `Write the Korean Hangul pronunciation of this ${pronLang} text. Return ONLY the pronunciation, nothing else.\nText: ${JSON.stringify(pronTarget)}`;
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: { temperature: 0.1, maxOutputTokens: 128 },
-                }),
-                signal: controller.signal,
-            }
-        );
-        clearTimeout(timeoutId);
-
-        if (!response.ok) return "";
-        const data = await response.json() as GeminiResponse;
-        const parts = data.candidates?.[0]?.content?.parts || [];
-        const result = parts[parts.length - 1]?.text?.trim() || "";
-        return result.replace(/```/g, '').replace(/\n/g, ' ').trim();
-    } catch {
-        return "";
-    }
-}
 
 /** Gemini 풀 fallback (Cloud Translation 실패 시) */
 async function geminiFullFallback(apiKey: string, text: string, sl: string, tl: string) {
