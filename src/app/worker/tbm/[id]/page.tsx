@@ -97,6 +97,8 @@ function WorkerTBMDetailContent() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isAudioFinished, setIsAudioFinished] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [showPron, setShowPron] = useState(false);
+    const [showRev, setShowRev] = useState(false);
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const voiceGenderRef = useRef<'male' | 'female'>('female');
     const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
@@ -420,8 +422,29 @@ function WorkerTBMDetailContent() {
                                                     {transData.text || tbm.content_ko}
                                                 </p>
 
-                                                {preferredLang !== "ko" && transData.pron && (
-                                                    <div className="flex items-start gap-4 p-4 bg-blue-500/10 rounded-2xl border border-blue-500/20">
+                                                {preferredLang !== "ko" && (transData.pron || transData.rev) && (
+                                                    <div className="flex flex-wrap gap-2 mt-2">
+                                                        {transData.pron && (
+                                                            <button
+                                                                onClick={() => setShowPron(v => !v)}
+                                                                className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${showPron ? 'bg-blue-500 text-white' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'}`}
+                                                            >
+                                                                {t.pron} {showPron ? '▲' : '▼'}
+                                                            </button>
+                                                        )}
+                                                        {transData.rev && (
+                                                            <button
+                                                                onClick={() => setShowRev(v => !v)}
+                                                                className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${showRev ? 'bg-purple-500 text-white' : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'}`}
+                                                            >
+                                                                {t.rev} {showRev ? '▲' : '▼'}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {showPron && transData.pron && (
+                                                    <div className="flex items-start gap-4 p-4 bg-blue-500/10 rounded-2xl border border-blue-500/20 animate-fadeIn">
                                                         <div className="px-2 py-1 bg-blue-500 text-[10px] font-black text-white rounded shrink-0 mt-1 uppercase">
                                                             {t.pron}
                                                         </div>
@@ -431,8 +454,8 @@ function WorkerTBMDetailContent() {
                                                     </div>
                                                 )}
 
-                                                {preferredLang !== "ko" && transData.rev && (
-                                                    <div className="flex items-start gap-4 p-4 bg-purple-500/5 rounded-2xl border border-purple-500/10">
+                                                {showRev && transData.rev && (
+                                                    <div className="flex items-start gap-4 p-4 bg-purple-500/5 rounded-2xl border border-purple-500/10 animate-fadeIn">
                                                         <div className="px-2 py-1 bg-purple-500/50 text-[10px] font-black text-white rounded shrink-0 mt-1 uppercase">
                                                             {t.rev}
                                                         </div>

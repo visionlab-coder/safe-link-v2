@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
                 voice: { languageCode: lang, name: voiceName, ssmlGender: gender.toUpperCase() },
                 audioConfig: {
                     audioEncoding: 'MP3',
-                    speakingRate: lang.startsWith('zh') ? 1.15 : 0.95,
+                    speakingRate: 1.0,
                     pitch: 0
                 }
             })
