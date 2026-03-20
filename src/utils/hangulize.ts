@@ -53,13 +53,60 @@ const vMap: Record<string, string> = {
 
 const batchimCandidates: Record<string, string> = { 'n': 'ㄴ', 'g': 'ㅇ', 'l': 'ㄹ', 'm': 'ㅁ', 'p': 'ㅂ', 't': 'ㅅ', 'k': 'ㄱ' };
 
+// 베트남어 음절 → 한글 매핑
+const viSyllables: Record<string, string> = {
+    "xin": "신", "chao": "짜오", "cam": "깜", "on": "언", "vang": "방",
+    "khong": "콩", "co": "꼬", "duoc": "드억", "tot": "똣", "xau": "써우",
+    "phai": "파이", "doi": "도이", "deo": "데오", "mu": "무", "bao": "바오",
+    "hiem": "히엠", "vui": "부이", "long": "롱", "buon": "부온",
+    "noi": "노이", "lam": "람", "viec": "비엑", "an": "안", "toan": "또안",
+    "nguy": "응위", "vao": "바오",
+    "khu": "쿠", "vuc": "붝", "cong": "꽁", "truong": "쯔엉",
+    "tang": "땅", "ham": "함", "mai": "마이", "san": "산",
+    "nha": "냐", "cua": "꾸아", "nguoi": "응어이", "lao": "라오",
+    "dong": "동", "quan": "꽌", "ly": "리", "ky": "끼",
+    "thuat": "투앗", "dien": "디엔", "nuoc": "느억", "lua": "르아",
+    "sat": "삿", "thep": "텝", "xi": "시", "mang": "망",
+    "gach": "각", "kinh": "낀", "go": "고", "da": "다",
+    "ong": "옹", "day": "제이", "cap": "깝",
+    "len": "렌", "xuong": "쑤엉", "trai": "짜이", "ben": "벤",
+    "trong": "쫑", "ngoai": "응오아이", "tren": "쩬", "duoi": "드어이",
+    "dung": "둥", "sai": "사이", "dau": "더우", "cuoi": "꾸오이",
+    "giup": "줍", "do": "도", "cho": "쪼", "toi": "또이",
+    "ban": "반", "anh": "아잉", "chi": "찌", "em": "엠",
+    "di": "디", "den": "덴", "ve": "베", "ra": "라",
+    "nay": "나이", "cai": "까이",
+    "kia": "끼아", "la": "라",
+    "hay": "하이", "va": "바", "roi": "로이", "chua": "쯔어",
+    "se": "쎄", "dang": "당",
+    "the": "테", "nao": "나오", "gi": "지", "tai": "따이",
+    "sao": "사오", "nhieu": "니에우", "it": "잇",
+};
+
 export function hangulize(text: string, lang: string): string {
     if (!text) return "";
     let normalized = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     normalized = normalized.replace(/u:/g, "v").replace(/ü/g, "v");
 
     if (lang === 'zh') return hangulizePinyin(normalized);
+    if (lang === 'vi') {
+        // 베트남어 특수 문자 처리: đ → d
+        normalized = normalized.replace(/đ/g, "d");
+        return hangulizeVietnamese(normalized);
+    }
     return genericHangulize(normalized);
+}
+
+function hangulizeVietnamese(text: string): string {
+    return text.split(/\s+/).map(word => {
+        if (viSyllables[word]) return viSyllables[word];
+        // 사전에 없으면 영어 패턴 기반 변환
+        let converted = word;
+        for (const [pattern, replacement] of engPatterns) {
+            converted = converted.replace(pattern, replacement);
+        }
+        return converted;
+    }).join(' ');
 }
 
 function hangulizePinyin(pinyin: string): string {
@@ -113,6 +160,118 @@ function hangulizePinyin(pinyin: string): string {
     }).join(" ");
 }
 
+/**
+ * 영어 및 Latin 스크립트 → 한글 발음 변환
+ * 음절/패턴 단위로 변환하여 자연스러운 한글 발음 생성
+ */
+const engPatterns: Array<[RegExp, string]> = [
+    // 일반적 영어 단어 (빈도순)
+    // 3+ 글자 패턴 (먼저 매칭)
+    [/tion/g, "션"], [/sion/g, "전"], [/ment/g, "먼트"], [/ness/g, "니스"],
+    [/ight/g, "아이트"], [/ough/g, "오"], [/ould/g, "우드"],
+    [/ther/g, "더"], [/ther/g, "더"], [/ture/g, "처"],
+    [/ble/g, "블"], [/ple/g, "플"], [/tle/g, "틀"],
+    [/ing\b/g, "잉"], [/ong\b/g, "옹"], [/ang\b/g, "앵"],
+    [/ung\b/g, "엉"], [/ank/g, "앵크"],
+    [/ous/g, "어스"], [/ious/g, "이어스"], [/eous/g, "이어스"],
+    [/ful/g, "풀"], [/less/g, "리스"], [/ize/g, "아이즈"],
+    [/ity/g, "이티"], [/ary/g, "어리"], [/ory/g, "오리"],
+    [/ally/g, "얼리"], [/ely/g, "을리"],
+    [/ck/g, "크"], [/tch/g, "치"],
+
+    // 2글자 자음 패턴
+    [/th/g, "스"], [/sh/g, "쉬"], [/ch/g, "치"], [/ph/g, "프"],
+    [/wh/g, "와"], [/wr/g, "르"], [/kn/g, "느"],
+    [/qu/g, "쿠"], [/ng/g, "ㅇ"],
+    [/tr/g, "트르"], [/dr/g, "드르"], [/pr/g, "프르"],
+    [/br/g, "브르"], [/cr/g, "크르"], [/gr/g, "그르"],
+    [/fr/g, "프르"], [/fl/g, "플"], [/bl/g, "블"],
+    [/sl/g, "슬"], [/cl/g, "클"], [/pl/g, "플"],
+    [/st/g, "스트"], [/sp/g, "스프"], [/sk/g, "스크"],
+    [/sm/g, "스므"], [/sn/g, "스느"],
+
+    // 2글자 모음 패턴
+    [/ee/g, "이"], [/ea/g, "이"], [/oo/g, "우"], [/ou/g, "아우"],
+    [/ow/g, "오우"], [/oi/g, "오이"], [/oy/g, "오이"],
+    [/ai/g, "에이"], [/ay/g, "에이"], [/ey/g, "에이"],
+    [/ie/g, "이"], [/ei/g, "에이"], [/oa/g, "오"],
+    [/au/g, "오"], [/aw/g, "오"],
+    [/ar/g, "아르"], [/er/g, "어"], [/ir/g, "어"], [/or/g, "오르"], [/ur/g, "어"],
+    [/al/g, "올"], [/el/g, "엘"], [/il/g, "일"], [/ol/g, "올"], [/ul/g, "울"],
+
+    // 단일 자음
+    [/b/g, "브"], [/c/g, "크"], [/d/g, "드"], [/f/g, "프"],
+    [/g/g, "그"], [/h/g, "ㅎ"], [/j/g, "지"], [/k/g, "크"],
+    [/l/g, "르"], [/m/g, "므"], [/n/g, "느"], [/p/g, "프"],
+    [/r/g, "르"], [/s/g, "스"], [/t/g, "트"], [/v/g, "브"],
+    [/w/g, "우"], [/x/g, "크스"], [/y/g, "이"], [/z/g, "즈"],
+
+    // 단일 모음
+    [/a/g, "아"], [/e/g, "에"], [/i/g, "이"], [/o/g, "오"], [/u/g, "우"],
+];
+
+// 자주 쓰는 영어 단어 직접 매핑 (정확한 발음)
+const commonWords: Record<string, string> = {
+    "hello": "헬로", "hi": "하이", "yes": "예스", "no": "노",
+    "ok": "오케이", "okay": "오케이", "please": "플리즈", "thank": "땡크", "thanks": "땡스",
+    "sorry": "쏘리", "good": "굿", "bad": "배드", "the": "더",
+    "safety": "세이프티", "helmet": "헬멧", "danger": "데인저", "warning": "워닝",
+    "caution": "코션", "stop": "스톱", "go": "고", "come": "컴",
+    "work": "워크", "worker": "워커", "site": "사이트", "area": "에어리어",
+    "zone": "존", "floor": "플로어", "level": "레벨",
+    "basement": "베이스먼트", "underground": "언더그라운드",
+    "rebar": "리바", "concrete": "콘크리트", "steel": "스틸",
+    "crane": "크레인", "scaffold": "스캐폴드", "ladder": "래더",
+    "fire": "파이어", "water": "워터", "power": "파워",
+    "electric": "일렉트릭", "tool": "툴", "machine": "머신",
+    "protect": "프로텍트", "protection": "프로텍션", "equipment": "이큅먼트",
+    "inspect": "인스펙트", "inspection": "인스펙션",
+    "manager": "매니저", "supervisor": "슈퍼바이저", "engineer": "엔지니어",
+    "wear": "웨어", "remove": "리무브", "install": "인스톨",
+    "check": "체크", "clean": "클린", "move": "무브", "lift": "리프트",
+    "push": "푸쉬", "pull": "풀", "open": "오픈", "close": "클로즈",
+    "start": "스타트", "finish": "피니시", "complete": "컴플리트",
+    "report": "리포트", "emergency": "이머전시", "accident": "액시던트",
+    "injury": "인저리", "hospital": "호스피탈", "first": "퍼스트", "aid": "에이드",
+    "hard": "하드", "hat": "햇", "vest": "베스트", "gloves": "글러브즈",
+    "boots": "부츠", "glasses": "글래시즈", "mask": "마스크",
+    "fall": "폴", "slip": "슬립", "trip": "트립", "hit": "히트",
+    "cut": "커트", "burn": "번", "crush": "크러쉬",
+    "left": "레프트", "right": "라이트", "up": "업", "down": "다운",
+    "here": "히어", "there": "데어", "this": "디스", "that": "댓",
+    "today": "투데이", "tomorrow": "투모로우", "morning": "모닝", "afternoon": "애프터눈",
+    "must": "머스트", "required": "리콰이어드", "prohibited": "프로히비티드",
+    "enter": "엔터", "exit": "엑시트", "entry": "엔트리",
+    "not": "낫", "don't": "돈트", "can't": "캔트", "do": "두",
+};
+
 function genericHangulize(text: string): string {
-    return text.split('').map(c => vMap[c] || c).join('');
+    // 1단계: 단어 단위로 분리하여 사전 매핑
+    const words = text.toLowerCase().split(/\s+/);
+    const result = words.map(word => {
+        // 정확한 단어 매핑이 있으면 사용
+        if (commonWords[word]) return commonWords[word];
+
+        // 복합어 처리: 접미사 분리 시도
+        for (const [suffix, suffixKr] of Object.entries(commonWords)) {
+            if (word.endsWith(suffix) && word.length > suffix.length) {
+                const prefix = word.slice(0, word.length - suffix.length);
+                if (commonWords[prefix]) return commonWords[prefix] + suffixKr;
+            }
+        }
+
+        // 2단계: 패턴 기반 변환
+        let converted = word;
+        for (const [pattern, replacement] of engPatterns) {
+            converted = converted.replace(pattern, replacement);
+        }
+
+        // 3단계: 자음 클러스터 정리 (연속 자음 사이에 으 삽입)
+        converted = converted.replace(/([ㅎ])/g, '');  // 독립 ㅎ 제거
+        converted = converted.replace(/ㅇ/g, 'ㅇ');  // 받침 ㅇ 유지
+
+        return converted;
+    });
+
+    return result.join(' ');
 }
