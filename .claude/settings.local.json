@@ -11,7 +11,8 @@
       "Bash(rm:*)",
       "Bash(Remove-Item:*)",
       "Bash(find .next:*)",
-      "Bash(npx vercel:*)"
+      "Bash(npx vercel:*)",
+      "mcp__plugin_telegram_telegram__reply"
     ]
   }
 }
