@@ -398,6 +398,50 @@ function AdminDashboardContent() {
                         </div>
                     </motion.section>
 
+                    {/* 📡 NFC Management Card */}
+                    <motion.section
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.35 }}
+                        onClick={() => router.push('/admin/nfc')}
+                        className="glass rounded-[48px] p-10 border-white/10 hover:border-cyan-500/30 transition-all cursor-pointer tap-effect group shadow-2xl relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 blur-[120px] rounded-full -mr-48 -mt-48 transition-all group-hover:bg-cyan-500/10" />
+
+                        <div className="flex flex-col gap-4 relative md:h-full">
+                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-cyan-400 mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-3xl font-black text-white text-gradient uppercase italic">NFC System</h3>
+                                <span className="px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-[9px] font-black text-cyan-400 tracking-wider">v2.5 NEW</span>
+                            </div>
+                            <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
+                                NFC 태그 관리, 출석 현황, TBM 청취 확인을 모니터링합니다.
+                            </p>
+                            <div className="flex gap-3 mt-4">
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); router.push('/admin/nfc'); }}
+                                    className="flex items-center gap-2 text-cyan-400 font-black tracking-widest text-sm uppercase"
+                                >
+                                    <span>Tag 관리</span>
+                                </button>
+                                <span className="text-slate-700">|</span>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); router.push('/admin/nfc/status'); }}
+                                    className="flex items-center gap-2 text-cyan-400 font-black tracking-widest text-sm uppercase"
+                                >
+                                    <span>현황 보기</span>
+                                    <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </motion.section>
+
                     {/* 📱 QR Center Card */}
                     <motion.section
                         initial={{ opacity: 0, y: 20 }}

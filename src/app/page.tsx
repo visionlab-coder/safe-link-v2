@@ -84,7 +84,7 @@ export default function LandingPage() {
           <div className="mt-6 px-6 py-2 glass-card rounded-full flex items-center gap-3 tech-border">
             <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shadow-[0_0_10px_rgba(59,130,246,1)]" />
             <p className="text-[10px] text-blue-100 font-black tracking-[0.5em] uppercase">
-              Global Field OS v2.0
+              Global Field OS v2.5
             </p>
           </div>
         </div>
