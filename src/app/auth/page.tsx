@@ -174,27 +174,32 @@ function AuthContent() {
     const activeLang = lang || "ko";
     const email = getVirtualEmail(phone);
     const autoPassword = `sl_${phone.replace(/[^0-9]/g, "")}_safe`;
+    const phoneDigits = phone.replace(/[^0-9]/g, "");
 
+    // 로그인 시도
     const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password: autoPassword });
     if (signInErr) {
+      // 신규 가입 → 즉시 프로필 생성까지 한 번에 처리
       const { error: signUpErr } = await supabase.auth.signUp({
         email, password: autoPassword,
-        options: { data: { phone_number: phone.replace(/[^0-9]/g, ""), display_name: workerName.trim() } },
+        options: { data: { phone_number: phoneDigits, display_name: workerName.trim() } },
       });
       if (signUpErr) { alert(signUpErr.message); setLoading(false); return; }
       const { error: signInErr2 } = await supabase.auth.signInWithPassword({ email, password: autoPassword });
       if (signInErr2) { alert(signInErr2.message); setLoading(false); return; }
-      const targetRole = searchParams.get("role");
-      const siteId = searchParams.get("site_id");
-      router.push(`/auth/setup?lang=${activeLang}&role=worker${targetRole ? `&role=${targetRole}` : ""}${siteId ? `&site_id=${siteId}` : ""}`);
-      setLoading(false);
-      return;
     }
-    // 이름 업데이트
+
+    // 세션에서 유저 정보 가져와서 프로필 upsert (신규든 기존이든 동일)
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
-      await supabase.from("profiles").update({ display_name: workerName.trim() }).eq("id", session.user.id);
-      await redirectByRole(session.user.id);
+      await supabase.from("profiles").upsert({
+        id: session.user.id,
+        display_name: workerName.trim(),
+        role: "WORKER",
+        preferred_lang: activeLang,
+        phone_number: phoneDigits,
+      });
+      router.push(`/worker?lang=${activeLang}`);
     }
     setLoading(false);
   };
