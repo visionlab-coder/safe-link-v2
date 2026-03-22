@@ -269,11 +269,6 @@ function WorkerChatContent() {
     }, [myId]);
 
     const handleSend = async (overrideText?: string | React.MouseEvent) => {
-        if (isRecording && typeof overrideText !== 'string') {
-            toggleRecording();
-            return;
-        }
-
         const messageText = typeof overrideText === 'string' ? overrideText : text;
         if (!messageText.trim() || !myId || !activeAdmin || isSending) return;
 
@@ -357,26 +352,30 @@ function WorkerChatContent() {
             if (recognitionRef.current) {
                 recognitionRef.current.stop();
             }
+            recognitionRef.current = null;
             setIsRecording(false);
         } else {
             const recognition = new SpeechRecognition();
             recognition.lang = getSTTLang(lang);
-            recognition.continuous = false;
+            recognition.continuous = true;
             recognition.interimResults = false;
 
             recognition.onstart = () => setIsRecording(true);
             recognition.onresult = (event: SpeechRecognitionEventLike) => {
-                const result = event.results[0][0].transcript;
+                const lastIdx = event.results.length - 1;
+                const result = event.results[lastIdx][0].transcript;
                 if (result && result.trim()) {
-                    setText(result.trim());
-                    handleSend(result.trim());
+                    setText(prev => prev ? `${prev} ${result.trim()}` : result.trim());
                 }
             };
             recognition.onerror = (event: Event) => {
                 console.error("STT Error:", event);
-                setIsRecording(false);
             };
-            recognition.onend = () => setIsRecording(false);
+            recognition.onend = () => {
+                if (recognitionRef.current) {
+                    try { recognitionRef.current.start(); } catch { setIsRecording(false); }
+                }
+            };
 
             recognitionRef.current = recognition;
             recognition.start();
@@ -510,29 +509,34 @@ function WorkerChatContent() {
                                                     </div>
                                                     <div className={`p-5 rounded-[32px] shadow-lg border-2 flex flex-col gap-3 ${isMe ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
 
-                                                        <div className="flex flex-col gap-1">
-                                                            <p className="font-black text-2xl md:text-3xl leading-snug whitespace-pre-wrap">
-                                                                {isMe ? m.source_text : (parsed.text || m.source_text)}
-                                                            </p>
-                                                            {/* Read Indicator (Kakao-style '1') */}
-                                                            {isMe && m.is_read === false && (
-                                                                <span className="text-[10px] font-black text-amber-300 self-end mr-2 leading-none">1</span>
-                                                            )}
-                                                        </div>
-
-                                                        <div className={`pt-3 border-t flex flex-col gap-1.5 ${isMe ? 'border-blue-400/50' : 'border-slate-100'}`}>
-                                                            {isMe ? (
-                                                                <div className="flex items-start gap-1.5 pt-1">
-                                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">번역</span>
-                                                                    <span className="font-bold text-lg">{parsed.text || m.source_text}</span>
+                                                        {isMe ? (
+                                                            // ── 내가 보낸 메시지: 원문(내 언어) + 하단에 한국어 번역 ──
+                                                            <>
+                                                                <div className="flex flex-col gap-1">
+                                                                    <p className="font-black text-2xl md:text-3xl leading-snug whitespace-pre-wrap">{m.source_text}</p>
+                                                                    {m.is_read === false && (
+                                                                        <span className="text-[10px] font-black text-amber-300 self-end mr-2 leading-none">1</span>
+                                                                    )}
                                                                 </div>
-                                                            ) : (
-                                                                <div className="flex items-start gap-1.5 pt-1">
-                                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-400 shrink-0 mt-0.5 font-black">原文</span>
+                                                                {parsed.text && parsed.text !== m.source_text && (
+                                                                    <div className="pt-3 border-t border-blue-400/50 flex items-start gap-1.5">
+                                                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">번역</span>
+                                                                        <span className="font-bold text-lg">{parsed.text}</span>
+                                                                    </div>
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                            // ── 관리자 메시지: 외국어 번역문(메인, 크게) + 하단에 한국어 원문만 ──
+                                                            <>
+                                                                <p className="font-black text-2xl md:text-3xl leading-snug whitespace-pre-wrap">
+                                                                    {parsed.text || m.source_text}
+                                                                </p>
+                                                                <div className="pt-3 border-t border-slate-100 flex items-start gap-1.5">
+                                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-400 shrink-0 mt-0.5 font-black">KO</span>
                                                                     <span className="font-bold text-lg text-slate-500">{m.source_text}</span>
                                                                 </div>
-                                                            )}
-                                                        </div>
+                                                            </>
+                                                        )}
                                                     </div>
                                                     <span className="text-[10px] text-slate-400 font-bold mt-1.5">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                 </motion.div>

@@ -314,26 +314,33 @@ function AdminChatContent() {
             if (recognitionRef.current) {
                 recognitionRef.current.stop();
             }
+            recognitionRef.current = null;
             setIsRecording(false);
         } else {
             const recognition = new SpeechRecognition();
             recognition.lang = getVoiceLang(adminLang);
-            recognition.continuous = false;
+            recognition.continuous = true;
             recognition.interimResults = false;
 
             recognition.onstart = () => setIsRecording(true);
             recognition.onresult = (event: SpeechRecognitionEventLike) => {
-                const result = event.results[0][0].transcript;
+                const lastIdx = event.results.length - 1;
+                const result = event.results[lastIdx][0].transcript;
                 if (result && result.trim()) {
-                    setText(result.trim());
-                    handleSend(result.trim());
+                    setText(prev => prev ? `${prev} ${result.trim()}` : result.trim());
                 }
             };
             recognition.onerror = (event: Event) => {
                 console.error("STT Error:", event);
-                setIsRecording(false);
             };
-            recognition.onend = () => setIsRecording(false);
+            // 사용자가 마이크 버튼을 직접 누를 때까지 계속 녹음 유지
+            recognition.onend = () => {
+                // 사용자가 stop을 호출한 경우(recognitionRef가 null) → 종료
+                // 브라우저가 자동으로 끊은 경우 → 재시작
+                if (recognitionRef.current) {
+                    try { recognitionRef.current.start(); } catch { setIsRecording(false); }
+                }
+            };
 
             recognitionRef.current = recognition;
             recognition.start();
@@ -341,11 +348,6 @@ function AdminChatContent() {
     };
 
     const handleSend = async (overrideText?: string | React.MouseEvent) => {
-        if (isRecording && typeof overrideText !== 'string') {
-            toggleRecording();
-            return;
-        }
-
         const messageText = typeof overrideText === 'string' ? overrideText : text;
         if (!messageText.trim() || !activeWorker || !myId || isSending) return;
 
@@ -631,27 +633,21 @@ function AdminChatContent() {
 
                                             <div className={`p-5 rounded-3xl shadow-md border flex flex-col gap-3 ${isAdmin ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
 
-                                                {/* Primary Text (Always show translated KO to Admin) */}
-                                                <div className="flex flex-col gap-1">
-                                                    <p className="font-black text-xl md:text-2xl landscape:text-4xl whitespace-pre-wrap leading-snug drop-shadow-sm">
-                                                        {isAdmin ? m.source_text : parsed.text}
-                                                    </p>
-                                                    {/* Read Indicator (Kakao-style '1') */}
-                                                    {isAdmin && m.is_read === false && (
-                                                        <span className="text-[10px] font-black text-amber-300 self-end mr-1 leading-none">1</span>
-                                                    )}
-                                                </div>
+                                                {isAdmin ? (
+                                                    // ── 관리자 메시지: 원문(한국어) → 한글발음 → 번역(외국어) → 역번역 ──
+                                                    <>
+                                                        {/* 1. 한국어 원문 (맨 위, 가장 크게) */}
+                                                        <div className="flex flex-col gap-1">
+                                                            <p className="font-black text-xl md:text-2xl landscape:text-4xl whitespace-pre-wrap leading-snug drop-shadow-sm">
+                                                                {m.source_text}
+                                                            </p>
+                                                            {m.is_read === false && (
+                                                                <span className="text-[10px] font-black text-amber-300 self-end mr-1 leading-none">1</span>
+                                                            )}
+                                                        </div>
 
-                                                {/* Translation Detail Section */}
-                                                <div className={`pt-3 border-t flex flex-col gap-2 ${isAdmin ? 'border-blue-400/50' : 'border-slate-100'}`}>
-
-                                                    {isAdmin ? (
-                                                        // ── 관리자 메시지: 번역문(외국어) + 발음 + 역번역 (이미지 1 스타일 유지) ──
-                                                        <>
-                                                            <div className="flex items-start gap-1.5 opacity-90">
-                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">{t.trans}</span>
-                                                                <span className="font-bold text-lg landscape:text-2xl">{parsed.text}</span>
-                                                            </div>
+                                                        <div className="pt-3 border-t border-blue-400/50 flex flex-col gap-2">
+                                                            {/* 2. 한글 발음 */}
                                                             {(() => {
                                                                 const pron = parsed.pron || hangulize(parsed.text, activeWorker?.preferred_lang || "en");
                                                                 return pron ? (
@@ -661,23 +657,36 @@ function AdminChatContent() {
                                                                     </div>
                                                                 ) : null;
                                                             })()}
+                                                            {/* 3. 번역 (외국어) */}
+                                                            <div className="flex items-start gap-1.5">
+                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">{t.trans}</span>
+                                                                <span className="font-bold text-lg landscape:text-2xl">{parsed.text}</span>
+                                                            </div>
+                                                            {/* 4. 역번역 */}
                                                             {parsed.rev && (
                                                                 <div className="flex items-start gap-1.5">
                                                                     <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">{t.rev}</span>
                                                                     <span className="font-bold text-base opacity-80">{parsed.rev}</span>
                                                                 </div>
                                                             )}
-                                                        </>
-                                                    ) : (
-                                                        // ── 근로자 메시지: 번역문(KO) 메인 + 원문(외국어)만 표시 (이미지 2 스타일 반영) ──
-                                                        <div className="flex flex-col gap-2">
-                                                            <div className="flex items-start gap-1.5 pt-1">
-                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-500 shrink-0 mt-0.5 font-black">原文</span>
-                                                                <span className="font-bold text-lg landscape:text-2xl text-slate-800">{m.source_text}</span>
-                                                            </div>
                                                         </div>
-                                                    )}
-                                                </div>
+                                                    </>
+                                                ) : (
+                                                    // ── 근로자 메시지: 한국어 번역문(메인) + 하단에 원문(외국어) ──
+                                                    <>
+                                                        <div className="flex flex-col gap-1">
+                                                            <p className="font-black text-xl md:text-2xl landscape:text-4xl whitespace-pre-wrap leading-snug drop-shadow-sm">
+                                                                {parsed.text || m.source_text}
+                                                            </p>
+                                                        </div>
+                                                        {m.source_text !== parsed.text && m.source_lang !== 'ko' && (
+                                                            <div className="pt-3 border-t border-slate-100 flex items-start gap-1.5">
+                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-500 shrink-0 mt-0.5 font-black">原文</span>
+                                                                <span className="font-bold text-lg landscape:text-2xl text-slate-500">{m.source_text}</span>
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
                                             </div>
                                             <span className={`text-[10px] text-slate-400 font-bold mt-1 ${isAdmin ? 'mr-2' : 'ml-2'} landscape:text-base`}>
                                                 {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
