@@ -62,66 +62,50 @@ export async function POST(request: NextRequest) {
         const sourceLang = langMap[sl] || sl;
         const targetLang = langMap[tl] || tl;
 
-        // === 병렬 실행: 번역 + (발음/역번역) ===
-        const translatePromise = fetch(
-            `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`,
-            {
+        // === 최속 병렬 실행: 번역 + 역번역 + 발음용 영어 번역 동시 시작 ===
+        const cloudTranslate = (q: string, source: string, target: string) =>
+            fetch(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ q: processedText, source: sourceLang, target: targetLang, format: 'text' }),
-            }
-        ).then(r => r.json() as Promise<CloudTranslateResponse>);
+                body: JSON.stringify({ q, source, target, format: 'text' }),
+            }).then(r => r.json() as Promise<CloudTranslateResponse>);
 
-        // 역번역도 Cloud Translation으로 병렬 실행 (번역 결과 필요하므로 체이닝)
-        const translated = await translatePromise;
+        // 1단계: 번역 (필수)
+        const translated = await cloudTranslate(processedText, sourceLang, targetLang);
         const translatedText = translated.data?.translations?.[0]?.translatedText;
 
         if (!translatedText) {
-            // Cloud Translation 실패 시 Gemini fallback
             return await geminiFullFallback(apiKey, processedText, sl, tl);
         }
 
-        // 역번역 + 발음 생성을 병렬 실행
+        // 2단계: 역번역 + 발음 생성을 완전 병렬 실행
         const pronTarget = tl === 'ko' ? processedText : translatedText;
         const pronLang = tl === 'ko' ? sl : tl;
         const isChinese = pronLang === 'zh' || pronLang === 'zh-CN';
         const isLatinScript = /^[a-zA-Z\s\-.,!?'"()0-9\u00C0-\u024F\u1E00-\u1EFF]+$/.test(
             pronTarget.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
         );
+        const needsEnglishBridge = !isLatinScript && !isChinese;
 
         const [reverseResult, pronEnglish] = await Promise.all([
-            // 역번역
-            fetch(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ q: translatedText, source: targetLang, target: sourceLang, format: 'text' }),
-            }).then(r => r.json() as Promise<CloudTranslateResponse>),
-
-            // 비-Latin, 비-중국어 스크립트만 영어 경유
-            (!isLatinScript && !isChinese)
-                ? fetch(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ q: pronTarget, source: (tl === 'ko' ? sourceLang : targetLang), target: 'en', format: 'text' }),
-                }).then(r => r.json() as Promise<CloudTranslateResponse>)
+            cloudTranslate(translatedText, targetLang, sourceLang),
+            needsEnglishBridge
+                ? cloudTranslate(pronTarget, (tl === 'ko' ? sourceLang : targetLang), 'en')
                 : Promise.resolve(null),
         ]);
 
         const reverseTranslated = reverseResult.data?.translations?.[0]?.translatedText || "";
 
-        // 한글 발음 생성
+        // 한글 발음 생성 (CPU only, 0ms)
         let pronunciation: string;
         if (isChinese) {
-            // 중국어: tiny-pinyin으로 병음 변환 → hangulizePinyin (최고 품질)
             const py = pinyin.isSupported()
                 ? pinyin.convertToPinyin(pronTarget, ' ', true)
                 : pronTarget;
             pronunciation = hangulize(py, 'zh');
         } else if (isLatinScript) {
-            // Latin 스크립트 (베트남어 등) → 직접 hangulize
             pronunciation = hangulize(pronTarget, pronLang);
         } else {
-            // 비-Latin (태국어, 아랍어 등) → 영어 경유 hangulize
             const englishText = pronEnglish?.data?.translations?.[0]?.translatedText || "";
             pronunciation = englishText ? hangulize(englishText, 'en') : "";
         }

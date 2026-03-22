@@ -87,10 +87,10 @@ function AuthContent() {
   const [existingUser, setExistingUser] = useState<{ email: string; role: string | null } | null>(null);
 
   const [phone, setPhone] = useState("");
+  const [workerName, setWorkerName] = useState("");
   const [password, setPassword] = useState("");
   const [passConfirm, setPassConfirm] = useState("");
   const [backupEmail, setBackupEmail] = useState("");
-  const [rememberMe, setRememberMe] = useState(true);
   const [countryCode, setCountryCode] = useState(DIAL_CODES[urlLang || "ko"] || "+82");
   const [hoveredLang, setHoveredLang] = useState<string | null>(null);
   const [adminSignupMode, setAdminSignupMode] = useState(false);
@@ -98,16 +98,17 @@ function AuthContent() {
 
   useEffect(() => {
     const savedLang = localStorage.getItem("safe-link-lang");
-    const savedPhone = localStorage.getItem("safe-link-phone");
-    const savedRemember = localStorage.getItem("safe-link-remember");
-    if (savedPhone) setPhone(savedPhone);
-    if (savedRemember === "false") setRememberMe(false);
     if (!urlLang && savedLang) {
       setLang(savedLang);
       setCountryCode(DIAL_CODES[savedLang] || "+82");
-      setMode("role");
+      // setMode("role"); // 로컬 저장소가 있어도 항상 언어 선택부터 시작하도록 주석 처리
     }
-  }, [urlLang]);
+    
+    // URL에 역할(role)이 있으면 즉시 해당 로그인 폼으로 진입 (자동 로그인 방지 및 진입 단계 단축)
+    const urlRole = searchParams.get("role");
+    if (urlRole === "worker") setMode("worker");
+    else if (urlRole === "admin") setMode("admin");
+  }, [urlLang, searchParams]);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -125,9 +126,10 @@ function AuthContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 자동 로그인 제거 — 기존 세션이 있어도 사용자가 직접 "이 계정으로 계속" 버튼을 눌러야 진입
+  // 자동 로그인 제거 — 기존 세션이 있어도 사용자가 직접 선택하며 진입해야 함
   useEffect(() => {
-    if (existingUser) setMode("role");
+    // 세션이 있어도 모드를 강제로 'role'로 바꾸지 않음. 
+    // 사용자가 언어를 먼저 선택하도록 유도.
   }, [existingUser]);
 
   const redirectByRoleString = useCallback((role: string | null, activeLang: string) => {
@@ -152,11 +154,7 @@ function AuthContent() {
 
   const getVirtualEmail = (num: string) => `${num.replace(/[^0-9]/g, "")}@safe-link.local`;
 
-  const saveSession = (phoneNum: string, remember: boolean) => {
-    localStorage.setItem("safe-link-remember", String(remember));
-    if (remember) localStorage.setItem("safe-link-phone", phoneNum);
-    else localStorage.removeItem("safe-link-phone");
-  };
+  // No auto-login — worker enters fresh every time
 
   const redirectByRole = async (userId: string) => {
     const activeLang = lang || "ko";
@@ -171,29 +169,33 @@ function AuthContent() {
   };
 
   const handleWorkerEnter = async () => {
-    if (!phone || !password) return;
+    if (!phone || !workerName.trim()) return;
     setLoading(true);
     const activeLang = lang || "ko";
     const email = getVirtualEmail(phone);
-    const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+    const autoPassword = `sl_${phone.replace(/[^0-9]/g, "")}_safe`;
+
+    const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password: autoPassword });
     if (signInErr) {
       const { error: signUpErr } = await supabase.auth.signUp({
-        email, password,
-        options: { data: { phone_number: phone.replace(/[^0-9]/g, "") } },
+        email, password: autoPassword,
+        options: { data: { phone_number: phone.replace(/[^0-9]/g, ""), display_name: workerName.trim() } },
       });
       if (signUpErr) { alert(signUpErr.message); setLoading(false); return; }
-      const { error: signInErr2 } = await supabase.auth.signInWithPassword({ email, password });
+      const { error: signInErr2 } = await supabase.auth.signInWithPassword({ email, password: autoPassword });
       if (signInErr2) { alert(signInErr2.message); setLoading(false); return; }
-      saveSession(phone, rememberMe);
       const targetRole = searchParams.get("role");
       const siteId = searchParams.get("site_id");
       router.push(`/auth/setup?lang=${activeLang}&role=worker${targetRole ? `&role=${targetRole}` : ""}${siteId ? `&site_id=${siteId}` : ""}`);
       setLoading(false);
       return;
     }
-    saveSession(phone, rememberMe);
+    // 이름 업데이트
     const { data: { session } } = await supabase.auth.getSession();
-    if (session) await redirectByRole(session.user.id);
+    if (session) {
+      await supabase.from("profiles").update({ display_name: workerName.trim() }).eq("id", session.user.id);
+      await redirectByRole(session.user.id);
+    }
     setLoading(false);
   };
 
@@ -433,29 +435,13 @@ function AuthContent() {
                     className="flex-1 bg-transparent text-white text-sm placeholder-slate-700 outline-none px-3 py-3.5" />
                 </div>
 
-                {/* Password */}
+                {/* Name */}
                 <div style={fieldBox}>
-                  <input type="password" placeholder={t.pass} value={password}
-                    onChange={e => setPassword(e.target.value)}
+                  <input type="text" placeholder={t.name} value={workerName}
+                    onChange={e => setWorkerName(e.target.value)}
                     onKeyDown={e => e.key === "Enter" && handleWorkerEnter()}
                     className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
                 </div>
-
-                {/* Auto-login toggle */}
-                <label className="flex items-center gap-3 p-3.5 rounded-xl cursor-pointer select-none transition-all"
-                  style={{ background: "rgba(16,185,129,0.05)", border: "1px solid rgba(16,185,129,0.12)" }}
-                  onClick={() => setRememberMe(v => !v)}>
-                  <div className="relative flex-shrink-0" style={{ width: 44, height: 24 }}>
-                    <div className="w-full h-full rounded-full transition-all duration-300"
-                      style={{ background: rememberMe ? "#10B981" : "rgba(255,255,255,0.1)" }} />
-                    <div className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300"
-                      style={{ left: rememberMe ? 22 : 2 }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs text-white font-bold block leading-tight">{t.rememberMe}</span>
-                    <span className="text-[11px] block mt-0.5 text-slate-600">{t.rememberDesc}</span>
-                  </div>
-                </label>
 
                 {/* Hint */}
                 <div className="flex items-start gap-2">
@@ -464,7 +450,7 @@ function AuthContent() {
                 </div>
 
                 {/* CTA */}
-                <button onClick={handleWorkerEnter} disabled={loading || !phone || !password}
+                <button onClick={handleWorkerEnter} disabled={loading || !phone || !workerName.trim()}
                   className="w-full py-3.5 font-black text-sm text-white rounded-xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: "linear-gradient(135deg,#059669 0%,#10B981 100%)", boxShadow: "0 4px 24px rgba(16,185,129,0.28)" }}>
                   {loading ? <Spinner /> : t.doEnter}
@@ -541,22 +527,6 @@ function AuthContent() {
                     </div>
                   </>
                 )}
-
-                {/* Auto-login toggle */}
-                <label className="flex items-center gap-3 p-3.5 rounded-xl cursor-pointer select-none"
-                  style={{ background: "rgba(59,130,246,0.05)", border: "1px solid rgba(59,130,246,0.12)" }}
-                  onClick={() => setRememberMe(v => !v)}>
-                  <div className="relative flex-shrink-0" style={{ width: 44, height: 24 }}>
-                    <div className="w-full h-full rounded-full transition-all duration-300"
-                      style={{ background: rememberMe ? "#3B82F6" : "rgba(255,255,255,0.1)" }} />
-                    <div className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300"
-                      style={{ left: rememberMe ? 22 : 2 }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs text-white font-bold block leading-tight">{t.rememberMe}</span>
-                    <span className="text-[11px] block mt-0.5 text-slate-600">{t.rememberDesc}</span>
-                  </div>
-                </label>
 
                 {/* CTA */}
                 <button onClick={adminSignupMode ? handleAdminSignup : handleAdminLogin}

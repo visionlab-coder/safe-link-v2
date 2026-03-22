@@ -83,6 +83,36 @@ const viSyllables: Record<string, string> = {
     "sao": "사오", "nhieu": "니에우", "it": "잇",
 };
 
+// 태국어 로마자 → 한글 매핑 (영어 bridge 경유 시 사용)
+const thSyllables: Record<string, string> = {
+    "sawatdi": "사왓디", "khrap": "크랍", "kha": "카", "chai": "차이", "mai": "마이",
+    "khob": "콥", "khun": "쿤", "sabai": "사바이", "di": "디", "arai": "아라이",
+    "nan": "난", "ni": "니", "thi": "티", "nai": "나이", "pen": "뻰", "khao": "카오",
+    "rao": "라오", "phom": "폼", "chan": "찬", "ja": "자", "pai": "빠이", "ma": "마",
+    "kin": "긴", "nam": "남", "wan": "완", "rot": "롯", "ban": "반", "mueang": "므앙",
+    "rong": "롱", "rian": "리안", "ngan": "응안", "phak": "팍", "pon": "뻰",
+    "suai": "수아이", "lek": "렉", "yai": "야이", "noi": "노이", "mak": "막",
+    "dee": "디", "rew": "레우", "cha": "차", "ao": "아오", "hai": "하이",
+    "kan": "깐", "kap": "갑", "duai": "두아이", "laew": "래우", "yang": "양",
+    "dai": "다이", "tong": "통", "sam": "삼", "si": "씨", "ha": "하",
+    "hok": "혹", "jet": "쩻", "paet": "뺏", "kao": "까오", "sip": "씹",
+    "song": "송", "phasa": "파사", "thai": "타이", "khon": "콘",
+};
+
+// 인도네시아어/말레이어 음절 매핑
+const idSyllables: Record<string, string> = {
+    "selamat": "슬라맛", "pagi": "빠기", "siang": "시앙", "sore": "소레", "malam": "말람",
+    "terima": "뜨리마", "kasih": "까시", "sama": "사마", "tidak": "띠닥", "bisa": "비사",
+    "apa": "아빠", "ini": "이니", "itu": "이뚜", "dan": "단", "yang": "양",
+    "untuk": "운뚝", "dengan": "드응안", "ada": "아다", "akan": "아깐", "dari": "다리",
+    "sudah": "수다", "belum": "블룸", "juga": "주가", "atau": "아따우", "saya": "사야",
+    "kami": "까미", "mereka": "므레까", "dia": "디아", "baik": "바잌", "bagus": "바구스",
+    "besar": "브사르", "kecil": "크칠", "baru": "바루", "lama": "라마",
+    "kerja": "끄르자", "pekerja": "쁘끄르자", "bahaya": "바하야", "aman": "아만",
+    "hati": "하띠", "helm": "헬름", "sepatu": "스빠뚜", "sarung": "사룽",
+    "tangan": "딴안", "alat": "알랏", "mesin": "므신", "bangunan": "방우난",
+};
+
 export function hangulize(text: string, lang: string): string {
     if (!text) return "";
     let normalized = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -90,11 +120,38 @@ export function hangulize(text: string, lang: string): string {
 
     if (lang === 'zh') return hangulizePinyin(normalized);
     if (lang === 'vi') {
-        // 베트남어 특수 문자 처리: đ → d
         normalized = normalized.replace(/đ/g, "d");
         return hangulizeVietnamese(normalized);
     }
+    if (lang === 'th') return hangulizeWithDict(normalized, thSyllables);
+    if (lang === 'id') return hangulizeWithDict(normalized, idSyllables);
     return genericHangulize(normalized);
+}
+
+/** 사전 기반 hangulize: 사전 매칭 → fallback generic */
+function hangulizeWithDict(text: string, dict: Record<string, string>): string {
+    return text.split(/\s+/).map(word => {
+        if (dict[word]) return dict[word];
+        // 복합어: 긴 접두사/접미사 검색
+        for (let i = Math.min(word.length, 8); i >= 2; i--) {
+            const prefix = word.substring(0, i);
+            const suffix = word.substring(i);
+            if (dict[prefix] && dict[suffix]) return dict[prefix] + dict[suffix];
+            if (dict[prefix] && suffix.length <= 2) {
+                let converted = suffix;
+                for (const [pattern, replacement] of engPatterns) {
+                    converted = converted.replace(pattern, replacement);
+                }
+                return dict[prefix] + converted;
+            }
+        }
+        // fallback: 영어 패턴 변환
+        let converted = word;
+        for (const [pattern, replacement] of engPatterns) {
+            converted = converted.replace(pattern, replacement);
+        }
+        return converted;
+    }).join(' ');
 }
 
 function hangulizeVietnamese(text: string): string {
@@ -243,6 +300,21 @@ const commonWords: Record<string, string> = {
     "must": "머스트", "required": "리콰이어드", "prohibited": "프로히비티드",
     "enter": "엔터", "exit": "엑시트", "entry": "엔트리",
     "not": "낫", "don't": "돈트", "can't": "캔트", "do": "두",
+    // 건설 현장 보강
+    "excavator": "엑스카베이터", "bulldozer": "불도저", "forklift": "포크리프트",
+    "welding": "웰딩", "drilling": "드릴링", "cutting": "커팅", "grinding": "그라인딩",
+    "harness": "하니스", "anchor": "앵커", "bolt": "볼트", "nut": "넛",
+    "wire": "와이어", "cable": "케이블", "pipe": "파이프", "valve": "밸브",
+    "beam": "빔", "column": "컬럼", "slab": "슬래브", "wall": "월",
+    "roof": "루프", "foundation": "파운데이션", "trench": "트렌치",
+    "demolition": "데몰리션", "asbestos": "아스베스토스", "toxic": "톡식",
+    "ventilation": "벤틸레이션", "dehydration": "디하이드레이션",
+    "stretcher": "스트레처", "extinguisher": "엑스팅귀셔",
+    "assembly": "어셈블리", "briefing": "브리핑", "permit": "퍼밋",
+    "foreman": "포맨", "operator": "오퍼레이터",
+    "signal": "시그널", "barrier": "배리어", "guardrail": "가드레일",
+    "before": "비포", "after": "애프터", "during": "듀링", "always": "올웨이즈", "never": "네버",
+    "immediately": "이미디어틀리", "carefully": "케어풀리", "slowly": "슬로울리",
 };
 
 function genericHangulize(text: string): string {

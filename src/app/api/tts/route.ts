@@ -24,13 +24,14 @@ export async function GET(request: NextRequest) {
 
     try {
         const voiceName = getBestCloudVoice(lang, gender);
+        const voiceLangCode = getVoiceLangCode(lang);
 
         const response = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 input: { text },
-                voice: { languageCode: lang, name: voiceName, ssmlGender: gender.toUpperCase() },
+                voice: { languageCode: voiceLangCode, name: voiceName, ssmlGender: gender.toUpperCase() },
                 audioConfig: {
                     audioEncoding: 'MP3',
                     speakingRate: 1.0,
@@ -82,26 +83,46 @@ async function fetchLegacyTTS(text: string, lang: string) {
     }
 }
 
-/** 국가별 최정예 뉴럴 성우 매핑 데이터 */
+/** 앱 내부 코드 → Google TTS languageCode 변환 */
+function getVoiceLangCode(lang: string): string {
+    const map: Record<string, string> = {
+        'ko': 'ko-KR', 'en': 'en-US', 'zh': 'zh-CN', 'vi': 'vi-VN', 'ja': 'ja-JP', 'jp': 'ja-JP',
+        'th': 'th-TH', 'id': 'id-ID', 'ph': 'fil-PH', 'tl': 'fil-PH', 'ru': 'ru-RU',
+        'uz': 'uz-UZ', 'ne': 'ne-NP', 'km': 'km-KH', 'my': 'my-MM',
+        'hi': 'hi-IN', 'bn': 'bn-IN', 'ar': 'ar-XA', 'fr': 'fr-FR', 'es': 'es-ES',
+        'mn': 'mn-MN', 'kk': 'kk-KZ',
+    };
+    return map[lang] || lang;
+}
+
+/** 국가별 최고 품질 뉴럴 성우 매핑 (20개 언어 전체) */
 function getBestCloudVoice(lang: string, gender: string): string {
     const isMale = gender === 'male';
     const base = lang.split('-')[0].toLowerCase();
 
-    const map: Record<string, { male: string, female: string }> = {
-        'ko': { female: 'ko-KR-Neural2-A', male: 'ko-KR-Neural2-C' },
-        'en': { female: 'en-US-Neural2-H', male: 'en-US-Neural2-D' },
-        'zh': { female: 'zh-CN-Neural2-A', male: 'zh-CN-Neural2-B' },
-        'vi': { female: 'vi-VN-Neural2-A', male: 'vi-VN-Wavenet-B' },
-        'ja': { female: 'ja-JP-Neural2-B', male: 'ja-JP-Neural2-C' },
-        'th': { female: 'th-TH-Neural2-A', male: 'th-TH-Standard-A' },
-        'id': { female: 'id-ID-Wavenet-A', male: 'id-ID-Wavenet-B' },
-        'ph': { female: 'fil-PH-Wavenet-A', male: 'fil-PH-Wavenet-B' },
-        'tl': { female: 'fil-PH-Wavenet-A', male: 'fil-PH-Wavenet-B' },
-        'ru': { female: 'ru-RU-Standard-C', male: 'ru-RU-Standard-D' },
-        'uz': { female: 'uz-UZ-Standard-A', male: 'uz-UZ-Standard-A' },
-        'ne': { female: 'ne-NP-Standard-A', male: 'ne-NP-Standard-A' },
-        'km': { female: 'km-KH-Standard-A', male: 'km-KH-Standard-A' },
-        'my': { female: 'my-MM-Standard-A', male: 'my-MM-Standard-A' },
+    const map: Record<string, { male: string, female: string, langCode: string }> = {
+        'ko': { female: 'ko-KR-Neural2-A', male: 'ko-KR-Neural2-C', langCode: 'ko-KR' },
+        'en': { female: 'en-US-Neural2-H', male: 'en-US-Neural2-D', langCode: 'en-US' },
+        'zh': { female: 'zh-CN-Neural2-A', male: 'zh-CN-Neural2-B', langCode: 'zh-CN' },
+        'vi': { female: 'vi-VN-Neural2-A', male: 'vi-VN-Wavenet-B', langCode: 'vi-VN' },
+        'ja': { female: 'ja-JP-Neural2-B', male: 'ja-JP-Neural2-C', langCode: 'ja-JP' },
+        'jp': { female: 'ja-JP-Neural2-B', male: 'ja-JP-Neural2-C', langCode: 'ja-JP' },
+        'th': { female: 'th-TH-Neural2-C', male: 'th-TH-Standard-A', langCode: 'th-TH' },
+        'id': { female: 'id-ID-Wavenet-A', male: 'id-ID-Wavenet-B', langCode: 'id-ID' },
+        'ph': { female: 'fil-PH-Wavenet-A', male: 'fil-PH-Wavenet-B', langCode: 'fil-PH' },
+        'tl': { female: 'fil-PH-Wavenet-A', male: 'fil-PH-Wavenet-B', langCode: 'fil-PH' },
+        'ru': { female: 'ru-RU-Wavenet-A', male: 'ru-RU-Wavenet-B', langCode: 'ru-RU' },
+        'uz': { female: 'uz-UZ-Standard-A', male: 'uz-UZ-Standard-A', langCode: 'uz-UZ' },
+        'ne': { female: 'ne-NP-Standard-A', male: 'ne-NP-Standard-A', langCode: 'ne-NP' },
+        'km': { female: 'km-KH-Standard-A', male: 'km-KH-Standard-A', langCode: 'km-KH' },
+        'my': { female: 'my-MM-Standard-A', male: 'my-MM-Standard-A', langCode: 'my-MM' },
+        'hi': { female: 'hi-IN-Neural2-A', male: 'hi-IN-Neural2-B', langCode: 'hi-IN' },
+        'bn': { female: 'bn-IN-Wavenet-A', male: 'bn-IN-Wavenet-B', langCode: 'bn-IN' },
+        'ar': { female: 'ar-XA-Wavenet-A', male: 'ar-XA-Wavenet-B', langCode: 'ar-XA' },
+        'fr': { female: 'fr-FR-Neural2-A', male: 'fr-FR-Neural2-B', langCode: 'fr-FR' },
+        'es': { female: 'es-ES-Neural2-A', male: 'es-ES-Neural2-B', langCode: 'es-ES' },
+        'mn': { female: 'mn-MN-Standard-A', male: 'mn-MN-Standard-A', langCode: 'mn-MN' },
+        'kk': { female: 'kk-KZ-Standard-A', male: 'kk-KZ-Standard-A', langCode: 'kk-KZ' },
     };
 
     const target = map[base] || map['ko'];
