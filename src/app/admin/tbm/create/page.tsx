@@ -87,6 +87,7 @@ function AdminTBMCreateContent() {
     };
 
     const recognitionRef = useRef<any>(null);
+    const micStreamRef = useRef<MediaStream | null>(null);
     const urlLang = searchParams.get("lang");
 
     const loadProfile = useCallback(async () => {
@@ -154,7 +155,13 @@ function AdminTBMCreateContent() {
         return map[c] || c;
     };
 
-    const toggleRecording = () => {
+    const acquireMic = async () => {
+        if (!micStreamRef.current) {
+            micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
+    };
+
+    const toggleRecording = async () => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (!SpeechRecognition) {
             alert("이 브라우저는 음성 인식을 지원하지 않습니다.");
@@ -168,6 +175,8 @@ function AdminTBMCreateContent() {
             setIsRecording(false);
             return;
         }
+
+        await acquireMic();
 
         const recognition = new SpeechRecognition();
         recognition.lang = getSTTLang(adminLang);

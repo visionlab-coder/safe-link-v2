@@ -116,6 +116,7 @@ function AdminChatContent() {
     const voiceGenderRef = useRef<'male' | 'female'>('female'); // Immediately updated
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+    const micStreamRef = useRef<MediaStream | null>(null);
 
     // Helper to change gender: updates ref immediately (no async delay) + state for UI
     const changeGender = (g: 'male' | 'female') => {
@@ -299,7 +300,13 @@ function AdminChatContent() {
         });
     };
 
-    const toggleRecording = () => {
+    const acquireMic = async () => {
+        if (!micStreamRef.current) {
+            micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
+    };
+
+    const toggleRecording = async () => {
         const speechWindow = window as Window & typeof globalThis & {
             SpeechRecognition?: SpeechRecognitionConstructor;
             webkitSpeechRecognition?: SpeechRecognitionConstructor;
@@ -317,6 +324,8 @@ function AdminChatContent() {
             recognitionRef.current = null;
             setIsRecording(false);
         } else {
+            await acquireMic();
+
             const recognition = new SpeechRecognition();
             recognition.lang = getVoiceLang(adminLang);
             recognition.continuous = true;
@@ -333,10 +342,7 @@ function AdminChatContent() {
             recognition.onerror = (event: Event) => {
                 console.error("STT Error:", event);
             };
-            // 사용자가 마이크 버튼을 직접 누를 때까지 계속 녹음 유지
             recognition.onend = () => {
-                // 사용자가 stop을 호출한 경우(recognitionRef가 null) → 종료
-                // 브라우저가 자동으로 끊은 경우 → 재시작
                 if (recognitionRef.current) {
                     try { recognitionRef.current.start(); } catch { setIsRecording(false); }
                 }

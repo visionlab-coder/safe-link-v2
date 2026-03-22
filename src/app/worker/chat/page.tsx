@@ -92,6 +92,7 @@ function WorkerChatContent() {
     const [isRecording, setIsRecording] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+    const micStreamRef = useRef<MediaStream | null>(null);
     const processedAudioIds = useRef<Set<string>>(new Set());
 
     const [myId, setMyId] = useState("");
@@ -337,7 +338,13 @@ function WorkerChatContent() {
         }
     };
 
-    const toggleRecording = () => {
+    const acquireMic = async () => {
+        if (!micStreamRef.current) {
+            micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
+    };
+
+    const toggleRecording = async () => {
         const speechWindow = window as Window & typeof globalThis & {
             SpeechRecognition?: SpeechRecognitionConstructor;
             webkitSpeechRecognition?: SpeechRecognitionConstructor;
@@ -355,6 +362,8 @@ function WorkerChatContent() {
             recognitionRef.current = null;
             setIsRecording(false);
         } else {
+            await acquireMic();
+
             const recognition = new SpeechRecognition();
             recognition.lang = getSTTLang(lang);
             recognition.continuous = true;
