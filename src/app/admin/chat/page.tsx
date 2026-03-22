@@ -11,21 +11,9 @@ import { playPremiumAudio, playProxyAudio } from "@/utils/tts";
 import { playNotificationSound } from "@/utils/notifications";
 import { Trash2, QrCode } from "lucide-react";
 import { hangulize } from "@/utils/hangulize";
+import { useCloudSTT } from "@/hooks/useCloudSTT";
 
 type ParsedMessage = { norm: string; text: string; pron: string; rev: string };
-type SpeechRecognitionEventLike = { results: ArrayLike<ArrayLike<{ transcript: string }>> };
-type SpeechRecognitionLike = {
-    lang: string;
-    continuous: boolean;
-    interimResults: boolean;
-    onstart: (() => void) | null;
-    onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-    onerror: ((event: Event) => void) | null;
-    onend: (() => void) | null;
-    start: () => void;
-    stop: () => void;
-};
-type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 const ui: Record<string, Record<string, string>> = {
     ko: {
         title: "실시간 번역 대화",
@@ -63,10 +51,6 @@ const isoMap: Record<string, string> = {
     ru: "ru", jp: "jp", fr: "fr", es: "es", ar: "sa", hi: "in",
 };
 
-const getVoiceLang = (c: string) => {
-    const map: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", th: "th-TH", uz: "uz-UZ", id: "id-ID", jp: "ja-JP", ph: "tl-PH" };
-    return map[c] || c;
-};
 
 type WorkerProfile = { id: string; display_name: string; preferred_lang: string; };
 type Message = {
@@ -109,14 +93,11 @@ function AdminChatContent() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [text, setText] = useState("");
     const [isSending, setIsSending] = useState(false);
-    const [isRecording, setIsRecording] = useState(false);
     const [myId, setMyId] = useState("");
     const triedJitTranslate = useRef<Set<string>>(new Set());
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const voiceGenderRef = useRef<'male' | 'female'>('female'); // Immediately updated
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-    const micStreamRef = useRef<MediaStream | null>(null);
 
     // Helper to change gender: updates ref immediately (no async delay) + state for UI
     const changeGender = (g: 'male' | 'female') => {
@@ -300,58 +281,14 @@ function AdminChatContent() {
         });
     };
 
-    const acquireMic = async () => {
-        if (!micStreamRef.current) {
-            micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
-        }
-    };
+    const handleTranscript = useCallback((transcript: string) => {
+        setText(prev => prev ? `${prev} ${transcript}` : transcript);
+    }, []);
 
-    const toggleRecording = async () => {
-        const speechWindow = window as Window & typeof globalThis & {
-            SpeechRecognition?: SpeechRecognitionConstructor;
-            webkitSpeechRecognition?: SpeechRecognitionConstructor;
-        };
-        const SpeechRecognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            alert("이 브라우저는 음성 인식을 지원하지 않습니다.");
-            return;
-        }
-
-        if (isRecording) {
-            if (recognitionRef.current) {
-                recognitionRef.current.stop();
-            }
-            recognitionRef.current = null;
-            setIsRecording(false);
-        } else {
-            await acquireMic();
-
-            const recognition = new SpeechRecognition();
-            recognition.lang = getVoiceLang(adminLang);
-            recognition.continuous = true;
-            recognition.interimResults = false;
-
-            recognition.onstart = () => setIsRecording(true);
-            recognition.onresult = (event: SpeechRecognitionEventLike) => {
-                const lastIdx = event.results.length - 1;
-                const result = event.results[lastIdx][0].transcript;
-                if (result && result.trim()) {
-                    setText(prev => prev ? `${prev} ${result.trim()}` : result.trim());
-                }
-            };
-            recognition.onerror = (event: Event) => {
-                console.error("STT Error:", event);
-            };
-            recognition.onend = () => {
-                if (recognitionRef.current) {
-                    try { recognitionRef.current.start(); } catch { setIsRecording(false); }
-                }
-            };
-
-            recognitionRef.current = recognition;
-            recognition.start();
-        }
-    };
+    const { isRecording, toggle: toggleRecording } = useCloudSTT({
+        lang: adminLang,
+        onTranscript: handleTranscript,
+    });
 
     const handleSend = async (overrideText?: string | React.MouseEvent) => {
         const messageText = typeof overrideText === 'string' ? overrideText : text;

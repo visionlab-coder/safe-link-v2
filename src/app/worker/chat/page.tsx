@@ -10,21 +10,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { playPremiumAudio, playProxyAudio } from "@/utils/tts";
 import { playNotificationSound } from "@/utils/notifications";
 import { formalizeKo } from "@/utils/politeness";
+import { useCloudSTT } from "@/hooks/useCloudSTT";
 
 type ParsedMessage = { text: string; pron: string; rev: string };
-type SpeechRecognitionEventLike = { results: ArrayLike<ArrayLike<{ transcript: string }>> };
-type SpeechRecognitionLike = {
-    lang: string;
-    continuous: boolean;
-    interimResults: boolean;
-    onstart: (() => void) | null;
-    onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-    onerror: ((event: Event) => void) | null;
-    onend: (() => void) | null;
-    start: () => void;
-    stop: () => void;
-};
-type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 type RealtimeMessagePayload = { new: Message };
 
 const ui: Record<string, Record<string, string>> = {
@@ -65,16 +53,6 @@ const ui: Record<string, Record<string, string>> = {
 
 const getUI = (lang: string) => ui[lang] || ui["en"];
 
-const getSTTLang = (c: string) => {
-    const map: Record<string, string> = {
-        ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", th: "th-TH",
-        uz: "uz-UZ", id: "id-ID", jp: "ja-JP", ph: "fil-PH",
-        km: "km-KH", mn: "mn-MN", my: "my-MM", ne: "ne-NP",
-        bn: "bn-BD", kk: "kk-KZ", ru: "ru-RU", fr: "fr-FR",
-        es: "es-ES", ar: "ar-SA", hi: "hi-IN",
-    };
-    return map[c] || c;
-};
 
 type AdminProfile = { id: string; display_name: string; role: string; site_id: string | null; };
 type Message = { id: string; from_user: string; to_user: string; source_text: string; translated_text: string; created_at: string; is_read?: boolean; };
@@ -89,10 +67,7 @@ function WorkerChatContent() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [text, setText] = useState("");
     const [isSending, setIsSending] = useState(false);
-    const [isRecording, setIsRecording] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-    const micStreamRef = useRef<MediaStream | null>(null);
     const processedAudioIds = useRef<Set<string>>(new Set());
 
     const [myId, setMyId] = useState("");
@@ -338,58 +313,14 @@ function WorkerChatContent() {
         }
     };
 
-    const acquireMic = async () => {
-        if (!micStreamRef.current) {
-            micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
-        }
-    };
+    const handleTranscript = useCallback((transcript: string) => {
+        setText(prev => prev ? `${prev} ${transcript}` : transcript);
+    }, []);
 
-    const toggleRecording = async () => {
-        const speechWindow = window as Window & typeof globalThis & {
-            SpeechRecognition?: SpeechRecognitionConstructor;
-            webkitSpeechRecognition?: SpeechRecognitionConstructor;
-        };
-        const SpeechRecognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            alert("이 브라우저는 음성 인식을 지원하지 않습니다.");
-            return;
-        }
-
-        if (isRecording) {
-            if (recognitionRef.current) {
-                recognitionRef.current.stop();
-            }
-            recognitionRef.current = null;
-            setIsRecording(false);
-        } else {
-            await acquireMic();
-
-            const recognition = new SpeechRecognition();
-            recognition.lang = getSTTLang(lang);
-            recognition.continuous = true;
-            recognition.interimResults = false;
-
-            recognition.onstart = () => setIsRecording(true);
-            recognition.onresult = (event: SpeechRecognitionEventLike) => {
-                const lastIdx = event.results.length - 1;
-                const result = event.results[lastIdx][0].transcript;
-                if (result && result.trim()) {
-                    setText(prev => prev ? `${prev} ${result.trim()}` : result.trim());
-                }
-            };
-            recognition.onerror = (event: Event) => {
-                console.error("STT Error:", event);
-            };
-            recognition.onend = () => {
-                if (recognitionRef.current) {
-                    try { recognitionRef.current.start(); } catch { setIsRecording(false); }
-                }
-            };
-
-            recognitionRef.current = recognition;
-            recognition.start();
-        }
-    };
+    const { isRecording, toggle: toggleRecording } = useCloudSTT({
+        lang,
+        onTranscript: handleTranscript,
+    });
 
     const t = getUI(lang);
     const parseMsg = (raw: unknown): ParsedMessage => {

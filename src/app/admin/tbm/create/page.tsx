@@ -7,6 +7,7 @@ import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
 import { Suspense } from "react";
 import { normalizeKoAsync } from "@/utils/normalize";
+import { useCloudSTT } from "@/hooks/useCloudSTT";
 
 const adminUI: Record<string, any> = {
     ko: {
@@ -72,7 +73,6 @@ function AdminTBMCreateContent() {
     const searchParams = useSearchParams();
     const [tbmText, setTbmText] = useState("");
     const [isSending, setIsSending] = useState(false);
-    const [isRecording, setIsRecording] = useState(false);
     const [history, setHistory] = useState<any[]>([]);
     const [isGeneratingAI, setIsGeneratingAI] = useState(false);
     const [aiTips, setAiTips] = useState<string[]>([]);
@@ -86,8 +86,6 @@ function AdminTBMCreateContent() {
         setVoiceGender(g);
     };
 
-    const recognitionRef = useRef<any>(null);
-    const micStreamRef = useRef<MediaStream | null>(null);
     const urlLang = searchParams.get("lang");
 
     const loadProfile = useCallback(async () => {
@@ -147,78 +145,17 @@ function AdminTBMCreateContent() {
     };
 
 
-    const getSTTLang = (c: string) => {
-        const map: Record<string, string> = {
-            ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN",
-            th: "th-TH", uz: "uz-UZ", id: "id-ID", jp: "ja-JP", ph: "fil-PH"
-        };
-        return map[c] || c;
-    };
+    const handleTranscript = useCallback((text: string) => {
+        setTbmText((prev) => {
+            const base = prev.trim();
+            return base ? base + " " + text : text;
+        });
+    }, []);
 
-    const acquireMic = async () => {
-        if (!micStreamRef.current) {
-            micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
-        }
-    };
-
-    const toggleRecording = async () => {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            alert("이 브라우저는 음성 인식을 지원하지 않습니다.");
-            return;
-        }
-
-        if (isRecording) {
-            const rec = recognitionRef.current;
-            recognitionRef.current = null;
-            if (rec) rec.stop();
-            setIsRecording(false);
-            return;
-        }
-
-        await acquireMic();
-
-        const recognition = new SpeechRecognition();
-        recognition.lang = getSTTLang(adminLang);
-        recognition.continuous = true;
-        recognition.interimResults = false;
-
-        recognition.onstart = () => setIsRecording(true);
-        recognition.onresult = (event: any) => {
-            let finalTranscript = "";
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                finalTranscript += event.results[i][0].transcript;
-            }
-            if (finalTranscript.trim()) {
-                setTbmText((prev) => {
-                    const base = prev.trim();
-                    return base ? base + " " + finalTranscript.trim() : finalTranscript.trim();
-                });
-            }
-        };
-        recognition.onerror = (e: any) => {
-            console.error("[TBM STT Error]", e);
-            if (e.error === "aborted" || e.error === "network") {
-                recognitionRef.current = null;
-                setIsRecording(false);
-            }
-        };
-        recognition.onend = () => {
-            if (recognitionRef.current) {
-                try {
-                    recognitionRef.current.start();
-                } catch {
-                    recognitionRef.current = null;
-                    setIsRecording(false);
-                }
-            } else {
-                setIsRecording(false);
-            }
-        };
-
-        recognitionRef.current = recognition;
-        recognition.start();
-    };
+    const { isRecording, toggle: toggleRecording } = useCloudSTT({
+        lang: adminLang,
+        onTranscript: handleTranscript,
+    });
 
     const handleSendTBM = async () => {
         if (!tbmText.trim()) return;
@@ -320,7 +257,7 @@ function AdminTBMCreateContent() {
                             <textarea
                                 value={tbmText}
                                 onChange={(e) => setTbmText(e.target.value)}
-                                placeholder={isRecording ? `${t.listening} [${getSTTLang(adminLang)}]` : t.placeholder}
+                                placeholder={isRecording ? `${t.listening} [${adminLang}]` : t.placeholder}
                                 className="flex-1 w-full bg-transparent text-2xl md:text-3xl font-bold text-white placeholder-slate-800 outline-none resize-none leading-snug tracking-tight"
                             />
 
