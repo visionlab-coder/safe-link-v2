@@ -163,7 +163,7 @@ function AdminChatContent() {
         const { data } = await supabase
             .from("messages")
             .select("*")
-            .or(`from_user.eq.${activeWorker.id},to_user.eq.${activeWorker.id}`)
+            .or(`and(from_user.eq.${myId},to_user.eq.${activeWorker.id}),and(from_user.eq.${activeWorker.id},to_user.eq.${myId})`)
             .order("created_at", { ascending: true });
         if (data) setMessages(data);
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);

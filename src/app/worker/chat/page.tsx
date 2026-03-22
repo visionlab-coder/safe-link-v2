@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import RoleGuard from "@/components/RoleGuard";
-import { analyzeMessageWithAI } from "@/utils/ai/watchdog";
+
 import { Users, QrCode } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { playPremiumAudio, playProxyAudio } from "@/utils/tts";
@@ -316,16 +316,15 @@ function WorkerChatContent() {
                 }
             }
 
-            const payload = {
-                site_id: siteId || "00000000-0000-0000-0000-000000000000",
+            const payload: Record<string, unknown> = {
                 from_user: myId,
                 to_user: activeAdmin.id,
                 source_lang: lang,
                 target_lang: "ko",
                 source_text: originalText,
                 translated_text: JSON.stringify({ text: translated, pron, rev }),
-                ai_analysis: await analyzeMessageWithAI(translated),
             };
+            if (siteId) payload.site_id = siteId;
 
             const { data: inserted, error: msgErr } = await supabase.from("messages").insert(payload).select().single();
             if (!msgErr && inserted) {
