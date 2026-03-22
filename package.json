@@ -35,7 +35,6 @@
     "pg": "^8.20.0",
     "tailwindcss": "^4",
     "typescript": "5.9.3",
-    "wrangler": "^3.109.2",
-    "xlsx": "^0.18.5"
+    "wrangler": "^3.109.2"
   }
 }
