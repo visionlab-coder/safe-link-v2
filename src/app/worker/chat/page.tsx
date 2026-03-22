@@ -11,6 +11,7 @@ import { playPremiumAudio, playProxyAudio } from "@/utils/tts";
 import { playNotificationSound } from "@/utils/notifications";
 import { formalizeKo } from "@/utils/politeness";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
+import { usePresence } from "@/hooks/usePresence";
 
 type ParsedMessage = { text: string; pron: string; rev: string };
 type RealtimeMessagePayload = { new: Message };
@@ -71,6 +72,7 @@ function WorkerChatContent() {
     const processedAudioIds = useRef<Set<string>>(new Set());
 
     const [myId, setMyId] = useState("");
+    const onlineUsers = usePresence(myId || null);
     const [admins, setAdmins] = useState<AdminProfile[]>([]);
     const [activeAdmin, setActiveAdmin] = useState<AdminProfile | null>(null);
     const [siteId, setSiteId] = useState<string | null>(null);
@@ -400,8 +402,11 @@ function WorkerChatContent() {
                                         onClick={() => { setActiveAdmin(a); setShowSidebar(false); }}
                                         className={`flex items-center gap-4 p-4 rounded-3xl transition-all border ${activeAdmin?.id === a.id ? 'bg-blue-600 border-blue-700 text-white shadow-lg' : 'bg-slate-50 border-slate-100 hover:bg-slate-100 text-slate-700'}`}
                                     >
-                                        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-black text-xs shrink-0 relative">
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-xs shrink-0 relative ${onlineUsers.has(a.id) ? 'bg-white/20 ring-2 ring-green-400/60' : 'bg-white/20'}`}>
                                             {a.display_name[0]}
+                                            {onlineUsers.has(a.id) && (
+                                                <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
+                                            )}
                                             {(unreadAdmins[a.id] || 0) > 0 && (
                                                 <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 rounded-full border-2 border-white text-white text-[10px] font-black flex items-center justify-center">
                                                     {unreadAdmins[a.id]}

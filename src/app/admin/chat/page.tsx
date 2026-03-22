@@ -12,6 +12,7 @@ import { playNotificationSound } from "@/utils/notifications";
 import { Trash2, QrCode } from "lucide-react";
 import { hangulize } from "@/utils/hangulize";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
+import { usePresence } from "@/hooks/usePresence";
 
 type ParsedMessage = { norm: string; text: string; pron: string; rev: string };
 const ui: Record<string, Record<string, string>> = {
@@ -94,6 +95,7 @@ function AdminChatContent() {
     const [text, setText] = useState("");
     const [isSending, setIsSending] = useState(false);
     const [myId, setMyId] = useState("");
+    const onlineUsers = usePresence(myId || null);
     const triedJitTranslate = useRef<Set<string>>(new Set());
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const voiceGenderRef = useRef<'male' | 'female'>('female'); // Immediately updated
@@ -481,9 +483,12 @@ function AdminChatContent() {
                                                 alt={w.preferred_lang}
                                                 width={40}
                                                 height={40}
-                                                className="w-10 h-10 object-cover rounded-full shadow border-2 border-slate-100"
+                                                className={`w-10 h-10 object-cover rounded-full shadow border-2 ${onlineUsers.has(w.id) ? 'border-green-400 ring-2 ring-green-400/40' : 'border-slate-100'}`}
                                                 unoptimized
                                             />
+                                            {onlineUsers.has(w.id) && (
+                                                <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
+                                            )}
                                             {(unreadWorkers[w.id] || 0) > 0 && (
                                                 <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 rounded-full border-2 border-white text-white text-[10px] font-black flex items-center justify-center">
                                                     {unreadWorkers[w.id]}
