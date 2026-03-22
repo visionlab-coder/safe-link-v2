@@ -162,40 +162,53 @@ function AdminTBMCreateContent() {
         }
 
         if (isRecording) {
-            if (recognitionRef.current) {
-                recognitionRef.current.stop();
-            }
+            const rec = recognitionRef.current;
+            recognitionRef.current = null;
+            if (rec) rec.stop();
             setIsRecording(false);
-        } else {
-            const recognition = new SpeechRecognition();
-            recognition.lang = getSTTLang(adminLang);
-            recognition.continuous = true; // 대화와 달리 브리핑은 길게 입력되도록 설정
-            recognition.interimResults = true;
-
-            recognition.onstart = () => setIsRecording(true);
-            recognition.onresult = (event: any) => {
-                let finalTranscript = "";
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        finalTranscript += event.results[i][0].transcript;
-                    }
-                }
-                if (finalTranscript.trim()) {
-                    setTbmText((prev) => {
-                        const base = prev.trim();
-                        return base ? base + " " + finalTranscript.trim() : finalTranscript.trim();
-                    });
-                }
-            };
-            recognition.onerror = (e: any) => {
-                console.error("[TBM STT Error]", e);
-                setIsRecording(false);
-            };
-            recognition.onend = () => setIsRecording(false);
-
-            recognitionRef.current = recognition;
-            recognition.start();
+            return;
         }
+
+        const recognition = new SpeechRecognition();
+        recognition.lang = getSTTLang(adminLang);
+        recognition.continuous = true;
+        recognition.interimResults = false;
+
+        recognition.onstart = () => setIsRecording(true);
+        recognition.onresult = (event: any) => {
+            let finalTranscript = "";
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                finalTranscript += event.results[i][0].transcript;
+            }
+            if (finalTranscript.trim()) {
+                setTbmText((prev) => {
+                    const base = prev.trim();
+                    return base ? base + " " + finalTranscript.trim() : finalTranscript.trim();
+                });
+            }
+        };
+        recognition.onerror = (e: any) => {
+            console.error("[TBM STT Error]", e);
+            if (e.error === "aborted" || e.error === "network") {
+                recognitionRef.current = null;
+                setIsRecording(false);
+            }
+        };
+        recognition.onend = () => {
+            if (recognitionRef.current) {
+                try {
+                    recognitionRef.current.start();
+                } catch {
+                    recognitionRef.current = null;
+                    setIsRecording(false);
+                }
+            } else {
+                setIsRecording(false);
+            }
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
     };
 
     const handleSendTBM = async () => {
