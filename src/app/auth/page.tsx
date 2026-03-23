@@ -192,6 +192,11 @@ function AuthContent() {
     // 세션에서 유저 정보 가져와서 프로필 upsert (신규든 기존이든 동일)
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
+      sessionStorage.setItem("safe-link-session-active", "true");
+      // 근로자는 setup 페이지를 거치지 않으므로 기본 자동로그인 비활성화
+      if (!localStorage.getItem("safe-link-remember")) {
+        localStorage.setItem("safe-link-remember", "false");
+      }
       await supabase.from("profiles").upsert({
         id: session.user.id,
         display_name: workerName.trim(),
@@ -210,7 +215,10 @@ function AuthContent() {
     const { error } = await supabase.auth.signInWithPassword({ email: adminEmail, password });
     if (error) { alert(error.message); setLoading(false); return; }
     const { data: { session } } = await supabase.auth.getSession();
-    if (session) await redirectByRole(session.user.id);
+    if (session) {
+      sessionStorage.setItem("safe-link-session-active", "true");
+      await redirectByRole(session.user.id);
+    }
     setLoading(false);
   };
 
@@ -226,6 +234,7 @@ function AuthContent() {
     if (signUpErr) { alert(signUpErr.message); setLoading(false); return; }
     const { error: loginErr } = await supabase.auth.signInWithPassword({ email: adminEmail, password });
     if (loginErr) { alert(loginErr.message); setLoading(false); return; }
+    sessionStorage.setItem("safe-link-session-active", "true");
     const targetRole = searchParams.get("role");
     const siteId = searchParams.get("site_id");
     router.push(`/auth/setup?lang=${activeLang}${targetRole ? `&role=${targetRole}` : ""}${siteId ? `&site_id=${siteId}` : ""}`);

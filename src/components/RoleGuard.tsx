@@ -17,6 +17,17 @@ export default function RoleGuard({
     useEffect(() => {
         const checkAuth = async () => {
             const supabase = createClient();
+
+            // 자동로그인 비활성화 체크:
+            // rememberMe=false이고 브라우저를 닫았다 다시 열면 (sessionStorage 없음) → 로그아웃
+            const rememberMe = localStorage.getItem("safe-link-remember");
+            const sessionActive = sessionStorage.getItem("safe-link-session-active");
+            if (rememberMe === "false" && !sessionActive) {
+                await supabase.auth.signOut();
+                router.replace("/auth");
+                return;
+            }
+
             let session;
             try {
                 const { data } = await supabase.auth.getSession();
@@ -28,11 +39,13 @@ export default function RoleGuard({
                 return;
             }
 
-            // 2. 만약 로그인 세션이 없다면? -> 로그인 창으로 쫓아냅니다!
             if (!session) {
                 router.replace("/auth");
                 return;
             }
+
+            // 현재 세션 활성 표시 (브라우저 닫으면 자동 삭제됨)
+            sessionStorage.setItem("safe-link-session-active", "true");
 
             // 3. ✨ 드디어 진짜 '내 서랍(DB)'에서 역할을 확인합니다!
             const { data: profile, error } = await supabase

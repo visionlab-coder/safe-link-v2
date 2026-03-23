@@ -400,6 +400,7 @@ function SetupContent() {
     } else {
       localStorage.setItem("safe-link-remember", "false");
     }
+    sessionStorage.setItem("safe-link-session-active", "true");
     window.location.href = `${roleToPath[role]}?lang=${language}`;
   };
 
