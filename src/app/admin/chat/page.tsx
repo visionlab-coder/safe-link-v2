@@ -599,8 +599,8 @@ function AdminChatContent() {
                                                         </div>
 
                                                         <div className="pt-3 border-t border-blue-400/50 flex flex-col gap-2">
-                                                            {/* 2. 한글 발음 */}
-                                                            {(() => {
+                                                            {/* 2. 한글 발음 (영어 제외 — 관리자는 기초 영어 가능) */}
+                                                            {activeWorker?.preferred_lang !== "en" && (() => {
                                                                 const pron = parsed.pron || hangulize(parsed.text, activeWorker?.preferred_lang || "en");
                                                                 return pron ? (
                                                                     <div className="flex items-start gap-1.5">

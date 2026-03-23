@@ -4,6 +4,7 @@ import { getErrorMessage } from '@/utils/errors';
 import { hangulize } from '@/utils/hangulize';
 import pinyin from 'tiny-pinyin';
 import { preProcessWithGlossary } from '@/utils/construction-glossary';
+import { formalizeKo } from '@/utils/politeness';
 
 interface CloudTranslateResponse {
     data?: { translations?: Array<{ translatedText?: string }> };
@@ -110,10 +111,15 @@ export async function POST(request: NextRequest) {
             pronunciation = englishText ? hangulize(englishText, 'en') : "";
         }
 
+        // 한국어 결과는 존대말(경어)로 변환
+        const finalTranslated = tl === 'ko' ? formalizeKo(translatedText) : translatedText;
+        // 역번역은 원래 언어로 돌아가므로, 한국어로 돌아오는 경우 존대말 적용
+        const finalReverse = sl === 'ko' ? formalizeKo(reverseTranslated) : reverseTranslated;
+
         return NextResponse.json({
-            translated: translatedText,
+            translated: finalTranslated,
             pronunciation,
-            reverse_translated: reverseTranslated,
+            reverse_translated: finalReverse,
         });
     } catch (error: unknown) {
         const message = getErrorMessage(error);
