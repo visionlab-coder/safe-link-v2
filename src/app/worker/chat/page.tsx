@@ -215,6 +215,9 @@ function WorkerChatContent() {
                     supabase.from("messages").update({ is_read: true }).eq("id", msg.id).then();
                     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
                     playNotificationSound();
+                    if (typeof navigator !== "undefined" && navigator.vibrate) {
+                        navigator.vibrate([300, 100, 300]);
+                    }
                 }
             })
             .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, (payload) => {
@@ -240,6 +243,9 @@ function WorkerChatContent() {
                 if (msg.to_user === myId && (!activeAdminRef.current || msg.from_user !== activeAdminRef.current.id)) {
                     setUnreadAdmins(prev => ({ ...prev, [msg.from_user]: (prev[msg.from_user] || 0) + 1 }));
                     playNotificationSound();
+                    if (typeof navigator !== "undefined" && navigator.vibrate) {
+                        navigator.vibrate([300, 100, 300]);
+                    }
                 }
             })
             .subscribe();
@@ -296,6 +302,7 @@ function WorkerChatContent() {
                 target_lang: "ko",
                 source_text: originalText,
                 translated_text: JSON.stringify({ text: translated, pron, rev }),
+                is_read: false,
             };
             if (siteId) payload.site_id = siteId;
 

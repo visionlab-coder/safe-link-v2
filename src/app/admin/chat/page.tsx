@@ -259,8 +259,11 @@ function AdminChatContent() {
                 // 3. AI 분석 수행
                 void analyzeMessageWithAI(msg.source_text);
 
-                // 4. 무조건 알림음 발생
+                // 4. 무조건 알림음 + 진동 발생
                 playNotificationSound();
+                if (typeof navigator !== "undefined" && navigator.vibrate) {
+                    navigator.vibrate([300, 100, 300]);
+                }
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
                 const updated = payload.new as Message;
@@ -343,6 +346,7 @@ function AdminChatContent() {
                 target_lang: activeWorker.preferred_lang,
                 source_text: originalText,
                 translated_text: JSON.stringify({ norm: normalized, text: translated, pron, rev }),
+                is_read: false,
             };
 
             const { data: inserted, error } = await supabase.from("messages").insert(payload).select().single();
