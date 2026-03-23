@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
@@ -9,6 +9,11 @@ const CHANNEL_NAME = "online-users";
 export function usePresence(userId: string | null) {
     const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
     const channelRef = useRef<RealtimeChannel | null>(null);
+
+    const updateFromState = useCallback((channel: RealtimeChannel) => {
+        const state = channel.presenceState();
+        setOnlineUsers(new Set<string>(Object.keys(state)));
+    }, []);
 
     useEffect(() => {
         if (!userId) return;
@@ -20,9 +25,21 @@ export function usePresence(userId: string | null) {
 
         channel
             .on("presence", { event: "sync" }, () => {
-                const state = channel.presenceState();
-                const ids = new Set<string>(Object.keys(state));
-                setOnlineUsers(ids);
+                updateFromState(channel);
+            })
+            .on("presence", { event: "join" }, ({ key }) => {
+                setOnlineUsers(prev => {
+                    const next = new Set(prev);
+                    next.add(key);
+                    return next;
+                });
+            })
+            .on("presence", { event: "leave" }, ({ key }) => {
+                setOnlineUsers(prev => {
+                    const next = new Set(prev);
+                    next.delete(key);
+                    return next;
+                });
             })
             .subscribe(async (status) => {
                 if (status === "SUBSCRIBED") {
@@ -36,7 +53,7 @@ export function usePresence(userId: string | null) {
             channel.unsubscribe();
             channelRef.current = null;
         };
-    }, [userId]);
+    }, [userId, updateFromState]);
 
     return onlineUsers;
 }
