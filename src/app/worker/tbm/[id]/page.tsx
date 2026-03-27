@@ -146,12 +146,15 @@ function WorkerTBMDetailContent() {
                 .single();
             tbmData = data;
         } else {
-            // 항상 최신 TBM을 가져옴 (site_id 필터 미적용 - 시연용)
-            const { data } = await supabase
+            // 현장별 TBM 필터링: site_id 있으면 해당 현장만, 없으면 전체
+            const siteId = profile?.site_id;
+            let query = supabase
                 .from("tbm_notices")
                 .select("*")
                 .order("created_at", { ascending: false })
                 .limit(1);
+            if (siteId) query = query.eq("site_id", siteId);
+            const { data } = await query;
             tbmData = data?.[0] || null;
         }
 

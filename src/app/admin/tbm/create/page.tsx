@@ -88,11 +88,13 @@ function AdminTBMCreateContent() {
 
     const urlLang = searchParams.get("lang");
 
+    const [adminSiteId, setAdminSiteId] = useState<string | null>(null);
+
     const loadProfile = useCallback(async () => {
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-            const { data: profile } = await supabase.from("profiles").select("preferred_lang").eq("id", session.user.id).single();
+            const { data: profile } = await supabase.from("profiles").select("preferred_lang, site_id").eq("id", session.user.id).single();
             let finalLang = profile?.preferred_lang || "ko";
 
             if (urlLang && urlLang !== profile?.preferred_lang) {
@@ -100,18 +102,22 @@ function AdminTBMCreateContent() {
                 finalLang = urlLang;
             }
             setAdminLang(finalLang);
+            setAdminSiteId(profile?.site_id || null);
         }
     }, [urlLang]);
 
     const fetchHistory = useCallback(async () => {
         const supabase = createClient();
-        const { data } = await supabase
+        let query = supabase
             .from("tbm_notices")
             .select("*")
             .order("created_at", { ascending: false })
             .limit(5);
+        // 본사 관리자(site_id 없음)는 전체, 현장 관리자는 자기 현장만
+        if (adminSiteId) query = query.eq("site_id", adminSiteId);
+        const { data } = await query;
         if (data) setHistory(data);
-    }, []);
+    }, [adminSiteId]);
 
     useEffect(() => {
         loadProfile();

@@ -264,8 +264,9 @@ function TBMStatusPageContent() {
         setLoading(true);
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
+        let adminSiteId: string | null = null;
         if (session) {
-            const { data: adminProfile } = await supabase.from("profiles").select("preferred_lang").eq("id", session.user.id).single();
+            const { data: adminProfile } = await supabase.from("profiles").select("preferred_lang, site_id").eq("id", session.user.id).single();
             let finalLang = adminProfile?.preferred_lang || "ko";
 
             if (urlLang && urlLang !== adminProfile?.preferred_lang) {
@@ -273,11 +274,17 @@ function TBMStatusPageContent() {
                 finalLang = urlLang;
             }
             setAdminLang(finalLang);
+            adminSiteId = adminProfile?.site_id || null;
         }
-        const { data: tbmRows } = await supabase.from("tbm_notices").select("*").order("created_at", { ascending: false }).limit(1);
+        // 본사 관리자(site_id 없음)는 전체, 현장 관리자는 자기 현장만
+        let tbmQuery = supabase.from("tbm_notices").select("*").order("created_at", { ascending: false }).limit(1);
+        if (adminSiteId) tbmQuery = tbmQuery.eq("site_id", adminSiteId);
+        const { data: tbmRows } = await tbmQuery;
         const tbm = tbmRows?.[0] || null;
         setLatestTBM(tbm);
-        const { data: workerProfiles } = await supabase.from("profiles").select("id, display_name, preferred_lang").eq("role", "WORKER");
+        let workerQuery = supabase.from("profiles").select("id, display_name, preferred_lang").eq("role", "WORKER");
+        if (adminSiteId) workerQuery = workerQuery.eq("site_id", adminSiteId);
+        const { data: workerProfiles } = await workerQuery;
         if (!tbm || !workerProfiles) {
             setWorkers(workerProfiles?.map(w => ({ ...w, signed: false })) || []);
             setLoading(false);

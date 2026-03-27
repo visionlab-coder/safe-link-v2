@@ -36,27 +36,31 @@ export async function POST(request: NextRequest) {
         }
         const { data: profile } = await supabase
             .from('profiles')
-            .select('role')
+            .select('role, site_id')
             .eq('id', user.id)
             .single();
         if (!profile) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
         const role = profile.role as string;
+        const adminSiteId = profile.site_id as string | null;
 
         // 1. 현장 데이터 취합 (최근 24시간)
-        // [TBM 현황]
-        const { count: totalWorkers } = await supabase
+        // [TBM 현황] — 본사 관리자(site_id 없음)는 전체, 현장 관리자는 자기 현장만
+        let workerCountQuery = supabase
             .from('profiles')
             .select('*', { count: 'exact', head: true })
-            .eq('role', 'WORKER'); // site_id 필터링이 필요할 수 있으나 MVP 우선 진행
+            .eq('role', 'WORKER');
+        if (adminSiteId) workerCountQuery = workerCountQuery.eq('site_id', adminSiteId);
+        const { count: totalWorkers } = await workerCountQuery;
 
-        const { data: recentTBM } = await supabase
+        let tbmQuery = supabase
             .from('tbm_notices')
             .select('*')
             .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
+            .limit(1);
+        if (adminSiteId) tbmQuery = tbmQuery.eq('site_id', adminSiteId);
+        const { data: recentTBM } = await tbmQuery.single();
 
         let ackCount = 0;
         if (recentTBM) {
