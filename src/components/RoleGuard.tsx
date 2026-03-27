@@ -28,17 +28,17 @@ export default function RoleGuard({
                 return;
             }
 
-            let session;
-            try {
-                const { data } = await supabase.auth.getSession();
-                session = data.session;
-            } catch {
-                // Invalid/expired refresh token — clear and redirect
+            // getUser()로 서버 검증 (getSession은 만료 토큰도 반환할 수 있음)
+            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            if (authError || !user) {
+                // 만료/무효 세션 → 정리 후 로그인으로
                 await supabase.auth.signOut();
                 router.replace("/auth");
                 return;
             }
 
+            // getSession으로 세션 객체도 확보 (하위 코드에서 session.user.id 사용)
+            const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
                 router.replace("/auth");
                 return;
