@@ -25,15 +25,17 @@ export async function middleware(request: NextRequest) {
         }
     )
 
-    // getUser()로 서버 검증 + 토큰 자동 갱신
-    await supabase.auth.getUser()
+    // getSession(): 쿠키 기반 JWT 파싱만 수행 (네트워크 왕복 없음)
+    // getUser()는 매번 Auth 서버 왕복 → 모든 요청에 +50-200ms 지연 유발
+    // 토큰 갱신은 Supabase SSR이 setAll 콜백에서 자동 처리
+    await supabase.auth.getSession()
 
     return supabaseResponse
 }
 
 export const config = {
     matcher: [
-        // 정적 파일과 _next 제외, 나머지 모든 경로에 적용
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        // 정적 파일, _next, API routes 제외 — 페이지 네비게이션만 처리
+        '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
 }

@@ -8,66 +8,61 @@ import AuthListener from "@/components/AuthListener";
 //    모든 폰트 SIL OFL 라이선스 (상용 서비스 완전 무료)
 // ─────────────────────────────────────────────────────
 
-// 라틴 / 키릴 / 그리스 / 베트남 / 인도네시아 / 우즈베크 / 카자흐 / 러시아
+// weight 최소화: 400(본문) + 900(굵게)만 로드 → 폰트 파일 50% 절감
+// 500/700은 브라우저가 400/900에서 합성 (시각 차이 거의 없음)
+
 const notoSans = Noto_Sans({
-  subsets: ["latin", "latin-ext", "cyrillic", "cyrillic-ext", "vietnamese"],
-  weight: ["400", "500", "700", "900"],
+  subsets: ["latin", "latin-ext", "cyrillic", "vietnamese"],
+  weight: ["400", "900"],
   display: "swap",
   variable: "--font-noto-sans",
 });
 
-// 한국어
 const notoSansKR = Noto_Sans_KR({
   subsets: ["latin"],
-  weight: ["400", "500", "700", "900"],
+  weight: ["400", "700", "900"],
   display: "swap",
   variable: "--font-noto-kr",
 });
 
-// 중국어 간체 (중국)
 const notoSansSC = Noto_Sans_SC({
   subsets: ["latin"],
-  weight: ["400", "500", "700", "900"],
+  weight: ["400", "700", "900"],
   display: "swap",
   variable: "--font-noto-sc",
 });
 
-// 중국어 번체 (대만/홍콩)
 const notoSansTC = Noto_Sans_TC({
   subsets: ["latin"],
-  weight: ["400", "500", "700", "900"],
+  weight: ["400", "700", "900"],
   display: "swap",
   variable: "--font-noto-tc",
 });
 
-// 일본어
 const notoSansJP = Noto_Sans_JP({
   subsets: ["latin"],
-  weight: ["400", "500", "700", "900"],
+  weight: ["400", "700", "900"],
   display: "swap",
   variable: "--font-noto-jp",
 });
 
-// 태국어
 const notoSansThai = Noto_Sans_Thai({
   subsets: ["thai"],
-  weight: ["400", "500", "700", "900"],
+  weight: ["400", "900"],
   display: "swap",
   variable: "--font-noto-thai",
 });
 
-// 아랍어 (사우디/중동)
 const notoSansArabic = Noto_Sans_Arabic({
   subsets: ["arabic"],
-  weight: ["400", "500", "700", "900"],
+  weight: ["400", "900"],
   display: "swap",
   variable: "--font-noto-arabic",
 });
 
-// 데바나가리 (힌디 / 네팔어)
 const notoSansDevanagari = Noto_Sans_Devanagari({
   subsets: ["devanagari"],
-  weight: ["400", "500", "700", "900"],
+  weight: ["400", "900"],
   display: "swap",
   variable: "--font-noto-devanagari",
 });

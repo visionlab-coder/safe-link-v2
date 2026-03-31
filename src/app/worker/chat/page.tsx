@@ -70,6 +70,9 @@ function WorkerChatContent() {
     const [isSending, setIsSending] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const processedAudioIds = useRef<Set<string>>(new Set());
+    const MSG_PAGE_SIZE = 50;
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingOlder, setLoadingOlder] = useState(false);
 
     const [myId, setMyId] = useState("");
     const onlineUsers = usePresence(myId || null);
@@ -115,12 +118,18 @@ function WorkerChatContent() {
         if (!session) return;
         setMyId(session.user.id);
 
-        const { data: profile } = await supabase.from("profiles").select("preferred_lang, site_id").eq("id", session.user.id).single();
+        // 프로필 + 관리자 목록 병렬 조회 (워터폴 제거)
+        const [profileRes, adminListRes] = await Promise.all([
+            supabase.from("profiles").select("preferred_lang, site_id").eq("id", session.user.id).single(),
+            supabase.from("profiles").select("id, display_name, role, site_id").not("role", "ilike", "worker").not("role", "eq", "ROOT"),
+        ]);
+
+        const profile = profileRes.data;
         if (profile?.site_id) setSiteId(profile.site_id);
 
         let finalLang = profile?.preferred_lang || "ko";
         if (urlLang && urlLang !== profile?.preferred_lang) {
-            await supabase.from("profiles").update({ preferred_lang: urlLang }).eq("id", session.user.id);
+            supabase.from("profiles").update({ preferred_lang: urlLang }).eq("id", session.user.id);
             finalLang = urlLang;
         }
         setLang(finalLang);
@@ -134,26 +143,17 @@ function WorkerChatContent() {
             currentFriends.add(addFriendId);
             localStorage.setItem(`wrk_friends_${session.user.id}`, JSON.stringify(Array.from(currentFriends)));
             alert(getUI(finalLang).friendAdded);
-            // Remove param from URL without reload
             window.history.replaceState({}, '', window.location.pathname + (urlLang ? `?lang=${urlLang}` : ''));
         }
         setFriendIds(currentFriends);
 
-        const { data: adminList } = await supabase
-            .from("profiles")
-            .select("id, display_name, role, site_id")
-            .not("role", "ilike", "worker")
-            .not("role", "eq", "ROOT"); // ROOT 제외
-
-        if (adminList) {
-            const prioritized = adminList.sort((a, b) => {
+        if (adminListRes.data) {
+            const prioritized = [...adminListRes.data].sort((a, b) => {
                 const isFriendA = currentFriends.has(a.id) ? 0 : 1;
                 const isFriendB = currentFriends.has(b.id) ? 0 : 1;
                 return isFriendA - isFriendB;
             });
             setAdmins(prioritized);
-
-            // Auto-select removed - User must select an admin from the list first
         }
     }, [urlLang, addFriendId]);
 
@@ -176,21 +176,20 @@ function WorkerChatContent() {
                 .from("messages")
                 .select("*")
                 .or(`and(from_user.eq.${myId},to_user.eq.${activeAdmin.id}),and(from_user.eq.${activeAdmin.id},to_user.eq.${myId})`)
-                .order("created_at", { ascending: true });
-            if (data) {
-                setMessages(data);
-                // Mark existing messages as processed so they don't play on reload
-                data.forEach(m => processedAudioIds.current.add(m.id));
+                .order("created_at", { ascending: false })
+                .limit(MSG_PAGE_SIZE);
+            const sorted = data ? [...data].reverse() : [];
+            setMessages(sorted);
+            setHasMore((data?.length ?? 0) >= MSG_PAGE_SIZE);
+            sorted.forEach(m => processedAudioIds.current.add(m.id));
 
-                // Mark as read (is_read 컬럼이 없어도 에러 무시)
-                supabase
-                    .from("messages")
-                    .update({ is_read: true })
-                    .eq("from_user", activeAdmin.id)
-                    .eq("to_user", myId)
-                    .eq("is_read", false)
-                    .then(() => {});
-            }
+            supabase
+                .from("messages")
+                .update({ is_read: true })
+                .eq("from_user", activeAdmin.id)
+                .eq("to_user", myId)
+                .eq("is_read", false)
+                .then(() => {});
             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 200);
         };
         fetchMessages();
@@ -227,7 +226,7 @@ function WorkerChatContent() {
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, [myId, activeAdmin, lang]);
+    }, [myId, activeAdmin]); // lang 제거: 언어 변경 시 채널 재생성 불필요
 
     // 🆕 Global Message Monitor (For Unread Notifications)
     useEffect(() => {
@@ -439,6 +438,25 @@ function WorkerChatContent() {
                         {activeAdmin ? (
                             <>
                                 <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col gap-6" style={{ backgroundImage: 'radial-gradient(circle at center, #cbd5e1 1px, transparent 1px)', backgroundSize: '32px 32px' }}>
+                                    {hasMore && (
+                                        <button disabled={loadingOlder} onClick={async () => {
+                                            if (loadingOlder || messages.length === 0 || !activeAdmin) return;
+                                            setLoadingOlder(true);
+                                            try {
+                                                const supabase = createClient();
+                                                const oldest = messages[0];
+                                                const { data } = await supabase.from("messages").select("*")
+                                                    .or(`and(from_user.eq.${myId},to_user.eq.${activeAdmin.id}),and(from_user.eq.${activeAdmin.id},to_user.eq.${myId})`)
+                                                    .lt("created_at", oldest.created_at).order("created_at", { ascending: false }).limit(MSG_PAGE_SIZE);
+                                                if (data && data.length > 0) setMessages(prev => [...[...data].reverse(), ...prev]);
+                                                setHasMore((data?.length ?? 0) >= MSG_PAGE_SIZE);
+                                            } finally {
+                                                setLoadingOlder(false);
+                                            }
+                                        }} className="self-center px-4 py-2 text-xs font-black text-slate-400 hover:text-slate-600 bg-white/80 rounded-full border border-slate-200 tap-effect uppercase tracking-widest disabled:opacity-50">
+                                            {loadingOlder ? '...' : lang === 'ko' ? '이전 메시지' : lang === 'zh' ? '更多消息' : lang === 'vi' ? 'Tin nhắn cũ' : 'Older messages'}
+                                        </button>
+                                    )}
                                     <AnimatePresence initial={false}>
                                         {messages.map((m, i) => {
                                             const isMe = m.from_user === myId;

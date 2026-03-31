@@ -28,8 +28,10 @@ const isoMap: Record<string, string> = {
     ru: "ru", jp: "jp", fr: "fr", es: "es", ar: "sa", hi: "in",
 };
 
-// ── 번역 함수 (Gemini AI 기반) ──
+// ── 번역 함수 ──
 interface TransResult { text: string; pron: string; rev: string; }
+
+/** 단일 텍스트 번역 */
 const translateKo = async (text: string, targetLang: string): Promise<TransResult> => {
     if (targetLang === "ko") return { text, pron: "", rev: "" };
     try {
@@ -48,6 +50,73 @@ const translateKo = async (text: string, targetLang: string): Promise<TransResul
     } catch {
         return { text, pron: "", rev: "" };
     }
+};
+
+/** 긴 텍스트를 문장 그룹으로 분할 (각 그룹 ~200자) */
+const splitIntoChunks = (text: string): string[] => {
+    const sentences = text.split(/(?<=[.!?。！？\n])\s*/);
+    const chunks: string[] = [];
+    let current = "";
+    for (const s of sentences) {
+        if ((current + s).length > 200 && current.trim()) {
+            chunks.push(current.trim());
+            current = s;
+        } else {
+            current += (current ? " " : "") + s;
+        }
+    }
+    if (current.trim()) chunks.push(current.trim());
+    return chunks.length > 0 ? chunks : [text];
+};
+
+/**
+ * 문단별 병렬 번역 + 점진적 콜백
+ * 각 문단이 번역될 때마다 onProgress를 호출하여 즉시 화면에 표시
+ */
+const translateChunked = async (
+    text: string,
+    targetLang: string,
+    onProgress: (partial: TransResult) => void,
+): Promise<TransResult> => {
+    if (targetLang === "ko") return { text, pron: "", rev: "" };
+
+    const chunks = splitIntoChunks(text);
+
+    // 짧은 텍스트(1 청크)는 그냥 한 번에 번역
+    if (chunks.length <= 1) return translateKo(text, targetLang);
+
+    // 병렬 번역 시작 — 각 청크가 완료되면 즉시 콜백
+    const results: (TransResult | null)[] = new Array(chunks.length).fill(null);
+
+    const promises = chunks.map((chunk, idx) =>
+        translateKo(chunk, targetLang).then((result) => {
+            results[idx] = result;
+
+            // 지금까지 번역 완료된 부분을 합쳐서 콜백
+            const merged: TransResult = { text: "", pron: "", rev: "" };
+            for (let i = 0; i < results.length; i++) {
+                if (results[i]) {
+                    merged.text += (merged.text ? " " : "") + results[i]!.text;
+                    merged.pron += (merged.pron ? " " : "") + results[i]!.pron;
+                    merged.rev += (merged.rev ? " " : "") + results[i]!.rev;
+                }
+            }
+            onProgress(merged);
+        })
+    );
+
+    await Promise.all(promises);
+
+    // 최종 결과 합산
+    const final: TransResult = { text: "", pron: "", rev: "" };
+    for (const r of results) {
+        if (r) {
+            final.text += (final.text ? " " : "") + r.text;
+            final.pron += (final.pron ? " " : "") + r.pron;
+            final.rev += (final.rev ? " " : "") + r.rev;
+        }
+    }
+    return final;
 };
 
 // ── UI 텍스트 (다국어) ──
@@ -171,15 +240,27 @@ function WorkerTBMDetailContent() {
 
             if (tbmData.content_ko && lang !== "ko") {
                 setTranslating(true);
-                const result = await translateKo(tbmData.content_ko, lang);
 
-                // API가 한글 발음을 반환 (서버에서 hangulize 처리됨)
-                // fallback: API 발음이 비어있으면 클라이언트에서 생성
+                const result = await translateChunked(
+                    tbmData.content_ko,
+                    lang,
+                    // 점진적 콜백: 번역이 하나씩 완료될 때마다 화면 갱신
+                    (partial) => {
+                        const cleaned = {
+                            ...partial,
+                            text: cleanupText(partial.text),
+                        };
+                        if (!cleaned.pron || cleaned.pron.trim() === "") {
+                            cleaned.pron = hangulize(cleaned.text, lang);
+                        }
+                        setTransData(cleaned);
+                    }
+                );
+
+                // 최종 결과 반영
                 if (!result.pron || result.pron.trim() === "") {
                     result.pron = hangulize(result.text, lang);
                 }
-
-                // 본문 클리닝 (발음은 정리하지 않음 — 한글이 깨질 수 있음)
                 result.text = cleanupText(result.text);
 
                 setTransData(result);

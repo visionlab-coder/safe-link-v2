@@ -60,18 +60,28 @@ export function clearGlossaryCache() {
  * 로컬 상수 사전 기반 은어 → 표준어 변환 (최장 일치 우선)
  */
 export function normalizeKo(text: string, dict: Record<string, string> = CONSTRUCTION_GLOSSARY): NormalizeResult {
-    let result = text;
     const changes: { from: string; to: string }[] = [];
 
     // 긴 표현(구절)부터 먼저 치환 (최장 일치)
     const sorted = Object.entries(dict)
         .sort((a, b) => b[0].length - a[0].length);
 
+    // 플레이스홀더 기반 치환: 치환된 영역이 재치환되지 않도록 보호
+    const placeholders: string[] = [];
+    let result = text;
+
     for (const [slang, standard] of sorted) {
         if (result.includes(slang)) {
             changes.push({ from: slang, to: standard });
-            result = result.split(slang).join(standard);
+            const ph = `\x00${placeholders.length}\x00`;
+            placeholders.push(standard);
+            result = result.split(slang).join(ph);
         }
+    }
+
+    // 플레이스홀더를 실제 표준어로 복원
+    for (let i = 0; i < placeholders.length; i++) {
+        result = result.split(`\x00${i}\x00`).join(placeholders[i]);
     }
 
     return { original: text, normalized: result, changes };
@@ -90,9 +100,11 @@ import { formalizeKo } from "./politeness";
 export async function normalizeKoAsync(text: string): Promise<NormalizeResult> {
     const dict = await fetchGlossaryFromDB();
     const normalizedData = normalizeKo(text, dict);
-    // 문장을 존댓말 지침에 맞게 변환
-    normalizedData.normalized = formalizeKo(normalizedData.normalized);
-    return normalizedData;
+    // 문장을 존댓말 지침에 맞게 변환 (불변성 유지)
+    return {
+        ...normalizedData,
+        normalized: formalizeKo(normalizedData.normalized),
+    };
 }
 
 /**

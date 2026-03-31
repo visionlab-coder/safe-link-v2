@@ -1,9 +1,20 @@
 import { createBrowserClient } from '@supabase/ssr'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+// 싱글턴: 매번 재생성하지 않고 동일 인스턴스 재사용
+// → 27곳에서 호출해도 커넥션 1개, realtime 채널 공유
+let _client: SupabaseClient | null = null;
 
 export function createClient() {
-    // 빌드 타임(환경 변수가 없을 때)에 크래시가 나지 않도록 방어합니다.
-    const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co').trim();
-    const key = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder').trim();
+    if (_client) return _client;
 
-    return createBrowserClient(url, key);
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+
+    if (!url || !key) {
+        throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
+    }
+
+    _client = createBrowserClient(url, key);
+    return _client;
 }

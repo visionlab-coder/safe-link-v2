@@ -38,7 +38,12 @@ const ui: Record<string, any> = {
         signedRate: "서명 완료율",
         activeDispatch: "최근 발송 내용",
         registry: "근로자 명부",
-        members: "명"
+        members: "명",
+        historyTitle: "TBM 이력",
+        today: "오늘",
+        prev: "이전",
+        next: "다음",
+        noHistoryDate: "해당 날짜에 TBM이 없습니다.",
     },
     en: {
         title: "TBM Status",
@@ -55,7 +60,12 @@ const ui: Record<string, any> = {
         signedRate: "Signed Rate",
         activeDispatch: "Active Dispatch",
         registry: "Worker Registry",
-        members: "Members"
+        members: "Members",
+        historyTitle: "TBM History",
+        today: "Today",
+        prev: "Prev",
+        next: "Next",
+        noHistoryDate: "No TBM on this date.",
     },
     zh: {
         title: "TBM签名状态",
@@ -72,11 +82,20 @@ const ui: Record<string, any> = {
         signedRate: "签名率",
         activeDispatch: "当前发布",
         registry: "工人名单",
-        members: "人"
+        members: "人",
+        historyTitle: "TBM历史",
+        today: "今天",
+        prev: "上一天",
+        next: "下一天",
+        noHistoryDate: "该日期没有TBM。",
     },
 };
 
 const getUI = (lang: string) => ui[lang] || ui["en"];
+
+function toDateStr(d: Date): string {
+    return d.toISOString().split("T")[0];
+}
 
 function TBMStatusPageContent() {
     const router = useRouter();
@@ -87,6 +106,8 @@ function TBMStatusPageContent() {
     const [adminLang, setAdminLang] = useState("ko");
     const [selectedSignature, setSelectedSignature] = useState<string | null>(null);
     const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
+    const [selectedDate, setSelectedDate] = useState(toDateStr(new Date()));
+    const [tbmList, setTbmList] = useState<any[]>([]);
 
     const urlLang = searchParams.get("lang");
 
@@ -177,51 +198,120 @@ function TBMStatusPageContent() {
         const providerToken = (session as any)?.provider_token;
 
         if (mode === 'print') {
+            const tbmDate = new Date(latestTBM.created_at);
+            const dateStr = tbmDate.toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
+            const timeStr = tbmDate.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+            const signedWorkers = workers.filter(w => w.signed);
+            const unsignedWorkers = workers.filter(w => !w.signed);
+            const sRate = workers.length > 0 ? Math.round((signedWorkers.length / workers.length) * 100) : 0;
+
             const printContent = `
                 <html>
                 <head>
-                    <title>TBM 안전 보건 일지 - ${new Date().toLocaleDateString()}</title>
+                    <title>안전보건일지 (TBM) - ${dateStr}</title>
                     <style>
-                        body { font-family: 'Inter', sans-serif; padding: 40px; color: #1e293b; }
-                        h1 { color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
-                        .header { margin-bottom: 30px; }
-                        .briefing { background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 30px; border: 1px solid #e2e8f0; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
-                        th { background: #f1f5f9; font-weight: bold; }
-                        .signature-img { height: 40px; }
+                        @page { size: A4; margin: 15mm; }
+                        * { margin: 0; padding: 0; box-sizing: border-box; }
+                        body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; color: #111; font-size: 11pt; line-height: 1.6; }
+                        .doc-header { text-align: center; border-bottom: 3px double #333; padding-bottom: 12px; margin-bottom: 16px; }
+                        .doc-header h1 { font-size: 20pt; font-weight: 900; letter-spacing: 8px; margin-bottom: 4px; }
+                        .doc-header .subtitle { font-size: 9pt; color: #666; }
+                        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid #333; margin-bottom: 16px; }
+                        .info-cell { padding: 8px 12px; border: 1px solid #ccc; }
+                        .info-cell .label { font-size: 8pt; color: #666; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
+                        .info-cell .value { font-size: 11pt; font-weight: bold; margin-top: 2px; }
+                        .content-box { border: 2px solid #333; padding: 16px; margin-bottom: 16px; min-height: 120px; }
+                        .content-box h3 { font-size: 10pt; font-weight: 900; background: #333; color: #fff; display: inline-block; padding: 2px 12px; margin-bottom: 10px; letter-spacing: 3px; }
+                        .content-box p { font-size: 11pt; line-height: 1.8; white-space: pre-wrap; }
+                        .summary-bar { display: flex; justify-content: space-between; align-items: center; background: #f5f5f5; border: 1px solid #ddd; padding: 8px 16px; margin-bottom: 12px; font-size: 10pt; }
+                        .summary-bar .rate { font-size: 14pt; font-weight: 900; }
+                        table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+                        th, td { border: 1px solid #999; padding: 6px 10px; text-align: center; font-size: 9pt; }
+                        th { background: #e8e8e8; font-weight: 900; font-size: 8pt; letter-spacing: 2px; }
+                        td.name { text-align: left; font-weight: bold; }
+                        .signature-img { height: 32px; max-width: 100px; }
+                        .unsigned { color: #c00; font-weight: bold; }
+                        .footer { margin-top: 30px; display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid #ccc; padding-top: 12px; }
+                        .footer .stamp-area { text-align: center; width: 140px; }
+                        .footer .stamp-area .line { border-bottom: 1px solid #333; height: 50px; margin-bottom: 4px; }
+                        .footer .stamp-area .label { font-size: 8pt; color: #666; }
+                        .footer .system { font-size: 7pt; color: #aaa; }
+                        @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
                     </style>
                 </head>
                 <body>
-                    <div class="header">
-                        <h1>Safe-Link TBM 안전 보건 일지</h1>
-                        <p><strong>현장명:</strong> ${escapeHtml(latestTBM.site_name || "현장 센터")}</p>
-                        <p><strong>일시:</strong> ${escapeHtml(new Date(latestTBM.created_at).toLocaleString())}</p>
+                    <div class="doc-header">
+                        <h1>안 전 보 건 일 지</h1>
+                        <div class="subtitle">Toolbox Meeting (TBM) Record — Safe-Link System</div>
                     </div>
-                    <div class="briefing">
-                        <h3>안전 지침 내용 (한국어)</h3>
+
+                    <div class="info-grid">
+                        <div class="info-cell">
+                            <div class="label">현장명</div>
+                            <div class="value">${escapeHtml(latestTBM.site_name || "현장")}</div>
+                        </div>
+                        <div class="info-cell">
+                            <div class="label">일시</div>
+                            <div class="value">${escapeHtml(dateStr)} ${escapeHtml(timeStr)}</div>
+                        </div>
+                        <div class="info-cell">
+                            <div class="label">참석 인원</div>
+                            <div class="value">${signedWorkers.length} / ${workers.length}명</div>
+                        </div>
+                        <div class="info-cell">
+                            <div class="label">서명 완료율</div>
+                            <div class="value">${sRate}%</div>
+                        </div>
+                    </div>
+
+                    <div class="content-box">
+                        <h3>안전 지시 사항</h3>
                         <p>${escapeHtml(latestTBM.content_ko)}</p>
                     </div>
+
+                    <div class="summary-bar">
+                        <span>서명 완료: <strong>${signedWorkers.length}명</strong> / 미서명: <strong class="unsigned">${unsignedWorkers.length}명</strong></span>
+                        <span class="rate">${sRate}%</span>
+                    </div>
+
                     <table>
                         <thead>
                             <tr>
-                                <th>근로자 성명</th>
-                                <th>설정 언어</th>
-                                <th>서명 시각</th>
-                                <th>서명 데이터</th>
+                                <th style="width:5%">NO</th>
+                                <th style="width:22%">성명</th>
+                                <th style="width:10%">언어</th>
+                                <th style="width:25%">서명 시각</th>
+                                <th style="width:20%">서명</th>
+                                <th style="width:18%">비고</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${workers.map(w => `
+                            ${workers.map((w, i) => `
                                 <tr>
-                                    <td>${escapeHtml(w.display_name)}</td>
+                                    <td>${i + 1}</td>
+                                    <td class="name">${escapeHtml(w.display_name)}</td>
                                     <td>${escapeHtml(w.preferred_lang.toUpperCase())}</td>
-                                    <td>${w.signed ? escapeHtml(new Date(w.signed_at!).toLocaleString()) : '미서명'}</td>
+                                    <td>${w.signed ? escapeHtml(new Date(w.signed_at!).toLocaleString("ko-KR")) : '<span class="unsigned">미서명</span>'}</td>
                                     <td>${w.signed && w.signature_data ? `<img src="${escapeHtml(w.signature_data)}" class="signature-img" />` : '-'}</td>
+                                    <td></td>
                                 </tr>
                             `).join('')}
                         </tbody>
                     </table>
+
+                    <div class="footer">
+                        <div class="system">Safe-Link V2 자동 생성 문서 | ${new Date().toLocaleString("ko-KR")}</div>
+                        <div style="display:flex;gap:24px;">
+                            <div class="stamp-area">
+                                <div class="line"></div>
+                                <div class="label">관리감독자</div>
+                            </div>
+                            <div class="stamp-area">
+                                <div class="line"></div>
+                                <div class="label">안전관리자</div>
+                            </div>
+                        </div>
+                    </div>
                 </body>
                 </html>
             `;
@@ -260,8 +350,9 @@ function TBMStatusPageContent() {
         }
     };
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (dateStr?: string) => {
         setLoading(true);
+        const targetDate = dateStr || selectedDate;
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
         let adminSiteId: string | null = null;
@@ -276,12 +367,23 @@ function TBMStatusPageContent() {
             setAdminLang(finalLang);
             adminSiteId = adminProfile?.site_id || null;
         }
-        // 본사 관리자(site_id 없음)는 전체, 현장 관리자는 자기 현장만
-        let tbmQuery = supabase.from("tbm_notices").select("*").order("created_at", { ascending: false }).limit(1);
+
+        // 선택한 날짜의 TBM 목록 조회
+        const dayStart = `${targetDate}T00:00:00+09:00`;
+        const dayEnd = `${targetDate}T23:59:59+09:00`;
+        let tbmQuery = supabase.from("tbm_notices").select("*")
+            .gte("created_at", dayStart)
+            .lte("created_at", dayEnd)
+            .order("created_at", { ascending: false });
         if (adminSiteId) tbmQuery = tbmQuery.eq("site_id", adminSiteId);
         const { data: tbmRows } = await tbmQuery;
-        const tbm = tbmRows?.[0] || null;
+        const allTbms = tbmRows || [];
+        setTbmList(allTbms);
+
+        // 가장 최근 TBM을 기본 선택
+        const tbm = allTbms[0] || null;
         setLatestTBM(tbm);
+
         let workerQuery = supabase.from("profiles").select("id, display_name, preferred_lang").eq("role", "WORKER");
         if (adminSiteId) workerQuery = workerQuery.eq("site_id", adminSiteId);
         const { data: workerProfiles } = await workerQuery;
@@ -303,7 +405,53 @@ function TBMStatusPageContent() {
         statusList.sort((a, b) => Number(a.signed) - Number(b.signed));
         setWorkers(statusList);
         setLoading(false);
-    }, [urlLang]);
+    }, [urlLang, selectedDate]);
+
+    /** 특정 TBM 선택 시 해당 서명 현황 로드 */
+    const selectTBM = useCallback(async (tbm: any) => {
+        setLatestTBM(tbm);
+        setLoading(true);
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        let adminSiteId: string | null = null;
+        if (session) {
+            const { data: p } = await supabase.from("profiles").select("site_id").eq("id", session.user.id).single();
+            adminSiteId = p?.site_id || null;
+        }
+        let workerQuery = supabase.from("profiles").select("id, display_name, preferred_lang").eq("role", "WORKER");
+        if (adminSiteId) workerQuery = workerQuery.eq("site_id", adminSiteId);
+        const { data: workerProfiles } = await workerQuery;
+        if (!workerProfiles) { setLoading(false); return; }
+        const { data: ackData } = await supabase.from("tbm_ack").select("worker_id, ack_at, signature_data").eq("tbm_id", tbm.id);
+        const ackMap = new Map((ackData || []).map(a => [a.worker_id, { at: a.ack_at, sig: a.signature_data }]));
+        const statusList: WorkerStatus[] = workerProfiles.map(w => ({
+            id: w.id,
+            display_name: w.display_name || "Anonymous",
+            preferred_lang: w.preferred_lang || "ko",
+            signed: ackMap.has(w.id),
+            signed_at: ackMap.get(w.id)?.at,
+            signature_data: ackMap.get(w.id)?.sig,
+        }));
+        statusList.sort((a, b) => Number(a.signed) - Number(b.signed));
+        setWorkers(statusList);
+        setLoading(false);
+    }, []);
+
+    const changeDate = useCallback((offset: number) => {
+        const d = new Date(selectedDate);
+        d.setDate(d.getDate() + offset);
+        // 미래 날짜 방지
+        if (d > new Date()) return;
+        const newDate = toDateStr(d);
+        setSelectedDate(newDate);
+        load(newDate);
+    }, [selectedDate, load]);
+
+    const goToday = useCallback(() => {
+        const today = toDateStr(new Date());
+        setSelectedDate(today);
+        load(today);
+    }, [load]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -342,7 +490,7 @@ function TBMStatusPageContent() {
                                 <button onClick={() => handleExport('drive')} className="w-full px-4 py-3 text-left text-[10px] font-black hover:bg-white/5 text-slate-300 transition-colors uppercase tracking-widest">☁️ 구글 드라이브 보관</button>
                             </div>
                         </div>
-                        <button onClick={load} className="glass px-5 py-2 rounded-full text-xs font-black text-slate-400 hover:text-white transition-all tap-effect uppercase tracking-widest">
+                        <button onClick={() => load()} className="glass px-5 py-2 rounded-full text-xs font-black text-slate-400 hover:text-white transition-all tap-effect uppercase tracking-widest">
                             {t.refreshBtn}
                         </button>
                     </div>
@@ -379,13 +527,66 @@ function TBMStatusPageContent() {
                         </section>
                     )}
 
+                    {/* 날짜 네비게이션 */}
+                    <div className="glass rounded-[32px] p-4 border-white/5 flex items-center justify-between">
+                        <button onClick={() => changeDate(-1)} className="px-4 py-2 rounded-2xl glass border-white/10 text-slate-400 hover:text-white text-xs font-black tap-effect">
+                            {t.prev}
+                        </button>
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="date"
+                                value={selectedDate}
+                                max={toDateStr(new Date())}
+                                onChange={(e) => { setSelectedDate(e.target.value); load(e.target.value); }}
+                                className="bg-transparent text-white font-black text-lg tracking-tight border-none outline-none text-center [color-scheme:dark]"
+                            />
+                            {selectedDate !== toDateStr(new Date()) && (
+                                <button onClick={goToday} className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-black tap-effect">
+                                    {t.today}
+                                </button>
+                            )}
+                        </div>
+                        <button
+                            onClick={() => changeDate(1)}
+                            disabled={selectedDate >= toDateStr(new Date())}
+                            className="px-4 py-2 rounded-2xl glass border-white/10 text-slate-400 hover:text-white text-xs font-black tap-effect disabled:opacity-20"
+                        >
+                            {t.next}
+                        </button>
+                    </div>
+
+                    {/* TBM 목록 (해당 날짜에 여러 건이 있을 수 있음) */}
+                    {tbmList.length > 1 && (
+                        <div className="flex flex-col gap-2">
+                            <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] px-4">{t.historyTitle} ({tbmList.length})</h3>
+                            <div className="flex gap-2 overflow-x-auto pb-2 px-1">
+                                {tbmList.map((tbm, idx) => (
+                                    <button
+                                        key={tbm.id}
+                                        onClick={() => selectTBM(tbm)}
+                                        className={`flex-shrink-0 px-4 py-3 rounded-2xl text-xs font-bold tap-effect transition-all ${latestTBM?.id === tbm.id ? "bg-blue-500/20 text-blue-400 border border-blue-500/30" : "glass border-white/5 text-slate-500 hover:text-white"}`}
+                                    >
+                                        <span className="font-black">#{idx + 1}</span>
+                                        <span className="ml-2">{new Date(tbm.created_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {tbmList.length === 0 && !loading && (
+                        <div className="glass rounded-[32px] p-8 border-white/5 text-center text-slate-600 font-bold italic">
+                            {t.noHistoryDate}
+                        </div>
+                    )}
+
                     {latestTBM && (
                         <div className="glass rounded-[32px] p-6 border-white/5 flex flex-col gap-3 group animate-float">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{t.activeDispatch}</h3>
                                 <span className="text-[10px] text-slate-700 font-bold">{new Date(latestTBM.created_at).toLocaleString()}</span>
                             </div>
-                            <p className="text-slate-400 font-bold leading-relaxed line-clamp-2 italic">&quot;{latestTBM.content_ko}&quot;</p>
+                            <p className="text-slate-400 font-bold leading-relaxed italic">&quot;{latestTBM.content_ko}&quot;</p>
                         </div>
                     )}
 

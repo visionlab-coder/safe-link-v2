@@ -98,8 +98,11 @@ function AdminChatContent() {
     const onlineUsers = usePresence(myId || null);
     const triedJitTranslate = useRef<Set<string>>(new Set());
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
-    const voiceGenderRef = useRef<'male' | 'female'>('female'); // Immediately updated
+    const voiceGenderRef = useRef<'male' | 'female'>('female');
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const MSG_PAGE_SIZE = 50;
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingOlder, setLoadingOlder] = useState(false);
 
     // Helper to change gender: updates ref immediately (no async delay) + state for UI
     const changeGender = (g: 'male' | 'female') => {
@@ -111,22 +114,22 @@ function AdminChatContent() {
     const load = useCallback(async () => {
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-            setMyId(session.user.id);
-            const { data: adminProfile } = await supabase.from("profiles").select("preferred_lang").eq("id", session.user.id).single();
-            let finalLang = adminProfile?.preferred_lang || "ko";
-            if (urlLang && urlLang !== adminProfile?.preferred_lang) {
-                await supabase.from("profiles").update({ preferred_lang: urlLang }).eq("id", session.user.id);
-                finalLang = urlLang;
-            }
-            setAdminLang(finalLang);
-        }
+        if (!session) return;
+        setMyId(session.user.id);
 
-        const { data } = await supabase.from("profiles")
-            .select("id, display_name, preferred_lang, role")
-            .eq("role", "WORKER")
-            .not("role", "eq", "ROOT"); // ROOT는 어떤 리스트에서도 제외
-        if (data) setWorkers(data);
+        // 프로필 조회 + 근로자 목록을 병렬 실행 (워터폴 제거)
+        const [profileRes, workersRes] = await Promise.all([
+            supabase.from("profiles").select("preferred_lang").eq("id", session.user.id).single(),
+            supabase.from("profiles").select("id, display_name, preferred_lang, role").eq("role", "WORKER").not("role", "eq", "ROOT"),
+        ]);
+
+        let finalLang = profileRes.data?.preferred_lang || "ko";
+        if (urlLang && urlLang !== profileRes.data?.preferred_lang) {
+            supabase.from("profiles").update({ preferred_lang: urlLang }).eq("id", session.user.id);
+            finalLang = urlLang;
+        }
+        setAdminLang(finalLang);
+        if (workersRes.data) setWorkers(workersRes.data);
 
         // 🆕 새로운 근로자 가입 시 사이드바 실시간 업데이트
         const profileSubscription = supabase
@@ -144,15 +147,18 @@ function AdminChatContent() {
     const fetchMessages = useCallback(async () => {
         if (!activeWorker || !myId) return;
         const supabase = createClient();
+        // 최신 50건만 로드 (ascending: false → 최신순 → reverse로 시간순 표시)
         const { data } = await supabase
             .from("messages")
             .select("*")
             .or(`and(from_user.eq.${myId},to_user.eq.${activeWorker.id}),and(from_user.eq.${activeWorker.id},to_user.eq.${myId})`)
-            .order("created_at", { ascending: true });
-        if (data) setMessages(data);
+            .order("created_at", { ascending: false })
+            .limit(MSG_PAGE_SIZE);
+        const sorted = data ? [...data].reverse() : [];
+        setMessages(sorted);
+        setHasMore((data?.length ?? 0) >= MSG_PAGE_SIZE);
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
 
-        // Mark as read (is_read 컬럼이 없어도 에러 무시)
         supabase
             .from("messages")
             .update({ is_read: true })
@@ -162,9 +168,34 @@ function AdminChatContent() {
             .then(() => {});
     }, [activeWorker, myId]);
 
+    const loadOlderMessages = useCallback(async () => {
+        if (loadingOlder || !activeWorker || !myId || messages.length === 0) return;
+        setLoadingOlder(true);
+        try {
+            const supabase = createClient();
+            const oldest = messages[0];
+            const { data } = await supabase
+                .from("messages")
+                .select("*")
+                .or(`and(from_user.eq.${myId},to_user.eq.${activeWorker.id}),and(from_user.eq.${activeWorker.id},to_user.eq.${myId})`)
+                .lt("created_at", oldest.created_at)
+                .order("created_at", { ascending: false })
+                .limit(MSG_PAGE_SIZE);
+            if (data && data.length > 0) {
+                const sorted = [...data].reverse();
+                setMessages(prev => [...sorted, ...prev]);
+            }
+            setHasMore((data?.length ?? 0) >= MSG_PAGE_SIZE);
+        } finally {
+            setLoadingOlder(false);
+        }
+    }, [loadingOlder, activeWorker, myId, messages]);
+
     const activeWorkerRef = useRef<WorkerProfile | null>(null);
     useEffect(() => {
         activeWorkerRef.current = activeWorker;
+        // 근로자 전환 시 JIT 번역 캐시 초기화 (메모리 누수 방지)
+        triedJitTranslate.current.clear();
         if (activeWorker) {
             setUnreadWorkers(prev => {
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -175,7 +206,7 @@ function AdminChatContent() {
         }
     }, [activeWorker, fetchMessages]);
 
-    // 🌍 실시간 미번역 메시지 처리 (근로자 측 번역 누락 대비 JIT 번역)
+    // 🌍 실시간 미번역 메시지 처리 (병렬 배치 JIT 번역)
     useEffect(() => {
         if (!myId) return;
         const translateUntranslated = async () => {
@@ -183,37 +214,55 @@ function AdminChatContent() {
                 if (m.from_user === myId) return false;
                 if (triedJitTranslate.current.has(m.id)) return false;
                 const parsed = parseMsg(m.translated_text);
-                // 번역이 없거나 원문과 같은 경우(미번역) 처리
                 return (!parsed.text || (parsed.text === m.source_text && m.source_lang !== 'ko'));
             });
 
             if (untranslated.length === 0) return;
 
-            for (const m of untranslated) {
+            // 먼저 전부 마킹하여 중복 실행 방지
+            const toTranslate = untranslated.filter(m => {
                 triedJitTranslate.current.add(m.id);
-                // source_lang이 없거나 이미 한국어면 번역 불필요
-                if (!m.source_lang || m.source_lang === 'ko') continue;
-                try {
-                    const res = await fetch('/api/translate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: m.source_text, sl: m.source_lang, tl: 'ko' })
-                    });
-                    if (res.ok) {
-                        const data = await res.json();
-                        const newJson = JSON.stringify({
-                            text: data.translated,
-                            pron: data.pronunciation,
-                            rev: data.reverse_translated
+                return m.source_lang && m.source_lang !== 'ko';
+            });
+
+            if (toTranslate.length === 0) return;
+
+            // 병렬 번역 (순차 루프 → Promise.all)
+            const results = await Promise.all(
+                toTranslate.map(async (m) => {
+                    try {
+                        const res = await fetch('/api/translate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ text: m.source_text, sl: m.source_lang, tl: 'ko' })
                         });
-                        setMessages(prev => prev.map(old => old.id === m.id ? { ...old, translated_text: newJson } : old));
-                        const supabase = createClient();
-                        await supabase.from("messages").update({ translated_text: newJson }).eq("id", m.id);
+                        if (!res.ok) return null;
+                        const data = await res.json();
+                        return {
+                            id: m.id,
+                            translated_text: JSON.stringify({
+                                text: data.translated,
+                                pron: data.pronunciation,
+                                rev: data.reverse_translated
+                            }),
+                        };
+                    } catch (e) {
+                        console.error("JIT Translation Error:", e);
+                        return null;
                     }
-                } catch (e) {
-                    console.error("JIT Translation Error:", e);
-                }
-            }
+                })
+            );
+
+            // 한 번에 상태 업데이트 (리렌더 1회)
+            const valid = results.filter(Boolean) as { id: string; translated_text: string }[];
+            if (valid.length === 0) return;
+
+            const updateMap = new Map(valid.map(r => [r.id, r.translated_text]));
+            setMessages(prev => prev.map(m => updateMap.has(m.id) ? { ...m, translated_text: updateMap.get(m.id)! } : m));
+
+            // DB 업데이트도 병렬
+            const supabase = createClient();
+            await Promise.all(valid.map(r => supabase.from("messages").update({ translated_text: r.translated_text }).eq("id", r.id)));
         };
         translateUntranslated();
     }, [messages, myId]);
@@ -556,6 +605,11 @@ function AdminChatContent() {
                     {/* Chat Area */}
                     <div className={`${!activeWorker ? 'hidden' : 'flex'} flex-col flex-1 bg-[#f8fafc] h-full relative`}>
                         <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col gap-6" style={{ backgroundImage: 'radial-gradient(circle at center, #e2e8f0 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
+                            {hasMore && (
+                                <button onClick={loadOlderMessages} disabled={loadingOlder} className="self-center px-4 py-2 text-xs font-black text-slate-400 hover:text-slate-600 bg-white/80 rounded-full border border-slate-200 tap-effect uppercase tracking-widest disabled:opacity-50">
+                                    {loadingOlder ? '...' : adminLang === 'ko' ? '이전 메시지 불러오기' : adminLang === 'zh' ? '加载更多消息' : 'Load older messages'}
+                                </button>
+                            )}
                             <AnimatePresence initial={false}>
                                 {messages.map((m, i) => {
                                     const isAdmin = m.from_user === myId;

@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
 import { Suspense } from "react";
-import { normalizeKoAsync } from "@/utils/normalize";
+import { normalizeKo, normalizeKoAsync } from "@/utils/normalize";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
 
 const adminUI: Record<string, any> = {
@@ -26,7 +26,9 @@ const adminUI: Record<string, any> = {
         historyTitle: "최근 발송 이력",
         noHistory: "발송 이력이 없습니다.",
         pushSuccess: "전파 완료",
-        back: "뒤로"
+        back: "뒤로",
+        previewNorm: "은어 자동 교정 미리보기",
+        recTime: "녹음 중"
     },
     en: {
         title: "SAFETY BROADCAST",
@@ -44,7 +46,9 @@ const adminUI: Record<string, any> = {
         historyTitle: "Recent History",
         noHistory: "No Broadcast History",
         pushSuccess: "Push Successful",
-        back: "Back"
+        back: "Back",
+        previewNorm: "Auto-correction Preview",
+        recTime: "Recording"
     },
     zh: {
         title: "安全简报发布",
@@ -62,7 +66,9 @@ const adminUI: Record<string, any> = {
         historyTitle: "最近发送历史",
         noHistory: "暂无发送历史",
         pushSuccess: "发布成功",
-        back: "返回"
+        back: "返回",
+        previewNorm: "自动校正预览",
+        recTime: "录音中"
     }
 };
 
@@ -112,7 +118,7 @@ function AdminTBMCreateContent() {
             .from("tbm_notices")
             .select("*")
             .order("created_at", { ascending: false })
-            .limit(5);
+            .limit(10);
         // 본사 관리자(site_id 없음)는 전체, 현장 관리자는 자기 현장만
         if (adminSiteId) query = query.eq("site_id", adminSiteId);
         const { data } = await query;
@@ -151,17 +157,65 @@ function AdminTBMCreateContent() {
     };
 
 
+    // ── 정규화 미리보기 (디바운스) ──
+    const [previewChanges, setPreviewChanges] = useState<{ from: string; to: string }[]>([]);
+    const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+        if (!tbmText.trim()) {
+            setPreviewChanges([]);
+            return;
+        }
+        previewTimerRef.current = setTimeout(() => {
+            const { changes } = normalizeKo(tbmText.trim());
+            setPreviewChanges(changes);
+        }, 500);
+        return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current); };
+    }, [tbmText]);
+
+    const [sttError, setSttError] = useState<string | null>(null);
+
     const handleTranscript = useCallback((text: string) => {
+        setSttError(null);
         setTbmText((prev) => {
             const base = prev.trim();
             return base ? base + " " + text : text;
         });
     }, []);
 
+    const handleSTTError = useCallback((type: string, message: string) => {
+        setSttError(message);
+        setTimeout(() => setSttError(null), 5000);
+    }, []);
+
     const { isRecording, toggle: toggleRecording } = useCloudSTT({
         lang: adminLang,
         onTranscript: handleTranscript,
+        onError: handleSTTError,
     });
+
+    // ── 녹음 경과 시간 (isRecording 선언 후) ──
+    const [recSeconds, setRecSeconds] = useState(0);
+    const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    useEffect(() => {
+        if (isRecording) {
+            setRecSeconds(0);
+            recTimerRef.current = setInterval(() => setRecSeconds(s => s + 1), 1000);
+        } else {
+            if (recTimerRef.current) clearInterval(recTimerRef.current);
+            recTimerRef.current = null;
+            setRecSeconds(0);
+        }
+        return () => { if (recTimerRef.current) clearInterval(recTimerRef.current); };
+    }, [isRecording]);
+
+    const formatRecTime = (sec: number) => {
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return `${m}:${s.toString().padStart(2, "0")}`;
+    };
 
     const handleSendTBM = async () => {
         if (!tbmText.trim()) return;
@@ -256,10 +310,25 @@ function AdminTBMCreateContent() {
                         <div className="glass rounded-[48px] p-8 border-white/10 shadow-3xl flex flex-col gap-6 relative min-h-[400px]">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">{t.koreanDraft}</h3>
-                                <button onClick={toggleRecording} className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all tap-effect ${isRecording ? "bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)]" : "glass border-white/10 text-slate-400 hover:text-white"}`}>
-                                    {isRecording ? t.listening : t.voiceInput}
+                                <button onClick={toggleRecording} className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all tap-effect relative ${isRecording ? "bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)]" : "glass border-white/10 text-slate-400 hover:text-white"}`}>
+                                    {isRecording && (
+                                        <span className="absolute inset-0 rounded-full bg-red-500/40 animate-ping" />
+                                    )}
+                                    <span className="relative flex items-center gap-2">
+                                        {isRecording ? (
+                                            <>
+                                                <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                                                {t.recTime} {formatRecTime(recSeconds)}
+                                            </>
+                                        ) : t.voiceInput}
+                                    </span>
                                 </button>
                             </div>
+                            {sttError && (
+                                <div className="px-4 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold animate-float">
+                                    {sttError}
+                                </div>
+                            )}
                             <textarea
                                 value={tbmText}
                                 onChange={(e) => setTbmText(e.target.value)}
@@ -267,8 +336,28 @@ function AdminTBMCreateContent() {
                                 className="flex-1 w-full bg-transparent text-2xl md:text-3xl font-bold text-white placeholder-slate-800 outline-none resize-none leading-snug tracking-tight"
                             />
 
+                            {/* 실시간 정규화 미리보기 (전송 전) */}
+                            {previewChanges.length > 0 && !normalizeResult && (
+                                <div className="p-4 glass rounded-[24px] border-blue-500/20 bg-blue-500/[0.03] animate-float">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">{t.previewNorm}</span>
+                                        <span className="text-[10px] text-slate-500 font-bold">{previewChanges.length} {t.changes}</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {previewChanges.map((c, i) => (
+                                            <div key={i} className="flex items-center gap-1.5 bg-white/5 px-3 py-1.5 rounded-full border border-white/5 text-xs font-bold">
+                                                <span className="text-red-400/70 line-through decoration-red-500/50">{c.from}</span>
+                                                <span className="text-slate-600">→</span>
+                                                <span className="text-green-400">{c.to}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 전송 후 정규화 결과 */}
                             {normalizeResult && (
-                                <div className="mt-4 p-5 glass rounded-[28px] border-amber-500/20 bg-amber-500/[0.03]">
+                                <div className="p-5 glass rounded-[28px] border-amber-500/20 bg-amber-500/[0.03]">
                                     <div className="flex justify-between items-center mb-3">
                                         <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">{t.normResult}</span>
                                         <span className="text-[10px] text-slate-500 font-bold uppercase">{normalizeResult.changes.length} {t.changes}</span>
