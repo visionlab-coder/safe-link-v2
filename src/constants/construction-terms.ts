@@ -51,10 +51,26 @@ const SPECIAL_TERMS = [
     "아차사고", "위험성평가", "근골격계",
 ];
 
+/** 현장 피드백 추가 장비/기계 용어 (2026-04) */
+const FIELD_FEEDBACK_TERMS = [
+    "CPB", "콘크리트 타설 붐", "씨피비",
+    "알폼", "유로폼", "거푸집 시스템",
+    "구루마", "손수레", "리어카",
+    "포클레인", "백호",
+    "바이브레이터", "바이브",
+    "스퀴즈 펌프", "피스톤 펌프",
+    "체인블록", "지브크레인", "유압잭",
+    "국물", "시멘트 페이스트",
+    "스터드", "인서트", "앙카", "앵커",
+    "쌍줄비계", "외줄비계", "안전발판",
+    "까라", "올려", "빼라", "정지",
+];
+
 export const CONSTRUCTION_SPEECH_HINTS = [
     ...SAFETY_TERMS,
     ...EQUIPMENT_TERMS,
     ...WORK_TERMS,
     ...TBM_TERMS,
     ...SPECIAL_TERMS,
+    ...FIELD_FEEDBACK_TERMS,
 ];

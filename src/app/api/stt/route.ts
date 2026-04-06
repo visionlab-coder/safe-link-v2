@@ -28,6 +28,61 @@ function normalizeServerSide(text: string): { normalized: string; changes: { fro
     return { normalized: result, changes };
 }
 
+/** Gemini 기반 건설 현장 문맥 보정 */
+async function correctWithLLM(transcript: string, apiKey: string): Promise<string> {
+    try {
+        const systemPrompt = `당신은 건설 현장 음성 인식 교정 전문가입니다.
+아래 텍스트는 건설 현장에서 STT(음성인식)로 변환된 결과입니다.
+건설 현장 문맥에 맞게 오인식된 단어를 교정해주세요.
+
+교정 규칙:
+1. 건설 장비/자재 오인식: CPD/CPVR→CPB, 아이폰→알폼(Al-Form), 씨피비→CPB
+2. 현장 은어의 문맥 보존: "국물"은 건설 현장에서 "시멘트 페이스트"를 의미
+3. 외국인 이름/팀명은 그대로 유지 (슈그아르, 압둘 등)
+4. 안전 용어 우선: 위험/경고 관련 단어가 애매하면 안전 관련으로 해석
+5. 숫자/층수 관련 오인식 교정: "식스"→"6", "일층"→"1층"
+6. 교정이 불필요하면 원문 그대로 반환
+
+반드시 교정된 텍스트만 반환하세요. 설명이나 따옴표 없이 텍스트만 출력하세요.`;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3000);
+
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
+                body: JSON.stringify({
+                    contents: [
+                        { role: 'user', parts: [{ text: `${systemPrompt}\n\nSTT 원문: ${transcript}` }] }
+                    ],
+                    generationConfig: {
+                        temperature: 0.1,
+                        maxOutputTokens: 512,
+                    },
+                }),
+            }
+        );
+
+        clearTimeout(timeout);
+
+        if (!response.ok) return transcript;
+
+        const data = await response.json() as {
+            candidates?: Array<{
+                content?: { parts?: Array<{ text?: string }> };
+            }>;
+        };
+        const corrected = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        return corrected || transcript;
+    } catch {
+        // LLM 실패 시 원문 그대로 반환 (graceful degradation)
+        return transcript;
+    }
+}
+
 /** 최소 confidence 임계값 — 이 미만은 오인식으로 간주하여 제거 */
 const MIN_CONFIDENCE = 0.6;
 
@@ -125,11 +180,18 @@ export async function POST(req: Request) {
             return NextResponse.json({ transcript: "" });
         }
 
-        // 한국어일 때 서버사이드 정규화 (은어→표준어)
+        // 한국어일 때: 1) LLM 문맥 보정 → 2) 은어→표준어 정규화
         if (languageCode.startsWith("ko")) {
-            const { normalized, changes } = normalizeServerSide(transcript.trim());
+            // 1단계: LLM 문맥 보정 (Gemini)
+            const corrected = await correctWithLLM(transcript.trim(), GOOGLE_API_KEY);
+            const llmCorrected = corrected !== transcript.trim();
+
+            // 2단계: 은어→표준어 정규화
+            const { normalized, changes } = normalizeServerSide(corrected);
+
             return NextResponse.json({
                 transcript: normalized,
+                ...(llmCorrected && { llm_corrected: true, raw_stt: transcript.trim() }),
                 ...(changes.length > 0 && { normalized: true, changes }),
             });
         }

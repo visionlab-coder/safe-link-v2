@@ -398,6 +398,62 @@ function AdminDashboardContent() {
                         </div>
                     </motion.section>
 
+                    {/* 🎙️ Live Interpreter Card */}
+                    <motion.section
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.35 }}
+                        onClick={() => router.push('/admin/live')}
+                        className="glass rounded-[48px] p-10 border-white/10 hover:border-indigo-500/30 transition-all cursor-pointer tap-effect group shadow-2xl relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/5 blur-[120px] rounded-full -mr-48 -mt-48 transition-all group-hover:bg-indigo-500/10" />
+                        <div className="flex flex-col gap-4 relative md:h-full">
+                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-indigo-400 mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                                </svg>
+                            </div>
+                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">Live Interpreter</h3>
+                            <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
+                                {lang === "ko" ? "실시간 동시통역. 말하면 근로자 폰에서 자동 번역 재생." : lang === "zh" ? "实时同声传译。发言后自动翻译播放。" : "Real-time interpretation. Speak and workers hear it translated."}
+                            </p>
+                            <div className="mt-4 flex items-center gap-2 text-indigo-400 font-black tracking-widest text-sm uppercase">
+                                <span>Start Broadcast</span>
+                                <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
+                            </div>
+                        </div>
+                    </motion.section>
+
+                    {/* 🧠 Safety Quiz Card */}
+                    <motion.section
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.35 }}
+                        onClick={() => router.push('/admin/quiz')}
+                        className="glass rounded-[48px] p-10 border-white/10 hover:border-pink-500/30 transition-all cursor-pointer tap-effect group shadow-2xl relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 left-0 w-96 h-96 bg-pink-500/5 blur-[120px] rounded-full -ml-48 -mt-48 transition-all group-hover:bg-pink-500/10" />
+                        <div className="flex flex-col gap-4 relative md:h-full">
+                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-pink-400 mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+                                </svg>
+                            </div>
+                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">Safety Quiz</h3>
+                            <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
+                                {lang === "ko" ? "실시간 안전 퀴즈. 근로자 이해도를 즉시 확인." : lang === "zh" ? "实时安全测验。即时确认工人理解度。" : "Live safety quiz. Check worker comprehension instantly."}
+                            </p>
+                            <div className="mt-4 flex items-center gap-2 text-pink-400 font-black tracking-widest text-sm uppercase">
+                                <span>Create Quiz</span>
+                                <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
+                            </div>
+                        </div>
+                    </motion.section>
+
                     {/* 📱 QR Center Card */}
                     <motion.section
                         initial={{ opacity: 0, y: 20 }}

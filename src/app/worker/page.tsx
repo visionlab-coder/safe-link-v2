@@ -23,6 +23,19 @@ const workerUI: Record<string, any> = {
         status: "작업 준비 상태",
         newChat: "🚨 관리자가 대화를 요청했습니다!",
         openChat: "대화방 입장",
+        stopWork: "작업 중지",
+        stopWorkDesc: "위험을 느끼면 즉시 누르세요",
+        stopWorkFamily: "당신의 생명과 가족이 가장 소중합니다",
+        stopWorkConfirm: "작업중지 요청이 전송되었습니다",
+        stopWorkCancel: "취소",
+        stopWorkSend: "작업중지 요청 전송",
+        stopWorkReason: "위험 상황을 간단히 설명해주세요",
+        visionTitle: "AI 위험 감지",
+        visionDesc: "사진으로 현장 위험을 AI가 분석합니다",
+        quizTitle: "안전 퀴즈",
+        quizDesc: "안전 교육 퀴즈에 참여하세요",
+        liveTitle: "실시간 통역",
+        liveDesc: "관리자의 말을 실시간으로 통역합니다",
     },
     en: {
         greeting: (name: string) => `Welcome, ${name}`,
@@ -38,6 +51,19 @@ const workerUI: Record<string, any> = {
         status: "Status",
         newChat: "🚨 Admin requested a chat!",
         openChat: "Enter Chat",
+        stopWork: "STOP WORK",
+        stopWorkDesc: "Press immediately if you sense danger",
+        stopWorkFamily: "Your life and your family matter most",
+        stopWorkConfirm: "Stop work request has been sent",
+        stopWorkCancel: "Cancel",
+        stopWorkSend: "Send Stop Work Request",
+        stopWorkReason: "Briefly describe the danger",
+        visionTitle: "AI HAZARD SCAN",
+        visionDesc: "AI analyzes site hazards from photos",
+        quizTitle: "SAFETY QUIZ",
+        quizDesc: "Take the safety training quiz",
+        liveTitle: "LIVE INTERPRETER",
+        liveDesc: "Real-time interpretation of admin speech",
     },
     zh: {
         greeting: (name: string) => `您好, ${name}`,
@@ -53,6 +79,19 @@ const workerUI: Record<string, any> = {
         status: "状态",
         newChat: "🚨 管理员请求与您对话！",
         openChat: "进入聊天",
+        stopWork: "停止作业",
+        stopWorkDesc: "如果感到危险，请立即按下",
+        stopWorkFamily: "您的生命和家人最重要",
+        stopWorkConfirm: "停工请求已发送",
+        stopWorkCancel: "取消",
+        stopWorkSend: "发送停工请求",
+        stopWorkReason: "请简要描述危险情况",
+        visionTitle: "AI危险检测",
+        visionDesc: "AI通过照片分析现场危险",
+        quizTitle: "安全测验",
+        quizDesc: "参加安全培训测验",
+        liveTitle: "实时翻译",
+        liveDesc: "实时翻译管理员讲话",
     },
     vi: {
         greeting: (name: string) => `Chào mừng, ${name}`,
@@ -68,6 +107,19 @@ const workerUI: Record<string, any> = {
         status: "Trạng thái",
         newChat: "🚨 Quản trị viên muốn trò chuyện!",
         openChat: "Vào trò chuyện",
+        stopWork: "DỪNG CÔNG VIỆC",
+        stopWorkDesc: "Nhấn ngay nếu bạn cảm thấy nguy hiểm",
+        stopWorkFamily: "Cuộc sống và gia đình bạn là quan trọng nhất",
+        stopWorkConfirm: "Yêu cầu dừng công việc đã được gửi",
+        stopWorkCancel: "Hủy",
+        stopWorkSend: "Gửi yêu cầu dừng việc",
+        stopWorkReason: "Mô tả ngắn gọn tình huống nguy hiểm",
+        visionTitle: "AI PHÁT HIỆN",
+        visionDesc: "AI phân tích nguy hiểm qua ảnh",
+        quizTitle: "BÀI KIỂM TRA",
+        quizDesc: "Tham gia bài kiểm tra an toàn",
+        liveTitle: "PHIÊN DỊCH",
+        liveDesc: "Phiên dịch trực tiếp lời quản trị viên",
     },
     th: {
         greeting: (name: string) => `ยินดีต้อนรับ, ${name}`,
@@ -83,6 +135,19 @@ const workerUI: Record<string, any> = {
         status: "สถานะ",
         newChat: "🚨 ผู้ดูแลระบบขอแชท!",
         openChat: "เข้าสู่แชท",
+        stopWork: "หยุดงาน",
+        stopWorkDesc: "กดทันทีหากคุณรู้สึกอันตราย",
+        stopWorkFamily: "ชีวิตและครอบครัวของคุณสำคัญที่สุด",
+        stopWorkConfirm: "ส่งคำขอหยุดงานแล้ว",
+        stopWorkCancel: "ยกเลิก",
+        stopWorkSend: "ส่งคำขอหยุดงาน",
+        stopWorkReason: "อธิบายสถานการณ์อันตรายสั้นๆ",
+        visionTitle: "AI ตรวจจับ",
+        visionDesc: "AI วิเคราะห์อันตรายจากภาพ",
+        quizTitle: "แบบทดสอบ",
+        quizDesc: "ทำแบบทดสอบความปลอดภัย",
+        liveTitle: "ล่ามสด",
+        liveDesc: "แปลคำพูดผู้ดูแลแบบเรียลไทม์",
     },
     uz: {
         greeting: (name: string) => `Xush kelibsiz, ${name}`,
@@ -98,6 +163,19 @@ const workerUI: Record<string, any> = {
         status: "Holat",
         newChat: "🚨 Admin chat so'radi!",
         openChat: "Chatga kirish",
+        stopWork: "ISHNI TO'XTATISH",
+        stopWorkDesc: "Xavf sezsangiz darhol bosing",
+        stopWorkFamily: "Hayotingiz va oilangiz eng muhim",
+        stopWorkConfirm: "Ishni to'xtatish so'rovi yuborildi",
+        stopWorkCancel: "Bekor qilish",
+        stopWorkSend: "To'xtatish so'rovini yuborish",
+        stopWorkReason: "Xavfli vaziyatni qisqacha tushuntiring",
+        visionTitle: "AI XAVF",
+        visionDesc: "AI suratlar orqali xavfni tahlil qiladi",
+        quizTitle: "XAVFSIZLIK TESTI",
+        quizDesc: "Xavfsizlik testida qatnashing",
+        liveTitle: "JONLI TARJIMA",
+        liveDesc: "Admin nutqini jonli tarjima",
     },
     ph: {
         greeting: (name: string) => `Maligayang pagdating, ${name}`,
@@ -113,6 +191,19 @@ const workerUI: Record<string, any> = {
         status: "Katayuan",
         newChat: "🚨 Humiling ng chat ang Admin!",
         openChat: "Pumasok sa Chat",
+        stopWork: "ITIGIL ANG TRABAHO",
+        stopWorkDesc: "Pindutin agad kung nakakaramdam ng panganib",
+        stopWorkFamily: "Ang iyong buhay at pamilya ang pinakamahalaga",
+        stopWorkConfirm: "Naipadala na ang kahilingan",
+        stopWorkCancel: "Kanselahin",
+        stopWorkSend: "Ipadala ang kahilingan",
+        stopWorkReason: "Maikling ilarawan ang panganib",
+        visionTitle: "AI HAZARD",
+        visionDesc: "AI ang nag-aanalisa ng panganib",
+        quizTitle: "SAFETY QUIZ",
+        quizDesc: "Sumali sa safety quiz",
+        liveTitle: "LIVE INTERPRETER",
+        liveDesc: "Real-time na pagsasalin",
     },
     ru: {
         greeting: (name: string) => `Добро пожаловать, ${name}`,
@@ -128,6 +219,19 @@ const workerUI: Record<string, any> = {
         status: "Статус",
         newChat: "🚨 Админ запрашивает чат!",
         openChat: "Войти в чат",
+        stopWork: "ОСТАНОВИТЬ РАБОТУ",
+        stopWorkDesc: "Нажмите немедленно при угрозе",
+        stopWorkFamily: "Ваша жизнь и семья — самое важное",
+        stopWorkConfirm: "Запрос на остановку отправлен",
+        stopWorkCancel: "Отмена",
+        stopWorkSend: "Отправить запрос",
+        stopWorkReason: "Кратко опишите опасность",
+        visionTitle: "AI АНАЛИЗ",
+        visionDesc: "AI анализирует опасности по фото",
+        quizTitle: "ТЕСТ",
+        quizDesc: "Пройдите тест по безопасности",
+        liveTitle: "СИНХРОННЫЙ ПЕРЕВОД",
+        liveDesc: "Перевод речи в реальном времени",
     },
     jp: {
         greeting: (name: string) => `ようこそ、${name}さん`,
@@ -143,6 +247,19 @@ const workerUI: Record<string, any> = {
         status: "ステータス",
         newChat: "🚨 管理者がチャットをリクエストしました！",
         openChat: "チャットに入る",
+        stopWork: "作業停止",
+        stopWorkDesc: "危険を感じたら直ちに押してください",
+        stopWorkFamily: "あなたの命と家族が最も大切です",
+        stopWorkConfirm: "作業停止リクエストが送信されました",
+        stopWorkCancel: "キャンセル",
+        stopWorkSend: "作業停止リクエスト送信",
+        stopWorkReason: "危険な状況を簡単に説明してください",
+        visionTitle: "AI危険検知",
+        visionDesc: "AIが写真から現場の危険を分析します",
+        quizTitle: "安全クイズ",
+        quizDesc: "安全教育クイズに参加",
+        liveTitle: "同時通訳",
+        liveDesc: "管理者の発言をリアルタイム通訳",
     },
 };
 const getUI = (lang: string) => workerUI[lang] || workerUI["en"];
@@ -164,6 +281,9 @@ function WorkerHomeContent() {
     const [newChatCount, setNewChatCount] = useState(0);
     const [newChatTime, setNewChatTime] = useState<string>("");
 
+    const [showStopWorkModal, setShowStopWorkModal] = useState(false);
+    const [stopWorkReason, setStopWorkReason] = useState("");
+    const [stopWorkSent, setStopWorkSent] = useState(false);
 
     const urlLang = searchParams.get("lang");
 
@@ -184,6 +304,29 @@ function WorkerHomeContent() {
             osc.start(ctx.currentTime);
             osc.stop(ctx.currentTime + 0.5);
         } catch { }
+    };
+
+    const handleStopWork = async () => {
+        if (!profile) return;
+        try {
+            const supabase = createClient();
+            await supabase.from("stop_work_alerts").insert({
+                worker_id: profile.id,
+                worker_name: profile.display_name,
+                site_id: profile.site_id,
+                reason: stopWorkReason || "Emergency stop - no reason provided",
+                lang: lang,
+            });
+            setStopWorkSent(true);
+            setStopWorkReason("");
+            triggerAlert();
+            setTimeout(() => {
+                setShowStopWorkModal(false);
+                setStopWorkSent(false);
+            }, 3000);
+        } catch (error) {
+            console.error("[StopWork] Failed:", error);
+        }
     };
 
     useEffect(() => {
@@ -301,6 +444,75 @@ function WorkerHomeContent() {
                     </div>
                 </header>
 
+                {/* 🛑 작업중지권 (Stop Work Authority) — 긴급 버튼 */}
+                <section className="relative">
+                    <button
+                        onClick={() => setShowStopWorkModal(true)}
+                        className="w-full py-6 bg-gradient-to-r from-red-700 via-red-600 to-red-700 rounded-[32px] border-2 border-red-400/50 shadow-[0_0_40px_-10px_rgba(239,68,68,0.6)] flex items-center justify-center gap-4 tap-effect hover:scale-[1.02] transition-all active:scale-95"
+                    >
+                        <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
+                            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                            </svg>
+                        </div>
+                        <div className="flex flex-col items-start">
+                            <span className="text-white text-xl font-black tracking-tight uppercase">{t.stopWork}</span>
+                            <span className="text-red-200/80 text-xs font-bold">{t.stopWorkDesc}</span>
+                        </div>
+                    </button>
+                    <p className="text-center text-red-300/40 text-[11px] font-bold mt-2 tracking-wide italic">{t.stopWorkFamily}</p>
+                </section>
+
+                {/* 🛑 작업중지 모달 */}
+                {showStopWorkModal && (
+                    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-fadeIn">
+                        <div className="bg-slate-900 rounded-[40px] p-8 w-full max-w-md border-2 border-red-500/50 shadow-[0_0_80px_-20px_rgba(239,68,68,0.5)] flex flex-col gap-6">
+                            {stopWorkSent ? (
+                                <div className="flex flex-col items-center gap-4 py-8">
+                                    <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center">
+                                        <svg className="w-12 h-12 text-green-400" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                        </svg>
+                                    </div>
+                                    <p className="text-green-400 text-xl font-black text-center">{t.stopWorkConfirm}</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-14 h-14 bg-red-500/20 rounded-2xl flex items-center justify-center">
+                                            <svg className="w-9 h-9 text-red-400" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                                            </svg>
+                                        </div>
+                                        <h3 className="text-2xl font-black text-white">{t.stopWork}</h3>
+                                    </div>
+                                    <p className="text-slate-400 font-bold text-sm">{t.stopWorkFamily}</p>
+                                    <textarea
+                                        value={stopWorkReason}
+                                        onChange={(e) => setStopWorkReason(e.target.value)}
+                                        placeholder={t.stopWorkReason}
+                                        className="w-full h-24 bg-slate-800 border border-white/10 rounded-2xl p-4 text-white font-bold placeholder:text-slate-600 resize-none focus:outline-none focus:border-red-500/50"
+                                    />
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => setShowStopWorkModal(false)}
+                                            className="flex-1 py-4 bg-slate-800 text-slate-400 font-black rounded-2xl tap-effect"
+                                        >
+                                            {t.stopWorkCancel}
+                                        </button>
+                                        <button
+                                            onClick={handleStopWork}
+                                            className="flex-1 py-4 bg-red-600 text-white font-black rounded-2xl shadow-lg tap-effect hover:bg-red-500 transition-colors"
+                                        >
+                                            {t.stopWorkSend}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {/* 🚀 New Notification (High Impact) */}
                 {hasNewTBM && (
                     <div
@@ -383,6 +595,64 @@ function WorkerHomeContent() {
                     >
                         {t.tbmBtn.toUpperCase()}
                     </button>
+                </section>
+
+                {/* 📸 AI Vision Section */}
+                <section
+                    onClick={() => router.push('/worker/vision')}
+                    className="glass rounded-[40px] p-8 border-white/10 hover:border-purple-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
+                >
+                    <div className="absolute inset-0 bg-purple-500/5 group-hover:bg-purple-500/10 transition-colors" />
+                    <div className="flex items-center gap-6 relative">
+                        <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-purple-400 shadow-lg">
+                            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                            </svg>
+                        </div>
+                        <div className="flex flex-col">
+                            <h2 className="text-2xl font-black text-white">{t.visionTitle}</h2>
+                            <p className="text-slate-400 font-bold text-sm tracking-tight">{t.visionDesc}</p>
+                        </div>
+                    </div>
+                </section>
+
+                {/* 🧠 Safety Quiz Section */}
+                <section
+                    onClick={() => router.push('/worker/quiz')}
+                    className="glass rounded-[40px] p-8 border-white/10 hover:border-amber-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
+                >
+                    <div className="absolute inset-0 bg-amber-500/5 group-hover:bg-amber-500/10 transition-colors" />
+                    <div className="flex items-center gap-6 relative">
+                        <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-amber-400 shadow-lg">
+                            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+                            </svg>
+                        </div>
+                        <div className="flex flex-col">
+                            <h2 className="text-2xl font-black text-white">{t.quizTitle}</h2>
+                            <p className="text-slate-400 font-bold text-sm tracking-tight">{t.quizDesc}</p>
+                        </div>
+                    </div>
+                </section>
+
+                {/* 🎙️ Live Interpretation Section */}
+                <section
+                    onClick={() => router.push('/worker/live')}
+                    className="glass rounded-[40px] p-8 border-white/10 hover:border-green-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
+                >
+                    <div className="absolute inset-0 bg-green-500/5 group-hover:bg-green-500/10 transition-colors" />
+                    <div className="flex items-center gap-6 relative">
+                        <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-green-400 shadow-lg">
+                            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                            </svg>
+                        </div>
+                        <div className="flex flex-col">
+                            <h2 className="text-2xl font-black text-white">{t.liveTitle}</h2>
+                            <p className="text-slate-400 font-bold text-sm tracking-tight">{t.liveDesc}</p>
+                        </div>
+                    </div>
                 </section>
 
                 {/* 💬 Communication Section */}
