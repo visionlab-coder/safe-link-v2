@@ -8,6 +8,7 @@ import RoleGuard from "@/components/RoleGuard";
 import { Suspense } from "react";
 import { normalizeKo, normalizeKoAsync } from "@/utils/normalize";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
+import SafetyLibraryModal from "@/components/SafetyLibraryModal";
 
 const adminUI: Record<string, any> = {
     ko: {
@@ -28,7 +29,9 @@ const adminUI: Record<string, any> = {
         pushSuccess: "전파 완료",
         back: "뒤로",
         previewNorm: "은어 자동 교정 미리보기",
-        recTime: "녹음 중"
+        recTime: "녹음 중",
+        library: "기초교육 라이브러리",
+        libraryDesc: "위험성평가 항목 불러오기"
     },
     en: {
         title: "SAFETY BROADCAST",
@@ -48,7 +51,9 @@ const adminUI: Record<string, any> = {
         pushSuccess: "Push Successful",
         back: "Back",
         previewNorm: "Auto-correction Preview",
-        recTime: "Recording"
+        recTime: "Recording",
+        library: "Safety Library",
+        libraryDesc: "Load risk assessment items"
     },
     zh: {
         title: "安全简报发布",
@@ -68,7 +73,9 @@ const adminUI: Record<string, any> = {
         pushSuccess: "发布成功",
         back: "返回",
         previewNorm: "自动校正预览",
-        recTime: "录音中"
+        recTime: "录音中",
+        library: "基础教育资料库",
+        libraryDesc: "加载危险评估项目"
     }
 };
 
@@ -94,6 +101,7 @@ function AdminTBMCreateContent() {
 
     const urlLang = searchParams.get("lang");
 
+    const [isLibraryOpen, setIsLibraryOpen] = useState(false);
     const [adminSiteId, setAdminSiteId] = useState<string | null>(null);
 
     const loadProfile = useCallback(async () => {
@@ -129,6 +137,13 @@ function AdminTBMCreateContent() {
         loadProfile();
         fetchHistory();
     }, [loadProfile, fetchHistory]);
+
+    const handleLibrarySelect = useCallback((text: string) => {
+        setTbmText((prev) => {
+            const base = prev.trim();
+            return base ? base + "\n\n" + text : text;
+        });
+    }, []);
 
     const handleGenerateAI = async () => {
         setIsGeneratingAI(true);
@@ -306,6 +321,26 @@ function AdminTBMCreateContent() {
                         )}
                     </section>
 
+                    {/* 기초교육 라이브러리 섹션 */}
+                    <section className="glass rounded-[40px] p-8 border-white/10 shadow-2xl relative overflow-hidden group">
+                        <div className="absolute top-0 left-0 w-32 h-32 bg-green-500/10 blur-[60px] rounded-full -ml-16 -mt-16 group-hover:bg-green-500/20 transition-all duration-1000" />
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-lg font-black text-white flex items-center gap-3 italic font-mono">
+                                <span className="w-2 h-6 bg-green-500 rounded-full" />
+                                {t.library}
+                            </h3>
+                            <button
+                                onClick={() => setIsLibraryOpen(true)}
+                                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl text-xs font-black shadow-lg tap-effect tracking-widest uppercase"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                </svg>
+                                {t.libraryDesc}
+                            </button>
+                        </div>
+                    </section>
+
                     <section className="flex flex-col flex-1 gap-6">
                         <div className="glass rounded-[48px] p-8 border-white/10 shadow-3xl flex flex-col gap-6 relative min-h-[400px]">
                             <div className="flex justify-between items-center">
@@ -421,6 +456,12 @@ function AdminTBMCreateContent() {
                         </div>
                     </section>
                 </main>
+                <SafetyLibraryModal
+                    isOpen={isLibraryOpen}
+                    onClose={() => setIsLibraryOpen(false)}
+                    onSelect={handleLibrarySelect}
+                    lang={adminLang}
+                />
             </div>
         </RoleGuard>
     );
