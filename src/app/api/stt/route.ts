@@ -131,11 +131,53 @@ export async function POST(req: Request) {
 
         const languageCode = lang || "ko-KR";
 
-        // 한국어일 때 건설 용어 힌트 적용
-        const speechContexts = languageCode.startsWith("ko")
-            ? [{ phrases: CONSTRUCTION_SPEECH_HINTS, boost: 5 }]
-            : [];
+        // === 1. OpenAI Whisper (한국어 전용, 최상위 품질) ===
+        const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim();
+        const isKorean = languageCode.startsWith("ko");
 
+        if (isKorean && OPENAI_API_KEY) {
+            try {
+                // OpenAI Whisper용 오디오 변환 (FormData 필요)
+                const formData = new FormData();
+                const audioBuffer = Buffer.from(audio, 'base64');
+                const audioBlob = new Blob([audioBuffer], { type: mimeType || 'audio/webm' });
+                formData.append('file', audioBlob, 'audio.webm');
+                formData.append('model', 'whisper-1');
+                formData.append('language', 'ko');
+                formData.append('prompt', CONSTRUCTION_SPEECH_HINTS.join(', '));
+
+                const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+                    body: formData,
+                });
+
+                if (whisperResponse.ok) {
+                    const whisperData = await whisperResponse.json();
+                    const transcript = whisperData.text || "";
+
+                    if (transcript.trim()) {
+                        console.log("[STT API] Used OpenAI Whisper for Korean");
+                        // LLM 보정 및 은어 정규화 적용
+                        const corrected = await correctWithLLM(transcript.trim(), GOOGLE_API_KEY);
+                        const { normalized, changes } = normalizeServerSide(corrected);
+
+                        return NextResponse.json({
+                            transcript: normalized,
+                            llm_corrected: corrected !== transcript.trim(),
+                            raw_stt: transcript.trim(),
+                            normalized: changes.length > 0,
+                            changes,
+                            engine: "whisper"
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error("[STT API] Whisper Fallback to Google STT due to error:", err);
+            }
+        }
+
+        // === 2. Google Cloud STT (기타 언어 및 Whisper 폴백) ===
         const url = `https://speech.googleapis.com/v1/speech:recognize?key=${GOOGLE_API_KEY}`;
 
         const response = await fetch(url, {
@@ -193,6 +235,7 @@ export async function POST(req: Request) {
                 transcript: normalized,
                 ...(llmCorrected && { llm_corrected: true, raw_stt: transcript.trim() }),
                 ...(changes.length > 0 && { normalized: true, changes }),
+                engine: "google"
             });
         }
 

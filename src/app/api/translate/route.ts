@@ -63,21 +63,67 @@ export async function POST(request: NextRequest) {
         const sourceLang = langMap[sl] || sl;
         const targetLang = langMap[tl] || tl;
 
-        // === 최속 병렬 실행: 번역 + 역번역 + 발음용 영어 번역 동시 시작 ===
-        const cloudTranslate = (q: string, source: string, target: string) =>
+        // === 1. Naver Papago (아시아권 언어 고품질 번역) ===
+        const NAVER_ID = process.env.NAVER_CLIENT_ID?.trim();
+        const NAVER_SECRET = process.env.NAVER_CLIENT_SECRET?.trim();
+        
+        // 파파고 지원 언어 목록
+        const papagoLangs = ['ko', 'en', 'zh-CN', 'vi', 'id', 'th', 'ru', 'ja', 'fr', 'es'];
+        const usePapago = NAVER_ID && NAVER_SECRET && papagoLangs.includes(sourceLang) && papagoLangs.includes(targetLang);
+
+        let translatedText = "";
+        let engine = "google";
+
+        if (usePapago) {
+            try {
+                const papagoRes = await fetch('https://openapi.naver.com/v1/papago/n2mt', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'X-Naver-Client-Id': NAVER_ID!,
+                        'X-Naver-Client-Secret': NAVER_SECRET!,
+                    },
+                    body: new URLSearchParams({
+                        source: sourceLang,
+                        target: targetLang,
+                        text: processedText,
+                    }),
+                });
+
+                if (papagoRes.ok) {
+                    const papagoData = await papagoRes.json();
+                    translatedText = papagoData.message?.result?.translatedText || "";
+                    if (translatedText) engine = "papago";
+                }
+            } catch (err) {
+                console.error("[Translation API] Papago error, falling back to Google:", err);
+            }
+        }
+
+        // === 2. Google Cloud Translation (기본 및 폴백) ===
+        if (!translatedText) {
+            const cloudTranslate = (q: string, source: string, target: string) =>
+                fetch(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ q, source, target, format: 'text' }),
+                }).then(r => r.json() as Promise<CloudTranslateResponse>);
+
+            const translated = await cloudTranslate(processedText, sourceLang, targetLang);
+            translatedText = translated.data?.translations?.[0]?.translatedText || "";
+        }
+
+        if (!translatedText) {
+            return await geminiFullFallback(apiKey, processedText, sl, tl);
+        }
+
+        // === 3. 역번역 및 발음 처리 (Google로 통일하여 속도 확보) ===
+        const cloudTranslateFast = (q: string, source: string, target: string) =>
             fetch(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ q, source, target, format: 'text' }),
             }).then(r => r.json() as Promise<CloudTranslateResponse>);
-
-        // 1단계: 번역 (필수)
-        const translated = await cloudTranslate(processedText, sourceLang, targetLang);
-        const translatedText = translated.data?.translations?.[0]?.translatedText;
-
-        if (!translatedText) {
-            return await geminiFullFallback(apiKey, processedText, sl, tl);
-        }
 
         // 2단계: 역번역 + 발음 생성을 완전 병렬 실행
         const pronTarget = tl === 'ko' ? processedText : translatedText;
@@ -89,9 +135,9 @@ export async function POST(request: NextRequest) {
         const needsEnglishBridge = !isLatinScript && !isChinese;
 
         const [reverseResult, pronEnglish] = await Promise.all([
-            cloudTranslate(translatedText, targetLang, sourceLang),
+            cloudTranslateFast(translatedText, targetLang, sourceLang),
             needsEnglishBridge
-                ? cloudTranslate(pronTarget, (tl === 'ko' ? sourceLang : targetLang), 'en')
+                ? cloudTranslateFast(pronTarget, (tl === 'ko' ? sourceLang : targetLang), 'en')
                 : Promise.resolve(null),
         ]);
 
@@ -120,6 +166,7 @@ export async function POST(request: NextRequest) {
             translated: finalTranslated,
             pronunciation,
             reverse_translated: finalReverse,
+            engine
         });
     } catch (error: unknown) {
         const message = getErrorMessage(error);
