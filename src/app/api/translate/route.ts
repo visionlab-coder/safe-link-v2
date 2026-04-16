@@ -76,12 +76,12 @@ export async function POST(request: NextRequest) {
 
         if (usePapago) {
             try {
-                const papagoRes = await fetch('https://openapi.naver.com/v1/papago/n2mt', {
+                const papagoRes = await fetch('https://papago.apigw.ntruss.com/nmt/v1/translation', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                        'X-Naver-Client-Id': NAVER_ID!,
-                        'X-Naver-Client-Secret': NAVER_SECRET!,
+                        'X-NCP-APIGW-API-KEY-ID': NAVER_ID!,
+                        'X-NCP-APIGW-API-KEY': NAVER_SECRET!,
                     },
                     body: new URLSearchParams({
                         source: sourceLang,
