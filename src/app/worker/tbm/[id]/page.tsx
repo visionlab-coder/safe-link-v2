@@ -298,10 +298,30 @@ function WorkerTBMDetailContent() {
 
     const handlePlayAudio = () => {
         if (!transData.text) return;
+        if (isPlaying) return; // 중복 클릭 방지 (startedAt 초기화 방지)
+
+        // 청취 시간 검증 — 텍스트 길이 기반 예상 재생시간의 70% 이상 실제 재생돼야 완료 인정
+        // (브라우저 음성 미지원 → 콜백 즉시 실행 → 게이트 우회 방지)
+        const textLen = transData.text.length;
+        // 한국어/중국어 등은 글자당 약 0.25초, 라틴/아랍 문자는 약 0.08초
+        const perChar = /[\u3131-\uD79D\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]/.test(transData.text) ? 0.25 : 0.08;
+        const estimatedMs = Math.max(3000, textLen * perChar * 1000);
+        const minRequiredMs = estimatedMs * 0.7;
+        const startedAt = Date.now();
+
         setIsPlaying(true);
         playPremiumAudio(transData.text, preferredLang, voiceGenderRef.current, () => {
             setIsPlaying(false);
-            setIsAudioFinished(true);
+            const elapsed = Date.now() - startedAt;
+            if (elapsed >= minRequiredMs) {
+                setIsAudioFinished(true);
+            } else {
+                // 콜백이 너무 빨리 왔음 — 브라우저 음성 미지원 또는 무음 fallthrough
+                // 남은 시간만큼 기다려서 게이트 해제 (실제 청취 강제)
+                const remaining = minRequiredMs - elapsed;
+                console.warn(`[TBM Audio] Early callback detected (${elapsed}ms < ${minRequiredMs.toFixed(0)}ms). Forcing wait.`);
+                setTimeout(() => setIsAudioFinished(true), remaining);
+            }
         });
     };
 
