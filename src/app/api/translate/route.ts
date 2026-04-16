@@ -134,22 +134,31 @@ export async function POST(request: NextRequest) {
         );
         const needsEnglishBridge = !isLatinScript && !isChinese;
 
-        const [reverseResult, pronEnglish] = await Promise.all([
+        const [reverseResult, pronEnglish, chinesePron] = await Promise.all([
             cloudTranslateFast(translatedText, targetLang, sourceLang),
             needsEnglishBridge
                 ? cloudTranslateFast(pronTarget, (tl === 'ko' ? sourceLang : targetLang), 'en')
                 : Promise.resolve(null),
+            // 중국어 → 한글 발음: Gemini 기반 고품질 생성 (국립국어원 표준)
+            isChinese
+                ? generateChinesePronunciation(apiKey, pronTarget)
+                : Promise.resolve(""),
         ]);
 
         const reverseTranslated = reverseResult.data?.translations?.[0]?.translatedText || "";
 
-        // 한글 발음 생성 (CPU only, 0ms)
+        // 한글 발음 생성
         let pronunciation: string;
         if (isChinese) {
-            const py = pinyin.isSupported()
-                ? pinyin.convertToPinyin(pronTarget, ' ', true)
-                : pronTarget;
-            pronunciation = hangulize(py, 'zh');
+            // Gemini 결과 우선, 실패 시 tiny-pinyin + hangulize 폴백
+            if (chinesePron) {
+                pronunciation = chinesePron;
+            } else {
+                const py = pinyin.isSupported()
+                    ? pinyin.convertToPinyin(pronTarget, ' ', true)
+                    : pronTarget;
+                pronunciation = hangulize(py, 'zh');
+            }
         } else if (isLatinScript) {
             pronunciation = hangulize(pronTarget, pronLang);
         } else {
@@ -177,6 +186,55 @@ export async function POST(request: NextRequest) {
 
 
 /** Gemini 풀 fallback (Cloud Translation 실패 시) */
+/** 중국어 → 한글 발음 생성 (Gemini 2.5 Flash, 국립국어원 표준 기반) */
+async function generateChinesePronunciation(apiKey: string, chineseText: string): Promise<string> {
+    if (!chineseText || chineseText.length > 2000) return "";
+    try {
+        const prompt = `다음 중국어 텍스트를 **한국어 한글로 읽는 발음**으로 변환해주세요.
+
+규칙:
+1. 국립국어원 외래어 표기법 (중국어) 기준
+2. 병음(pinyin)을 한글로 자연스럽게 표기 (예: 你好 → 니하오, 谢谢 → 씨에씨에, 中国 → 쭝궈)
+3. 건설 현장 전문 용어도 정확하게 (예: 安全帽 → 안취안마오, 钢筋 → 깡진, 混凝土 → 훈닝투)
+4. 띄어쓰기는 원문 단위 유지
+5. 한국어로 발음하기 쉽게, 외국어 티가 나지 않게
+6. 발음 결과만 반환, 설명·따옴표·원문 반복 금지
+
+중국어: ${chineseText}
+
+발음:`;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+                signal: controller.signal,
+                body: JSON.stringify({
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                    generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
+                }),
+            }
+        );
+
+        clearTimeout(timeout);
+        if (!response.ok) return "";
+
+        const data = await response.json() as GeminiResponse;
+        const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        // 한글·공백·구두점만 허용 (혹시 라틴/한자 섞여있으면 거부)
+        if (!result) return "";
+        const koRatio = (result.match(/[\uAC00-\uD7A3]/g) || []).length / result.length;
+        if (koRatio < 0.5) return ""; // 한글 비율 50% 미만이면 실패로 간주
+        return result;
+    } catch {
+        return "";
+    }
+}
+
 async function geminiFullFallback(apiKey: string, text: string, sl: string, tl: string) {
     try {
         const prompt = `Translate accurately. Source: ${sl}, Target: ${tl}.
