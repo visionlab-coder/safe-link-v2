@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Activity, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -12,22 +12,43 @@ interface HealthStatus {
 export default function SystemHealthCheck() {
     const [status, setStatus] = useState<HealthStatus | null>(null);
     const [loading, setLoading] = useState(false);
+    const [consecFailures, setConsecFailures] = useState(0);
+    const mountedRef = useRef(true);
 
-    const checkHealth = async () => {
+    const checkHealth = useCallback(async (retry = 0): Promise<void> => {
         setLoading(true);
         try {
-            const res = await fetch('/api/check');
+            const res = await fetch('/api/check', { cache: 'no-store' });
             const data = await res.json();
+            if (!mountedRef.current) return;
+
+            const anyDown = Object.values(data).some((s) => (s as { status: string }).status !== 'ok');
+
+            // 재시도 로직: 실패 시 최대 2회 재시도 (일시적 네트워크 지연 방지)
+            if (anyDown && retry < 2) {
+                setTimeout(() => { if (mountedRef.current) checkHealth(retry + 1); }, 2000);
+                return;
+            }
+
             setStatus(data);
+            setConsecFailures(prev => anyDown ? prev + 1 : 0);
         } catch (e) {
             console.error("Health check failed", e);
         } finally {
-            setLoading(false);
+            if (mountedRef.current) setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
+        mountedRef.current = true;
         checkHealth();
+        // 30초마다 자동 재점검
+        const interval = setInterval(() => checkHealth(), 30000);
+        return () => {
+            mountedRef.current = false;
+            clearInterval(interval);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const StatusItem = ({ label, itemStatus }: { label: string, itemStatus?: { status: string, message: string } }) => {
@@ -52,6 +73,10 @@ export default function SystemHealthCheck() {
         );
     };
 
+    // 오류 판별: 연속 2회 이상 down인 경우에만 알람 (transient 필터링)
+    const anyDown = status && Object.values(status).some(s => s.status !== 'ok');
+    const showAlert = anyDown && consecFailures >= 2;
+
     return (
         <motion.section
             initial={{ opacity: 0, y: 10 }}
@@ -64,14 +89,15 @@ export default function SystemHealthCheck() {
                         <Activity className="w-6 h-6" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-black text-white tracking-tight italic uppercase">Pre-flight Check</h3>
-                        <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase">Monday Demo Stability Monitor</p>
+                        <h3 className="text-lg font-black text-white tracking-tight italic uppercase">시스템 상태</h3>
+                        <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase">30초마다 자동 점검 · 핵심 서비스 가용성</p>
                     </div>
                 </div>
-                <button 
-                    onClick={checkHealth}
+                <button
+                    onClick={() => checkHealth()}
                     disabled={loading}
                     className="p-2 hover:bg-white/10 rounded-full transition-colors group"
+                    title="수동 재점검"
                 >
                     <RefreshCw className={`w-4 h-4 text-slate-400 group-hover:text-white ${loading ? 'animate-spin' : ''}`} />
                 </button>
@@ -84,15 +110,16 @@ export default function SystemHealthCheck() {
             </div>
 
             <AnimatePresence>
-                {status && (Object.values(status).some(s => s.status !== 'ok')) && (
-                    <motion.div 
+                {showAlert && (
+                    <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        className="bg-red-500/10 border border-red-500/20 p-3 rounded-2xl"
+                        className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-2xl"
                     >
-                        <p className="text-[10px] text-red-400 font-bold uppercase leading-tight">
-                            ⚠️ Critical: One or more systems are down. Check your API keys in .env.local immediately for the Monday demo.
+                        <p className="text-[11px] text-amber-400 font-bold leading-relaxed">
+                            ⚠️ 일부 서비스 연결 지연 중 · 현장 기능에는 영향 없으며 30초 후 자동 재점검됩니다.
+                            지속 시 전산팀에 문의하세요.
                         </p>
                     </motion.div>
                 )}
