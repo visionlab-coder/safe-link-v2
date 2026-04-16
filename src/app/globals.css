@@ -126,7 +126,8 @@ body {
 }
 
 .animate-float {
-  animation: float 6s ease-in-out infinite;
+  /* 둥둥 떠다니는 애니메이션 제거 (가독성 저하 피드백) */
+  /* animation: float 6s ease-in-out infinite; */
 }
 
 @keyframes pulse-soft {
