@@ -151,7 +151,7 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { audio, lang, mimeType } = await req.json();
+        const { audio, lang, mimeType, live } = await req.json();
 
         if (!audio) {
             return NextResponse.json({ error: "No audio data" }, { status: 400 });
@@ -170,18 +170,31 @@ export async function POST(req: Request) {
             const transcript = await transcribeWithWhisper(audio, mimeType, languageCode, OPENAI_API_KEY);
 
             if (transcript) {
-                // 한국어: Gemini 문맥 보정 + 은어 정규화
-                if (shortLang === 'ko' && GOOGLE_API_KEY) {
-                    const corrected = await correctWithLLM(transcript, GOOGLE_API_KEY);
-                    const { normalized, changes } = normalizeServerSide(corrected);
-                    return NextResponse.json({
-                        transcript: normalized,
-                        llm_corrected: corrected !== transcript,
-                        raw_stt: transcript,
-                        normalized: changes.length > 0,
-                        changes,
-                        engine: "whisper",
-                    });
+                // 한국어: 은어 정규화 (동기, 즉시) + Gemini 교정 (live 모드에서는 스킵)
+                if (shortLang === 'ko') {
+                    if (live) {
+                        // 실시간 통역: 은어 정규화만 (0ms), Gemini 교정 스킵 (1~3초 절약)
+                        const { normalized, changes } = normalizeServerSide(transcript);
+                        return NextResponse.json({
+                            transcript: normalized,
+                            normalized: changes.length > 0,
+                            changes,
+                            engine: "whisper",
+                            live: true,
+                        });
+                    }
+                    if (GOOGLE_API_KEY) {
+                        const corrected = await correctWithLLM(transcript, GOOGLE_API_KEY);
+                        const { normalized, changes } = normalizeServerSide(corrected);
+                        return NextResponse.json({
+                            transcript: normalized,
+                            llm_corrected: corrected !== transcript,
+                            raw_stt: transcript,
+                            normalized: changes.length > 0,
+                            changes,
+                            engine: "whisper",
+                        });
+                    }
                 }
                 return NextResponse.json({ transcript, engine: "whisper" });
             }
@@ -241,6 +254,16 @@ export async function POST(req: Request) {
         }
 
         if (shortLang === "ko") {
+            if (live) {
+                // 실시간 통역: 은어 정규화만, Gemini 스킵
+                const { normalized, changes } = normalizeServerSide(transcript.trim());
+                return NextResponse.json({
+                    transcript: normalized,
+                    ...(changes.length > 0 && { normalized: true, changes }),
+                    engine: "google",
+                    live: true,
+                });
+            }
             const corrected = await correctWithLLM(transcript.trim(), GOOGLE_API_KEY);
             const llmCorrected = corrected !== transcript.trim();
             const { normalized, changes } = normalizeServerSide(corrected);

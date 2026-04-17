@@ -72,7 +72,8 @@ function AdminLiveContent() {
     const { isRecording, toggle: toggleRecording } = useCloudSTT({
         lang: "ko",
         onTranscript: handleTranscript,
-        chunkInterval: 8000,
+        chunkInterval: 3000,
+        live: true,
     });
 
     const handleStartBroadcast = () => {

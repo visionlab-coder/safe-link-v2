@@ -41,6 +41,8 @@ interface UseCloudSTTOptions {
     onTranscript: (text: string) => void;
     onError?: (type: STTErrorType, message: string) => void;
     chunkInterval?: number;
+    /** 실시간 통역 모드: Gemini 교정 스킵하여 지연 최소화 */
+    live?: boolean;
 }
 
 /** 노이즈 환경(건설 현장)에 최적화된 오디오 제약조건 */
@@ -65,6 +67,7 @@ export function useCloudSTT({
     onTranscript,
     onError,
     chunkInterval = 10_000,
+    live = false,
 }: UseCloudSTTOptions) {
     const [isRecording, setIsRecording] = useState(false);
     const streamRef = useRef<MediaStream | null>(null);
@@ -156,6 +159,7 @@ export function useCloudSTT({
                     audio: base64,
                     lang: getSTTLang(langRef.current),
                     mimeType: blob.type,
+                    ...(live && { live: true }),
                 }),
                 signal: controller.signal,
             });
