@@ -55,26 +55,19 @@ function AdminLiveContent() {
         const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setTranscripts(prev => [...prev, { text: text.trim(), time }]);
 
-        // 서버 측 프리번역 엔드포인트 호출 (활성 언어 자동 감지 + 병렬 번역)
-        // 근로자는 번역 호출 없이 DB 값만 읽음 → 비용 97% 절감, 지연 3배 단축
-        try {
-            await fetch("/api/live/broadcast", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    session_id: sessionId,
-                    text_ko: text.trim(),
-                    site_id: siteId,
-                }),
-            });
-        } catch (err) {
-            console.error("[Live] broadcast failed:", err);
-        }
+        const supabase = createClient();
+        const payload: any = {
+            session_id: sessionId,
+            text_ko: text.trim(),
+            created_by: adminId,
+        };
+        if (siteId) payload.site_id = siteId;
+        await supabase.from("live_translations").insert(payload);
 
         setTimeout(() => {
             scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
         }, 100);
-    }, [sessionId, siteId]);
+    }, [sessionId, siteId, adminId]);
 
     const { isRecording, toggle: toggleRecording } = useCloudSTT({
         lang: "ko",

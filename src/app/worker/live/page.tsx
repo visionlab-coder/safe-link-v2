@@ -88,60 +88,37 @@ export default function WorkerLivePage() {
                 setIsConnected(true);
                 const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-                const myLang = langRef.current;
-
-                // 한국어 근로자 → 원문 그대로
-                if (myLang === 'ko') {
+                if (langRef.current === 'ko') {
                     const newSub: Subtitle = { id: row.id, text_ko: row.text_ko, translated: row.text_ko, pronunciation: "", time };
                     setSubtitles(prev => [...prev, newSub]);
                     if (audioEnabledRef.current) {
                         ttsQueueRef.current.push(row.text_ko);
                         processQueue();
                     }
-                    return;
-                }
-
-                // 최적 경로: 서버가 프리번역해둔 값 사용 (API 호출 0, 지연 즉시)
-                const pretranslated = row.translations?.[myLang];
-                if (pretranslated) {
-                    const newSub: Subtitle = {
-                        id: row.id,
-                        text_ko: row.text_ko,
-                        translated: pretranslated,
-                        pronunciation: "",
-                        time,
-                    };
-                    setSubtitles(prev => [...prev, newSub]);
-                    if (audioEnabledRef.current) {
-                        ttsQueueRef.current.push(pretranslated);
-                        processQueue();
+                } else {
+                    try {
+                        const res = await fetch("/api/translate", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ text: row.text_ko, sl: "ko", tl: langRef.current }),
+                        });
+                        const data = await res.json();
+                        const newSub: Subtitle = {
+                            id: row.id,
+                            text_ko: row.text_ko,
+                            translated: data.translated || row.text_ko,
+                            pronunciation: data.pronunciation || "",
+                            time,
+                        };
+                        setSubtitles(prev => [...prev, newSub]);
+                        if (audioEnabledRef.current) {
+                            ttsQueueRef.current.push(data.translated || row.text_ko);
+                            processQueue();
+                        }
+                    } catch {
+                        const newSub: Subtitle = { id: row.id, text_ko: row.text_ko, translated: row.text_ko, pronunciation: "", time };
+                        setSubtitles(prev => [...prev, newSub]);
                     }
-                    return;
-                }
-
-                // 폴백: 프리번역에 내 언어 없으면 런타임 번역 (신규 국적 등록 직후 등)
-                try {
-                    const res = await fetch("/api/translate", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ text: row.text_ko, sl: "ko", tl: myLang }),
-                    });
-                    const data = await res.json();
-                    const newSub: Subtitle = {
-                        id: row.id,
-                        text_ko: row.text_ko,
-                        translated: data.translated || row.text_ko,
-                        pronunciation: data.pronunciation || "",
-                        time,
-                    };
-                    setSubtitles(prev => [...prev, newSub]);
-                    if (audioEnabledRef.current) {
-                        ttsQueueRef.current.push(data.translated || row.text_ko);
-                        processQueue();
-                    }
-                } catch {
-                    const newSub: Subtitle = { id: row.id, text_ko: row.text_ko, translated: row.text_ko, pronunciation: "", time };
-                    setSubtitles(prev => [...prev, newSub]);
                 }
 
                 setTimeout(() => {
