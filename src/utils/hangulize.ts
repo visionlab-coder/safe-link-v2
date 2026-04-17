@@ -271,7 +271,7 @@ const engPatterns: Array<[RegExp, string]> = [
 // 사전에 없는 단어는 패턴 매칭으로 변환하되, 정확도가 떨어지므로 사전을 최대한 확장
 const commonWords: Record<string, string> = {
     // ── 기본 ──
-    "a": "어", "an": "언", "the": "더", "of": "오브", "is": "이즈", "are": "아",
+    "i": "아이", "a": "어", "an": "언", "the": "더", "of": "오브", "is": "이즈", "are": "아",
     "in": "인", "on": "온", "at": "앳", "to": "투", "for": "포", "and": "앤드",
     "or": "오어", "but": "벗", "with": "위드", "from": "프롬", "by": "바이",
     "as": "애즈", "if": "이프", "so": "소", "be": "비", "it": "잇",
