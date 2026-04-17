@@ -129,19 +129,26 @@ export async function POST(request: NextRequest) {
         const pronTarget = tl === 'ko' ? processedText : translatedText;
         const pronLang = tl === 'ko' ? sl : tl;
         const isChinese = pronLang === 'zh' || pronLang === 'zh-CN';
+        const isJapanese = pronLang === 'ja' || pronLang === 'jp';
+        const isThai = pronLang === 'th';
         const isLatinScript = /^[a-zA-Z\s\-.,!?'"()0-9\u00C0-\u024F\u1E00-\u1EFF]+$/.test(
             pronTarget.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
         );
-        const needsEnglishBridge = !isLatinScript && !isChinese;
+        const needsEnglishBridge = !isLatinScript && !isChinese && !isJapanese && !isThai;
 
-        const [reverseResult, pronEnglish, chinesePron] = await Promise.all([
+        const [reverseResult, pronEnglish, chinesePron, japPron, thaiPron] = await Promise.all([
             cloudTranslateFast(translatedText, targetLang, sourceLang),
             needsEnglishBridge
                 ? cloudTranslateFast(pronTarget, (tl === 'ko' ? sourceLang : targetLang), 'en')
                 : Promise.resolve(null),
-            // 중국어 → 한글 발음: Gemini 기반 고품질 생성 (국립국어원 표준)
             isChinese
                 ? generateChinesePronunciation(apiKey, pronTarget)
+                : Promise.resolve(""),
+            isJapanese
+                ? generateJapanesePronunciation(apiKey, pronTarget)
+                : Promise.resolve(""),
+            isThai
+                ? generateThaiPronunciation(apiKey, pronTarget)
                 : Promise.resolve(""),
         ]);
 
@@ -150,7 +157,6 @@ export async function POST(request: NextRequest) {
         // 한글 발음 생성
         let pronunciation: string;
         if (isChinese) {
-            // Gemini 결과 우선, 실패 시 tiny-pinyin + hangulize 폴백
             if (chinesePron) {
                 pronunciation = chinesePron;
             } else {
@@ -159,6 +165,10 @@ export async function POST(request: NextRequest) {
                     : pronTarget;
                 pronunciation = hangulize(py, 'zh');
             }
+        } else if (isJapanese) {
+            pronunciation = japPron || hangulize(pronTarget, 'ja');
+        } else if (isThai) {
+            pronunciation = thaiPron || hangulize(pronTarget, 'th');
         } else if (isLatinScript) {
             pronunciation = hangulize(pronTarget, pronLang);
         } else {
@@ -229,6 +239,100 @@ async function generateChinesePronunciation(apiKey: string, chineseText: string)
         if (!result) return "";
         const koRatio = (result.match(/[\uAC00-\uD7A3]/g) || []).length / result.length;
         if (koRatio < 0.5) return ""; // 한글 비율 50% 미만이면 실패로 간주
+        return result;
+    } catch {
+        return "";
+    }
+}
+
+/** 일본어 → 한글 발음 생성 (Gemini 2.5 Flash, 국립국어원 표준 기반) */
+async function generateJapanesePronunciation(apiKey: string, japaneseText: string): Promise<string> {
+    if (!japaneseText || japaneseText.length > 2000) return "";
+    try {
+        const prompt = `다음 일본어 텍스트를 **한국어 한글로 읽는 발음**으로 변환해주세요.
+
+규칙:
+1. 국립국어원 외래어 표기법 (일본어) 기준
+2. 히라가나·가타카나·한자 모두 한글로 변환 (예: こんにちは → 콘니치와, 安全 → 안젠, ヘルメット → 헤루멧토)
+3. 건설 현장 전문 용어도 정확하게 (예: 安全帽 → 안젠보, 鉄筋 → 텟킨, コンクリート → 콘쿠리토)
+4. 띄어쓰기는 원문 단위 유지
+5. 발음 결과만 반환, 설명·따옴표·원문 반복 금지
+
+일본어: ${japaneseText}
+
+발음:`;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+                signal: controller.signal,
+                body: JSON.stringify({
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                    generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
+                }),
+            }
+        );
+
+        clearTimeout(timeout);
+        if (!response.ok) return "";
+
+        const data = await response.json() as GeminiResponse;
+        const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (!result) return "";
+        const koRatio = (result.match(/[\uAC00-\uD7A3]/g) || []).length / result.length;
+        if (koRatio < 0.5) return "";
+        return result;
+    } catch {
+        return "";
+    }
+}
+
+/** 태국어 → 한글 발음 생성 (Gemini 2.5 Flash, 국립국어원 표준 기반) */
+async function generateThaiPronunciation(apiKey: string, thaiText: string): Promise<string> {
+    if (!thaiText || thaiText.length > 2000) return "";
+    try {
+        const prompt = `다음 태국어 텍스트를 **한국어 한글로 읽는 발음**으로 변환해주세요.
+
+규칙:
+1. 국립국어원 외래어 표기법 (태국어) 기준
+2. 태국 문자를 자연스러운 한글 발음으로 변환 (예: สวัสดี → 사왓디, ขอบคุณ → 콥쿤, ความปลอดภัย → 쾀쁠럿파이)
+3. 건설 현장 전문 용어도 정확하게 (예: หมวกนิรภัย → 무억니라파이, ความปลอดภัย → 쾀쁠럿파이)
+4. 띄어쓰기는 원문 단위 유지
+5. 발음 결과만 반환, 설명·따옴표·원문 반복 금지
+
+태국어: ${thaiText}
+
+발음:`;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+                signal: controller.signal,
+                body: JSON.stringify({
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                    generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
+                }),
+            }
+        );
+
+        clearTimeout(timeout);
+        if (!response.ok) return "";
+
+        const data = await response.json() as GeminiResponse;
+        const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (!result) return "";
+        const koRatio = (result.match(/[\uAC00-\uD7A3]/g) || []).length / result.length;
+        if (koRatio < 0.5) return "";
         return result;
     } catch {
         return "";
