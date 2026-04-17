@@ -8,6 +8,31 @@ import { languages } from "@/constants";
 import { HardHat, ShieldCheck, Info, CheckCircle2, XCircle, ArrowLeft } from "lucide-react";
 import { getT } from "./translations";
 
+/** 원시 API 에러를 사용자 친화적 한국어로 변환. 절대 내부 에러 메시지를 그대로 노출하지 않음. */
+function sanitizeAuthError(msg: string): string {
+  console.error("[Auth] Raw error:", msg);
+  const m = msg.toLowerCase();
+  if (m.includes("api key") || m.includes("apikey") || m.includes("unauthorized") || m.includes("authentication")) {
+    return "서버 연결 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+  }
+  if (m.includes("invalid login") || m.includes("invalid credentials") || m.includes("wrong password")) {
+    return "이메일 또는 비밀번호가 올바르지 않습니다.";
+  }
+  if (m.includes("already registered") || m.includes("already exists") || m.includes("duplicate")) {
+    return "이미 등록된 계정입니다. 로그인을 시도해주세요.";
+  }
+  if (m.includes("not confirmed") || m.includes("email") && m.includes("confirm")) {
+    return "이메일 인증이 필요합니다. 메일함을 확인해주세요.";
+  }
+  if (m.includes("rate limit") || m.includes("too many")) {
+    return "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.";
+  }
+  if (m.includes("network") || m.includes("fetch") || m.includes("connection")) {
+    return "네트워크 연결을 확인해주세요.";
+  }
+  return "오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+}
+
 const DIAL_CODES: Record<string, string> = {
   ko: "+82", vi: "+84", zh: "+86", th: "+66", uz: "+998",
   ph: "+63", km: "+855", id: "+62", mn: "+976", my: "+95",
@@ -184,9 +209,9 @@ function AuthContent() {
         email, password: autoPassword,
         options: { data: { phone_number: phoneDigits, display_name: workerName.trim() } },
       });
-      if (signUpErr) { alert(signUpErr.message); setLoading(false); return; }
+      if (signUpErr) { alert(sanitizeAuthError(signUpErr.message)); setLoading(false); return; }
       const { error: signInErr2 } = await supabase.auth.signInWithPassword({ email, password: autoPassword });
-      if (signInErr2) { alert(signInErr2.message); setLoading(false); return; }
+      if (signInErr2) { alert(sanitizeAuthError(signInErr2.message)); setLoading(false); return; }
     }
 
     // 세션에서 유저 정보 가져와서 프로필 upsert (신규든 기존이든 동일)
@@ -213,7 +238,7 @@ function AuthContent() {
     if (!adminEmail || !password) return;
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email: adminEmail, password });
-    if (error) { alert(error.message); setLoading(false); return; }
+    if (error) { alert(sanitizeAuthError(error.message)); setLoading(false); return; }
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       sessionStorage.setItem("safe-link-session-active", "true");
@@ -231,9 +256,9 @@ function AuthContent() {
       email: adminEmail, password,
       options: { data: { backup_email: backupEmail || null } },
     });
-    if (signUpErr) { alert(signUpErr.message); setLoading(false); return; }
+    if (signUpErr) { alert(sanitizeAuthError(signUpErr.message)); setLoading(false); return; }
     const { error: loginErr } = await supabase.auth.signInWithPassword({ email: adminEmail, password });
-    if (loginErr) { alert(loginErr.message); setLoading(false); return; }
+    if (loginErr) { alert(sanitizeAuthError(loginErr.message)); setLoading(false); return; }
     sessionStorage.setItem("safe-link-session-active", "true");
     const targetRole = searchParams.get("role");
     const siteId = searchParams.get("site_id");
