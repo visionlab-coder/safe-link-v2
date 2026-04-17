@@ -247,9 +247,9 @@ async function generateChinesePronunciation(apiKey: string, chineseText: string)
         const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
         // 한글·공백·구두점만 허용 (혹시 라틴/한자 섞여있으면 거부)
         if (!result) return "";
-        const koRatio = (result.match(/[\uAC00-\uD7A3]/g) || []).length / result.length;
-        if (koRatio < 0.5) return ""; // 한글 비율 50% 미만이면 실패로 간주
-        return result;
+        // 한글·공백·구두점만 추출 (괄호 안 원문 표기 등 비한글 제거)
+        const koreanOnly = result.replace(/[^\uAC00-\uD7A3\s]/g, "").trim();
+        return koreanOnly.length >= 2 ? koreanOnly : "";
     } catch {
         return "";
     }
@@ -294,9 +294,8 @@ async function generateJapanesePronunciation(apiKey: string, japaneseText: strin
         const data = await response.json() as GeminiResponse;
         const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
         if (!result) return "";
-        const koRatio = (result.match(/[\uAC00-\uD7A3]/g) || []).length / result.length;
-        if (koRatio < 0.5) return "";
-        return result;
+        const koreanOnly = result.replace(/[^\uAC00-\uD7A3\s]/g, "").trim();
+        return koreanOnly.length >= 2 ? koreanOnly : "";
     } catch {
         return "";
     }
@@ -341,9 +340,8 @@ async function generateThaiPronunciation(apiKey: string, thaiText: string): Prom
         const data = await response.json() as GeminiResponse;
         const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
         if (!result) return "";
-        const koRatio = (result.match(/[\uAC00-\uD7A3]/g) || []).length / result.length;
-        if (koRatio < 0.5) return "";
-        return result;
+        const koreanOnly = result.replace(/[^\uAC00-\uD7A3\s]/g, "").trim();
+        return koreanOnly.length >= 2 ? koreanOnly : "";
     } catch {
         return "";
     }
@@ -402,9 +400,8 @@ async function generateNonLatinPronunciation(apiKey: string, text: string, lang:
         const data = await response.json() as GeminiResponse;
         const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
         if (!result) return "";
-        const koRatio = (result.match(/[\uAC00-\uD7A3]/g) || []).length / result.length;
-        if (koRatio < 0.5) return "";
-        return result;
+        const koreanOnly = result.replace(/[^\uAC00-\uD7A3\s]/g, "").trim();
+        return koreanOnly.length >= 2 ? koreanOnly : "";
     } catch {
         return "";
     }
@@ -429,7 +426,7 @@ Text: ${JSON.stringify(text)}`;
         );
 
         if (!response.ok) {
-            return NextResponse.json({ translated: text, pronunciation: "API Offline", reverse_translated: text, is_fallback: true });
+            return NextResponse.json({ translated: text, pronunciation: "", reverse_translated: text, is_fallback: true });
         }
 
         const data = await response.json() as GeminiResponse;
@@ -446,6 +443,6 @@ Text: ${JSON.stringify(text)}`;
             reverse_translated: parsed.reverse_translated || "",
         });
     } catch {
-        return NextResponse.json({ translated: text, pronunciation: "Offline", reverse_translated: text, is_fallback: true });
+        return NextResponse.json({ translated: text, pronunciation: "", reverse_translated: text, is_fallback: true });
     }
 }
