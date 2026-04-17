@@ -53,8 +53,8 @@ const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
     channelCount: 1,
 };
 
-/** API 타임아웃 (ms) */
-const FETCH_TIMEOUT = 15_000;
+/** API 타임아웃 (ms) — live 모드에서는 sendChunk에서 별도 제한 */
+const FETCH_TIMEOUT = 8_000;
 
 /** 최소 유효 청크 크기 (bytes) - 이 이하는 무음/소음만 포함 가능성 높음 */
 const MIN_CHUNK_SIZE = 2000;

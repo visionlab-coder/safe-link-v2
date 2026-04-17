@@ -11,7 +11,9 @@ export const getVoiceLang = (c: string) => {
     const map: Record<string, string> = {
         ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN",
         th: "th-TH", uz: "uz-UZ", id: "id-ID", jp: "ja-JP",
-        ph: "tl-PH"
+        ph: "tl-PH", km: "km-KH", mn: "mn-MN", my: "my-MM",
+        ne: "ne-NP", bn: "bn-BD", kk: "kk-KZ", ru: "ru-RU",
+        fr: "fr-FR", es: "es-ES", ar: "ar-SA", hi: "hi-IN",
     };
     return map[c] || c;
 };

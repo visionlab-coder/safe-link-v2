@@ -87,43 +87,55 @@ export default function WorkerLivePage() {
                 const row = payload.new as any;
                 setIsConnected(true);
                 const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const myLang = langRef.current;
 
-                if (langRef.current === 'ko') {
-                    const newSub: Subtitle = { id: row.id, text_ko: row.text_ko, translated: row.text_ko, pronunciation: "", time };
-                    setSubtitles(prev => [...prev, newSub]);
-                    if (audioEnabledRef.current) {
-                        ttsQueueRef.current.push(row.text_ko);
+                const addSubAndScroll = (sub: Subtitle, ttsText?: string) => {
+                    setSubtitles(prev => [...prev, sub]);
+                    if (ttsText && audioEnabledRef.current) {
+                        ttsQueueRef.current.push(ttsText);
                         processQueue();
                     }
-                } else {
-                    try {
-                        const res = await fetch("/api/translate", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ text: row.text_ko, sl: "ko", tl: langRef.current }),
-                        });
-                        const data = await res.json();
-                        const newSub: Subtitle = {
-                            id: row.id,
-                            text_ko: row.text_ko,
-                            translated: data.translated || row.text_ko,
-                            pronunciation: data.pronunciation || "",
-                            time,
-                        };
-                        setSubtitles(prev => [...prev, newSub]);
-                        if (audioEnabledRef.current) {
-                            ttsQueueRef.current.push(data.translated || row.text_ko);
-                            processQueue();
-                        }
-                    } catch {
-                        const newSub: Subtitle = { id: row.id, text_ko: row.text_ko, translated: row.text_ko, pronunciation: "", time };
-                        setSubtitles(prev => [...prev, newSub]);
-                    }
+                    // 스크롤: 상태 업데이트 후 다음 렌더 프레임에서 실행
+                    requestAnimationFrame(() => {
+                        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+                    });
+                };
+
+                if (myLang === 'ko') {
+                    addSubAndScroll(
+                        { id: row.id, text_ko: row.text_ko, translated: row.text_ko, pronunciation: "", time },
+                        row.text_ko
+                    );
+                    return;
                 }
 
-                setTimeout(() => {
-                    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-                }, 100);
+                // 서버 프리번역이 있으면 즉시 사용 (API 호출 0)
+                const pretranslated = row.translations?.[myLang];
+                if (pretranslated) {
+                    addSubAndScroll(
+                        { id: row.id, text_ko: row.text_ko, translated: pretranslated, pronunciation: "", time },
+                        pretranslated
+                    );
+                    return;
+                }
+
+                // 폴백: 런타임 번역
+                try {
+                    const res = await fetch("/api/translate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ text: row.text_ko, sl: "ko", tl: myLang }),
+                    });
+                    const data = await res.json();
+                    addSubAndScroll(
+                        { id: row.id, text_ko: row.text_ko, translated: data.translated || row.text_ko, pronunciation: data.pronunciation || "", time },
+                        data.translated || row.text_ko
+                    );
+                } catch {
+                    addSubAndScroll(
+                        { id: row.id, text_ko: row.text_ko, translated: row.text_ko, pronunciation: "", time }
+                    );
+                }
             })
             .subscribe();
 
