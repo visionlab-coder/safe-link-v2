@@ -44,6 +44,12 @@ export default function WorkerLivePage() {
     useEffect(() => { langRef.current = lang; }, [lang]);
     useEffect(() => { genderRef.current = gender; }, [gender]);
 
+    // 자막 추가 후 렌더 완료 시점에 스크롤 (requestAnimationFrame은 렌더 전 실행되어 부정확)
+    useEffect(() => {
+        if (subtitles.length === 0) return;
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    }, [subtitles]);
+
     // 오디오 자동재생 unlock — 모바일 브라우저는 사용자 터치 전 오디오 차단
     useEffect(() => {
         const unlock = () => {
@@ -115,10 +121,6 @@ export default function WorkerLivePage() {
                         ttsQueueRef.current.push(ttsText);
                         processQueue();
                     }
-                    // 스크롤: 상태 업데이트 후 다음 렌더 프레임에서 실행
-                    requestAnimationFrame(() => {
-                        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-                    });
                 };
 
                 if (myLang === 'ko') {
