@@ -225,7 +225,7 @@ async function generateChinesePronunciation(apiKey: string, chineseText: string)
 발음:`;
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
+        const timeout = setTimeout(() => controller.abort(), 7000);
 
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
@@ -249,7 +249,7 @@ async function generateChinesePronunciation(apiKey: string, chineseText: string)
         if (!result) return "";
         // 한글·공백·구두점만 추출 (괄호 안 원문 표기 등 비한글 제거)
         const koreanOnly = result.replace(/[^\uAC00-\uD7A3\s]/g, "").trim();
-        return koreanOnly.length >= 2 ? koreanOnly : "";
+        return koreanOnly.length >= 1 ? koreanOnly : "";
     } catch {
         return "";
     }
@@ -273,7 +273,7 @@ async function generateJapanesePronunciation(apiKey: string, japaneseText: strin
 발음:`;
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
+        const timeout = setTimeout(() => controller.abort(), 7000);
 
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
@@ -295,7 +295,7 @@ async function generateJapanesePronunciation(apiKey: string, japaneseText: strin
         const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
         if (!result) return "";
         const koreanOnly = result.replace(/[^\uAC00-\uD7A3\s]/g, "").trim();
-        return koreanOnly.length >= 2 ? koreanOnly : "";
+        return koreanOnly.length >= 1 ? koreanOnly : "";
     } catch {
         return "";
     }
@@ -319,7 +319,7 @@ async function generateThaiPronunciation(apiKey: string, thaiText: string): Prom
 발음:`;
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
+        const timeout = setTimeout(() => controller.abort(), 7000);
 
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
@@ -341,7 +341,7 @@ async function generateThaiPronunciation(apiKey: string, thaiText: string): Prom
         const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
         if (!result) return "";
         const koreanOnly = result.replace(/[^\uAC00-\uD7A3\s]/g, "").trim();
-        return koreanOnly.length >= 2 ? koreanOnly : "";
+        return koreanOnly.length >= 1 ? koreanOnly : "";
     } catch {
         return "";
     }
@@ -379,7 +379,7 @@ async function generateNonLatinPronunciation(apiKey: string, text: string, lang:
 발음:`;
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
+        const timeout = setTimeout(() => controller.abort(), 7000);
 
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
@@ -401,7 +401,7 @@ async function generateNonLatinPronunciation(apiKey: string, text: string, lang:
         const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
         if (!result) return "";
         const koreanOnly = result.replace(/[^\uAC00-\uD7A3\s]/g, "").trim();
-        return koreanOnly.length >= 2 ? koreanOnly : "";
+        return koreanOnly.length >= 1 ? koreanOnly : "";
     } catch {
         return "";
     }
