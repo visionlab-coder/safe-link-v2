@@ -172,7 +172,9 @@ export async function POST(request: NextRequest) {
                 pronunciation = hangulize(py, 'zh');
             }
         } else if (isJapanese) {
-            pronunciation = japPron || hangulize(pronTarget, 'ja');
+            const raw = japPron || hangulize(pronTarget, 'ja');
+            // 한글·공백·구두점만 허용 — 한자·가나 제거
+            pronunciation = raw.replace(/[^\uAC00-\uD7A3\s.,!?]/g, "").trim();
         } else if (isThai) {
             pronunciation = thaiPron || hangulize(pronTarget, 'th');
         } else if (isNonLatinOther) {

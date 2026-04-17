@@ -206,7 +206,7 @@ function hangulizeJapanese(text: string): string {
         } else if (ch === " " || ch === "\u3000") {
             parts.push(" ");
         } else {
-            parts.push(ch); // 한자 등 미매핑 문자 유지
+            // 한자·미매핑 문자는 제거 (읽을 수 없으므로)
         }
         i++;
     }
