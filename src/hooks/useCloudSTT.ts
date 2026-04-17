@@ -140,7 +140,8 @@ export function useCloudSTT({
     const sendChunk = useCallback(async (blob: Blob) => {
         if (blob.size < MIN_CHUNK_SIZE) return;
 
-        if (emptyStreakRef.current >= MAX_EMPTY_STREAK) {
+        // live 모드에서는 빈 응답 스킵 비활성화 (음성 누락 방지)
+        if (!live && emptyStreakRef.current >= MAX_EMPTY_STREAK) {
             emptyStreakRef.current = 0;
             return;
         }
