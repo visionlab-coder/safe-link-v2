@@ -44,6 +44,25 @@ export default function WorkerLivePage() {
     useEffect(() => { langRef.current = lang; }, [lang]);
     useEffect(() => { genderRef.current = gender; }, [gender]);
 
+    // 오디오 자동재생 unlock — 모바일 브라우저는 사용자 터치 전 오디오 차단
+    useEffect(() => {
+        const unlock = () => {
+            const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+            ctx.resume().then(() => ctx.close());
+            // 무음 오디오 재생하여 브라우저 오디오 정책 해제
+            const silent = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=");
+            silent.play().catch(() => {});
+            document.removeEventListener('touchstart', unlock);
+            document.removeEventListener('click', unlock);
+        };
+        document.addEventListener('touchstart', unlock, { once: true });
+        document.addEventListener('click', unlock, { once: true });
+        return () => {
+            document.removeEventListener('touchstart', unlock);
+            document.removeEventListener('click', unlock);
+        };
+    }, []);
+
     const processQueue = () => {
         if (isPlayingRef.current || ttsQueueRef.current.length === 0) return;
         isPlayingRef.current = true;

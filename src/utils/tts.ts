@@ -164,17 +164,18 @@ const playBrowserNativeAudio = (text: string, langCode: string, gender: VoiceGen
 };
 
 /**
- * [수정] 서버 기반 TTS (API 파라미터에 gender 추가)
- * @returns success 여부를 콜백으로 전달
+ * 서버 기반 TTS (Google Cloud Neural2)
+ * 오디오 재생 차단 시 브라우저 TTS로 폴백, 실패해도 큐 멈추지 않음
  */
 export const playProxyAudio = (text: string, lang: string, gender: VoiceGender, onDone?: (success: boolean) => void) => {
     const tl = lang === 'zh' ? 'zh-CN' : lang;
     const segments = text.match(/[^.!?。！？\n]+[.!?。！？\n]?/g) || [text];
     let streamIdx = 0;
+    let anySuccess = false;
 
     const nextStream = () => {
         if (streamIdx >= segments.length) {
-            if (onDone) onDone(true);
+            if (onDone) onDone(anySuccess);
             return;
         }
         const chunk = segments[streamIdx++].trim();
@@ -183,19 +184,44 @@ export const playProxyAudio = (text: string, lang: string, gender: VoiceGender, 
         const url = `/api/tts?text=${encodeURIComponent(chunk)}&lang=${tl}&gender=${gender}`;
         const audio = new Audio(url);
 
-        audio.onplay = () => {};
-        audio.onended = nextStream;
-        audio.onerror = (e) => {
-            console.warn("[PremiumTTS] Proxy Audio Error:", e);
-            if (onDone) onDone(false);
+        audio.onended = () => { anySuccess = true; nextStream(); };
+        audio.onerror = () => {
+            // Cloud TTS 실패 → 브라우저 TTS로 이 청크만 재생, 큐는 계속 진행
+            tryBrowserFallback(chunk, lang, gender, nextStream);
         };
 
-        audio.play().catch(err => {
-            console.warn("[PremiumTTS] Audio Play Denied:", err);
-            if (onDone) onDone(false);
+        audio.play().catch(() => {
+            // 자동재생 차단 → 브라우저 TTS 시도
+            tryBrowserFallback(chunk, lang, gender, nextStream);
         });
     };
     nextStream();
+};
+
+/** 단일 청크에 대한 브라우저 TTS 폴백 (실패해도 콜백 호출하여 큐 진행) */
+const tryBrowserFallback = (text: string, lang: string, gender: VoiceGender, onEnd: () => void) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+        onEnd();
+        return;
+    }
+    const targetLang = getVoiceLang(lang);
+    const targetLangBase = targetLang.split('-')[0].toLowerCase();
+    const voices = window.speechSynthesis.getVoices();
+    const voice = voices.find(v => v.lang.toLowerCase().startsWith(targetLangBase));
+
+    if (!voice) {
+        onEnd();
+        return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.voice = voice;
+    utter.lang = targetLang;
+    utter.rate = 0.95;
+    utter.onend = onEnd;
+    utter.onerror = () => onEnd();
+    window.speechSynthesis.speak(utter);
 };
 
 if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis) {
