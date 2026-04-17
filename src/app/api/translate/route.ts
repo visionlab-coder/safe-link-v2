@@ -131,12 +131,15 @@ export async function POST(request: NextRequest) {
         const isChinese = pronLang === 'zh' || pronLang === 'zh-CN';
         const isJapanese = pronLang === 'ja' || pronLang === 'jp';
         const isThai = pronLang === 'th';
+        // 나머지 비라틴 언어: 키릴·아랍·데바나가리·크메르·버마·벵골
+        const nonLatinLangs = new Set(['km', 'mn', 'my', 'ne', 'bn', 'kk', 'ru', 'ar', 'hi']);
         const isLatinScript = /^[a-zA-Z\s\-.,!?'"()0-9\u00C0-\u024F\u1E00-\u1EFF]+$/.test(
             pronTarget.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
         );
-        const needsEnglishBridge = !isLatinScript && !isChinese && !isJapanese && !isThai;
+        const isNonLatinOther = nonLatinLangs.has(pronLang) && !isLatinScript;
+        const needsEnglishBridge = !isLatinScript && !isChinese && !isJapanese && !isThai && !isNonLatinOther;
 
-        const [reverseResult, pronEnglish, chinesePron, japPron, thaiPron] = await Promise.all([
+        const [reverseResult, pronEnglish, chinesePron, japPron, thaiPron, nonLatinPron] = await Promise.all([
             cloudTranslateFast(translatedText, targetLang, sourceLang),
             needsEnglishBridge
                 ? cloudTranslateFast(pronTarget, (tl === 'ko' ? sourceLang : targetLang), 'en')
@@ -149,6 +152,9 @@ export async function POST(request: NextRequest) {
                 : Promise.resolve(""),
             isThai
                 ? generateThaiPronunciation(apiKey, pronTarget)
+                : Promise.resolve(""),
+            isNonLatinOther
+                ? generateNonLatinPronunciation(apiKey, pronTarget, pronLang)
                 : Promise.resolve(""),
         ]);
 
@@ -169,6 +175,8 @@ export async function POST(request: NextRequest) {
             pronunciation = japPron || hangulize(pronTarget, 'ja');
         } else if (isThai) {
             pronunciation = thaiPron || hangulize(pronTarget, 'th');
+        } else if (isNonLatinOther) {
+            pronunciation = nonLatinPron || "";
         } else if (isLatinScript) {
             pronunciation = hangulize(pronTarget, pronLang);
         } else {
@@ -306,6 +314,67 @@ async function generateThaiPronunciation(apiKey: string, thaiText: string): Prom
 5. 발음 결과만 반환, 설명·따옴표·원문 반복 금지
 
 태국어: ${thaiText}
+
+발음:`;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+                signal: controller.signal,
+                body: JSON.stringify({
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                    generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
+                }),
+            }
+        );
+
+        clearTimeout(timeout);
+        if (!response.ok) return "";
+
+        const data = await response.json() as GeminiResponse;
+        const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (!result) return "";
+        const koRatio = (result.match(/[\uAC00-\uD7A3]/g) || []).length / result.length;
+        if (koRatio < 0.5) return "";
+        return result;
+    } catch {
+        return "";
+    }
+}
+
+/** 비라틴 언어(러시아·몽골·미얀마·크메르·네팔·벵골·카자흐·아랍·힌디) → 한글 발음 */
+async function generateNonLatinPronunciation(apiKey: string, text: string, lang: string): Promise<string> {
+    if (!text || text.length > 2000) return "";
+
+    const langExamples: Record<string, string> = {
+        ru: "Привет→쁘리볫, спасибо→스빠씨바, безопасность→비자빠스나스찌",
+        mn: "сайн байна уу→사인 바인나 우, баярлалаа→바야를라라",
+        my: "မင်္ဂလာပါ→밍글라바, ကျေးဇူးတင်ပါ→제주띤빠",
+        km: "ជំរាបសួរ→춤랍수어, សុខសប្បាយ→속삽바이",
+        ne: "नमस्ते→나마스테, धन्यवाद→단야바드",
+        bn: "আমাকে→아마케, ধন্যবাদ→다냐바드",
+        kk: "сәлем→살렘, рахмет→라흐멧",
+        ar: "مرحبا→마르하바, شكراً→슈크란",
+        hi: "नमस्ते→나마스테, धन्यवाद→단야바드",
+    };
+    const examples = langExamples[lang] || "";
+
+    try {
+        const prompt = `다음 외국어 텍스트를 **한국어 한글로 읽는 발음**으로 변환해주세요.
+
+규칙:
+1. 국립국어원 외래어 표기법 기준으로 자연스러운 한글 발음
+2. 발음 예시: ${examples}
+3. 건설 현장 안전 용어도 정확하게 변환
+4. 띄어쓰기는 원문 단위 유지
+5. 발음 결과만 반환, 설명·따옴표·원문 반복 금지
+
+텍스트: ${text}
 
 발음:`;
 
