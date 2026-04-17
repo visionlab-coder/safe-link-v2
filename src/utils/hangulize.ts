@@ -508,31 +508,46 @@ const commonWords: Record<string, string> = {
 };
 
 function genericHangulize(text: string): string {
-    // 1단계: 단어 단위로 분리하여 사전 매핑
     const words = text.toLowerCase().split(/\s+/);
     const result = words.map(word => {
-        // 정확한 단어 매핑이 있으면 사용
-        if (commonWords[word]) return commonWords[word];
+        // 구두점 분리
+        const punctMatch = word.match(/^([^a-z]*)([a-z'-]+)([^a-z]*)$/);
+        const prefix = punctMatch?.[1] || '';
+        const core = punctMatch?.[2] || word;
+        const suffix = punctMatch?.[3] || '';
 
-        // 복합어 처리: 접미사 분리 시도
-        for (const [suffix, suffixKr] of Object.entries(commonWords)) {
-            if (word.endsWith(suffix) && word.length > suffix.length) {
-                const prefix = word.slice(0, word.length - suffix.length);
-                if (commonWords[prefix]) return commonWords[prefix] + suffixKr;
+        // 1. 정확한 단어 매핑
+        if (commonWords[core]) return prefix + commonWords[core] + suffix;
+
+        // 2. 복합어: 접미사 -ing, -ed, -s, -er, -ly 분리 시도
+        const suffixes = [
+            ['ing', '잉'], ['ting', '팅'], ['ding', '딩'], ['ning', '닝'],
+            ['ed', '드'], ['ted', '티드'], ['ded', '디드'],
+            ['ly', '리'], ['ily', '일리'],
+            ['er', '어'], ['or', '어'], ['ers', '어즈'],
+            ['ness', '니스'], ['ment', '먼트'], ['tion', '션'], ['sion', '전'],
+            ['able', '에이블'], ['ible', '이블'],
+            ['ful', '풀'], ['less', '리스'],
+            ['ous', '어스'], ['ive', '이브'],
+            ['al', '올'], ['ial', '이얼'],
+            ['es', '즈'], ['s', '스'],
+        ];
+        for (const [sfx, sfxKr] of suffixes) {
+            if (core.length > sfx.length + 2 && core.endsWith(sfx)) {
+                const stem = core.slice(0, core.length - sfx.length);
+                if (commonWords[stem]) return prefix + commonWords[stem] + sfxKr + suffix;
+                // 자음 중복 제거 (running → run + ning)
+                if (stem.length > 2 && stem[stem.length - 1] === stem[stem.length - 2]) {
+                    const dedupStem = stem.slice(0, -1);
+                    if (commonWords[dedupStem]) return prefix + commonWords[dedupStem] + sfxKr + suffix;
+                }
+                // e 복원 (making → make)
+                if (commonWords[stem + 'e']) return prefix + commonWords[stem + 'e'] + sfxKr + suffix;
             }
         }
 
-        // 2단계: 패턴 기반 변환
-        let converted = word;
-        for (const [pattern, replacement] of engPatterns) {
-            converted = converted.replace(pattern, replacement);
-        }
-
-        // 3단계: 자음 클러스터 정리 (연속 자음 사이에 으 삽입)
-        converted = converted.replace(/([ㅎ])/g, '');  // 독립 ㅎ 제거
-        converted = converted.replace(/ㅇ/g, 'ㅇ');  // 받침 ㅇ 유지
-
-        return converted;
+        // 3. 사전에 없는 단어 → 영어 원문 유지 (깨진 한글보다 나음)
+        return prefix + core + suffix;
     });
 
     return result.join(' ');
