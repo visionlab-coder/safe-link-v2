@@ -30,8 +30,8 @@ export default function WorkerLivePage() {
     const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
     const [isConnected, setIsConnected] = useState(false);
     const [audioEnabled, setAudioEnabled] = useState(true);
-    const [profileId, setProfileId] = useState("");
-    const [siteId, setSiteId] = useState<string | null>(null);
+    // profileId와 siteId를 동시에 세팅하여 subscription이 한 번만 생성되도록
+    const [authReady, setAuthReady] = useState<{ profileId: string; siteId: string | null } | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const ttsQueueRef = useRef<string[]>([]);
     const isPlayingRef = useRef(false);
@@ -78,13 +78,13 @@ export default function WorkerLivePage() {
             const supabase = createClient();
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
-                setProfileId(session.user.id);
                 const { data: profile } = await supabase.from("profiles").select("preferred_lang, site_id").eq("id", session.user.id).single();
                 if (profile?.preferred_lang) {
                     setLang(profile.preferred_lang);
                     langRef.current = profile.preferred_lang;
                 }
-                setSiteId(profile?.site_id || null);
+                // profileId + siteId 동시 세팅 → subscription 1회만 생성
+                setAuthReady({ profileId: session.user.id, siteId: profile?.site_id || null });
             }
         };
         load();
@@ -92,11 +92,12 @@ export default function WorkerLivePage() {
 
     // Subscribe to live translations
     useEffect(() => {
-        if (!profileId) return;
+        if (!authReady) return;
+        const { profileId, siteId } = authReady;
         const supabase = createClient();
 
         const channel = supabase
-            .channel("live_translation_feed")
+            .channel(`live_translation_feed_${profileId}`)
             .on("postgres_changes", {
                 event: "INSERT",
                 schema: "public",
@@ -128,13 +129,25 @@ export default function WorkerLivePage() {
                     return;
                 }
 
-                // 서버 프리번역이 있으면 즉시 사용 (API 호출 0)
+                // 서버 프리번역이 있으면 즉시 표시 후 발음은 비동기로 추가
                 const pretranslated = row.translations?.[myLang];
                 if (pretranslated) {
                     addSubAndScroll(
                         { id: row.id, text_ko: row.text_ko, translated: pretranslated, pronunciation: "", time },
                         pretranslated
                     );
+                    // 발음을 백그라운드로 가져와서 업데이트
+                    fetch("/api/translate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ text: row.text_ko, sl: "ko", tl: myLang }),
+                    }).then(r => r.json()).then(data => {
+                        if (data.pronunciation) {
+                            setSubtitles(prev => prev.map(s =>
+                                s.id === row.id ? { ...s, pronunciation: data.pronunciation } : s
+                            ));
+                        }
+                    }).catch(() => {});
                     return;
                 }
 
@@ -159,7 +172,7 @@ export default function WorkerLivePage() {
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, [profileId, siteId]);
+    }, [authReady]);
 
     const t = getT(lang);
 
