@@ -41,6 +41,8 @@ interface UseCloudSTTOptions {
     onTranscript: (text: string) => void;
     onError?: (type: STTErrorType, message: string) => void;
     chunkInterval?: number;
+    /** 침묵 감지 ms — 이 시간 이상 조용하면 자동 전송 (기본 2000ms) */
+    silenceDuration?: number;
     /** 실시간 통역 모드: Gemini 교정 스킵하여 지연 최소화 */
     live?: boolean;
 }
@@ -53,26 +55,24 @@ const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
     channelCount: 1,
 };
 
-/** API 타임아웃 (ms) — live 모드에서는 sendChunk에서 별도 제한 */
 const FETCH_TIMEOUT = 8_000;
-
-/** 최소 유효 청크 크기 (bytes) - 이 이하는 무음/소음만 포함 가능성 높음 */
 const MIN_CHUNK_SIZE = 2000;
-
-/** 연속 빈 응답 허용 횟수 - 초과 시 전송 스킵 */
 const MAX_EMPTY_STREAK = 2;
+
+/** 침묵 판정 RMS 임계값 (0~1) — 건설 현장 배경음 고려해 낮게 설정 */
+const SILENCE_RMS_THRESHOLD = 0.015;
 
 export function useCloudSTT({
     lang,
     onTranscript,
     onError,
     chunkInterval = 10_000,
+    silenceDuration = 2000,
     live = false,
 }: UseCloudSTTOptions) {
     const [isRecording, setIsRecording] = useState(false);
     const streamRef = useRef<MediaStream | null>(null);
     const recorderRef = useRef<MediaRecorder | null>(null);
-    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const activeRef = useRef(false);
     const cyclingRef = useRef(false);
     const langRef = useRef(lang);
@@ -80,18 +80,32 @@ export function useCloudSTT({
     const onErrorRef = useRef(onError);
     const emptyStreakRef = useRef(0);
 
-    // ref 동기화
+    // VAD (Voice Activity Detection) refs
+    const audioCtxRef = useRef<AudioContext | null>(null);
+    const analyserRef = useRef<AnalyserNode | null>(null);
+    const vadFrameRef = useRef<number | null>(null);
+    const silenceStartRef = useRef<number | null>(null);
+    const maxChunkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const recordingStartRef = useRef<number>(0);
+
     useEffect(() => { langRef.current = lang; }, [lang]);
     useEffect(() => { onTranscriptRef.current = onTranscript; }, [onTranscript]);
     useEffect(() => { onErrorRef.current = onError; }, [onError]);
 
-    /** 녹음 중지 + 리소스 정리 (내부용) */
+    const stopVAD = useCallback(() => {
+        if (vadFrameRef.current) { cancelAnimationFrame(vadFrameRef.current); vadFrameRef.current = null; }
+        if (maxChunkTimerRef.current) { clearTimeout(maxChunkTimerRef.current); maxChunkTimerRef.current = null; }
+        if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+            audioCtxRef.current.close().catch(() => {});
+        }
+        audioCtxRef.current = null;
+        analyserRef.current = null;
+        silenceStartRef.current = null;
+    }, []);
+
     const stopInternal = useCallback(() => {
         activeRef.current = false;
-        if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-        }
+        stopVAD();
         if (recorderRef.current?.state === "recording") {
             recorderRef.current.stop();
         }
@@ -101,16 +115,12 @@ export function useCloudSTT({
         }
         emptyStreakRef.current = 0;
         cyclingRef.current = false;
-    }, []);
+    }, [stopVAD]);
 
-    // 컴포넌트 언마운트 시 자동 정리 (마이크 + 인터벌 누수 방지)
     useEffect(() => {
-        return () => {
-            stopInternal();
-        };
+        return () => { stopInternal(); };
     }, [stopInternal]);
 
-    /** 마이크 스트림 획득 (실패 시 기본 제약조건으로 재시도) */
     const acquireStream = useCallback(async (): Promise<MediaStream> => {
         try {
             return await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
@@ -119,15 +129,12 @@ export function useCloudSTT({
         }
     }, []);
 
-    /** 스트림 활성 상태 확인 + 비활성 시 재연결 */
     const ensureStream = useCallback(async (): Promise<boolean> => {
         if (streamRef.current?.active) return true;
-
         if (streamRef.current) {
             streamRef.current.getTracks().forEach(t => t.stop());
             streamRef.current = null;
         }
-
         try {
             streamRef.current = await acquireStream();
             return true;
@@ -140,7 +147,6 @@ export function useCloudSTT({
     const sendChunk = useCallback(async (blob: Blob) => {
         if (blob.size < MIN_CHUNK_SIZE) return;
 
-        // live 모드에서는 빈 응답 스킵 비활성화 (음성 누락 방지)
         if (!live && emptyStreakRef.current >= MAX_EMPTY_STREAK) {
             emptyStreakRef.current = 0;
             return;
@@ -187,10 +193,10 @@ export function useCloudSTT({
         } finally {
             clearTimeout(timeoutId);
         }
-    }, []);
+    }, [live]);
 
+    // 녹음 시작 + VAD 루프
     const startCycle = useCallback(async () => {
-        // 사이클 겹침 방지
         if (!activeRef.current || cyclingRef.current) return;
         cyclingRef.current = true;
 
@@ -210,14 +216,78 @@ export function useCloudSTT({
                     const blob = new Blob(chunks, { type: mimeType });
                     sendChunk(blob);
                 }
+                // 녹음 완료 후 active 상태면 다음 사이클 즉시 시작
+                if (activeRef.current) {
+                    cyclingRef.current = false;
+                    startCycle();
+                }
             };
 
             recorderRef.current = recorder;
             recorder.start();
+            recordingStartRef.current = Date.now();
+
+            // ── VAD 침묵 감지 시작 ──────────────────────────────────
+            // 이전 VAD 정리
+            if (vadFrameRef.current) { cancelAnimationFrame(vadFrameRef.current); vadFrameRef.current = null; }
+            if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+                audioCtxRef.current.close().catch(() => {});
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const AudioCtxCtor = window.AudioContext || (window as any).webkitAudioContext as typeof AudioContext;
+            const ctx = new AudioCtxCtor();
+            audioCtxRef.current = ctx;
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 512;
+            analyserRef.current = analyser;
+            const source = ctx.createMediaStreamSource(streamRef.current);
+            source.connect(analyser);
+            silenceStartRef.current = null;
+
+            const floatBuf = new Float32Array(analyser.fftSize);
+
+            const vadLoop = () => {
+                if (!activeRef.current || recorder.state !== "recording") return;
+
+                analyser.getFloatTimeDomainData(floatBuf);
+                let sum = 0;
+                for (let i = 0; i < floatBuf.length; i++) sum += floatBuf[i] * floatBuf[i];
+                const rms = Math.sqrt(sum / floatBuf.length);
+
+                const now = Date.now();
+
+                if (rms < SILENCE_RMS_THRESHOLD) {
+                    // 침묵 감지
+                    if (silenceStartRef.current === null) {
+                        silenceStartRef.current = now;
+                    } else if (now - silenceStartRef.current >= silenceDuration) {
+                        // 침묵 지속시간 초과 → 전송
+                        silenceStartRef.current = null;
+                        if (recorder.state === "recording") recorder.stop();
+                        return; // VAD 루프 중단 (onstop에서 새 사이클 시작)
+                    }
+                } else {
+                    // 말소리 감지 → 침묵 타이머 리셋
+                    silenceStartRef.current = null;
+                }
+
+                vadFrameRef.current = requestAnimationFrame(vadLoop);
+            };
+            vadFrameRef.current = requestAnimationFrame(vadLoop);
+
+            // 최대 청크 길이 안전장치 (말을 너무 길게 하는 경우)
+            if (maxChunkTimerRef.current) clearTimeout(maxChunkTimerRef.current);
+            maxChunkTimerRef.current = setTimeout(() => {
+                if (activeRef.current && recorder.state === "recording") {
+                    recorder.stop();
+                }
+            }, chunkInterval);
+
         } finally {
             cyclingRef.current = false;
         }
-    }, [sendChunk, ensureStream]);
+    }, [sendChunk, ensureStream, silenceDuration, chunkInterval]);
 
     const toggle = useCallback(async () => {
         if (activeRef.current) {
@@ -228,24 +298,15 @@ export function useCloudSTT({
 
         try {
             streamRef.current = await acquireStream();
-
             activeRef.current = true;
             emptyStreakRef.current = 0;
             setIsRecording(true);
             startCycle();
-
-            intervalRef.current = setInterval(() => {
-                if (!activeRef.current) return;
-                if (recorderRef.current?.state === "recording") {
-                    recorderRef.current.stop();
-                }
-                startCycle();
-            }, chunkInterval);
         } catch {
             onErrorRef.current?.("mic_denied", "마이크 권한을 허용해주세요.");
             setIsRecording(false);
         }
-    }, [startCycle, chunkInterval, acquireStream, stopInternal]);
+    }, [startCycle, acquireStream, stopInternal]);
 
     return { isRecording, toggle };
 }
