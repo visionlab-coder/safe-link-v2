@@ -11,6 +11,18 @@ const i18n: Record<string, Record<string, string>> = {
     zh: { title: "安全测验", noQuiz: "目前没有进行中的测验", correct: "回答正确！", wrong: "回答错误", correctAnswer: "正确答案", back: "返回", alreadyAnswered: "已经回答过了", waiting: "翻译中..." },
     vi: { title: "BAI KIEM TRA", noQuiz: "Hien khong co bai kiem tra", correct: "Dung roi!", wrong: "Sai roi", correctAnswer: "Dap an dung", back: "Quay lai", alreadyAnswered: "Da tra loi", waiting: "Dang dich..." },
     th: { title: "แบบทดสอบ", noQuiz: "ไม่มีแบบทดสอบ", correct: "ถูกต้อง!", wrong: "ผิด", correctAnswer: "คำตอบที่ถูก", back: "กลับ", alreadyAnswered: "ตอบแล้ว", waiting: "กำลังแปล..." },
+    uz: { title: "XAVFSIZLIK TESTI", noQuiz: "Hozirda faol test yo'q", correct: "To'g'ri!", wrong: "Noto'g'ri", correctAnswer: "To'g'ri javob", back: "Orqaga", alreadyAnswered: "Allaqachon javoblangan", waiting: "Tarjima qilinmoqda..." },
+    ph: { title: "SAFETY QUIZ", noQuiz: "Walang aktibong quiz", correct: "Tama!", wrong: "Mali", correctAnswer: "Tamang sagot", back: "Bumalik", alreadyAnswered: "Nasagot na", waiting: "Nagsasalin..." },
+    ru: { title: "ТЕСТ БЕЗОПАСНОСТИ", noQuiz: "Нет активного теста", correct: "Правильно!", wrong: "Неверно", correctAnswer: "Правильный ответ", back: "Назад", alreadyAnswered: "Уже отвечено", waiting: "Перевод..." },
+    km: { title: "តេស្តសុវត្ថិភាព", noQuiz: "មិនមានតេស្តសកម្ម", correct: "ត្រឹមត្រូវ!", wrong: "មិនត្រឹមត្រូវ", correctAnswer: "ចំលើយត្រឹមត្រូវ", back: "ត្រឡប់", alreadyAnswered: "បានឆ្លើយហើយ", waiting: "កំពុងបកប្រែ..." },
+    mn: { title: "АЮУЛГҮЙ ТЕСТ", noQuiz: "Идэвхтэй тест байхгүй", correct: "Зөв!", wrong: "Буруу", correctAnswer: "Зөв хариулт", back: "Буцах", alreadyAnswered: "Хариулсан байна", waiting: "Орчуулж байна..." },
+    my: { title: "ဘေးကင်းရေး ကွစ်ဇ်", noQuiz: "လက်ရှိ ကွစ်ဇ် မရှိပါ", correct: "မှန်ကန်သည်!", wrong: "မှားယွင်းသည်", correctAnswer: "မှန်ကန်သောအဖြေ", back: "ပြန်သွားပါ", alreadyAnswered: "ဖြေဆိုပြီးပါပြီ", waiting: "ဘာသာပြန်နေသည်..." },
+    ne: { title: "सुरक्षा क्विज", noQuiz: "हालका कुनै क्विज छैन", correct: "सही!", wrong: "गलत", correctAnswer: "सही उत्तर", back: "फिर्ता", alreadyAnswered: "पहिले नै जवाफ दिइसक्यो", waiting: "अनुवाद गर्दै..." },
+    bn: { title: "নিরাপত্তা কুইজ", noQuiz: "বর্তমানে কোনো কুইজ নেই", correct: "সঠিক!", wrong: "ভুল", correctAnswer: "সঠিক উত্তর", back: "ফিরে যান", alreadyAnswered: "ইতিমধ্যে উত্তর দেওয়া হয়েছে", waiting: "অনুবাদ হচ্ছে..." },
+    kk: { title: "ҚАУІПСІЗДІК ТЕСТІ", noQuiz: "Белсенді тест жоқ", correct: "Дұрыс!", wrong: "Қате", correctAnswer: "Дұрыс жауап", back: "Артқа", alreadyAnswered: "Бұрын жауап берілді", waiting: "Аударылуда..." },
+    ar: { title: "اختبار السلامة", noQuiz: "لا يوجد اختبار نشط", correct: "صحيح!", wrong: "خطأ", correctAnswer: "الإجابة الصحيحة", back: "رجوع", alreadyAnswered: "تمت الإجابة بالفعل", waiting: "جارٍ الترجمة..." },
+    hi: { title: "सुरक्षा प्रश्नोत्तरी", noQuiz: "अभी कोई प्रश्नोत्तरी नहीं है", correct: "सही!", wrong: "गलत", correctAnswer: "सही उत्तर", back: "वापस जाएं", alreadyAnswered: "पहले से जवाब दिया गया", waiting: "अनुवाद हो रहा है..." },
+    id: { title: "KUIS KESELAMATAN", noQuiz: "Tidak ada kuis aktif saat ini", correct: "Benar!", wrong: "Salah", correctAnswer: "Jawaban benar", back: "Kembali", alreadyAnswered: "Sudah dijawab", waiting: "Menerjemahkan..." },
 };
 const getT = (lang: string) => i18n[lang] || i18n["en"];
 

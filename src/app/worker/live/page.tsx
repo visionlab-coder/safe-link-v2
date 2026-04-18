@@ -20,6 +20,19 @@ const i18n: Record<string, Record<string, string>> = {
     zh: { title: "实时翻译", waiting: "等待广播...", waitingDesc: "管理员开始广播后自动连接", connected: "已连接", back: "退出" },
     vi: { title: "PHIÊN DỊCH TRỰC TIẾP", waiting: "Đang chờ phát sóng...", waitingDesc: "Sẽ tự động kết nối khi admin bắt đầu", connected: "Đã kết nối", back: "Thoát" },
     th: { title: "ล่ามสด", waiting: "รอการถ่ายทอด...", waitingDesc: "จะเชื่อมต่อเมื่อผู้ดูแลเริ่มถ่ายทอด", connected: "เชื่อมต่อแล้ว", back: "ออก" },
+    uz: { title: "JONLI TARJIMA", waiting: "Efirni kutmoqda...", waitingDesc: "Admin boshlaganda avtomatik ulanadi", connected: "Ulangan", back: "Chiqish" },
+    ph: { title: "LIVE INTERPRETER", waiting: "Naghihintay sa broadcast...", waitingDesc: "Awtomatikong kokonektahin kapag nagsimula ang admin", connected: "Nakakonekta", back: "Lumabas" },
+    ru: { title: "СИНХРОННЫЙ ПЕРЕВОД", waiting: "Ожидание трансляции...", waitingDesc: "Автоматически подключится, когда начнёт администратор", connected: "Подключено", back: "Выйти" },
+    jp: { title: "同時通訳", waiting: "放送を待っています...", waitingDesc: "管理者が放送を開始すると自動接続されます", connected: "接続済み", back: "退出" },
+    km: { title: "បកប្រែផ្ទាល់", waiting: "កំពុងរង់ចាំការផ្សាយ...", waitingDesc: "នឹងភ្ជាប់ដោយស្វ័យប្រវត្តិនៅពេលអ្នកគ្រប់គ្រងចាប់ផ្តើម", connected: "បានភ្ជាប់", back: "ចាកចេញ" },
+    mn: { title: "ШУУД ОРЧУУЛГА", waiting: "Нэвтрүүлэг хүлээж байна...", waitingDesc: "Захиргаа эхлүүлэхэд автоматаар холбогдоно", connected: "Холбогдсон", back: "Гарах" },
+    my: { title: "တိုက်ရိုက် ဘာသာပြန်", waiting: "ထုတ်လွှင့်မှုကို စောင့်နေသည်...", waitingDesc: "မန်နေဂျာ စတင်သောအခါ အလိုအလျောက် ချိတ်ဆက်မည်", connected: "ချိတ်ဆက်ပြီး", back: "ထွက်မည်" },
+    ne: { title: "लाइभ अनुवाद", waiting: "प्रसारण पर्खँदै...", waitingDesc: "व्यवस्थापकले सुरु गरेपछि स्वतः जडान हुनेछ", connected: "जडान भयो", back: "बाहिर निस्कनुहोस्" },
+    bn: { title: "লাইভ অনুবাদ", waiting: "সম্প্রচারের অপেক্ষা...", waitingDesc: "ম্যানেজার শুরু করলে স্বয়ংক্রিয়ভাবে সংযুক্ত হবে", connected: "সংযুক্ত", back: "বের হন" },
+    kk: { title: "ТІКЕЛЕЙ АУДАРМА", waiting: "Трансляция күтуде...", waitingDesc: "Менеджер бастаған кезде автоматты түрде қосылады", connected: "Қосылды", back: "Шығу" },
+    ar: { title: "ترجمة فورية", waiting: "في انتظار البث...", waitingDesc: "سيتصل تلقائيًا عند بدء المدير", connected: "متصل", back: "خروج" },
+    hi: { title: "लाइव अनुवाद", waiting: "प्रसारण की प्रतीक्षा में...", waitingDesc: "प्रबंधक के शुरू करने पर स्वचालित रूप से जुड़ जाएगा", connected: "जुड़ा हुआ", back: "बाहर निकलें" },
+    id: { title: "PENERJEMAH LANGSUNG", waiting: "Menunggu siaran...", waitingDesc: "Akan terhubung otomatis saat admin memulai", connected: "Terhubung", back: "Keluar" },
 };
 const getT = (lang: string) => i18n[lang] || i18n["en"];
 
@@ -96,6 +109,23 @@ export default function WorkerLivePage() {
         load();
     }, []);
 
+    // Presence: 근로자가 이 페이지에 있음을 관리자에게 알림
+    useEffect(() => {
+        if (!authReady) return;
+        const { profileId, siteId } = authReady;
+        const supabase = createClient();
+        const channelName = `live_audience_${siteId || 'global'}`;
+        const channel = supabase.channel(channelName, { config: { presence: { key: profileId } } });
+
+        channel.subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+                await channel.track({ role: 'worker' });
+            }
+        });
+
+        return () => { supabase.removeChannel(channel); };
+    }, [authReady]);
+
     // Subscribe to live translations
     useEffect(() => {
         if (!authReady) return;
@@ -153,18 +183,32 @@ export default function WorkerLivePage() {
                     return;
                 }
 
-                // 폴백: 런타임 번역
+                // 폴백: fast=true로 번역만 즉시 표시 → 발음은 백그라운드
                 try {
                     const res = await fetch("/api/translate", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ text: row.text_ko, sl: "ko", tl: myLang }),
+                        body: JSON.stringify({ text: row.text_ko, sl: "ko", tl: myLang, fast: true }),
                     });
                     const data = await res.json();
+                    const translatedNow = data.translated || row.text_ko;
+                    // 번역문 즉시 표시 (발음 없이)
                     addSubAndScroll(
-                        { id: row.id, text_ko: row.text_ko, translated: data.translated || row.text_ko, pronunciation: data.pronunciation || "", time },
-                        data.translated || row.text_ko
+                        { id: row.id, text_ko: row.text_ko, translated: translatedNow, pronunciation: "", time },
+                        translatedNow
                     );
+                    // 발음은 백그라운드에서 별도 fetch → 완성되면 subtitle 업데이트
+                    fetch("/api/translate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ text: row.text_ko, sl: "ko", tl: myLang }),
+                    }).then(r => r.json()).then(d => {
+                        if (d.pronunciation) {
+                            setSubtitles(prev => prev.map(s =>
+                                s.id === row.id ? { ...s, pronunciation: d.pronunciation } : s
+                            ));
+                        }
+                    }).catch(() => {});
                 } catch {
                     addSubAndScroll(
                         { id: row.id, text_ko: row.text_ko, translated: row.text_ko, pronunciation: "", time }

@@ -30,6 +30,18 @@ const i18n: Record<string, Record<string, string>> = {
     zh: { title: "AI危险检测", subtitle: "拍照后AI自动分析危险", capture: "拍照", analyzing: "分析中...", noItems: "未检测到建筑相关项目", back: "返回", retake: "重新拍照", found: "项检测到" },
     vi: { title: "AI PHÁT HIỆN NGUY HIỂM", subtitle: "Chụp ảnh để AI phân tích nguy hiểm", capture: "CHỤP ẢNH", analyzing: "Đang phân tích...", noItems: "Không phát hiện mục liên quan", back: "Quay lại", retake: "Chụp lại", found: "đã phát hiện" },
     th: { title: "AI ตรวจจับอันตราย", subtitle: "ถ่ายรูปแล้ว AI จะวิเคราะห์อันตราย", capture: "ถ่ายรูป", analyzing: "กำลังวิเคราะห์...", noItems: "ไม่พบรายการที่เกี่ยวข้อง", back: "กลับ", retake: "ถ่ายใหม่", found: "ตรวจพบ" },
+    uz: { title: "AI XAVF", subtitle: "Rasm oling, AI tahlil qiladi", capture: "RASM OLISH", analyzing: "Tahlil qilinmoqda...", noItems: "Qurilish ob'ektlari topilmadi", back: "Orqaga", retake: "Qayta olish", found: "topildi" },
+    ph: { title: "AI HAZARD SCAN", subtitle: "Kumuha ng larawan para suriin ng AI", capture: "KUMUHA NG LARAWAN", analyzing: "Sinusuri...", noItems: "Walang naitalang konstruksyon", back: "Bumalik", retake: "Kumuha Ulit", found: "natukoy" },
+    ru: { title: "AI АНАЛИЗ", subtitle: "Сфотографируйте для анализа AI", capture: "СФОТОГРАФИРОВАТЬ", analyzing: "Анализ...", noItems: "Строительные объекты не обнаружены", back: "Назад", retake: "Переснять", found: "обнаружено" },
+    km: { title: "AI រកគ្រោះថ្នាក់", subtitle: "ថតរូបដើម្បី AI វិភាគ", capture: "ថតរូប", analyzing: "កំពុងវិភាគ...", noItems: "រកមិនឃើញធាតុសំណង់", back: "ត្រឡប់", retake: "ថតម្តងទៀត", found: "ត្រូវបានរកឃើញ" },
+    mn: { title: "AI АЮУЛ", subtitle: "Зураг авахад AI шинжилнэ", capture: "ЗУРАГ АВАХ", analyzing: "Шинжилж байна...", noItems: "Барилгын объект олдсонгүй", back: "Буцах", retake: "Дахин авах", found: "илрүүлсэн" },
+    my: { title: "AI အန္တရာယ် ရှာဖွေ", subtitle: "ဓာတ်ပုံ ရိုက်ပါ AI စစ်ဆေးမည်", capture: "ဓာတ်ပုံ ရိုက်ပါ", analyzing: "စစ်ဆေးနေသည်...", noItems: "ဆောက်လုပ်ရေး ပစ္စည်းများ မတွေ့ပါ", back: "ပြန်သွားပါ", retake: "ပြန်ရိုက်ပါ", found: "တွေ့ရှိသည်" },
+    ne: { title: "AI खतरा पहिचान", subtitle: "फोटो खिचे AI ले विश्लेषण गर्छ", capture: "फोटो खिच्नुहोस्", analyzing: "विश्लेषण गर्दै...", noItems: "निर्माण सम्बन्धित वस्तु फेला परेन", back: "फिर्ता", retake: "पुनः खिच्नुहोस्", found: "पहिचान भयो" },
+    bn: { title: "AI বিপদ শনাক্তকরণ", subtitle: "ছবি তুলুন AI বিশ্লেষণ করবে", capture: "ছবি তুলুন", analyzing: "বিশ্লেষণ হচ্ছে...", noItems: "নির্মাণ সম্পর্কিত কিছু পাওয়া যায়নি", back: "ফিরে যান", retake: "পুনরায় তুলুন", found: "শনাক্ত করা হয়েছে" },
+    kk: { title: "AI ҚАУІП", subtitle: "Сурет түсіріңіз, AI талдайды", capture: "СУРЕТ ТҮСІРУ", analyzing: "Талдануда...", noItems: "Құрылыс объектілері табылмады", back: "Артқа", retake: "Қайта түсіру", found: "анықталды" },
+    ar: { title: "فحص المخاطر AI", subtitle: "التقط صورة وسيحلل الذكاء الاصطناعي المخاطر", capture: "التقاط صورة", analyzing: "جارٍ التحليل...", noItems: "لم يتم اكتشاف عناصر بناء", back: "رجوع", retake: "إعادة الالتقاط", found: "تم اكتشافه" },
+    hi: { title: "AI खतरा पहचान", subtitle: "फोटो लें और AI खतरे का विश्लेषण करेगा", capture: "फोटो लें", analyzing: "विश्लेषण हो रहा है...", noItems: "निर्माण संबंधी कोई वस्तु नहीं मिली", back: "वापस जाएं", retake: "पुनः लें", found: "पाया गया" },
+    id: { title: "AI DETEKSI BAHAYA", subtitle: "Ambil foto dan AI akan menganalisis bahaya", capture: "AMBIL FOTO", analyzing: "Menganalisis...", noItems: "Tidak ada item konstruksi yang terdeteksi", back: "Kembali", retake: "Ambil Ulang", found: "terdeteksi" },
 };
 const getT = (lang: string) => i18n[lang] || i18n["en"];
 

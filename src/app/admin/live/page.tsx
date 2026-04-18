@@ -29,16 +29,18 @@ function AdminLiveContent() {
         load();
     }, []);
 
-    // Track listeners via Supabase presence
+    // Track listeners via Supabase presence — site-based fixed channel so workers can join
     useEffect(() => {
-        if (!isLive || !sessionId) return;
+        if (!adminId) return;
         const supabase = createClient();
-        const channel = supabase.channel(`live_presence_${sessionId}`, { config: { presence: { key: adminId } } });
+        const channelName = `live_audience_${siteId || 'global'}`;
+        const channel = supabase.channel(channelName, { config: { presence: { key: adminId } } });
 
         channel
             .on('presence', { event: 'sync' }, () => {
                 const state = channel.presenceState();
-                setListenerCount(Math.max(0, Object.keys(state).length - 1));
+                const workerCount = Object.values(state).flat().filter((p: any) => (p as any).role === 'worker').length;
+                setListenerCount(workerCount);
             })
             .subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
@@ -47,7 +49,7 @@ function AdminLiveContent() {
             });
 
         return () => { supabase.removeChannel(channel); };
-    }, [isLive, sessionId, adminId]);
+    }, [adminId, siteId]);
 
     const handleTranscript = useCallback(async (text: string) => {
         if (!sessionId || !text.trim()) return;

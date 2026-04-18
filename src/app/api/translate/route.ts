@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const { text, sl, tl } = await request.json();
+        const { text, sl, tl, fast } = await request.json();
 
         if (!text || !sl || !tl) {
             return NextResponse.json({ error: "Missing required texts" }, { status: 400 });
@@ -126,6 +126,7 @@ export async function POST(request: NextRequest) {
             }).then(r => r.json() as Promise<CloudTranslateResponse>);
 
         // 2단계: 역번역 + 발음 생성을 완전 병렬 실행
+        // fast=true: Gemini 발음 생성 스킵 → 번역 즉시 반환 (실시간 통역 폴백 경로 고속화)
         const pronTarget = tl === 'ko' ? processedText : translatedText;
         const pronLang = tl === 'ko' ? sl : tl;
         const isChinese = pronLang === 'zh' || pronLang === 'zh-CN';
@@ -141,19 +142,19 @@ export async function POST(request: NextRequest) {
 
         const [reverseResult, pronEnglish, chinesePron, japPron, thaiPron, nonLatinPron] = await Promise.all([
             cloudTranslateFast(translatedText, targetLang, sourceLang),
-            needsEnglishBridge
+            (!fast && needsEnglishBridge)
                 ? cloudTranslateFast(pronTarget, (tl === 'ko' ? sourceLang : targetLang), 'en')
                 : Promise.resolve(null),
-            isChinese
+            (!fast && isChinese)
                 ? generateChinesePronunciation(apiKey, pronTarget)
                 : Promise.resolve(""),
-            isJapanese
+            (!fast && isJapanese)
                 ? generateJapanesePronunciation(apiKey, pronTarget)
                 : Promise.resolve(""),
-            isThai
+            (!fast && isThai)
                 ? generateThaiPronunciation(apiKey, pronTarget)
                 : Promise.resolve(""),
-            isNonLatinOther
+            (!fast && isNonLatinOther)
                 ? generateNonLatinPronunciation(apiKey, pronTarget, pronLang)
                 : Promise.resolve(""),
         ]);

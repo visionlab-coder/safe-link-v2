@@ -165,24 +165,13 @@ export async function POST(req: Request) {
         const languageCode = lang || "ko-KR";
         const shortLang = languageCode.split('-')[0];
 
-        // === 1. Whisper 우선 (소음 현장 최적, 전체 언어 지원) ===
-        if (OPENAI_API_KEY && WHISPER_LANG_MAP[shortLang]) {
+        // === 1. live 모드: Google Cloud STT 우선 (Whisper보다 3~6배 빠름 — 200~500ms vs 1~3s) ===
+        if (!live && OPENAI_API_KEY && WHISPER_LANG_MAP[shortLang]) {
             const transcript = await transcribeWithWhisper(audio, mimeType, languageCode, OPENAI_API_KEY);
 
             if (transcript) {
-                // 한국어: 은어 정규화 (동기, 즉시) + Gemini 교정 (live 모드에서는 스킵)
+                // 한국어: 은어 정규화 (동기, 즉시) + Gemini 교정
                 if (shortLang === 'ko') {
-                    if (live) {
-                        // 실시간 통역: 은어 정규화만 (0ms), Gemini 교정 스킵 (1~3초 절약)
-                        const { normalized, changes } = normalizeServerSide(transcript);
-                        return NextResponse.json({
-                            transcript: normalized,
-                            normalized: changes.length > 0,
-                            changes,
-                            engine: "whisper",
-                            live: true,
-                        });
-                    }
                     if (GOOGLE_API_KEY) {
                         const corrected = await correctWithLLM(transcript, GOOGLE_API_KEY);
                         const { normalized, changes } = normalizeServerSide(corrected);
@@ -201,7 +190,7 @@ export async function POST(req: Request) {
             // Whisper 실패 시 Google 폴백으로 계속
         }
 
-        // === 2. Google Cloud STT 폴백 ===
+        // === 2. Google Cloud STT (live 모드 기본 + non-live 폴백) ===
         if (!GOOGLE_API_KEY) {
             return NextResponse.json({ error: "STT unavailable" }, { status: 503 });
         }
