@@ -68,7 +68,8 @@ export default function TravelTalk() {
   }, []);
 
   /* ── Pusher 연결 ── */
-  const connectPusher = (code: string, lang: string) => {
+  // isGuest: 게스트(QR 스캔한 쪽)만 true → join 알림 전송
+  const connectPusher = (code: string, lang: string, isGuest: boolean) => {
     if (pusherRef.current) pusherRef.current.disconnect();
 
     pusherRef.current = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
@@ -89,26 +90,30 @@ export default function TravelTalk() {
 
     channelRef.current.bind('partner-left', () => setPartner(false));
 
-    fetch('/api/travel/join', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ room: code, lang }),
-    });
+    // 구독 확정 후에 join 알림 전송 (타이밍 문제 방지)
+    if (isGuest) {
+      channelRef.current.bind('pusher:subscription_succeeded', () => {
+        fetch('/api/travel/join', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ room: code, lang }),
+        });
+      });
+    }
   };
 
   const createRoom = () => {
     const code = Math.floor(1000 + Math.random() * 9000).toString();
     setRoomCode(code);
     setPhase('waiting');
-    connectPusher(code, myLang);
+    connectPusher(code, myLang, false); // 호스트: join 알림 안 보냄
   };
 
   const joinRoom = (code: string, lang: string) => {
     setRoomCode(code);
     setMyLang(lang);
-    setPartner(true);
     setPhase('chat');
-    connectPusher(code, lang);
+    connectPusher(code, lang, true); // 게스트: 구독 확정 후 join 알림 전송
   };
 
   const sendMessage = async (text: string) => {
