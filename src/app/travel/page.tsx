@@ -184,7 +184,7 @@ export default function TravelTalk() {
   const [partnerLang, setPartnerLang] = useState<string | null>(null);
   const [ttsEnabled, setTtsEnabled]   = useState(true);
   const [voiceGender, setVoiceGender] = useState<VoiceGender>('female');
-  const [mode, setMode]               = useState<ChatMode>('simultaneous');
+  const [mode, setMode]               = useState<ChatMode>('conversation');
   const [learningMode, setLearningMode] = useState(false); // false = 빠른 대화, true = 학습(발음+역번역)
   const [myRole, setMyRole]           = useState<'host' | 'guest'>('guest');
 
@@ -346,10 +346,7 @@ export default function TravelTalk() {
     setMyRole('guest');
     setPhase('chat');
     subscribeChannel(code, 'guest', lang);
-    // 게스트: 사용자 클릭 컨텍스트 내에서 직접 STT 시작
-    // iOS Safari는 getUserMedia를 useEffect에서 호출하면 차단함
-    toggleSTT();
-  }, [subscribeChannel, unlockAudio, toggleSTT]);
+  }, [subscribeChannel, unlockAudio]);
 
   /* 동시통역 모드: 호스트는 파트너 입장 시 presence 이벤트로 phase 전환 → effect에서 STT 시작
      게스트는 joinRoom(클릭 컨텍스트)에서 직접 시작하므로 여기서 제외 */
