@@ -54,12 +54,12 @@ function PlayBtn({ text, lang, onPlay }: { text: string; lang: string; onPlay: (
 }
 
 /* ─── 메시지 버블 컴포넌트 ─── */
-function MsgBubble({ msg, isKorean, onPlay }: {
-  msg: Message; isKorean: boolean;
+function MsgBubble({ msg, isKorean, learningMode, onPlay }: {
+  msg: Message; isKorean: boolean; learningMode: boolean;
   onPlay: (text: string, lang: string) => void;
 }) {
-  const hasPron = isKorean && msg.pronunciation;
-  const hasRev  = isKorean && msg.reverse_translated;
+  const hasPron = isKorean && learningMode && msg.pronunciation;
+  const hasRev  = isKorean && learningMode && msg.reverse_translated;
 
   if (msg.mine) {
     return (
@@ -184,8 +184,9 @@ export default function TravelTalk() {
   const [partnerLang, setPartnerLang] = useState<string | null>(null);
   const [ttsEnabled, setTtsEnabled]   = useState(true);
   const [voiceGender, setVoiceGender] = useState<VoiceGender>('female');
-  const [mode, setMode]               = useState<ChatMode>('conversation');
+  const [mode, setMode]               = useState<ChatMode>('simultaneous');
   const [learningMode, setLearningMode] = useState(false); // false = 빠른 대화, true = 학습(발음+역번역)
+  const [myRole, setMyRole]           = useState<'host' | 'guest'>('guest');
 
   const channelRef       = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const bottomRef        = useRef<HTMLDivElement>(null);
@@ -319,6 +320,7 @@ export default function TravelTalk() {
     unlockAudio();
     const code = Math.floor(1000 + Math.random() * 9000).toString();
     setRoomCode(code);
+    setMyRole('host');
     setPhase('waiting');
     subscribeChannel(code, 'host', myLang);
   }, [myLang, subscribeChannel, unlockAudio]);
@@ -327,6 +329,7 @@ export default function TravelTalk() {
     unlockAudio();
     setRoomCode(code);
     setMyLang(lang);
+    setMyRole('guest');
     setPhase('chat');
     subscribeChannel(code, 'guest', lang);
   }, [subscribeChannel, unlockAudio]);
@@ -345,8 +348,8 @@ export default function TravelTalk() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, mode]);
 
-  /* 학습 모드 여부 — 한국인 사용자에게만 적용 */
   const isKorean = myLang === 'ko';
+  const isHost   = myRole === 'host';
 
   /* ════ HOME ════ */
   if (phase === 'home') return (
@@ -493,21 +496,23 @@ export default function TravelTalk() {
             color="#5dade2"
           />
 
-          {/* 대화 / 동시통역 모드 */}
-          <Toggle
-            on={isSim}
-            onToggle={() => {
-              const next: ChatMode = isSim ? 'conversation' : 'simultaneous';
-              setMode(next);
-              if (next === 'conversation' && isRecording) toggleSTT();
-            }}
-            labelOn="동시통역"
-            labelOff="대화"
-            color={RED}
-          />
+          {/* 대화 / 동시통역 모드 — 호스트만 표시 */}
+          {isHost && (
+            <Toggle
+              on={isSim}
+              onToggle={() => {
+                const next: ChatMode = isSim ? 'conversation' : 'simultaneous';
+                setMode(next);
+                if (next === 'conversation' && isRecording) toggleSTT();
+              }}
+              labelOn="동시통역"
+              labelOff="대화"
+              color={RED}
+            />
+          )}
 
           {/* 학습 모드 토글 — 한국인 호스트만 표시 */}
-          {isKorean && (
+          {isHost && isKorean && (
             <Toggle
               on={learningMode}
               onToggle={() => setLearningMode(v => !v)}
@@ -536,7 +541,7 @@ export default function TravelTalk() {
               <p style={{ fontSize: 12, lineHeight: 2.4, color: '#2e2e3e' }}>
                 {isSim ? '말하면 자동으로 번역됩니다 · 話すと自動翻訳' : '버튼을 눌러 대화를 시작하세요 · タップして話す'}
               </p>
-              {isKorean && (
+              {isKorean && learningMode && (
                 <div style={{ marginTop: 16, padding: '10px 14px', background: BLUE, borderRadius: 12, fontSize: 11, color: 'rgba(100,180,255,0.7)', lineHeight: 2 }}>
                   한글 발음 · 역번역 자동 표시<br />
                   <span style={{ opacity: 0.6 }}>상대방 언어를 따라 읽을 수 있습니다</span>
@@ -546,7 +551,7 @@ export default function TravelTalk() {
           )}
 
           {messages.map(msg => (
-            <MsgBubble key={msg.id} msg={msg} isKorean={isKorean} onPlay={speakTTS} />
+            <MsgBubble key={msg.id} msg={msg} isKorean={isKorean} learningMode={learningMode} onPlay={speakTTS} />
           ))}
 
           {translating && (
