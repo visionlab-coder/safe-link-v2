@@ -1,13 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/utils/supabase/client';
 import { QRCodeSVG } from 'qrcode.react';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = createClient();
 
 const LANGS: Record<string, { label: string; flag: string; stt: string; tts: string }> = {
   ko: { label: '한국어', flag: '🇰🇷', stt: 'ko-KR', tts: 'ko-KR' },
@@ -67,46 +64,46 @@ export default function TravelTalk() {
     }
   }, []);
 
-  /* ── Supabase Realtime 채널 구독 ── */
+  /* ── Supabase Realtime 채널 구독 (usePresence.ts 동일 패턴) ── */
   const subscribeChannel = (code: string, myRole: 'host' | 'guest', lang: string) => {
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
     }
 
     const ch = supabase.channel(`travel-${code}`, {
-      config: {
-        presence: { key: myRole },
-        broadcast: { self: false },
-      },
+      config: { presence: { key: myRole } },
     });
 
-    // Presence: 상대방이 채널에 들어오면 감지
-    ch.on('presence', { event: 'join' }, ({ newPresences }: { newPresences: Array<{ lang: string; role: string }> }) => {
-      const partner = newPresences.find(p => p.role !== myRole);
-      if (partner) {
-        setPartnerLang(partner.lang);
+    const handlePresenceChange = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const state: Record<string, any[]> = ch.presenceState();
+      const roles = Object.keys(state);
+      // 상대방(다른 role)이 있으면 chat으로 전환
+      const partnerRole = myRole === 'host' ? 'guest' : 'host';
+      if (roles.includes(partnerRole)) {
+        const partnerData = state[partnerRole]?.[0];
+        if (partnerData?.lang) setPartnerLang(partnerData.lang);
         setPartner(true);
         setPhase('chat');
+      } else {
+        setPartner(false);
       }
-    });
+    };
 
-    ch.on('presence', { event: 'leave' }, () => setPartner(false));
-
-    // 번역 메시지 수신
-    ch.on('broadcast', { event: 'new-message' }, ({ payload }: { payload: Message }) => {
-      setMessages(prev => [...prev, { ...payload, mine: false }]);
-      speakTTS(payload.translated, myLangRef.current);
-    });
-
-    // 구독 완료 후 Presence 등록
-    ch.subscribe(async (status: string) => {
-      if (status === 'SUBSCRIBED') {
-        await ch.track({ role: myRole, lang });
-      }
-    });
+    ch.on('presence', { event: 'sync'  }, handlePresenceChange)
+      .on('presence', { event: 'join'  }, handlePresenceChange)
+      .on('presence', { event: 'leave' }, handlePresenceChange)
+      .on('broadcast', { event: 'new-message' }, ({ payload }: { payload: Message }) => {
+        setMessages(prev => [...prev, { ...payload, mine: false }]);
+        speakTTS(payload.translated, myLangRef.current);
+      })
+      .subscribe(async (status: string) => {
+        if (status === 'SUBSCRIBED') {
+          await ch.track({ role: myRole, lang });
+        }
+      });
 
     channelRef.current = ch;
-    return ch;
   };
 
   const createRoom = () => {
@@ -120,7 +117,6 @@ export default function TravelTalk() {
     setRoomCode(code);
     setMyLang(lang);
     setPhase('chat');
-    setPartner(true);
     subscribeChannel(code, 'guest', lang);
   };
 
