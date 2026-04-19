@@ -1,17 +1,19 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { QRCodeSVG } from 'qrcode.react';
+import { playPremiumAudio } from '@/utils/tts';
+import { useCloudSTT } from '@/hooks/useCloudSTT';
 
 const supabase = createClient();
 
-const LANGS: Record<string, { label: string; flag: string; stt: string; tts: string }> = {
-  ko: { label: '한국어', flag: '🇰🇷', stt: 'ko-KR', tts: 'ko-KR' },
-  ja: { label: '日本語', flag: '🇯🇵', stt: 'ja-JP', tts: 'ja-JP' },
-  en: { label: 'English', flag: '🇺🇸', stt: 'en-US', tts: 'en-US' },
-  zh: { label: '中文',    flag: '🇨🇳', stt: 'zh-CN', tts: 'zh-CN' },
-  vi: { label: 'Việt',   flag: '🇻🇳', stt: 'vi-VN', tts: 'vi-VN' },
+const LANGS: Record<string, { label: string; flag: string; stt: string }> = {
+  ko: { label: '한국어', flag: '🇰🇷', stt: 'ko-KR' },
+  ja: { label: '日本語', flag: '🇯🇵', stt: 'ja-JP' },
+  en: { label: 'English', flag: '🇺🇸', stt: 'en-US' },
+  zh: { label: '中文',    flag: '🇨🇳', stt: 'zh-CN' },
+  vi: { label: 'Việt',   flag: '🇻🇳', stt: 'vi-VN' },
 };
 
 interface Message {
@@ -23,6 +25,8 @@ interface Message {
   time: string;
 }
 
+type ChatMode = 'conversation' | 'simultaneous';
+
 const RED = '#c0392b';
 const PAGE = {
   minHeight: '100vh', background: '#07070e', color: '#ede8e3',
@@ -31,27 +35,30 @@ const PAGE = {
 } as const;
 
 export default function TravelTalk() {
-  const [phase, setPhase]           = useState<'home' | 'waiting' | 'join' | 'chat'>('home');
-  const [myLang, setMyLang]         = useState('ko');
-  const [roomCode, setRoomCode]     = useState('');
-  const [inputCode, setInputCode]   = useState('');
+  const [phase, setPhase]             = useState<'home' | 'waiting' | 'join' | 'chat'>('home');
+  const [myLang, setMyLang]           = useState('ko');
+  const [roomCode, setRoomCode]       = useState('');
+  const [inputCode, setInputCode]     = useState('');
   const [pendingCode, setPendingCode] = useState('');
-  const [messages, setMessages]     = useState<Message[]>([]);
-  const [travelUrl, setTravelUrl]   = useState('');
-  const [listening, setListening]   = useState(false);
-  const [partnerOnline, setPartner] = useState(false);
-  const [inputText, setInputText]   = useState('');
+  const [messages, setMessages]       = useState<Message[]>([]);
+  const [travelUrl, setTravelUrl]     = useState('');
+  const [partnerOnline, setPartner]   = useState(false);
+  const [inputText, setInputText]     = useState('');
   const [translating, setTranslating] = useState(false);
   const [partnerLang, setPartnerLang] = useState<string | null>(null);
+  const [ttsEnabled, setTtsEnabled]   = useState(true);
+  const [mode, setMode]               = useState<ChatMode>('conversation');
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const channelRef = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognRef  = useRef<any>(null);
-  const bottomRef  = useRef<HTMLDivElement>(null);
-  const myLangRef  = useRef(myLang);
+  const channelRef    = useRef<any>(null);
+  const bottomRef     = useRef<HTMLDivElement>(null);
+  const myLangRef     = useRef(myLang);
+  const ttsEnabledRef = useRef(ttsEnabled);
+  const partnerLangRef = useRef(partnerLang);
 
   useEffect(() => { myLangRef.current = myLang; }, [myLang]);
+  useEffect(() => { ttsEnabledRef.current = ttsEnabled; }, [ttsEnabled]);
+  useEffect(() => { partnerLangRef.current = partnerLang; }, [partnerLang]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   useEffect(() => {
@@ -64,8 +71,13 @@ export default function TravelTalk() {
     }
   }, []);
 
-  /* ── Supabase Realtime 채널 구독 (usePresence.ts 동일 패턴) ── */
-  const subscribeChannel = (code: string, myRole: 'host' | 'guest', lang: string) => {
+  const speakTTS = useCallback((text: string) => {
+    if (!text || !ttsEnabledRef.current) return;
+    playPremiumAudio(text, myLangRef.current, 'female');
+  }, []);
+
+  /* ── Supabase Realtime 채널 구독 ── */
+  const subscribeChannel = useCallback((code: string, myRole: 'host' | 'guest', lang: string) => {
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
     }
@@ -77,10 +89,8 @@ export default function TravelTalk() {
     const handlePresenceChange = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const state: Record<string, any[]> = ch.presenceState();
-      const roles = Object.keys(state);
-      // 상대방(다른 role)이 있으면 chat으로 전환
       const partnerRole = myRole === 'host' ? 'guest' : 'host';
-      if (roles.includes(partnerRole)) {
+      if (Object.keys(state).includes(partnerRole)) {
         const partnerData = state[partnerRole]?.[0];
         if (partnerData?.lang) setPartnerLang(partnerData.lang);
         setPartner(true);
@@ -95,7 +105,7 @@ export default function TravelTalk() {
       .on('presence', { event: 'leave' }, handlePresenceChange)
       .on('broadcast', { event: 'new-message' }, ({ payload }: { payload: Message }) => {
         setMessages(prev => [...prev, { ...payload, mine: false }]);
-        speakTTS(payload.translated, myLangRef.current);
+        speakTTS(payload.translated);
       })
       .subscribe(async (status: string) => {
         if (status === 'SUBSCRIBED') {
@@ -104,45 +114,29 @@ export default function TravelTalk() {
       });
 
     channelRef.current = ch;
-  };
+  }, [speakTTS]);
 
-  const createRoom = () => {
-    const code = Math.floor(1000 + Math.random() * 9000).toString();
-    setRoomCode(code);
-    setPhase('waiting');
-    subscribeChannel(code, 'host', myLang);
-  };
-
-  const joinRoom = (code: string, lang: string) => {
-    setRoomCode(code);
-    setMyLang(lang);
-    setPhase('chat');
-    subscribeChannel(code, 'guest', lang);
-  };
-
-  const sendMessage = async (text: string) => {
+  const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || translating) return;
     setTranslating(true);
     setInputText('');
-    const targetLang = partnerLang || (myLang === 'ko' ? 'ja' : 'ko');
+    const pLang = partnerLangRef.current || (myLangRef.current === 'ko' ? 'ja' : 'ko');
     try {
       const res = await fetch('/api/travel/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, from: myLang, to: targetLang }),
+        body: JSON.stringify({ text, from: myLangRef.current, to: pLang }),
       });
       const { translated } = await res.json();
 
       const msg: Message = {
         id: Date.now(), original: text, translated,
-        mine: true, lang: myLang,
+        mine: true, lang: myLangRef.current,
         time: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
       };
 
-      // 내 화면에 표시
       setMessages(prev => [...prev, msg]);
 
-      // 상대방에게 클라이언트 broadcast (서버 경유 없이)
       channelRef.current?.send({
         type: 'broadcast',
         event: 'new-message',
@@ -153,31 +147,40 @@ export default function TravelTalk() {
     } finally {
       setTranslating(false);
     }
-  };
+  }, [translating]);
 
-  const startSTT = () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const w = window as any;
-    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!SR) { alert('Chrome을 사용해주세요.'); return; }
-    recognRef.current = new SR();
-    recognRef.current.lang = LANGS[myLang].stt;
-    recognRef.current.interimResults = false;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    recognRef.current.onresult = (e: any) => sendMessage(e.results[0][0].transcript);
-    recognRef.current.onend = () => setListening(false);
-    recognRef.current.start();
-    setListening(true);
-  };
+  const createRoom = useCallback(() => {
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    setRoomCode(code);
+    setPhase('waiting');
+    subscribeChannel(code, 'host', myLang);
+  }, [myLang, subscribeChannel]);
 
-  const stopSTT = () => { recognRef.current?.stop(); setListening(false); };
+  const joinRoom = useCallback((code: string, lang: string) => {
+    setRoomCode(code);
+    setMyLang(lang);
+    setPhase('chat');
+    subscribeChannel(code, 'guest', lang);
+  }, [subscribeChannel]);
 
-  const speakTTS = (text: string, lang: string) => {
-    if (!text) return;
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = LANGS[lang]?.tts || 'ko-KR';
-    window.speechSynthesis.speak(u);
-  };
+  /* ── Cloud STT 훅 ── */
+  const { isRecording, toggle: toggleSTT } = useCloudSTT({
+    lang: LANGS[myLang]?.stt || 'ko-KR',
+    onTranscript: sendMessage,
+    live: true,
+    silenceDuration: mode === 'simultaneous' ? 1000 : 1500,
+  });
+
+  /* 동시통역 모드: 채팅 진입 시 자동 STT 시작 */
+  const modeRef = useRef(mode);
+  useEffect(() => { modeRef.current = mode; }, [mode]);
+
+  useEffect(() => {
+    if (phase === 'chat' && mode === 'simultaneous' && !isRecording) {
+      toggleSTT();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, mode]);
 
   /* ════ HOME ════ */
   if (phase === 'home') return (
@@ -288,33 +291,77 @@ export default function TravelTalk() {
 
   /* ════ CHAT ════ */
   const pLang = partnerLang || (myLang === 'ko' ? 'ja' : 'ko');
+  const isSim = mode === 'simultaneous';
 
   return (
     <div style={PAGE}>
       <div style={{ width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
 
-        <div style={{ padding: '13px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.055)', background: 'rgba(7,7,14,0.96)', backdropFilter: 'blur(20px)', position: 'sticky', top: 0, zIndex: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: partnerOnline ? '#2ecc71' : '#3a3a4a', display: 'inline-block', transition: 'background 0.3s' }} />
-            <span style={{ fontSize: 11, color: partnerOnline ? '#2ecc71' : '#3a3a4a' }}>
-              {partnerOnline ? '연결됨 · 接続中' : '연결 끊김'}
+        {/* 헤더 */}
+        <div style={{ padding: '11px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.055)', background: 'rgba(7,7,14,0.96)', backdropFilter: 'blur(20px)', position: 'sticky', top: 0, zIndex: 20 }}>
+          {/* 연결 상태 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: partnerOnline ? '#2ecc71' : '#3a3a4a', display: 'inline-block', transition: 'background 0.3s' }} />
+            <span style={{ fontSize: 10, color: partnerOnline ? '#2ecc71' : '#3a3a4a' }}>
+              {partnerOnline ? '연결됨' : '끊김'}
             </span>
           </div>
-          <span style={{ fontSize: 10, color: '#2a2a3a', letterSpacing: 4 }}>#{roomCode}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ fontSize: 17 }}>{LANGS[myLang]?.flag}</span>
-            <span style={{ fontSize: 11, color: '#333' }}>↔</span>
-            <span style={{ fontSize: 17 }}>{LANGS[pLang]?.flag}</span>
+
+          {/* 언어 표시 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 16 }}>{LANGS[myLang]?.flag}</span>
+            <span style={{ fontSize: 10, color: '#333' }}>↔</span>
+            <span style={{ fontSize: 16 }}>{LANGS[pLang]?.flag}</span>
+          </div>
+
+          {/* TTS 토글 + 모드 스위치 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* TTS 켜기/끄기 */}
+            <button onClick={() => setTtsEnabled(v => !v)} title={ttsEnabled ? '음성 끄기' : '음성 켜기'} style={{
+              padding: '4px 8px', borderRadius: 8,
+              background: ttsEnabled ? 'rgba(46,204,113,0.15)' : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${ttsEnabled ? 'rgba(46,204,113,0.4)' : 'rgba(255,255,255,0.1)'}`,
+              color: ttsEnabled ? '#2ecc71' : '#444', fontSize: 14, cursor: 'pointer', lineHeight: 1,
+            }}>
+              {ttsEnabled ? '🔊' : '🔇'}
+            </button>
+
+            {/* 대화 / 동시통역 모드 */}
+            <button onClick={() => {
+              const next: ChatMode = isSim ? 'conversation' : 'simultaneous';
+              setMode(next);
+              if (next === 'conversation' && isRecording) toggleSTT();
+            }} style={{
+              padding: '4px 9px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+              background: isSim ? 'rgba(192,57,43,0.2)' : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${isSim ? 'rgba(192,57,43,0.5)' : 'rgba(255,255,255,0.1)'}`,
+              color: isSim ? '#e74c3c' : '#555', whiteSpace: 'nowrap',
+            }}>
+              {isSim ? '동시통역' : '대화'}
+            </button>
           </div>
         </div>
 
+        {/* 모드 안내 배너 */}
+        {isSim && (
+          <div style={{ padding: '6px 16px', background: 'rgba(192,57,43,0.07)', borderBottom: '1px solid rgba(192,57,43,0.15)', display: 'flex', alignItems: 'center', gap: 7, fontSize: 11 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: isRecording ? RED : '#555', animation: isRecording ? 'blink 1s infinite' : 'none', display: 'inline-block' }} />
+            <span style={{ color: isRecording ? '#e74c3c' : '#555' }}>
+              {isRecording ? '동시통역 중 · 同時通訳中 · Interpreting...' : '마이크 시작 중...'}
+            </span>
+          </div>
+        )}
+
+        {/* 메시지 목록 */}
         <div style={{ flex: 1, padding: '20px 16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 18 }}>
           {messages.length === 0 && (
             <div style={{ textAlign: 'center', paddingTop: 70, color: '#2e2e3e' }}>
               <p style={{ fontSize: 36, marginBottom: 20 }}>💬</p>
-              <p style={{ fontSize: 13, lineHeight: 2.4 }}>
-                아래 버튼을 눌러 대화를 시작하세요<br />
-                <span style={{ fontSize: 11, color: '#22222e' }}>ボタンを押して話しかけてください</span>
+              <p style={{ fontSize: 13, lineHeight: 2.4, color: '#2e2e3e' }}>
+                {isSim
+                  ? '말하면 자동으로 번역됩니다\n話すと自動翻訳されます'
+                  : '아래 버튼을 눌러 대화를 시작하세요\nボタンを押して話しかけてください'
+                }
               </p>
             </div>
           )}
@@ -340,26 +387,53 @@ export default function TravelTalk() {
           <div ref={bottomRef} />
         </div>
 
+        {/* 입력 영역 */}
         <div style={{ padding: '14px 16px 20px', borderTop: '1px solid rgba(255,255,255,0.055)', background: 'rgba(7,7,14,0.98)', backdropFilter: 'blur(20px)' }}>
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             <input value={inputText} onChange={e => setInputText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && sendMessage(inputText)}
-              placeholder="직접 입력하거나 말하기를 눌러주세요"
+              placeholder="직접 입력 · テキスト入力"
               style={{ flex: 1, padding: '13px 16px', background: 'rgba(255,255,255,0.055)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 14, color: '#ede8e3', fontSize: 14, outline: 'none' }}
             />
             <button onClick={() => sendMessage(inputText)} style={{ padding: '13px 18px', background: inputText.trim() ? RED : 'rgba(255,255,255,0.04)', border: 'none', borderRadius: 14, color: '#fff', fontSize: 20, cursor: 'pointer' }}>↑</button>
           </div>
-          <button onMouseDown={startSTT} onMouseUp={stopSTT} onTouchStart={startSTT} onTouchEnd={stopSTT}
-            style={{ width: '100%', padding: 17, background: listening ? `linear-gradient(135deg, #7b241c, ${RED})` : 'rgba(192,57,43,0.1)', border: `1px solid rgba(192,57,43,${listening ? '0.9' : '0.35'})`, borderRadius: 16, color: listening ? '#fff' : '#e74c3c', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, transition: 'all 0.18s', userSelect: 'none', WebkitUserSelect: 'none' }}>
-            <span style={{ fontSize: 22 }}>{listening ? '◉' : '🎙'}</span>
-            {listening ? '듣는 중... · 聞いています' : `${LANGS[myLang]?.flag} 누르고 말하기 · 押して話す`}
-          </button>
+
+          {/* 대화 모드: 수동 토글 마이크 버튼 */}
+          {!isSim && (
+            <button onClick={toggleSTT} style={{
+              width: '100%', padding: 17,
+              background: isRecording ? `linear-gradient(135deg, #7b241c, ${RED})` : 'rgba(192,57,43,0.1)',
+              border: `1px solid rgba(192,57,43,${isRecording ? '0.9' : '0.35'})`,
+              borderRadius: 16, color: isRecording ? '#fff' : '#e74c3c',
+              fontSize: 14, fontWeight: 700, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              transition: 'all 0.18s', userSelect: 'none', WebkitUserSelect: 'none',
+            }}>
+              <span style={{ fontSize: 22 }}>{isRecording ? '◉' : '🎙'}</span>
+              {isRecording ? '듣는 중 · 聞いています (탭하면 중지)' : `${LANGS[myLang]?.flag} 탭해서 말하기 · タップして話す`}
+            </button>
+          )}
+
+          {/* 동시통역 모드: 중지 버튼만 */}
+          {isSim && (
+            <button onClick={toggleSTT} style={{
+              width: '100%', padding: 12,
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.07)',
+              borderRadius: 14, color: '#444',
+              fontSize: 12, cursor: 'pointer', transition: 'all 0.18s',
+            }}>
+              {isRecording ? '마이크 일시 중지 · マイク一時停止' : '마이크 재시작 · マイク再開'}
+            </button>
+          )}
         </div>
       </div>
       <style>{`
         @keyframes dot{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
         @keyframes blink{0%,100%{opacity:1}50%{opacity:0.15}}
-        *{box-sizing:border-box;margin:0;padding:0}::-webkit-scrollbar{width:0}input::placeholder{color:#333}
+        *{box-sizing:border-box;margin:0;padding:0}
+        ::-webkit-scrollbar{width:0}
+        input::placeholder{color:#333}
       `}</style>
     </div>
   );
