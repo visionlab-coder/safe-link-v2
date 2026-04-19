@@ -201,27 +201,32 @@ export async function POST(req: Request) {
 
         const speechContexts = [{ phrases: CONSTRUCTION_SPEECH_HINTS.slice(0, 500), boost: 15 }];
 
-        const response = await fetch(
-            `https://speech.googleapis.com/v1/speech:recognize`,
-            {
+        const buildConfig = (enhanced: boolean) => ({
+            encoding,
+            sampleRateHertz: sampleRate,
+            languageCode,
+            enableAutomaticPunctuation: true,
+            ...(enhanced
+                ? { model: "latest_long", useEnhanced: true, speechContexts }
+                : { model: "default" }),
+        });
+
+        const callSTT = async (enhanced: boolean) =>
+            fetch(`https://speech.googleapis.com/v1/speech:recognize`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "x-goog-api-key": GOOGLE_API_KEY },
-                body: JSON.stringify({
-                    config: {
-                        encoding,
-                        sampleRateHertz: sampleRate,
-                        languageCode,
-                        enableAutomaticPunctuation: true,
-                        model: "latest_long",
-                        useEnhanced: true,
-                        speechContexts,
-                    },
-                    audio: { content: audio },
-                }),
-            }
-        );
+                body: JSON.stringify({ config: buildConfig(enhanced), audio: { content: audio } }),
+            });
 
-        const data = await response.json() as SpeechRecognitionResponse;
+        let response = await callSTT(true);
+        let data = await response.json() as SpeechRecognitionResponse;
+
+        // latest_long / useEnhanced 미지원 언어(zh-CN 등) → default 모델로 폴백
+        if (data.error) {
+            console.warn("[STT] latest_long 실패, default 모델로 폴백:", data.error.message);
+            response = await callSTT(false);
+            data = await response.json() as SpeechRecognitionResponse;
+        }
 
         if (data.error) {
             console.error("[STT API Error]", data.error);
