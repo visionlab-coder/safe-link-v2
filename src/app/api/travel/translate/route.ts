@@ -1,30 +1,27 @@
-import Pusher from 'pusher';
+import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
-const pusherServer = new Pusher({
-  appId:   process.env.PUSHER_APP_ID!,
-  key:     process.env.PUSHER_KEY!,
-  secret:  process.env.PUSHER_SECRET!,
-  cluster: process.env.PUSHER_CLUSTER!,
-  useTLS:  true,
-});
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { text, from, to, room } = body;
-
+  const { text, from, to, room } = await request.json();
   if (!text || !from || !to || !room) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
 
   try {
     const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();
-    const url = `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`;
-    const gRes = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ q: text, source: from, target: to, format: 'text' }),
-    });
+    const gRes = await fetch(
+      `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: text, source: from, target: to, format: 'text' }),
+      }
+    );
     const gData = await gRes.json();
     const translated: string = gData.data.translations[0].translatedText;
 
@@ -36,11 +33,17 @@ export async function POST(request: NextRequest) {
       time:       new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
     };
 
-    await pusherServer.trigger(`travel-${room}`, 'new-message', message);
+    // Supabase Realtime broadcast로 상대방에게 전송
+    await supabaseAdmin.channel(`travel-${room}`).send({
+      type:    'broadcast',
+      event:   'new-message',
+      payload: message,
+    });
 
-    return NextResponse.json({ translated, message });
+    return NextResponse.json({ translated });
   } catch (err) {
-    console.error('[travel/translate]', err);
-    return NextResponse.json({ error: 'Translation failed' }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[travel/translate]', msg);
+    return NextResponse.json({ error: 'Translation failed', detail: msg }, { status: 500 });
   }
 }
