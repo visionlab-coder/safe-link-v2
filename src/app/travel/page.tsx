@@ -324,8 +324,14 @@ export default function TravelTalk() {
     silenceDuration: mode === 'simultaneous' ? 800 : 1500,
   });
 
-  const createRoom = useCallback(() => {
+  const createRoom = useCallback(async () => {
     unlockAudio();
+    // iOS Safari: 클릭 컨텍스트에서 마이크 권한 미리 요청
+    // 이후 effect에서 toggleSTT() 호출 시 이미 허가된 상태라 다이얼로그 없이 통과
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+    } catch {}
     const code = Math.floor(1000 + Math.random() * 9000).toString();
     setRoomCode(code);
     setMyRole('host');
