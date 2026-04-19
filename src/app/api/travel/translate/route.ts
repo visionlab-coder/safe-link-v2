@@ -1,29 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-async function supabaseBroadcast(room: string, event: string, payload: object) {
-  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/realtime/v1/api/broadcast`;
-  await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-      'apikey':        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    },
-    body: JSON.stringify({
-      messages: [{ topic: `realtime:travel-${room}`, event, payload }],
-    }),
-  });
-}
-
 export async function POST(request: NextRequest) {
-  const { text, from, to, room } = await request.json();
-  if (!text || !from || !to || !room) {
+  const { text, from, to } = await request.json();
+  if (!text || !from || !to) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
 
   try {
     const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();
-    const gRes = await fetch(
+    const res = await fetch(
       `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`,
       {
         method: 'POST',
@@ -31,24 +16,12 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({ q: text, source: from, target: to, format: 'text' }),
       }
     );
-    const gData = await gRes.json();
-    const translated: string = gData.data.translations[0].translatedText;
-
-    const message = {
-      id:         Date.now(),
-      original:   text,
-      translated,
-      lang:       from,
-      time:       new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
-    };
-
-    // Supabase Realtime REST API로 상대방에게 브로드캐스트
-    await supabaseBroadcast(room, 'new-message', message);
-
+    const data = await res.json();
+    const translated: string = data.data.translations[0].translatedText;
     return NextResponse.json({ translated });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[travel/translate]', msg);
-    return NextResponse.json({ error: 'Translation failed', detail: msg }, { status: 500 });
+    return NextResponse.json({ error: 'Translation failed' }, { status: 500 });
   }
 }

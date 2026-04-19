@@ -129,15 +129,25 @@ export default function TravelTalk() {
       const res = await fetch('/api/travel/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, from: myLang, to: targetLang, room: roomCode }),
+        body: JSON.stringify({ text, from: myLang, to: targetLang }),
       });
-      const data = await res.json();
+      const { translated } = await res.json();
+
       const msg: Message = {
-        id: Date.now(), original: text, translated: data.translated,
+        id: Date.now(), original: text, translated,
         mine: true, lang: myLang,
         time: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
       };
+
+      // 내 화면에 표시
       setMessages(prev => [...prev, msg]);
+
+      // 상대방에게 클라이언트 broadcast (서버 경유 없이)
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'new-message',
+        payload: { ...msg, mine: false },
+      });
     } catch (e) {
       console.error(e);
     } finally {
