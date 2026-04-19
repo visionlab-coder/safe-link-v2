@@ -346,7 +346,11 @@ export default function TravelTalk() {
     setMyRole('guest');
     setPhase('chat');
     subscribeChannel(code, 'guest', lang);
-  }, [subscribeChannel, unlockAudio]);
+    // 게스트: 언어 선택 탭(사용자 제스처) 내에서 직접 STT 시작
+    // 외국인 게스트는 UI를 모르므로 자동 시작이 필수
+    // 클릭 컨텍스트라 iOS Safari getUserMedia 권한 다이얼로그 정상 표시됨
+    toggleSTT();
+  }, [subscribeChannel, unlockAudio, toggleSTT]);
 
   /* 동시통역 모드: 호스트는 파트너 입장 시 presence 이벤트로 phase 전환 → effect에서 STT 시작
      게스트는 joinRoom(클릭 컨텍스트)에서 직접 시작하므로 여기서 제외 */
