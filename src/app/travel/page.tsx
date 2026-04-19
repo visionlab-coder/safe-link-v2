@@ -186,13 +186,14 @@ export default function TravelTalk() {
   const [voiceGender, setVoiceGender] = useState<VoiceGender>('female');
   const [mode, setMode]               = useState<ChatMode>('conversation');
 
-  const channelRef     = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const bottomRef      = useRef<HTMLDivElement>(null);
-  const myLangRef      = useRef(myLang);
-  const ttsEnabledRef  = useRef(ttsEnabled);
-  const voiceGenderRef = useRef(voiceGender);
-  const partnerLangRef = useRef(partnerLang);
-  const translatingRef = useRef(translating);
+  const channelRef       = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const bottomRef        = useRef<HTMLDivElement>(null);
+  const myLangRef        = useRef(myLang);
+  const ttsEnabledRef    = useRef(ttsEnabled);
+  const voiceGenderRef   = useRef(voiceGender);
+  const partnerLangRef   = useRef(partnerLang);
+  const translatingRef   = useRef(translating);
+  const audioUnlockedRef = useRef(false);
 
   useEffect(() => { myLangRef.current = myLang; }, [myLang]);
   useEffect(() => { ttsEnabledRef.current = ttsEnabled; }, [ttsEnabled]);
@@ -206,6 +207,17 @@ export default function TravelTalk() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     if (code && code.length === 4) { setPendingCode(code); setPhase('join'); }
+  }, []);
+
+  /* 브라우저 자동재생 정책 우회 — 사용자 제스처 직후 무음 재생으로 오디오 컨텍스트 언락 */
+  const unlockAudio = useCallback(() => {
+    if (audioUnlockedRef.current) return;
+    try {
+      // 최소 WAV 파일 (무음 0.1초) — data URI로 서버 요청 없이 즉시 언락
+      const sil = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==');
+      sil.volume = 0;
+      sil.play().then(() => { audioUnlockedRef.current = true; }).catch(() => {});
+    } catch {}
   }, []);
 
   const speakTTS = useCallback((text: string, lang: string) => {
@@ -253,6 +265,7 @@ export default function TravelTalk() {
   /* ── 메시지 전송 ── */
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || translatingRef.current) return;
+    unlockAudio();
     setTranslating(true);
     setInputText('');
     const sl = myLangRef.current;
@@ -285,21 +298,23 @@ export default function TravelTalk() {
     } finally {
       setTranslating(false);
     }
-  }, []);
+  }, [unlockAudio]);
 
   const createRoom = useCallback(() => {
+    unlockAudio();
     const code = Math.floor(1000 + Math.random() * 9000).toString();
     setRoomCode(code);
     setPhase('waiting');
     subscribeChannel(code, 'host', myLang);
-  }, [myLang, subscribeChannel]);
+  }, [myLang, subscribeChannel, unlockAudio]);
 
   const joinRoom = useCallback((code: string, lang: string) => {
+    unlockAudio();
     setRoomCode(code);
     setMyLang(lang);
     setPhase('chat');
     subscribeChannel(code, 'guest', lang);
-  }, [subscribeChannel]);
+  }, [subscribeChannel, unlockAudio]);
 
   /* ── Cloud STT ── */
   const { isRecording, toggle: toggleSTT } = useCloudSTT({
