@@ -339,7 +339,7 @@ export default function TravelTalk() {
     lang: LANGS[myLang]?.stt || 'ko-KR',
     onTranscript: sendMessage,
     live: true,
-    silenceDuration: mode === 'simultaneous' ? 1000 : 1500,
+    silenceDuration: mode === 'simultaneous' ? 800 : 1500,
   });
 
   /* 동시통역 모드: 채팅 진입 시 자동 STT 시작 */
