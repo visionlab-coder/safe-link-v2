@@ -185,6 +185,7 @@ export default function TravelTalk() {
   const [ttsEnabled, setTtsEnabled]   = useState(true);
   const [voiceGender, setVoiceGender] = useState<VoiceGender>('female');
   const [mode, setMode]               = useState<ChatMode>('conversation');
+  const [learningMode, setLearningMode] = useState(false); // false = 빠른 대화, true = 학습(발음+역번역)
 
   const channelRef       = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const bottomRef        = useRef<HTMLDivElement>(null);
@@ -192,14 +193,16 @@ export default function TravelTalk() {
   const ttsEnabledRef    = useRef(ttsEnabled);
   const voiceGenderRef   = useRef(voiceGender);
   const partnerLangRef   = useRef(partnerLang);
-  const translatingRef   = useRef(translating);
-  const audioUnlockedRef = useRef(false);
+  const translatingRef    = useRef(translating);
+  const audioUnlockedRef  = useRef(false);
+  const learningModeRef   = useRef(learningMode);
 
   useEffect(() => { myLangRef.current = myLang; }, [myLang]);
   useEffect(() => { ttsEnabledRef.current = ttsEnabled; }, [ttsEnabled]);
   useEffect(() => { voiceGenderRef.current = voiceGender; }, [voiceGender]);
   useEffect(() => { partnerLangRef.current = partnerLang; }, [partnerLang]);
   useEffect(() => { translatingRef.current = translating; }, [translating]);
+  useEffect(() => { learningModeRef.current = learningMode; }, [learningMode]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   useEffect(() => {
@@ -271,13 +274,25 @@ export default function TravelTalk() {
     const sl = myLangRef.current;
     const tl = partnerLangRef.current || (sl === 'ko' ? 'ja' : 'ko');
     try {
-      /* 기존 SAFE-LINK /api/translate 사용 → 발음 + 역번역 포함 */
-      const res = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, sl, tl }),
-      });
-      const { translated = '', pronunciation = '', reverse_translated = '' } = await res.json();
+      let translated = '', pronunciation = '', reverse_translated = '';
+
+      if (learningModeRef.current) {
+        /* 학습 모드: 발음 + 역번역 포함 (Gemini 호출 → 1~2초 추가) */
+        const res = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, sl, tl }),
+        });
+        ({ translated = '', pronunciation = '', reverse_translated = '' } = await res.json());
+      } else {
+        /* 빠른 대화 모드: 번역만 (딜레이 최소) */
+        const res = await fetch('/api/travel/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, from: sl, to: tl }),
+        });
+        ({ translated = '' } = await res.json());
+      }
 
       const msg: Message = {
         id: Date.now(), original: text, translated,
@@ -329,6 +344,9 @@ export default function TravelTalk() {
     if (phase === 'chat' && mode === 'simultaneous' && !isRecording) toggleSTT();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, mode]);
+
+  /* 학습 모드 여부 — 한국인 사용자에게만 적용 */
+  const isKorean = myLang === 'ko';
 
   /* ════ HOME ════ */
   if (phase === 'home') return (
@@ -438,9 +456,8 @@ export default function TravelTalk() {
   }
 
   /* ════ CHAT ════ */
-  const pLang    = partnerLang || (myLang === 'ko' ? 'ja' : 'ko');
-  const isSim    = mode === 'simultaneous';
-  const isKorean = myLang === 'ko';
+  const pLang = partnerLang || (myLang === 'ko' ? 'ja' : 'ko');
+  const isSim = mode === 'simultaneous';
 
   return (
     <div style={PAGE}>
@@ -488,6 +505,17 @@ export default function TravelTalk() {
             labelOff="대화"
             color={RED}
           />
+
+          {/* 학습 모드 토글 — 한국인 호스트만 표시 */}
+          {isKorean && (
+            <Toggle
+              on={learningMode}
+              onToggle={() => setLearningMode(v => !v)}
+              labelOn="학습"
+              labelOff="빠른"
+              color="#f39c12"
+            />
+          )}
         </div>
 
         {/* 동시통역 배너 */}
