@@ -21,7 +21,8 @@ export async function POST(request: NextRequest) {
     await pusherServer.trigger(`travel-${room}`, 'partner-joined', { lang });
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error('[travel/join]', err);
-    return NextResponse.json({ error: 'Join failed' }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[travel/join]', msg);
+    return NextResponse.json({ error: 'Join failed', detail: msg }, { status: 500 });
   }
 }
