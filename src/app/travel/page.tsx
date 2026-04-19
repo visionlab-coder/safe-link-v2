@@ -68,28 +68,43 @@ export default function TravelTalk() {
   }, []);
 
   /* ── Supabase Realtime 채널 구독 ── */
-  const subscribeChannel = (code: string) => {
+  const subscribeChannel = (code: string, myRole: 'host' | 'guest', lang: string) => {
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
     }
+
     const ch = supabase.channel(`travel-${code}`, {
-      config: { broadcast: { self: false } },
+      config: {
+        presence: { key: myRole },
+        broadcast: { self: false },
+      },
     });
 
-    ch.on('broadcast', { event: 'partner-joined' }, ({ payload }: { payload: { lang: string } }) => {
-      setPartnerLang(payload.lang);
-      setPartner(true);
-      setPhase('chat');
+    // Presence: 상대방이 채널에 들어오면 감지
+    ch.on('presence', { event: 'join' }, ({ newPresences }: { newPresences: Array<{ lang: string; role: string }> }) => {
+      const partner = newPresences.find(p => p.role !== myRole);
+      if (partner) {
+        setPartnerLang(partner.lang);
+        setPartner(true);
+        setPhase('chat');
+      }
     });
 
+    ch.on('presence', { event: 'leave' }, () => setPartner(false));
+
+    // 번역 메시지 수신
     ch.on('broadcast', { event: 'new-message' }, ({ payload }: { payload: Message }) => {
       setMessages(prev => [...prev, { ...payload, mine: false }]);
       speakTTS(payload.translated, myLangRef.current);
     });
 
-    ch.on('broadcast', { event: 'partner-left' }, () => setPartner(false));
+    // 구독 완료 후 Presence 등록
+    ch.subscribe(async (status: string) => {
+      if (status === 'SUBSCRIBED') {
+        await ch.track({ role: myRole, lang });
+      }
+    });
 
-    ch.subscribe();
     channelRef.current = ch;
     return ch;
   };
@@ -98,21 +113,15 @@ export default function TravelTalk() {
     const code = Math.floor(1000 + Math.random() * 9000).toString();
     setRoomCode(code);
     setPhase('waiting');
-    subscribeChannel(code); // 호스트: 구독만, 알림 안 보냄
+    subscribeChannel(code, 'host', myLang);
   };
 
   const joinRoom = (code: string, lang: string) => {
     setRoomCode(code);
     setMyLang(lang);
     setPhase('chat');
-    const ch = subscribeChannel(code);
-    // 구독 완료 후 호스트에게 입장 알림 (클라이언트에서 직접 broadcast)
-    ch.subscribe((status: string) => {
-      if (status === 'SUBSCRIBED') {
-        ch.send({ type: 'broadcast', event: 'partner-joined', payload: { lang } });
-        setPartner(true);
-      }
-    });
+    setPartner(true);
+    subscribeChannel(code, 'guest', lang);
   };
 
   const sendMessage = async (text: string) => {
