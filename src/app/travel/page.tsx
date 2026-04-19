@@ -316,6 +316,14 @@ export default function TravelTalk() {
     }
   }, [unlockAudio]);
 
+  /* ── Cloud STT ── */
+  const { isRecording, toggle: toggleSTT } = useCloudSTT({
+    lang: LANGS[myLang]?.stt || 'ko-KR',
+    onTranscript: sendMessage,
+    live: true,
+    silenceDuration: mode === 'simultaneous' ? 800 : 1500,
+  });
+
   const createRoom = useCallback(() => {
     unlockAudio();
     const code = Math.floor(1000 + Math.random() * 9000).toString();
@@ -332,21 +340,17 @@ export default function TravelTalk() {
     setMyRole('guest');
     setPhase('chat');
     subscribeChannel(code, 'guest', lang);
-  }, [subscribeChannel, unlockAudio]);
+    // 게스트: 사용자 클릭 컨텍스트 내에서 직접 STT 시작
+    // iOS Safari는 getUserMedia를 useEffect에서 호출하면 차단함
+    toggleSTT();
+  }, [subscribeChannel, unlockAudio, toggleSTT]);
 
-  /* ── Cloud STT ── */
-  const { isRecording, toggle: toggleSTT } = useCloudSTT({
-    lang: LANGS[myLang]?.stt || 'ko-KR',
-    onTranscript: sendMessage,
-    live: true,
-    silenceDuration: mode === 'simultaneous' ? 800 : 1500,
-  });
-
-  /* 동시통역 모드: 채팅 진입 시 자동 STT 시작 */
+  /* 동시통역 모드: 호스트는 파트너 입장 시 presence 이벤트로 phase 전환 → effect에서 STT 시작
+     게스트는 joinRoom(클릭 컨텍스트)에서 직접 시작하므로 여기서 제외 */
   useEffect(() => {
-    if (phase === 'chat' && mode === 'simultaneous' && !isRecording) toggleSTT();
+    if (phase === 'chat' && mode === 'simultaneous' && !isRecording && myRole === 'host') toggleSTT();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, mode]);
+  }, [phase, mode, myRole]);
 
   const isKorean = myLang === 'ko';
   const isHost   = myRole === 'host';
