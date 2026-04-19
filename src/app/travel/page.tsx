@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { QRCodeSVG } from 'qrcode.react';
-import { playPremiumAudio } from '@/utils/tts';
+import { playPremiumAudio, VoiceGender } from '@/utils/tts';
 import { useCloudSTT } from '@/hooks/useCloudSTT';
 
 const supabase = createClient();
@@ -20,20 +20,156 @@ interface Message {
   id: number;
   original: string;
   translated: string;
+  pronunciation: string;
+  reverse_translated: string;
   mine: boolean;
-  lang: string;
+  lang: string;          // sender's lang
+  targetLang: string;    // receiver's lang
   time: string;
 }
 
 type ChatMode = 'conversation' | 'simultaneous';
 
-const RED = '#c0392b';
-const PAGE = {
+const RED   = '#c0392b';
+const BLUE  = 'rgba(52,152,219,0.18)';
+const PAGE  = {
   minHeight: '100vh', background: '#07070e', color: '#ede8e3',
   fontFamily: "'Noto Sans JP','Apple SD Gothic Neo',sans-serif",
   display: 'flex', justifyContent: 'center',
 } as const;
 
+/* ─── 재생 버튼 ─── */
+function PlayBtn({ text, lang, onPlay }: { text: string; lang: string; onPlay: (t: string, l: string) => void }) {
+  return (
+    <button
+      onClick={() => onPlay(text, lang)}
+      title="다시 듣기"
+      style={{
+        background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: 6, color: 'rgba(255,255,255,0.45)', fontSize: 12,
+        padding: '2px 6px', cursor: 'pointer', lineHeight: 1,
+      }}
+    >▶</button>
+  );
+}
+
+/* ─── 메시지 버블 컴포넌트 ─── */
+function MsgBubble({ msg, isKorean, onPlay }: {
+  msg: Message; isKorean: boolean;
+  onPlay: (text: string, lang: string) => void;
+}) {
+  const hasPron = isKorean && msg.pronunciation;
+  const hasRev  = isKorean && msg.reverse_translated;
+
+  if (msg.mine) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+        <div style={{ maxWidth: '82%', borderRadius: '20px 20px 4px 20px', background: `linear-gradient(135deg,${RED},#7b241c)`, padding: '12px 16px', fontSize: 15, lineHeight: 1.65 }}>
+          {msg.original}
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.12)', fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ flex: 1 }}>{msg.translated}</span>
+            <PlayBtn text={msg.translated} lang={msg.targetLang} onPlay={onPlay} />
+          </div>
+          {(hasPron || hasRev) && (
+            <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              {hasPron && (
+                <div style={{ fontSize: 11, color: 'rgba(100,180,255,0.8)', marginBottom: 2 }}>
+                  <span style={{ opacity: 0.6 }}>발음 </span>{msg.pronunciation}
+                </div>
+              )}
+              {hasRev && (
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>
+                  <span style={{ opacity: 0.6 }}>역번역 </span>{msg.reverse_translated}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <span style={{ fontSize: 10, color: '#2e2e3e' }}>{LANGS[msg.lang]?.flag} {msg.time}</span>
+      </div>
+    );
+  }
+
+  /* 상대방 메시지 */
+  if (isKorean) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+        <div style={{ maxWidth: '82%', borderRadius: '20px 20px 20px 4px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.07)', padding: '12px 16px' }}>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ flex: 1 }}>{msg.original}</span>
+            <PlayBtn text={msg.original} lang={msg.lang} onPlay={onPlay} />
+          </div>
+          <div style={{ fontSize: 15, lineHeight: 1.65, color: '#ede8e3', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ flex: 1 }}>{msg.translated}</span>
+            <PlayBtn text={msg.translated} lang={msg.targetLang} onPlay={onPlay} />
+          </div>
+          {(hasPron || hasRev) && (
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+              {hasPron && (
+                <div style={{ fontSize: 11, color: 'rgba(100,180,255,0.75)', marginBottom: 3 }}>
+                  <span style={{ opacity: 0.6 }}>발음 </span>{msg.pronunciation}
+                </div>
+              )}
+              {hasRev && (
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>
+                  <span style={{ opacity: 0.6 }}>역번역 </span>{msg.reverse_translated}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <span style={{ fontSize: 10, color: '#2e2e3e' }}>{LANGS[msg.lang]?.flag} {msg.time}</span>
+      </div>
+    );
+  }
+
+  /* 외국인 */
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+      <div style={{ maxWidth: '82%', borderRadius: '20px 20px 20px 4px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.07)', padding: '12px 16px' }}>
+        <div style={{ fontSize: 15, lineHeight: 1.65, color: '#ede8e3', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ flex: 1 }}>{msg.translated}</span>
+          <PlayBtn text={msg.translated} lang={msg.targetLang} onPlay={onPlay} />
+        </div>
+        <div style={{ marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{msg.original}</div>
+      </div>
+      <span style={{ fontSize: 10, color: '#2e2e3e' }}>{LANGS[msg.lang]?.flag} {msg.time}</span>
+    </div>
+  );
+}
+
+/* ─── 토글 스위치 컴포넌트 ─── */
+function Toggle({ on, onToggle, labelOn, labelOff, color = RED }: {
+  on: boolean; onToggle: () => void;
+  labelOn: string; labelOff: string; color?: string;
+}) {
+  return (
+    <button onClick={onToggle} style={{
+      display: 'flex', alignItems: 'center', gap: 5,
+      padding: '4px 8px', borderRadius: 8, cursor: 'pointer',
+      background: on ? `${color}22` : 'rgba(255,255,255,0.04)',
+      border: `1px solid ${on ? `${color}88` : 'rgba(255,255,255,0.09)'}`,
+      color: on ? color : '#444', fontSize: 11, fontWeight: 700,
+      whiteSpace: 'nowrap', transition: 'all 0.18s',
+    }}>
+      <span style={{
+        width: 24, height: 13, borderRadius: 7,
+        background: on ? color : 'rgba(255,255,255,0.1)',
+        position: 'relative', display: 'inline-block',
+        transition: 'background 0.2s', flexShrink: 0,
+      }}>
+        <span style={{
+          position: 'absolute', top: 2, left: on ? 13 : 2,
+          width: 9, height: 9, borderRadius: '50%',
+          background: '#fff', transition: 'left 0.2s',
+        }} />
+      </span>
+      {on ? labelOn : labelOff}
+    </button>
+  );
+}
+
+/* ════════ 메인 컴포넌트 ════════ */
 export default function TravelTalk() {
   const [phase, setPhase]             = useState<'home' | 'waiting' | 'join' | 'chat'>('home');
   const [myLang, setMyLang]           = useState('ko');
@@ -47,40 +183,39 @@ export default function TravelTalk() {
   const [translating, setTranslating] = useState(false);
   const [partnerLang, setPartnerLang] = useState<string | null>(null);
   const [ttsEnabled, setTtsEnabled]   = useState(true);
+  const [voiceGender, setVoiceGender] = useState<VoiceGender>('female');
   const [mode, setMode]               = useState<ChatMode>('conversation');
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const channelRef    = useRef<any>(null);
-  const bottomRef     = useRef<HTMLDivElement>(null);
-  const myLangRef     = useRef(myLang);
-  const ttsEnabledRef = useRef(ttsEnabled);
+  const channelRef     = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const bottomRef      = useRef<HTMLDivElement>(null);
+  const myLangRef      = useRef(myLang);
+  const ttsEnabledRef  = useRef(ttsEnabled);
+  const voiceGenderRef = useRef(voiceGender);
   const partnerLangRef = useRef(partnerLang);
+  const translatingRef = useRef(translating);
 
   useEffect(() => { myLangRef.current = myLang; }, [myLang]);
   useEffect(() => { ttsEnabledRef.current = ttsEnabled; }, [ttsEnabled]);
+  useEffect(() => { voiceGenderRef.current = voiceGender; }, [voiceGender]);
   useEffect(() => { partnerLangRef.current = partnerLang; }, [partnerLang]);
+  useEffect(() => { translatingRef.current = translating; }, [translating]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   useEffect(() => {
     setTravelUrl(`${window.location.origin}/travel`);
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
-    if (code && code.length === 4) {
-      setPendingCode(code);
-      setPhase('join');
-    }
+    if (code && code.length === 4) { setPendingCode(code); setPhase('join'); }
   }, []);
 
-  const speakTTS = useCallback((text: string) => {
+  const speakTTS = useCallback((text: string, lang: string) => {
     if (!text || !ttsEnabledRef.current) return;
-    playPremiumAudio(text, myLangRef.current, 'female');
+    playPremiumAudio(text, lang, voiceGenderRef.current);
   }, []);
 
   /* ── Supabase Realtime 채널 구독 ── */
   const subscribeChannel = useCallback((code: string, myRole: 'host' | 'guest', lang: string) => {
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-    }
+    if (channelRef.current) supabase.removeChannel(channelRef.current);
 
     const ch = supabase.channel(`travel-${code}`, {
       config: { presence: { key: myRole } },
@@ -91,8 +226,8 @@ export default function TravelTalk() {
       const state: Record<string, any[]> = ch.presenceState();
       const partnerRole = myRole === 'host' ? 'guest' : 'host';
       if (Object.keys(state).includes(partnerRole)) {
-        const partnerData = state[partnerRole]?.[0];
-        if (partnerData?.lang) setPartnerLang(partnerData.lang);
+        const pd = state[partnerRole]?.[0];
+        if (pd?.lang) setPartnerLang(pd.lang);
         setPartner(true);
         setPhase('chat');
       } else {
@@ -105,33 +240,36 @@ export default function TravelTalk() {
       .on('presence', { event: 'leave' }, handlePresenceChange)
       .on('broadcast', { event: 'new-message' }, ({ payload }: { payload: Message }) => {
         setMessages(prev => [...prev, { ...payload, mine: false }]);
-        speakTTS(payload.translated);
+        /* 받은 메시지 TTS: 내 언어로 번역된 텍스트를 내 언어 음성으로 */
+        speakTTS(payload.translated, myLangRef.current);
       })
       .subscribe(async (status: string) => {
-        if (status === 'SUBSCRIBED') {
-          await ch.track({ role: myRole, lang });
-        }
+        if (status === 'SUBSCRIBED') await ch.track({ role: myRole, lang });
       });
 
     channelRef.current = ch;
   }, [speakTTS]);
 
+  /* ── 메시지 전송 ── */
   const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || translating) return;
+    if (!text.trim() || translatingRef.current) return;
     setTranslating(true);
     setInputText('');
-    const pLang = partnerLangRef.current || (myLangRef.current === 'ko' ? 'ja' : 'ko');
+    const sl = myLangRef.current;
+    const tl = partnerLangRef.current || (sl === 'ko' ? 'ja' : 'ko');
     try {
-      const res = await fetch('/api/travel/translate', {
+      /* 기존 SAFE-LINK /api/translate 사용 → 발음 + 역번역 포함 */
+      const res = await fetch('/api/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, from: myLangRef.current, to: pLang }),
+        body: JSON.stringify({ text, sl, tl }),
       });
-      const { translated } = await res.json();
+      const { translated = '', pronunciation = '', reverse_translated = '' } = await res.json();
 
       const msg: Message = {
         id: Date.now(), original: text, translated,
-        mine: true, lang: myLangRef.current,
+        pronunciation, reverse_translated,
+        mine: true, lang: sl, targetLang: tl,
         time: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -147,7 +285,7 @@ export default function TravelTalk() {
     } finally {
       setTranslating(false);
     }
-  }, [translating]);
+  }, []);
 
   const createRoom = useCallback(() => {
     const code = Math.floor(1000 + Math.random() * 9000).toString();
@@ -163,7 +301,7 @@ export default function TravelTalk() {
     subscribeChannel(code, 'guest', lang);
   }, [subscribeChannel]);
 
-  /* ── Cloud STT 훅 ── */
+  /* ── Cloud STT ── */
   const { isRecording, toggle: toggleSTT } = useCloudSTT({
     lang: LANGS[myLang]?.stt || 'ko-KR',
     onTranscript: sendMessage,
@@ -172,13 +310,8 @@ export default function TravelTalk() {
   });
 
   /* 동시통역 모드: 채팅 진입 시 자동 STT 시작 */
-  const modeRef = useRef(mode);
-  useEffect(() => { modeRef.current = mode; }, [mode]);
-
   useEffect(() => {
-    if (phase === 'chat' && mode === 'simultaneous' && !isRecording) {
-      toggleSTT();
-    }
+    if (phase === 'chat' && mode === 'simultaneous' && !isRecording) toggleSTT();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, mode]);
 
@@ -229,7 +362,7 @@ export default function TravelTalk() {
     </div>
   );
 
-  /* ════ JOIN — QR 스캔: 언어 선택 ════ */
+  /* ════ JOIN ════ */
   if (phase === 'join') return (
     <div style={{ ...PAGE, alignItems: 'center' }}>
       <div style={{ width: '100%', maxWidth: 420, padding: '0 28px', textAlign: 'center' }}>
@@ -259,7 +392,7 @@ export default function TravelTalk() {
     </div>
   );
 
-  /* ════ WAITING — QR 대기 ════ */
+  /* ════ WAITING ════ */
   if (phase === 'waiting') {
     const qrUrl = `${travelUrl}?code=${roomCode}`;
     return (
@@ -290,92 +423,89 @@ export default function TravelTalk() {
   }
 
   /* ════ CHAT ════ */
-  const pLang = partnerLang || (myLang === 'ko' ? 'ja' : 'ko');
-  const isSim = mode === 'simultaneous';
+  const pLang    = partnerLang || (myLang === 'ko' ? 'ja' : 'ko');
+  const isSim    = mode === 'simultaneous';
+  const isKorean = myLang === 'ko';
 
   return (
     <div style={PAGE}>
       <div style={{ width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
 
-        {/* 헤더 */}
-        <div style={{ padding: '11px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.055)', background: 'rgba(7,7,14,0.96)', backdropFilter: 'blur(20px)', position: 'sticky', top: 0, zIndex: 20 }}>
-          {/* 연결 상태 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: partnerOnline ? '#2ecc71' : '#3a3a4a', display: 'inline-block', transition: 'background 0.3s' }} />
-            <span style={{ fontSize: 10, color: partnerOnline ? '#2ecc71' : '#3a3a4a' }}>
-              {partnerOnline ? '연결됨' : '끊김'}
-            </span>
-          </div>
+        {/* ── 헤더 ── */}
+        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.055)', background: 'rgba(7,7,14,0.96)', backdropFilter: 'blur(20px)', position: 'sticky', top: 0, zIndex: 20, flexWrap: 'wrap' }}>
 
-          {/* 언어 표시 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {/* 연결 상태 + 언어 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 'auto' }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: partnerOnline ? '#2ecc71' : '#3a3a4a', display: 'inline-block' }} />
             <span style={{ fontSize: 16 }}>{LANGS[myLang]?.flag}</span>
             <span style={{ fontSize: 10, color: '#333' }}>↔</span>
             <span style={{ fontSize: 16 }}>{LANGS[pLang]?.flag}</span>
+            <span style={{ fontSize: 9, color: '#2a2a3a', letterSpacing: 3 }}>#{roomCode}</span>
           </div>
 
-          {/* TTS 토글 + 모드 스위치 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* TTS 켜기/끄기 */}
-            <button onClick={() => setTtsEnabled(v => !v)} title={ttsEnabled ? '음성 끄기' : '음성 켜기'} style={{
-              padding: '4px 8px', borderRadius: 8,
-              background: ttsEnabled ? 'rgba(46,204,113,0.15)' : 'rgba(255,255,255,0.05)',
-              border: `1px solid ${ttsEnabled ? 'rgba(46,204,113,0.4)' : 'rgba(255,255,255,0.1)'}`,
-              color: ttsEnabled ? '#2ecc71' : '#444', fontSize: 14, cursor: 'pointer', lineHeight: 1,
-            }}>
-              {ttsEnabled ? '🔊' : '🔇'}
-            </button>
+          {/* TTS 음성 켜기/끄기 */}
+          <Toggle
+            on={ttsEnabled}
+            onToggle={() => setTtsEnabled(v => !v)}
+            labelOn="🔊"
+            labelOff="🔇"
+            color="#2ecc71"
+          />
 
-            {/* 대화 / 동시통역 모드 */}
-            <button onClick={() => {
+          {/* 남자/여자 음성 */}
+          <Toggle
+            on={voiceGender === 'male'}
+            onToggle={() => setVoiceGender(g => g === 'female' ? 'male' : 'female')}
+            labelOn="♂ 남자"
+            labelOff="♀ 여자"
+            color="#5dade2"
+          />
+
+          {/* 대화 / 동시통역 모드 */}
+          <Toggle
+            on={isSim}
+            onToggle={() => {
               const next: ChatMode = isSim ? 'conversation' : 'simultaneous';
               setMode(next);
               if (next === 'conversation' && isRecording) toggleSTT();
-            }} style={{
-              padding: '4px 9px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer',
-              background: isSim ? 'rgba(192,57,43,0.2)' : 'rgba(255,255,255,0.05)',
-              border: `1px solid ${isSim ? 'rgba(192,57,43,0.5)' : 'rgba(255,255,255,0.1)'}`,
-              color: isSim ? '#e74c3c' : '#555', whiteSpace: 'nowrap',
-            }}>
-              {isSim ? '동시통역' : '대화'}
-            </button>
-          </div>
+            }}
+            labelOn="동시통역"
+            labelOff="대화"
+            color={RED}
+          />
         </div>
 
-        {/* 모드 안내 배너 */}
+        {/* 동시통역 배너 */}
         {isSim && (
-          <div style={{ padding: '6px 16px', background: 'rgba(192,57,43,0.07)', borderBottom: '1px solid rgba(192,57,43,0.15)', display: 'flex', alignItems: 'center', gap: 7, fontSize: 11 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: isRecording ? RED : '#555', animation: isRecording ? 'blink 1s infinite' : 'none', display: 'inline-block' }} />
+          <div style={{ padding: '5px 14px', background: 'rgba(192,57,43,0.07)', borderBottom: '1px solid rgba(192,57,43,0.15)', display: 'flex', alignItems: 'center', gap: 7, fontSize: 11 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: isRecording ? RED : '#444', animation: isRecording ? 'blink 1s infinite' : 'none', display: 'inline-block' }} />
             <span style={{ color: isRecording ? '#e74c3c' : '#555' }}>
-              {isRecording ? '동시통역 중 · 同時通訳中 · Interpreting...' : '마이크 시작 중...'}
+              {isRecording ? '동시통역 중 · 同時通訳中' : '마이크 시작 중...'}
             </span>
           </div>
         )}
 
         {/* 메시지 목록 */}
-        <div style={{ flex: 1, padding: '20px 16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div style={{ flex: 1, padding: '20px 14px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
           {messages.length === 0 && (
-            <div style={{ textAlign: 'center', paddingTop: 70, color: '#2e2e3e' }}>
-              <p style={{ fontSize: 36, marginBottom: 20 }}>💬</p>
-              <p style={{ fontSize: 13, lineHeight: 2.4, color: '#2e2e3e' }}>
-                {isSim
-                  ? '말하면 자동으로 번역됩니다\n話すと自動翻訳されます'
-                  : '아래 버튼을 눌러 대화를 시작하세요\nボタンを押して話しかけてください'
-                }
+            <div style={{ textAlign: 'center', paddingTop: 60, color: '#2e2e3e' }}>
+              <p style={{ fontSize: 34, marginBottom: 16 }}>💬</p>
+              <p style={{ fontSize: 12, lineHeight: 2.4, color: '#2e2e3e' }}>
+                {isSim ? '말하면 자동으로 번역됩니다 · 話すと自動翻訳' : '버튼을 눌러 대화를 시작하세요 · タップして話す'}
               </p>
+              {isKorean && (
+                <div style={{ marginTop: 16, padding: '10px 14px', background: BLUE, borderRadius: 12, fontSize: 11, color: 'rgba(100,180,255,0.7)', lineHeight: 2 }}>
+                  한글 발음 · 역번역 자동 표시<br />
+                  <span style={{ opacity: 0.6 }}>상대방 언어를 따라 읽을 수 있습니다</span>
+                </div>
+              )}
             </div>
           )}
+
           {messages.map(msg => (
-            <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: msg.mine ? 'flex-end' : 'flex-start', gap: 5 }}>
-              <div style={{ maxWidth: '80%', padding: '13px 17px', borderRadius: msg.mine ? '20px 20px 4px 20px' : '20px 20px 20px 4px', background: msg.mine ? `linear-gradient(135deg, ${RED}, #7b241c)` : 'rgba(255,255,255,0.07)', fontSize: 15, lineHeight: 1.65, border: msg.mine ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
-                {msg.original}
-              </div>
-              <div style={{ maxWidth: '80%', padding: '7px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.025)', fontSize: 13, color: '#666', fontStyle: 'italic', border: '1px solid rgba(255,255,255,0.04)' }}>
-                {msg.translated}
-              </div>
-              <span style={{ fontSize: 10, color: '#2e2e3e' }}>{LANGS[msg.lang]?.flag} {msg.time}</span>
-            </div>
+            <MsgBubble key={msg.id} msg={msg} isKorean={isKorean} onPlay={speakTTS} />
           ))}
+
           {translating && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#3a3a4a', fontSize: 12 }}>
               {[0, 1, 2].map(i => (
@@ -388,46 +518,44 @@ export default function TravelTalk() {
         </div>
 
         {/* 입력 영역 */}
-        <div style={{ padding: '14px 16px 20px', borderTop: '1px solid rgba(255,255,255,0.055)', background: 'rgba(7,7,14,0.98)', backdropFilter: 'blur(20px)' }}>
+        <div style={{ padding: '12px 14px 20px', borderTop: '1px solid rgba(255,255,255,0.055)', background: 'rgba(7,7,14,0.98)', backdropFilter: 'blur(20px)' }}>
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             <input value={inputText} onChange={e => setInputText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && sendMessage(inputText)}
               placeholder="직접 입력 · テキスト入力"
-              style={{ flex: 1, padding: '13px 16px', background: 'rgba(255,255,255,0.055)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 14, color: '#ede8e3', fontSize: 14, outline: 'none' }}
+              style={{ flex: 1, padding: '13px 15px', background: 'rgba(255,255,255,0.055)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 14, color: '#ede8e3', fontSize: 14, outline: 'none' }}
             />
-            <button onClick={() => sendMessage(inputText)} style={{ padding: '13px 18px', background: inputText.trim() ? RED : 'rgba(255,255,255,0.04)', border: 'none', borderRadius: 14, color: '#fff', fontSize: 20, cursor: 'pointer' }}>↑</button>
+            <button onClick={() => sendMessage(inputText)} style={{ padding: '13px 17px', background: inputText.trim() ? RED : 'rgba(255,255,255,0.04)', border: 'none', borderRadius: 14, color: '#fff', fontSize: 20, cursor: 'pointer' }}>↑</button>
           </div>
 
-          {/* 대화 모드: 수동 토글 마이크 버튼 */}
-          {!isSim && (
+          {!isSim ? (
             <button onClick={toggleSTT} style={{
-              width: '100%', padding: 17,
-              background: isRecording ? `linear-gradient(135deg, #7b241c, ${RED})` : 'rgba(192,57,43,0.1)',
+              width: '100%', padding: 16,
+              background: isRecording ? `linear-gradient(135deg,#7b241c,${RED})` : 'rgba(192,57,43,0.1)',
               border: `1px solid rgba(192,57,43,${isRecording ? '0.9' : '0.35'})`,
               borderRadius: 16, color: isRecording ? '#fff' : '#e74c3c',
               fontSize: 14, fontWeight: 700, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
               transition: 'all 0.18s', userSelect: 'none', WebkitUserSelect: 'none',
             }}>
-              <span style={{ fontSize: 22 }}>{isRecording ? '◉' : '🎙'}</span>
-              {isRecording ? '듣는 중 · 聞いています (탭하면 중지)' : `${LANGS[myLang]?.flag} 탭해서 말하기 · タップして話す`}
+              <span style={{ fontSize: 20 }}>{isRecording ? '◉' : '🎙'}</span>
+              {isRecording
+                ? `듣는 중 · 聞いています (${voiceGender === 'female' ? '♀' : '♂'})`
+                : `${LANGS[myLang]?.flag} 탭해서 말하기 · タップして話す`}
             </button>
-          )}
-
-          {/* 동시통역 모드: 중지 버튼만 */}
-          {isSim && (
+          ) : (
             <button onClick={toggleSTT} style={{
-              width: '100%', padding: 12,
+              width: '100%', padding: 11,
               background: 'rgba(255,255,255,0.03)',
               border: '1px solid rgba(255,255,255,0.07)',
-              borderRadius: 14, color: '#444',
-              fontSize: 12, cursor: 'pointer', transition: 'all 0.18s',
+              borderRadius: 12, color: '#444', fontSize: 11, cursor: 'pointer',
             }}>
               {isRecording ? '마이크 일시 중지 · マイク一時停止' : '마이크 재시작 · マイク再開'}
             </button>
           )}
         </div>
       </div>
+
       <style>{`
         @keyframes dot{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
         @keyframes blink{0%,100%{opacity:1}50%{opacity:0.15}}
