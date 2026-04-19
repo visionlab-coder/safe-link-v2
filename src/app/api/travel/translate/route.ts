@@ -1,10 +1,19 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+async function supabaseBroadcast(room: string, event: string, payload: object) {
+  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/realtime/v1/api/broadcast`;
+  await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+      'apikey':        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    },
+    body: JSON.stringify({
+      messages: [{ topic: `realtime:travel-${room}`, event, payload }],
+    }),
+  });
+}
 
 export async function POST(request: NextRequest) {
   const { text, from, to, room } = await request.json();
@@ -33,12 +42,8 @@ export async function POST(request: NextRequest) {
       time:       new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
     };
 
-    // Supabase Realtime broadcast로 상대방에게 전송
-    await supabaseAdmin.channel(`travel-${room}`).send({
-      type:    'broadcast',
-      event:   'new-message',
-      payload: message,
-    });
+    // Supabase Realtime REST API로 상대방에게 브로드캐스트
+    await supabaseBroadcast(room, 'new-message', message);
 
     return NextResponse.json({ translated });
   } catch (err) {
