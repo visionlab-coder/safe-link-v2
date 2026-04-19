@@ -352,12 +352,6 @@ export default function TravelTalk() {
     toggleSTT();
   }, [subscribeChannel, unlockAudio, toggleSTT]);
 
-  /* 동시통역 모드: 호스트는 파트너 입장 시 presence 이벤트로 phase 전환 → effect에서 STT 시작
-     게스트는 joinRoom(클릭 컨텍스트)에서 직접 시작하므로 여기서 제외 */
-  useEffect(() => {
-    if (phase === 'chat' && mode === 'simultaneous' && !isRecording && myRole === 'host') toggleSTT();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, mode, myRole]);
 
   const isKorean = myLang === 'ko';
   const isHost   = myRole === 'host';
@@ -514,6 +508,8 @@ export default function TravelTalk() {
               onToggle={() => {
                 const next: ChatMode = isSim ? 'conversation' : 'simultaneous';
                 setMode(next);
+                // 클릭 컨텍스트에서 직접 STT 시작/정지 (iOS Safari effect 차단 우회)
+                if (next === 'simultaneous' && !isRecording) toggleSTT();
                 if (next === 'conversation' && isRecording) toggleSTT();
               }}
               labelOn="동시통역"
