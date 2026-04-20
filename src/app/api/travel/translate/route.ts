@@ -52,7 +52,8 @@ export async function POST(request: NextRequest) {
       }
     );
     const data = await res.json();
-    const translated: string = data.data.translations[0].translatedText;
+    const translated: string = data?.data?.translations?.[0]?.translatedText || '';
+    if (!translated) throw new Error('Empty translation response');
     return NextResponse.json({ translated, engine: 'google' });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

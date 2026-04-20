@@ -205,6 +205,7 @@ export default function TravelTalk() {
   useEffect(() => { translatingRef.current = translating; }, [translating]);
   useEffect(() => { learningModeRef.current = learningMode; }, [learningMode]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => () => { if (channelRef.current) supabase.removeChannel(channelRef.current); }, []);
 
   useEffect(() => {
     setTravelUrl(`${window.location.origin}/travel`);
@@ -302,13 +303,18 @@ export default function TravelTalk() {
         time: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
       };
 
-      setMessages(prev => [...prev, msg]);
-
-      channelRef.current?.send({
-        type: 'broadcast',
-        event: 'new-message',
-        payload: { ...msg, mine: false },
+      setMessages(prev => {
+        const next = [...prev, msg];
+        return next.length > 200 ? next.slice(-200) : next;
       });
+
+      if (translated) {
+        channelRef.current?.send({
+          type: 'broadcast',
+          event: 'new-message',
+          payload: { ...msg, mine: false },
+        });
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -392,7 +398,7 @@ export default function TravelTalk() {
             onKeyDown={e => e.key === 'Enter' && joinRoom(inputCode, myLang)}
             style={{ flex: 1, padding: '15px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, color: '#ede8e3', fontSize: 26, textAlign: 'center', letterSpacing: 12, outline: 'none' }}
           />
-          <button onClick={() => joinRoom(inputCode, myLang)} style={{ padding: '15px 22px', background: inputCode.length === 4 ? 'rgba(192,57,43,0.75)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, color: '#fff', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>입장</button>
+          <button onClick={() => joinRoom(inputCode, myLang)} disabled={inputCode.length < 4} style={{ padding: '15px 22px', background: inputCode.length === 4 ? 'rgba(192,57,43,0.75)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, color: '#fff', fontSize: 13, cursor: inputCode.length === 4 ? 'pointer' : 'default', whiteSpace: 'nowrap' }}>입장</button>
         </div>
 
         <p style={{ marginTop: 48, textAlign: 'center', fontSize: 11, color: '#2a2a3a', lineHeight: 2.2 }}>
