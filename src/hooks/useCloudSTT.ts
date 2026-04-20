@@ -75,6 +75,7 @@ export function useCloudSTT({
     const recorderRef = useRef<MediaRecorder | null>(null);
     const activeRef = useRef(false);
     const cyclingRef = useRef(false);
+    const mutedRef = useRef(false); // muted: 녹음은 유지하되 결과 버림 (TTS/파트너 발화 중)
     const langRef = useRef(lang);
     const onTranscriptRef = useRef(onTranscript);
     const onErrorRef = useRef(onError);
@@ -180,7 +181,10 @@ export function useCloudSTT({
 
             if (data.transcript?.trim()) {
                 emptyStreakRef.current = 0;
-                onTranscriptRef.current(data.transcript.trim());
+                // muted 상태(TTS 재생 중 / 파트너 발화 중)면 결과 버림
+                if (!mutedRef.current) {
+                    onTranscriptRef.current(data.transcript.trim());
+                }
             } else {
                 emptyStreakRef.current += 1;
             }
@@ -308,5 +312,8 @@ export function useCloudSTT({
         }
     }, [startCycle, acquireStream, stopInternal]);
 
-    return { isRecording, toggle };
+    const mute   = useCallback(() => { mutedRef.current = true;  }, []);
+    const unmute = useCallback(() => { mutedRef.current = false; }, []);
+
+    return { isRecording, toggle, mute, unmute };
 }

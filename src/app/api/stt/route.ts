@@ -134,6 +134,9 @@ async function transcribeWithWhisper(
 
 const MIN_CONFIDENCE = 0.6;
 
+/** 음성 어시스턴트 wake word — STT가 잡아도 즉시 폐기 */
+const WAKE_WORD_RE = /^(ok\s*google|okay\s*google|hey\s*google|ok\s*구글|오케이\s*구글|hey\s*siri|하이\s*빅스비|hi\s*bixby|ok\s*bixby|알렉사|alexa)\.?$/i;
+
 /**
  * 교차 음성 오염 필터 — 상대방 언어가 내 마이크에 섞였을 때 폐기
  * 원리: 각 언어 고유 문자 범위로 판별 (한글·가나·CJK 구분)
@@ -275,6 +278,11 @@ export async function POST(req: Request) {
             .join(" ") || "";
 
         if (!transcript.trim()) {
+            return NextResponse.json({ transcript: "" });
+        }
+
+        // 음성 어시스턴트 wake word 폐기 (OK Google 등)
+        if (WAKE_WORD_RE.test(transcript.trim())) {
             return NextResponse.json({ transcript: "" });
         }
 

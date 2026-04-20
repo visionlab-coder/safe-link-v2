@@ -233,9 +233,17 @@ export default function TravelTalk() {
     } catch {}
   }, []);
 
+  const muteSTTRef   = useRef<() => void>(() => {});
+  const unmuteSTTRef = useRef<() => void>(() => {});
+
   const speakTTS = useCallback((text: string, lang: string) => {
     if (!text || !ttsEnabledRef.current) return;
-    playPremiumAudio(text, lang, voiceGenderRef.current);
+    // TTS 재생 중 내 마이크 결과 버림 (상대 목소리 재귀 방지)
+    muteSTTRef.current();
+    playPremiumAudio(text, lang, voiceGenderRef.current, () => {
+      // TTS 끝나고 300ms 후 unmute (음향 잔향 여유)
+      setTimeout(() => unmuteSTTRef.current(), 300);
+    });
   }, []);
 
   /* ── Supabase Realtime 채널 구독 ── */
@@ -265,11 +273,18 @@ export default function TravelTalk() {
       .on('presence', { event: 'leave' }, handlePresenceChange)
       .on('broadcast', { event: 'new-message' }, ({ payload }: { payload: Message }) => {
         setPartnerSpeaking(false);
+        unmuteSTTRef.current(); // 메시지 수신 = 파트너 발화 완료 → unmute
         setMessages(prev => [...prev, { ...payload, mine: false }]);
         speakTTS(payload.translated, myLangRef.current);
       })
-      .on('broadcast', { event: 'speaking-start' }, () => setPartnerSpeaking(true))
-      .on('broadcast', { event: 'speaking-end'   }, () => setPartnerSpeaking(false))
+      .on('broadcast', { event: 'speaking-start' }, () => {
+        setPartnerSpeaking(true);
+        muteSTTRef.current(); // 파트너 발화 시작 → 내 STT 결과 버림
+      })
+      .on('broadcast', { event: 'speaking-end' }, () => {
+        setPartnerSpeaking(false);
+        // speakTTS의 onEnd에서 unmute하므로 여기선 하지 않음 (TTS 재생 중일 수 있음)
+      })
       .subscribe(async (status: string) => {
         if (status === 'SUBSCRIBED') await ch.track({ role: myRole, lang });
       });
@@ -348,12 +363,15 @@ export default function TravelTalk() {
   }, [unlockAudio]);
 
   /* ── Cloud STT ── */
-  const { isRecording, toggle: toggleSTT } = useCloudSTT({
+  const { isRecording, toggle: toggleSTT, mute: muteSTT, unmute: unmuteSTT } = useCloudSTT({
     lang: LANGS[myLang]?.stt || 'ko-KR',
     onTranscript: sendMessage,
     live: true,
     silenceDuration: mode === 'simultaneous' ? 800 : 1500,
   });
+  // ref에 연결 — subscribeChannel / speakTTS 클로저에서 접근
+  useEffect(() => { muteSTTRef.current = muteSTT; }, [muteSTT]);
+  useEffect(() => { unmuteSTTRef.current = unmuteSTT; }, [unmuteSTT]);
 
   const createRoom = useCallback(async () => {
     unlockAudio();
