@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const t0 = Date.now();
   const { text, from, to } = await request.json();
   if (!text || !from || !to) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
         const translated: string = data.message?.result?.translatedText || '';
         if (translated) {
           const final = to === 'ko' ? formalizeKo(translated) : translated;
+          console.log(`[translate] papago ${from}→${to} ${Date.now()-t0}ms`);
           return NextResponse.json({ translated: final, engine: 'papago' });
         }
       }
@@ -64,6 +66,7 @@ export async function POST(request: NextRequest) {
     const translated: string = data?.data?.translations?.[0]?.translatedText || '';
     if (!translated) throw new Error('Empty translation response');
     const final = to === 'ko' ? formalizeKo(translated) : translated;
+    console.log(`[translate] google ${from}→${to} ${Date.now()-t0}ms`);
     return NextResponse.json({ translated: final, engine: 'google' });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

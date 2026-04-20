@@ -175,6 +175,7 @@ interface SpeechRecognitionResponse {
 export async function POST(req: Request) {
     const GOOGLE_API_KEY = process.env.GOOGLE_CLOUD_API_KEY?.trim();
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim();
+    const t0 = Date.now();
 
     if (!GOOGLE_API_KEY && !OPENAI_API_KEY) {
         console.error("[STT API] No STT provider API key configured");
@@ -315,6 +316,8 @@ export async function POST(req: Request) {
             });
         }
 
+        const elapsed = Date.now() - t0;
+        console.log(`[STT] ${shortLang} live=${live} → ${elapsed}ms`);
         return NextResponse.json({ transcript: transcript.trim(), engine: "google" });
     } catch (error: unknown) {
         console.error("[STT API Internal Error]", error);
