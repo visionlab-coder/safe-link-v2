@@ -291,7 +291,8 @@ export default function TravelTalk() {
       })
       .on('broadcast', { event: 'speaking-end' }, () => {
         setPartnerSpeaking(false);
-        // speakTTS의 onEnd에서 unmute하므로 여기선 하지 않음 (TTS 재생 중일 수 있음)
+        // new-message가 네트워크 지연으로 안 오는 경우 대비 — 2초 후 강제 unmute
+        setTimeout(() => unmuteSTTRef.current(), 2000);
       })
       .subscribe(async (status: string) => {
         if (status === 'SUBSCRIBED') await ch.track({ role: myRole, lang });
