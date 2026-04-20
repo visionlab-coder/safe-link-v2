@@ -414,6 +414,11 @@ export default function TravelTalk() {
   const { isRecording, toggle: toggleSTT, mute: muteSTT, unmute: unmuteSTT } = useCloudSTT({
     lang: LANGS[myLang]?.stt || 'ko-KR',
     onTranscript: sendMessage,
+    // VAD 음성 감지 즉시 → 파트너에게 speaking-start 조기 전달
+    // (sendMessage 내부 speaking-start보다 1~3초 빠름 → 파트너 STT 조기 뮤트)
+    onSpeechStart: useCallback(() => {
+      channelRef.current?.send({ type: 'broadcast', event: 'speaking-start', payload: {} });
+    }, []),
     live: true,
     silenceDuration: mode === 'simultaneous' ? 800 : 1500,
   });

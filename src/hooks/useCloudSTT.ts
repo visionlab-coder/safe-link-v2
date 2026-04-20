@@ -40,6 +40,8 @@ interface UseCloudSTTOptions {
     lang: string;
     onTranscript: (text: string) => void;
     onError?: (type: STTErrorType, message: string) => void;
+    /** VAD가 음성 시작을 감지하는 즉시 호출 — STT 완료 전 파트너에게 조기 신호 전달용 */
+    onSpeechStart?: () => void;
     chunkInterval?: number;
     /** 침묵 감지 ms — 이 시간 이상 조용하면 자동 전송 (기본 2000ms) */
     silenceDuration?: number;
@@ -66,6 +68,7 @@ export function useCloudSTT({
     lang,
     onTranscript,
     onError,
+    onSpeechStart,
     chunkInterval = 10_000,
     silenceDuration = 2000,
     live = false,
@@ -79,6 +82,7 @@ export function useCloudSTT({
     const langRef = useRef(lang);
     const onTranscriptRef = useRef(onTranscript);
     const onErrorRef = useRef(onError);
+    const onSpeechStartRef = useRef(onSpeechStart);
     const emptyStreakRef = useRef(0);
 
     // VAD (Voice Activity Detection) refs
@@ -92,6 +96,7 @@ export function useCloudSTT({
     useEffect(() => { langRef.current = lang; }, [lang]);
     useEffect(() => { onTranscriptRef.current = onTranscript; }, [onTranscript]);
     useEffect(() => { onErrorRef.current = onError; }, [onError]);
+    useEffect(() => { onSpeechStartRef.current = onSpeechStart; }, [onSpeechStart]);
 
     const stopVAD = useCallback(() => {
         if (vadFrameRef.current) { cancelAnimationFrame(vadFrameRef.current); vadFrameRef.current = null; }
@@ -252,6 +257,7 @@ export function useCloudSTT({
             silenceStartRef.current = null;
 
             const floatBuf = new Float32Array(analyser.fftSize);
+            let speechFiredThisCycle = false; // 사이클당 1회만 onSpeechStart 호출
 
             const vadLoop = () => {
                 if (!activeRef.current || recorder.state !== "recording") return;
@@ -276,6 +282,11 @@ export function useCloudSTT({
                 } else {
                     // 말소리 감지 → 침묵 타이머 리셋
                     silenceStartRef.current = null;
+                    // 이번 사이클에서 첫 음성 감지 + muted 아닐 때 → 파트너에게 즉시 신호
+                    if (!speechFiredThisCycle && !mutedRef.current) {
+                        speechFiredThisCycle = true;
+                        onSpeechStartRef.current?.();
+                    }
                 }
 
                 vadFrameRef.current = requestAnimationFrame(vadLoop);
