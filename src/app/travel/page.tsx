@@ -453,11 +453,19 @@ export default function TravelTalk() {
     return (
       <div style={{ ...PAGE, alignItems: 'center' }}>
         <div style={{ textAlign: 'center', padding: 36, maxWidth: 380 }}>
-          <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 28 }}>SAFE-LINK · TRAVEL TALK</p>
-          <p style={{ fontSize: 13, color: '#555', marginBottom: 20, lineHeight: 2 }}>
-            상대방 폰으로 QR을 스캔해주세요<br />
-            <span style={{ fontSize: 11, color: '#3a3a4a' }}>相手のスマホでQRを読み取ってください</span>
-          </p>
+          <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 16 }}>SAFE-LINK · TRAVEL TALK</p>
+
+          {/* 외국인에게 폰 화면을 보여주면 자기 언어로 읽고 QR 스캔 */}
+          <div style={{ marginBottom: 20, padding: '14px 18px', background: 'rgba(192,57,43,0.07)', border: '1px solid rgba(192,57,43,0.2)', borderRadius: 16 }}>
+            <p style={{ fontSize: 14, color: '#e74c3c', fontWeight: 700, marginBottom: 10 }}>📷 이 화면을 상대방에게 보여주세요</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, lineHeight: 1.8 }}>
+              <span style={{ color: '#ccc' }}>🇯🇵 QRコードをスキャンしてください</span>
+              <span style={{ color: '#ccc' }}>🇺🇸 Please scan this QR code</span>
+              <span style={{ color: '#ccc' }}>🇨🇳 请用手机扫描此二维码</span>
+              <span style={{ color: '#ccc' }}>🇻🇳 Vui lòng quét mã QR này</span>
+            </div>
+          </div>
+
           {travelUrl && (
             <div style={{ display: 'inline-block', background: '#fff', borderRadius: 20, padding: 18, marginBottom: 24 }}>
               <QRCodeSVG value={qrUrl} size={200} fgColor="#07070e" bgColor="#ffffff" />
