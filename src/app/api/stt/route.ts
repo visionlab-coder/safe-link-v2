@@ -132,44 +132,24 @@ async function transcribeWithWhisper(
     }
 }
 
-/** 일반 신뢰도 임계값 */
 const MIN_CONFIDENCE = 0.6;
-/** live 모드(Travel Talk) — 교차 오염 가능성↑, 더 엄격한 신뢰도 요구 */
-const MIN_CONFIDENCE_LIVE = 0.75;
 
 /** 음성 어시스턴트 wake word — STT가 잡아도 즉시 폐기 */
 const WAKE_WORD_RE = /^(ok\s*google|okay\s*google|hey\s*google|ok\s*구글|오케이\s*구글|hey\s*siri|하이\s*빅스비|hi\s*bixby|ok\s*bixby|알렉사|alexa)\.?$/i;
 
 /**
- * 일본어 음성을 한국어 STT가 한글 발음으로 전사한 패턴
- * 예) ありがとうございます → "아리가또 고자이마시다"
- * 가나 문자가 없어 문자 기반 필터를 우회하는 케이스를 잡음
- */
-const JA_PHONETIC_IN_KO_RE = /고자이마스|고자이마시다|아리가또|아리가토|코니치와|고니치와|스미마셍|스미마센|와카리마스|와카리마셍|와카리마시타|나니?데스까|도코데스|도코카라|오하이오\s*고자|이키마스|이키마셍|오야스미/i;
-
-/**
  * 교차 음성 오염 필터 — 상대방 언어가 내 마이크에 섞였을 때 폐기
- * Layer 1: 문자 범위 감지 (가나·한글·CJK)
- * Layer 2 (ko전용): 한국어 STT가 일본어 음성을 한글 발음으로 전사한 패턴 감지
+ * 원리: 각 언어 고유 문자 범위로 판별 (한글·가나·CJK 구분)
  */
 function isCrossTalkContamination(transcript: string, shortLang: string): boolean {
     const hasHangul = /[\uAC00-\uD7A3\u3131-\u318E]/.test(transcript);
     const hasKana   = /[\u3040-\u309F\u30A0-\u30FF]/.test(transcript);
 
     switch (shortLang) {
-        case 'ko':
-            if (hasKana) return true;
-            // 한국어 STT가 일본어 음성을 한글 음소로 전사한 패턴 (가나 없이도 탐지)
-            if (JA_PHONETIC_IN_KO_RE.test(transcript)) return true;
-            return false;
-        case 'ja':
-            return hasHangul;
-        case 'zh':
-            return hasHangul || hasKana;
-        case 'vi': case 'en':
-            return false;
-        default:
-            return false;
+        case 'ko': return hasKana;
+        case 'ja': return hasHangul;
+        case 'zh': return hasHangul || hasKana;
+        default:   return false;
     }
 }
 
@@ -276,13 +256,11 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: data.error.message }, { status: 400 });
         }
 
-        // live 모드(Travel Talk)는 교차 오염 가능성이 높아 더 엄격한 신뢰도 적용
-        const confidenceThreshold = live ? MIN_CONFIDENCE_LIVE : MIN_CONFIDENCE;
         const transcript = data.results
             ?.map((res) => {
                 const alt = res.alternatives?.[0];
                 if (!alt?.transcript) return "";
-                if (alt.confidence !== undefined && alt.confidence < confidenceThreshold) return "";
+                if (alt.confidence !== undefined && alt.confidence < MIN_CONFIDENCE) return "";
                 return alt.transcript;
             })
             .filter(Boolean)

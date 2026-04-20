@@ -398,11 +398,9 @@ export default function TravelTalk() {
           event: 'new-message',
           payload: { ...msg, mine: false },
         });
-        // 상대방 기기에서 번역 TTS를 재생하는 동안 내 마이크가 에코를 픽업하는 현상 방지
-        // 한 글자당 약 150ms + VAD silenceDuration(1500ms) 여유 — 8초 상한
-        const echoGuardMs = Math.min(1500 + translated.length * 150, 8000);
+        // 상대방 기기 TTS 재생 중 에코 픽업 방지 — 고정 3초
         safeMute();
-        scheduleUnmute(echoGuardMs);
+        scheduleUnmute(3000);
       }
     } catch (e) {
       console.error(e);
