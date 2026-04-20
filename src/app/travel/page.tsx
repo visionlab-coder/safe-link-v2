@@ -396,6 +396,11 @@ export default function TravelTalk() {
           event: 'new-message',
           payload: { ...msg, mine: false },
         });
+        // 상대방 기기에서 번역 TTS를 재생하는 동안 내 마이크가 에코를 픽업하는 현상 방지
+        // 한 글자당 약 150ms + VAD silenceDuration(1500ms) 여유 — 8초 상한
+        const echoGuardMs = Math.min(1500 + translated.length * 150, 8000);
+        safeMute();
+        scheduleUnmute(echoGuardMs);
       }
     } catch (e) {
       console.error(e);
@@ -403,7 +408,7 @@ export default function TravelTalk() {
       setTranslating(false);
       channelRef.current?.send({ type: 'broadcast', event: 'speaking-end', payload: {} });
     }
-  }, [unlockAudio]);
+  }, [unlockAudio, safeMute, scheduleUnmute]);
 
   /* ── Cloud STT ── */
   const { isRecording, toggle: toggleSTT, mute: muteSTT, unmute: unmuteSTT } = useCloudSTT({
