@@ -395,11 +395,8 @@ export default function TravelTalk() {
     setMyRole('guest');
     setPhase('chat');
     subscribeChannel(code, 'guest', lang);
-    // 게스트: 언어 선택 탭(사용자 제스처) 내에서 직접 STT 시작
-    // 외국인 게스트는 UI를 모르므로 자동 시작이 필수
-    // 클릭 컨텍스트라 iOS Safari getUserMedia 권한 다이얼로그 정상 표시됨
-    toggleSTT();
-  }, [subscribeChannel, unlockAudio, toggleSTT]);
+    // STT 자동 시작 제거 — 게스트도 버튼을 눌러서 말하는 대화 모드로 시작
+  }, [subscribeChannel, unlockAudio]);
 
 
   const isKorean = myLang === 'ko';
