@@ -257,8 +257,9 @@ export default function TravelTalk() {
     // TTS 재생 중 내 마이크 결과 버림 (상대 목소리 재귀 방지)
     muteSTTRef.current();
     playPremiumAudio(text, lang, voiceGenderRef.current, () => {
-      // TTS 끝나고 300ms 후 unmute (음향 잔향 여유)
-      setTimeout(() => unmuteSTTRef.current(), 300);
+      // TTS 종료 후 2000ms 유지 — VAD silenceDuration(1500ms) + 여유 500ms
+      // TTS 포함 청크가 전송·폐기된 후 unmute해야 레이스 컨디션 차단
+      setTimeout(() => unmuteSTTRef.current(), 2000);
     });
   }, []);
 

@@ -147,6 +147,8 @@ export function useCloudSTT({
 
     const sendChunk = useCallback(async (blob: Blob) => {
         if (blob.size < MIN_CHUNK_SIZE) return;
+        // muted 상태면 API 호출 자체를 스킵 (TTS 포함 오디오 서버 전송 방지)
+        if (mutedRef.current) return;
 
         if (!live && emptyStreakRef.current >= MAX_EMPTY_STREAK) {
             emptyStreakRef.current = 0;
