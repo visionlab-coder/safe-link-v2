@@ -190,6 +190,7 @@ export default function TravelTalk() {
 
   const channelRef       = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const bottomRef        = useRef<HTMLDivElement>(null);
+  const travelTokenRef   = useRef<string>('');
   const myLangRef        = useRef(myLang);
   const ttsEnabledRef    = useRef(ttsEnabled);
   const voiceGenderRef   = useRef(voiceGender);
@@ -212,6 +213,11 @@ export default function TravelTalk() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     if (code && code.length === 4) { setPendingCode(code); setPhase('join'); }
+    // 페이지 로드 시 서버 토큰 발급 (사용자 불편 없음 — 백그라운드 자동)
+    fetch('/api/travel/session', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => { if (d.token) travelTokenRef.current = d.token; })
+      .catch(() => {});
   }, []);
 
   /* 브라우저 자동재생 정책 우회 — 사용자 제스처 직후 무음 재생으로 오디오 컨텍스트 언락 */
@@ -278,11 +284,13 @@ export default function TravelTalk() {
     try {
       let translated = '', pronunciation = '', reverse_translated = '';
 
+      const authHeader = { 'x-travel-token': travelTokenRef.current };
+
       if (learningModeRef.current) {
         /* 학습 모드: 발음 + 역번역 포함 (Gemini 호출 → 1~2초 추가) */
         const res = await fetch('/api/translate', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeader },
           body: JSON.stringify({ text, sl, tl }),
         });
         ({ translated = '', pronunciation = '', reverse_translated = '' } = await res.json());
@@ -290,7 +298,7 @@ export default function TravelTalk() {
         /* 빠른 대화 모드: 번역만 (딜레이 최소) */
         const res = await fetch('/api/travel/translate', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeader },
           body: JSON.stringify({ text, from: sl, to: tl }),
         });
         ({ translated = '' } = await res.json());

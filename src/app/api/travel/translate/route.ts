@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyTravelToken } from '@/lib/travel-auth';
 
 // 파파고 지원 언어 (Travel Talk 5개 언어 모두 포함)
 const PAPAGO_LANG_MAP: Record<string, string> = {
@@ -6,6 +7,10 @@ const PAPAGO_LANG_MAP: Record<string, string> = {
 };
 
 export async function POST(request: NextRequest) {
+  if (!verifyTravelToken(request.headers.get('x-travel-token'))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { text, from, to } = await request.json();
   if (!text || !from || !to) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
