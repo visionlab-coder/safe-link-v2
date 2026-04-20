@@ -219,7 +219,10 @@ export default function TravelTalk() {
   useEffect(() => { translatingRef.current = translating; }, [translating]);
   useEffect(() => { learningModeRef.current = learningMode; }, [learningMode]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
-  useEffect(() => () => { if (channelRef.current) supabase.removeChannel(channelRef.current); }, []);
+  useEffect(() => () => {
+    if (channelRef.current) supabase.removeChannel(channelRef.current);
+    if (unmuteTimerRef.current) clearTimeout(unmuteTimerRef.current);
+  }, []);
 
   useEffect(() => {
     setTravelUrl(`${window.location.origin}/travel`);
@@ -273,9 +276,10 @@ export default function TravelTalk() {
       return;
     }
     safeMute();
+    // 비상 안전타이머: TTS 오류로 onEnd가 절대 안 오는 극단적 경우에도 60초 후 강제 unmute
+    scheduleUnmute(60000);
     playPremiumAudio(text, lang, voiceGenderRef.current, () => {
-      // TTS 종료 후 2000ms 유지 — VAD silenceDuration(1500ms) + 여유 500ms
-      // TTS 포함 오디오 청크가 전송·폐기된 후 unmute (레이스 컨디션 차단)
+      // TTS 정상 종료: 60초 타이머를 2000ms로 교체 (VAD silenceDuration 1500ms + 여유)
       scheduleUnmute(2000);
     });
   }, [safeMute, scheduleUnmute]);

@@ -50,8 +50,7 @@ export function ensurePoliteKo(text: string): string {
         { from: /준다[.!?]?$/, to: "줍니다." },       // 준다 → 줍니다
         { from: /산다[.!?]?$/, to: "삽니다." },
         { from: /신다[.!?]?$/, to: "신습니다." },
-        { from: /는다[.!?]?$/, to: "ㅂ니다." },       // fallback: X는다 → X ㅂ니다 (불완전, 아래 후처리)
-        { from: /ㄴ다[.!?]?$/, to: "ㅂ니다." },
+        { from: /는다[.!?]?$/, to: "습니다." },       // 먹는다 → 먹습니다 (받침 있는 동사 현재형)
 
         // === 과거형 ===
         { from: /했다[.!?]?$/, to: "했습니다." },
@@ -118,6 +117,40 @@ export function ensurePoliteKo(text: string): string {
         result += "요.";
     }
 
+    return result;
+}
+
+/**
+ * 일본어 출력의 경어 보장 — 반말(だ체/명령형)을 です/ます체로 변환
+ * 파파고가 반말 입력을 だ体로 번역하는 경우 방어
+ */
+export function formalizeJa(text: string): string {
+    const trimmed = text?.trim();
+    if (!trimmed) return text;
+
+    // 이미 경어면 그대로
+    if (/(?:です|ます|ください|ませ|でしょう|ましょう|ません)[。！？.!?]?$/.test(trimmed)) return trimmed;
+
+    const rules: Array<{ from: RegExp; to: string }> = [
+        // 단정/추측 반말 → 존댓말
+        { from: /だろう[。！？.!?]?$/, to: 'でしょう。' },
+        { from: /であろう[。！？.!?]?$/, to: 'でしょう。' },
+        { from: /である[。！？.!?]?$/, to: 'です。' },
+        { from: /だ[。！？.!?]?$/, to: 'です。' },
+        // 명령형/요청 반말 → 정중 요청형
+        { from: /してくれ[。！？.!?]?$/, to: 'してください。' },
+        { from: /てくれ[。！？.!?]?$/, to: 'てください。' },
+        { from: /しろ[。！？.!?]?$/, to: 'してください。' },
+        { from: /なさい[。！？.!?]?$/, to: 'てください。' },
+    ];
+
+    let result = trimmed;
+    for (const rule of rules) {
+        if (rule.from.test(result)) {
+            result = result.replace(rule.from, rule.to);
+            break;
+        }
+    }
     return result;
 }
 

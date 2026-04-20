@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyTravelToken } from '@/lib/travel-auth';
-import { formalizeKo } from '@/utils/politeness';
+import { formalizeKo, formalizeJa } from '@/utils/politeness';
 
 // 파파고 지원 언어 (Travel Talk 5개 언어 모두 포함)
 const PAPAGO_LANG_MAP: Record<string, string> = {
@@ -42,7 +42,9 @@ export async function POST(request: NextRequest) {
         const data = await res.json();
         const translated: string = data.message?.result?.translatedText || '';
         if (translated) {
-          const final = to === 'ko' ? formalizeKo(translated) : translated;
+            const final = to === 'ko' ? formalizeKo(translated)
+                      : to === 'ja' ? formalizeJa(translated)
+                      : translated;
           console.log(`[translate] papago ${from}→${to} ${Date.now()-t0}ms`);
           return NextResponse.json({ translated: final, engine: 'papago' });
         }
@@ -62,10 +64,13 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({ q: text, source: from, target: to, format: 'text' }),
       }
     );
+    if (!res.ok) throw new Error(`Google API ${res.status}`);
     const data = await res.json();
     const translated: string = data?.data?.translations?.[0]?.translatedText || '';
     if (!translated) throw new Error('Empty translation response');
-    const final = to === 'ko' ? formalizeKo(translated) : translated;
+    const final = to === 'ko' ? formalizeKo(translated)
+                : to === 'ja' ? formalizeJa(translated)
+                : translated;
     console.log(`[translate] google ${from}→${to} ${Date.now()-t0}ms`);
     return NextResponse.json({ translated: final, engine: 'google' });
   } catch (err) {
