@@ -244,24 +244,41 @@ export default function TravelTalk() {
     } catch {}
   }, []);
 
-  const muteSTTRef   = useRef<() => void>(() => {});
-  const unmuteSTTRef = useRef<() => void>(() => {});
+  const muteSTTRef      = useRef<() => void>(() => {});
+  const unmuteSTTRef    = useRef<() => void>(() => {});
+  const unmuteTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 안전한 unmute — 이전 예약된 타이머를 취소하고 새로 예약
+  const scheduleUnmute = useCallback((delayMs: number) => {
+    if (unmuteTimerRef.current) clearTimeout(unmuteTimerRef.current);
+    unmuteTimerRef.current = setTimeout(() => {
+      unmuteTimerRef.current = null;
+      unmuteSTTRef.current();
+    }, delayMs);
+  }, []);
+
+  // 새 mute 시 기존 unmute 타이머 취소 (타이머 충돌 방지)
+  const safeMute = useCallback(() => {
+    if (unmuteTimerRef.current) { clearTimeout(unmuteTimerRef.current); unmuteTimerRef.current = null; }
+    muteSTTRef.current();
+  }, []);
 
   const speakTTS = useCallback((text: string, lang: string) => {
     if (!ttsEnabledRef.current) {
-      // TTS 꺼진 상태: speaking-start로 muted됐을 수 있으니 즉시 해제
-      unmuteSTTRef.current();
+      scheduleUnmute(0); // TTS 꺼짐: 즉시 unmute
       return;
     }
-    if (!text) return;
-    // TTS 재생 중 내 마이크 결과 버림 (상대 목소리 재귀 방지)
-    muteSTTRef.current();
+    if (!text) {
+      scheduleUnmute(0); // 빈 텍스트: 즉시 unmute
+      return;
+    }
+    safeMute();
     playPremiumAudio(text, lang, voiceGenderRef.current, () => {
       // TTS 종료 후 2000ms 유지 — VAD silenceDuration(1500ms) + 여유 500ms
-      // TTS 포함 청크가 전송·폐기된 후 unmute해야 레이스 컨디션 차단
-      setTimeout(() => unmuteSTTRef.current(), 2000);
+      // TTS 포함 오디오 청크가 전송·폐기된 후 unmute (레이스 컨디션 차단)
+      scheduleUnmute(2000);
     });
-  }, []);
+  }, [safeMute, scheduleUnmute]);
 
   /* ── Supabase Realtime 채널 구독 ── */
   const subscribeChannel = useCallback((code: string, myRole: 'host' | 'guest', lang: string) => {
@@ -299,19 +316,20 @@ export default function TravelTalk() {
       })
       .on('broadcast', { event: 'speaking-start' }, () => {
         setPartnerSpeaking(true);
-        muteSTTRef.current(); // 파트너 발화 시작 → 내 STT 결과 버림
+        safeMute(); // 기존 unmute 타이머 취소 + mute
+        // 최후 안전장치: 8초 후 강제 unmute (new-message 유실·TTS 오류 대비)
+        scheduleUnmute(8000);
       })
       .on('broadcast', { event: 'speaking-end' }, () => {
         setPartnerSpeaking(false);
-        // new-message가 네트워크 지연으로 안 오는 경우 대비 — 2초 후 강제 unmute
-        setTimeout(() => unmuteSTTRef.current(), 2000);
+        // unmute는 speakTTS onEnd(+2000ms)에서 처리 — 여기서 하면 TTS 재생 중 조기 해제됨
       })
       .subscribe(async (status: string) => {
         if (status === 'SUBSCRIBED') await ch.track({ role: myRole, lang });
       });
 
     channelRef.current = ch;
-  }, [speakTTS]);
+  }, [speakTTS, safeMute, scheduleUnmute]);
 
   /* ── 메시지 전송 ── */
   const sendMessage = useCallback(async (text: string) => {
