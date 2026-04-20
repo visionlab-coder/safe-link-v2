@@ -210,7 +210,8 @@ export default function TravelTalk() {
   const partnerLangRef   = useRef(partnerLang);
   const translatingRef    = useRef(translating);
   const audioUnlockedRef  = useRef(false);
-  const learningModeRef   = useRef(learningMode);
+  const learningModeRef      = useRef(learningMode);
+  const partnerSpeakingRef   = useRef(false); // STT 2차 방어: 파트너 발화 중 결과 폐기
 
   useEffect(() => { myLangRef.current = myLang; }, [myLang]);
   useEffect(() => { ttsEnabledRef.current = ttsEnabled; }, [ttsEnabled]);
@@ -218,6 +219,7 @@ export default function TravelTalk() {
   useEffect(() => { partnerLangRef.current = partnerLang; }, [partnerLang]);
   useEffect(() => { translatingRef.current = translating; }, [translating]);
   useEffect(() => { learningModeRef.current = learningMode; }, [learningMode]);
+  useEffect(() => { partnerSpeakingRef.current = partnerSpeaking; }, [partnerSpeaking]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
   useEffect(() => () => {
     if (channelRef.current) supabase.removeChannel(channelRef.current);
@@ -410,15 +412,25 @@ export default function TravelTalk() {
     }
   }, [unlockAudio, safeMute, scheduleUnmute]);
 
+  // [2차 방어] 파트너 발화 중 도착한 STT 결과 폐기 — 타이밍 갭 보완
+  const handleTranscript = useCallback((text: string) => {
+    if (partnerSpeakingRef.current) {
+      console.log('[Travel STT] 파트너 발화 중 폐기:', text.slice(0, 20));
+      return;
+    }
+    sendMessage(text);
+  }, [sendMessage]);
+
+  // [1차 방어] VAD 음성 감지 즉시 파트너에게 speaking-start 조기 전달
+  const handleSpeechStart = useCallback(() => {
+    channelRef.current?.send({ type: 'broadcast', event: 'speaking-start', payload: {} });
+  }, []);
+
   /* ── Cloud STT ── */
   const { isRecording, toggle: toggleSTT, mute: muteSTT, unmute: unmuteSTT } = useCloudSTT({
     lang: LANGS[myLang]?.stt || 'ko-KR',
-    onTranscript: sendMessage,
-    // VAD 음성 감지 즉시 → 파트너에게 speaking-start 조기 전달
-    // (sendMessage 내부 speaking-start보다 1~3초 빠름 → 파트너 STT 조기 뮤트)
-    onSpeechStart: useCallback(() => {
-      channelRef.current?.send({ type: 'broadcast', event: 'speaking-start', payload: {} });
-    }, []),
+    onTranscript: handleTranscript,
+    onSpeechStart: handleSpeechStart,
     live: true,
     silenceDuration: mode === 'simultaneous' ? 800 : 1500,
   });
