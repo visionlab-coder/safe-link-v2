@@ -211,7 +211,8 @@ export default function TravelTalk() {
   const translatingRef    = useRef(translating);
   const audioUnlockedRef  = useRef(false);
   const learningModeRef      = useRef(learningMode);
-  const partnerSpeakingRef   = useRef(false); // STT 2차 방어: 파트너 발화 중 결과 폐기
+  const modeRef              = useRef(mode);
+  const partnerSpeakingRef   = useRef(false);
 
   useEffect(() => { myLangRef.current = myLang; }, [myLang]);
   useEffect(() => { ttsEnabledRef.current = ttsEnabled; }, [ttsEnabled]);
@@ -219,6 +220,7 @@ export default function TravelTalk() {
   useEffect(() => { partnerLangRef.current = partnerLang; }, [partnerLang]);
   useEffect(() => { translatingRef.current = translating; }, [translating]);
   useEffect(() => { learningModeRef.current = learningMode; }, [learningMode]);
+  useEffect(() => { modeRef.current = mode; }, [mode]);
   useEffect(() => { partnerSpeakingRef.current = partnerSpeaking; }, [partnerSpeaking]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
   useEffect(() => () => {
@@ -322,13 +324,15 @@ export default function TravelTalk() {
       })
       .on('broadcast', { event: 'speaking-start' }, () => {
         setPartnerSpeaking(true);
-        safeMute(); // 기존 unmute 타이머 취소 + mute
-        // 최후 안전장치: 8초 후 강제 unmute (new-message 유실·TTS 오류 대비)
-        scheduleUnmute(8000);
+        // 대화 모드: 파트너 발화 중 내 STT 뮤트 (교차 간섭 방지)
+        // 동시통역 모드: 양쪽이 동시에 말하는 게 정상 — 뮤트 안 함
+        if (modeRef.current !== 'simultaneous') {
+          safeMute();
+          scheduleUnmute(8000);
+        }
       })
       .on('broadcast', { event: 'speaking-end' }, () => {
         setPartnerSpeaking(false);
-        // unmute는 speakTTS onEnd(+2000ms)에서 처리 — 여기서 하면 TTS 재생 중 조기 해제됨
       })
       .subscribe(async (status: string) => {
         if (status === 'SUBSCRIBED') await ch.track({ role: myRole, lang });
@@ -398,9 +402,9 @@ export default function TravelTalk() {
           event: 'new-message',
           payload: { ...msg, mine: false },
         });
-        // 상대방 기기 TTS 재생 중 에코 픽업 방지 — 고정 3초
+        // TTS 에코 픽업 방지 — 동시통역 1.5초, 대화 모드 3초
         safeMute();
-        scheduleUnmute(3000);
+        scheduleUnmute(modeRef.current === 'simultaneous' ? 1500 : 3000);
       }
     } catch (e) {
       console.error(e);
@@ -412,8 +416,8 @@ export default function TravelTalk() {
 
   // [2차 방어] 파트너 발화 중 도착한 STT 결과 폐기 — 타이밍 갭 보완
   const handleTranscript = useCallback((text: string) => {
-    if (partnerSpeakingRef.current) {
-      console.log('[Travel STT] 파트너 발화 중 폐기:', text.slice(0, 20));
+    // 대화 모드에서만 파트너 발화 중 차단 (동시통역은 양쪽 동시 발화가 정상)
+    if (partnerSpeakingRef.current && modeRef.current !== 'simultaneous') {
       return;
     }
     sendMessage(text);
