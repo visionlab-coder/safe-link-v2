@@ -187,6 +187,7 @@ export default function TravelTalk() {
   const [mode, setMode]               = useState<ChatMode>('conversation');
   const [learningMode, setLearningMode] = useState(false); // false = 빠른 대화, true = 학습(발음+역번역)
   const [myRole, setMyRole]           = useState<'host' | 'guest'>('guest');
+  const [partnerSpeaking, setPartnerSpeaking] = useState(false);
 
   const channelRef          = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const bottomRef           = useRef<HTMLDivElement>(null);
@@ -263,10 +264,12 @@ export default function TravelTalk() {
       .on('presence', { event: 'join'  }, handlePresenceChange)
       .on('presence', { event: 'leave' }, handlePresenceChange)
       .on('broadcast', { event: 'new-message' }, ({ payload }: { payload: Message }) => {
+        setPartnerSpeaking(false);
         setMessages(prev => [...prev, { ...payload, mine: false }]);
-        /* 받은 메시지 TTS: 내 언어로 번역된 텍스트를 내 언어 음성으로 */
         speakTTS(payload.translated, myLangRef.current);
       })
+      .on('broadcast', { event: 'speaking-start' }, () => setPartnerSpeaking(true))
+      .on('broadcast', { event: 'speaking-end'   }, () => setPartnerSpeaking(false))
       .subscribe(async (status: string) => {
         if (status === 'SUBSCRIBED') await ch.track({ role: myRole, lang });
       });
@@ -280,6 +283,8 @@ export default function TravelTalk() {
     unlockAudio();
     setTranslating(true);
     setInputText('');
+    // 상대방에게 "말하는 중" 신호 전송 — 교차 발화 억제
+    channelRef.current?.send({ type: 'broadcast', event: 'speaking-start', payload: {} });
     const sl = myLangRef.current;
     const tl = partnerLangRef.current || (sl === 'ko' ? 'ja' : 'ko');
     try {
@@ -338,6 +343,7 @@ export default function TravelTalk() {
       console.error(e);
     } finally {
       setTranslating(false);
+      channelRef.current?.send({ type: 'broadcast', event: 'speaking-end', payload: {} });
     }
   }, [unlockAudio]);
 
@@ -569,6 +575,16 @@ export default function TravelTalk() {
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: isRecording ? RED : '#444', animation: isRecording ? 'blink 1s infinite' : 'none', display: 'inline-block' }} />
             <span style={{ color: isRecording ? '#e74c3c' : '#555' }}>
               {isRecording ? '동시통역 중 · 同時通訳中' : '마이크 시작 중...'}
+            </span>
+          </div>
+        )}
+
+        {/* 상대방 발화 중 알림 — 교차 발화 억제 시각적 신호 */}
+        {partnerSpeaking && (
+          <div style={{ padding: '4px 14px', background: 'rgba(46,204,113,0.07)', borderBottom: '1px solid rgba(46,204,113,0.15)', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2ecc71', animation: 'blink 0.8s infinite', display: 'inline-block' }} />
+            <span style={{ color: '#2ecc71' }}>
+              {LANGS[pLang]?.flag} 상대방이 말하는 중 · {pLang === 'ja' ? '相手が話しています' : pLang === 'zh' ? '对方正在说话' : pLang === 'vi' ? 'Đối phương đang nói' : 'Partner speaking...'}
             </span>
           </div>
         )}

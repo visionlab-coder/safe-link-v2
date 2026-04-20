@@ -134,6 +134,34 @@ async function transcribeWithWhisper(
 
 const MIN_CONFIDENCE = 0.6;
 
+/**
+ * 교차 음성 오염 필터 — 상대방 언어가 내 마이크에 섞였을 때 폐기
+ * 원리: 각 언어 고유 문자 범위로 판별 (한글·가나·CJK 구분)
+ * 예) 한국어폰에서 일본어 가나(あ-ン) 감지 → 상대 음성 블리드인 → 폐기
+ */
+function isCrossTalkContamination(transcript: string, shortLang: string): boolean {
+    const hasHangul = /[\uAC00-\uD7A3\u3131-\u318E]/.test(transcript);
+    const hasKana   = /[\u3040-\u309F\u30A0-\u30FF]/.test(transcript); // 히라가나+가타카나
+    const hasCJKOnly = /[\u4E00-\u9FFF]/.test(transcript) && !hasHangul && !hasKana;
+
+    switch (shortLang) {
+        case 'ko':
+            // 한국어폰: 일본어 가나 감지 → 상대방 음성 유입
+            return hasKana;
+        case 'ja':
+            // 일본어폰: 한글 감지 → 상대방 음성 유입
+            return hasHangul;
+        case 'zh':
+            // 중국어폰: 한글 또는 가나 감지 → 타국어 유입
+            return hasHangul || hasKana;
+        case 'vi': case 'en':
+            // 라틴 계열은 문자로 구분 불가 — 신뢰도 필터에 의존
+            return false;
+        default:
+            return false;
+    }
+}
+
 interface SpeechRecognitionResponse {
     error?: { message?: string };
     results?: Array<{
@@ -247,6 +275,12 @@ export async function POST(req: Request) {
             .join(" ") || "";
 
         if (!transcript.trim()) {
+            return NextResponse.json({ transcript: "" });
+        }
+
+        // 교차 음성 오염 감지 — 상대방 언어가 섞인 경우 폐기
+        if (isCrossTalkContamination(transcript, shortLang)) {
+            console.log(`[STT] Cross-talk filtered (${shortLang}):`, transcript.slice(0, 30));
             return NextResponse.json({ transcript: "" });
         }
 
