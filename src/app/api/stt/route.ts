@@ -199,7 +199,10 @@ export async function POST(req: Request) {
         const sampleRate = 48000;
         if (mimeType?.includes('ogg')) encoding = "OGG_OPUS";
 
-        const speechContexts = [{ phrases: CONSTRUCTION_SPEECH_HINTS.slice(0, 500), boost: 15 }];
+        // 건설현장 용어 힌트는 한국어 전용 — 일본어·중국어 등에 적용 시 오인식 유발
+        const speechContexts = shortLang === 'ko'
+            ? [{ phrases: CONSTRUCTION_SPEECH_HINTS.slice(0, 500), boost: 15 }]
+            : [];
 
         const buildConfig = (enhanced: boolean) => ({
             encoding,
@@ -207,7 +210,7 @@ export async function POST(req: Request) {
             languageCode,
             enableAutomaticPunctuation: true,
             ...(enhanced
-                ? { model: "latest_long", useEnhanced: true, speechContexts }
+                ? { model: "latest_long", useEnhanced: true, ...(speechContexts.length > 0 && { speechContexts }) }
                 : { model: "default" }),
         });
 

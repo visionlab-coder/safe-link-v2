@@ -188,9 +188,10 @@ export default function TravelTalk() {
   const [learningMode, setLearningMode] = useState(false); // false = 빠른 대화, true = 학습(발음+역번역)
   const [myRole, setMyRole]           = useState<'host' | 'guest'>('guest');
 
-  const channelRef       = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const bottomRef        = useRef<HTMLDivElement>(null);
-  const travelTokenRef   = useRef<string>('');
+  const channelRef          = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const bottomRef           = useRef<HTMLDivElement>(null);
+  const travelTokenRef      = useRef<string>('');
+  const travelTokenReadyRef = useRef<Promise<void>>(Promise.resolve());
   const myLangRef        = useRef(myLang);
   const ttsEnabledRef    = useRef(ttsEnabled);
   const voiceGenderRef   = useRef(voiceGender);
@@ -213,8 +214,8 @@ export default function TravelTalk() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     if (code && code.length === 4) { setPendingCode(code); setPhase('join'); }
-    // 페이지 로드 시 서버 토큰 발급 (사용자 불편 없음 — 백그라운드 자동)
-    fetch('/api/travel/session', { method: 'POST' })
+    // 페이지 로드 시 서버 토큰 발급 — Promise로 보관해 첫 메시지 전송 전 반드시 대기
+    travelTokenReadyRef.current = fetch('/api/travel/session', { method: 'POST' })
       .then(r => r.json())
       .then(d => { if (d.token) travelTokenRef.current = d.token; })
       .catch(() => {});
@@ -284,6 +285,8 @@ export default function TravelTalk() {
     try {
       let translated = '', pronunciation = '', reverse_translated = '';
 
+      // 토큰 미준비 시 대기 (게스트가 즉시 말하는 경우 레이스 컨디션 방지)
+      if (!travelTokenRef.current) await travelTokenReadyRef.current;
       const authHeader = { 'x-travel-token': travelTokenRef.current };
 
       if (learningModeRef.current) {
