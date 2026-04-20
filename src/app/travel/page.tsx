@@ -146,22 +146,33 @@ function Toggle({ on, onToggle, labelOn, labelOff, color = RED }: {
   return (
     <button onClick={onToggle} style={{
       display: 'flex', alignItems: 'center', gap: 5,
-      padding: '4px 8px', borderRadius: 8, cursor: 'pointer',
-      background: on ? `${color}22` : 'rgba(255,255,255,0.04)',
-      border: `1px solid ${on ? `${color}88` : 'rgba(255,255,255,0.09)'}`,
-      color: on ? color : '#444', fontSize: 11, fontWeight: 700,
-      whiteSpace: 'nowrap', transition: 'all 0.18s',
+      padding: '5px 10px', borderRadius: 10, cursor: 'pointer',
+      background: on
+        ? `linear-gradient(135deg, ${color}33, ${color}18)`
+        : 'rgba(255,255,255,0.10)',
+      border: `1px solid ${on ? `${color}99` : 'rgba(255,255,255,0.22)'}`,
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+      boxShadow: on
+        ? `0 2px 12px ${color}33, inset 0 1px 0 rgba(255,255,255,0.12)`
+        : 'inset 0 1px 0 rgba(255,255,255,0.12), 0 2px 8px rgba(0,0,0,0.3)',
+      color: on ? color : 'rgba(255,255,255,0.75)',
+      fontSize: 11, fontWeight: 700,
+      whiteSpace: 'nowrap', transition: 'all 0.2s',
     }}>
       <span style={{
-        width: 24, height: 13, borderRadius: 7,
-        background: on ? color : 'rgba(255,255,255,0.1)',
+        width: 26, height: 14, borderRadius: 7,
+        background: on ? color : 'rgba(255,255,255,0.25)',
         position: 'relative', display: 'inline-block',
         transition: 'background 0.2s', flexShrink: 0,
+        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3)',
       }}>
         <span style={{
-          position: 'absolute', top: 2, left: on ? 13 : 2,
+          position: 'absolute', top: 2.5, left: on ? 14 : 2.5,
           width: 9, height: 9, borderRadius: '50%',
-          background: '#fff', transition: 'left 0.2s',
+          background: '#fff',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+          transition: 'left 0.2s',
         }} />
       </span>
       {on ? labelOn : labelOff}
@@ -535,7 +546,7 @@ export default function TravelTalk() {
       <div style={{ width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
 
         {/* ── 헤더 ── */}
-        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.055)', background: 'rgba(7,7,14,0.96)', backdropFilter: 'blur(20px)', position: 'sticky', top: 0, zIndex: 20, flexWrap: 'wrap' }}>
+        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.10)', background: 'rgba(15,15,25,0.88)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', position: 'sticky', top: 0, zIndex: 20, flexWrap: 'wrap', boxShadow: '0 1px 0 rgba(255,255,255,0.06)' }}>
 
           {/* 연결 상태 + 언어 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 'auto' }}>
