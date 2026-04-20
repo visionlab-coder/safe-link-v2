@@ -4,7 +4,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 
 const STT_LANG_MAP: Record<string, string> = {
     ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN",
-    th: "th-TH", uz: "uz-UZ", id: "id-ID", jp: "ja-JP",
+    th: "th-TH", uz: "uz-UZ", id: "id-ID", ja: "ja-JP", jp: "ja-JP",
     ph: "fil-PH", km: "km-KH", mn: "mn-MN", my: "my-MM",
     ne: "ne-NP", bn: "bn-BD", kk: "kk-KZ", ru: "ru-RU",
     fr: "fr-FR", es: "es-ES", ar: "ar-SA", hi: "hi-IN",

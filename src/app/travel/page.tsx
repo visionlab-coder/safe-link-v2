@@ -285,8 +285,16 @@ export default function TravelTalk() {
     try {
       let translated = '', pronunciation = '', reverse_translated = '';
 
-      // 토큰 미준비 시 대기 (게스트가 즉시 말하는 경우 레이스 컨디션 방지)
-      if (!travelTokenRef.current) await travelTokenReadyRef.current;
+      // 토큰 미준비 시 대기, 실패했으면 1회 재시도
+      if (!travelTokenRef.current) {
+        await travelTokenReadyRef.current;
+        if (!travelTokenRef.current) {
+          await fetch('/api/travel/session', { method: 'POST' })
+            .then(r => r.json())
+            .then(d => { if (d.token) travelTokenRef.current = d.token; })
+            .catch(() => {});
+        }
+      }
       const authHeader = { 'x-travel-token': travelTokenRef.current };
 
       if (learningModeRef.current) {
