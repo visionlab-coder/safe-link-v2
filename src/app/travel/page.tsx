@@ -237,7 +237,12 @@ export default function TravelTalk() {
   const unmuteSTTRef = useRef<() => void>(() => {});
 
   const speakTTS = useCallback((text: string, lang: string) => {
-    if (!text || !ttsEnabledRef.current) return;
+    if (!ttsEnabledRef.current) {
+      // TTS 꺼진 상태: speaking-start로 muted됐을 수 있으니 즉시 해제
+      unmuteSTTRef.current();
+      return;
+    }
+    if (!text) return;
     // TTS 재생 중 내 마이크 결과 버림 (상대 목소리 재귀 방지)
     muteSTTRef.current();
     playPremiumAudio(text, lang, voiceGenderRef.current, () => {
@@ -251,7 +256,10 @@ export default function TravelTalk() {
     if (channelRef.current) supabase.removeChannel(channelRef.current);
 
     const ch = supabase.channel(`travel-${code}`, {
-      config: { presence: { key: myRole } },
+      config: {
+        presence:  { key: myRole },
+        broadcast: { self: false }, // 내가 보낸 브로드캐스트 자기수신 차단
+      },
     });
 
     const handlePresenceChange = () => {
@@ -273,8 +281,8 @@ export default function TravelTalk() {
       .on('presence', { event: 'leave' }, handlePresenceChange)
       .on('broadcast', { event: 'new-message' }, ({ payload }: { payload: Message }) => {
         setPartnerSpeaking(false);
-        unmuteSTTRef.current(); // 메시지 수신 = 파트너 발화 완료 → unmute
         setMessages(prev => [...prev, { ...payload, mine: false }]);
+        // speakTTS 내부에서 mute/unmute 처리 (TTS on: mute→재생→unmute, TTS off: 즉시 unmute)
         speakTTS(payload.translated, myLangRef.current);
       })
       .on('broadcast', { event: 'speaking-start' }, () => {
