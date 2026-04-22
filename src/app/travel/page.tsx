@@ -463,7 +463,7 @@ export default function TravelTalk() {
     onTranscript: handleTranscript,
     onSpeechStart: handleSpeechStart,
     live: true,
-    silenceDuration: soloMode ? 350 : mode === 'simultaneous' ? 800 : 1200,
+    silenceDuration: soloMode ? 500 : mode === 'simultaneous' ? 800 : 1200,
   });
   useEffect(() => { muteSTTRef.current = muteSTT; }, [muteSTT]);
   useEffect(() => { unmuteSTTRef.current = unmuteSTT; }, [unmuteSTT]);
