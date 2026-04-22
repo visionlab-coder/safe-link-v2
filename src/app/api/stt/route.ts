@@ -238,7 +238,7 @@ export async function POST(req: Request) {
         const tryEnhanced = !live;
         const callSTT = async (enhanced: boolean): Promise<Response> => {
             const ctrl = new AbortController();
-            const t = setTimeout(() => ctrl.abort(), 4000);
+            const t = setTimeout(() => ctrl.abort(), 3000);
             const res = await fetch(`https://speech.googleapis.com/v1/speech:recognize`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "x-goog-api-key": GOOGLE_API_KEY },

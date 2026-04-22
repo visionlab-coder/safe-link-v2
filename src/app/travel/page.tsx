@@ -283,7 +283,7 @@ export default function TravelTalk() {
     safeMute();
     scheduleUnmute(60000);
     playPremiumAudio(text, lang, voiceGenderRef.current, () => {
-      scheduleUnmute(2000);
+      scheduleUnmute(soloModeRef.current ? 200 : 2000);
     });
   }, [safeMute, scheduleUnmute]);
 
@@ -463,7 +463,7 @@ export default function TravelTalk() {
     onTranscript: handleTranscript,
     onSpeechStart: handleSpeechStart,
     live: true,
-    silenceDuration: mode === 'simultaneous' ? 800 : 1500,
+    silenceDuration: soloMode ? 350 : mode === 'simultaneous' ? 800 : 1200,
   });
   useEffect(() => { muteSTTRef.current = muteSTT; }, [muteSTT]);
   useEffect(() => { unmuteSTTRef.current = unmuteSTT; }, [unmuteSTT]);
