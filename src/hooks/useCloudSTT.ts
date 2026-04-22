@@ -84,6 +84,10 @@ export function useCloudSTT({
     const onErrorRef = useRef(onError);
     const onSpeechStartRef = useRef(onSpeechStart);
     const emptyStreakRef = useRef(0);
+    // prop refs: VAD 루프가 항상 최신 값을 읽음 (모드 전환 시 콜백 재생성 불필요)
+    const silenceDurationRef = useRef(silenceDuration);
+    const chunkIntervalRef   = useRef(chunkInterval);
+    const liveRef            = useRef(live);
 
     // VAD (Voice Activity Detection) refs
     const audioCtxRef = useRef<AudioContext | null>(null);
@@ -97,6 +101,9 @@ export function useCloudSTT({
     useEffect(() => { onTranscriptRef.current = onTranscript; }, [onTranscript]);
     useEffect(() => { onErrorRef.current = onError; }, [onError]);
     useEffect(() => { onSpeechStartRef.current = onSpeechStart; }, [onSpeechStart]);
+    useEffect(() => { silenceDurationRef.current = silenceDuration; }, [silenceDuration]);
+    useEffect(() => { chunkIntervalRef.current = chunkInterval; }, [chunkInterval]);
+    useEffect(() => { liveRef.current = live; }, [live]);
 
     const stopVAD = useCallback(() => {
         if (vadFrameRef.current) { cancelAnimationFrame(vadFrameRef.current); vadFrameRef.current = null; }
@@ -152,10 +159,9 @@ export function useCloudSTT({
 
     const sendChunk = useCallback(async (blob: Blob) => {
         if (blob.size < MIN_CHUNK_SIZE) return;
-        // muted 상태면 API 호출 자체를 스킵 (TTS 포함 오디오 서버 전송 방지)
         if (mutedRef.current) return;
 
-        if (!live && emptyStreakRef.current >= MAX_EMPTY_STREAK) {
+        if (!liveRef.current && emptyStreakRef.current >= MAX_EMPTY_STREAK) {
             emptyStreakRef.current = 0;
             return;
         }
@@ -174,7 +180,7 @@ export function useCloudSTT({
                     audio: base64,
                     lang: getSTTLang(langRef.current),
                     mimeType: blob.type,
-                    ...(live && { live: true }),
+                    ...(liveRef.current && { live: true }),
                 }),
                 signal: controller.signal,
             });
@@ -204,7 +210,7 @@ export function useCloudSTT({
         } finally {
             clearTimeout(timeoutId);
         }
-    }, [live]);
+    }, []);
 
     // 녹음 시작 + VAD 루프
     const startCycle = useCallback(async () => {
@@ -273,7 +279,7 @@ export function useCloudSTT({
                     // 침묵 감지
                     if (silenceStartRef.current === null) {
                         silenceStartRef.current = now;
-                    } else if (now - silenceStartRef.current >= silenceDuration) {
+                    } else if (now - silenceStartRef.current >= silenceDurationRef.current) {
                         // 침묵 지속시간 초과 → 전송
                         silenceStartRef.current = null;
                         if (recorder.state === "recording") recorder.stop();
@@ -299,12 +305,12 @@ export function useCloudSTT({
                 if (activeRef.current && recorder.state === "recording") {
                     recorder.stop();
                 }
-            }, chunkInterval);
+            }, chunkIntervalRef.current);
 
         } finally {
             cyclingRef.current = false;
         }
-    }, [sendChunk, ensureStream, silenceDuration, chunkInterval]);
+    }, [sendChunk, ensureStream]);
 
     const toggle = useCallback(async () => {
         if (activeRef.current) {

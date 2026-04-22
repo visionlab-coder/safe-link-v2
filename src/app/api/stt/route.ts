@@ -234,18 +234,26 @@ export async function POST(req: Request) {
                 : { model: "default" }),
         });
 
-        const callSTT = async (enhanced: boolean) =>
-            fetch(`https://speech.googleapis.com/v1/speech:recognize`, {
+        // live 모드: 속도 우선 → default 모델 직접 사용 (latest_long 이중호출 없애 ~1s 단축)
+        const tryEnhanced = !live;
+        const callSTT = async (enhanced: boolean): Promise<Response> => {
+            const ctrl = new AbortController();
+            const t = setTimeout(() => ctrl.abort(), 4000);
+            const res = await fetch(`https://speech.googleapis.com/v1/speech:recognize`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "x-goog-api-key": GOOGLE_API_KEY },
                 body: JSON.stringify({ config: buildConfig(enhanced), audio: { content: audio } }),
+                signal: ctrl.signal,
             });
+            clearTimeout(t);
+            return res;
+        };
 
-        let response = await callSTT(true);
+        let response = await callSTT(tryEnhanced);
         let data = await response.json() as SpeechRecognitionResponse;
 
-        // latest_long / useEnhanced 미지원 언어(zh-CN 등) → default 모델로 폴백
-        if (data.error) {
+        // non-live에서만 enhanced 실패 시 default 모델로 폴백
+        if (data.error && tryEnhanced) {
             console.warn("[STT] latest_long 실패, default 모델로 폴백:", data.error.message);
             response = await callSTT(false);
             data = await response.json() as SpeechRecognitionResponse;

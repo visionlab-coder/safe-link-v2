@@ -29,6 +29,7 @@ interface Message {
 }
 
 type ChatMode = 'conversation' | 'simultaneous';
+type Phase = 'home' | 'waiting' | 'join' | 'chat' | 'solo-setup';
 
 const RED   = '#c0392b';
 const BLUE  = 'rgba(52,152,219,0.18)';
@@ -182,7 +183,7 @@ function Toggle({ on, onToggle, labelOn, labelOff, color = RED }: {
 
 /* ════════ 메인 컴포넌트 ════════ */
 export default function TravelTalk() {
-  const [phase, setPhase]             = useState<'home' | 'waiting' | 'join' | 'chat'>('home');
+  const [phase, setPhase]             = useState<Phase>('home');
   const [myLang, setMyLang]           = useState('ko');
   const [roomCode, setRoomCode]       = useState('');
   const [inputCode, setInputCode]     = useState('');
@@ -196,9 +197,13 @@ export default function TravelTalk() {
   const [ttsEnabled, setTtsEnabled]   = useState(true);
   const [voiceGender, setVoiceGender] = useState<VoiceGender>('female');
   const [mode, setMode]               = useState<ChatMode>('conversation');
-  const [learningMode, setLearningMode] = useState(false); // false = 빠른 대화, true = 학습(발음+역번역)
+  const [learningMode, setLearningMode] = useState(false);
   const [myRole, setMyRole]           = useState<'host' | 'guest'>('guest');
   const [partnerSpeaking, setPartnerSpeaking] = useState(false);
+
+  /* ── solo mode ── */
+  const [soloMode, setSoloMode]   = useState(false);
+  const [soloTurn, setSoloTurn]   = useState<'mine' | 'partner'>('mine');
 
   const channelRef          = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const bottomRef           = useRef<HTMLDivElement>(null);
@@ -213,6 +218,8 @@ export default function TravelTalk() {
   const learningModeRef      = useRef(learningMode);
   const modeRef              = useRef(mode);
   const partnerSpeakingRef   = useRef(false);
+  const soloModeRef          = useRef(soloMode);
+  const soloTurnRef          = useRef(soloTurn);
 
   useEffect(() => { myLangRef.current = myLang; }, [myLang]);
   useEffect(() => { ttsEnabledRef.current = ttsEnabled; }, [ttsEnabled]);
@@ -222,6 +229,8 @@ export default function TravelTalk() {
   useEffect(() => { learningModeRef.current = learningMode; }, [learningMode]);
   useEffect(() => { modeRef.current = mode; }, [mode]);
   useEffect(() => { partnerSpeakingRef.current = partnerSpeaking; }, [partnerSpeaking]);
+  useEffect(() => { soloModeRef.current = soloMode; }, [soloMode]);
+  useEffect(() => { soloTurnRef.current = soloTurn; }, [soloTurn]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
   useEffect(() => () => {
     if (channelRef.current) supabase.removeChannel(channelRef.current);
@@ -233,18 +242,16 @@ export default function TravelTalk() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     if (code && code.length === 4) { setPendingCode(code); setPhase('join'); }
-    // 페이지 로드 시 서버 토큰 발급 — Promise로 보관해 첫 메시지 전송 전 반드시 대기
     travelTokenReadyRef.current = fetch('/api/travel/session', { method: 'POST' })
       .then(r => r.json())
       .then(d => { if (d.token) travelTokenRef.current = d.token; })
       .catch(() => {});
   }, []);
 
-  /* 브라우저 자동재생 정책 우회 — 사용자 제스처 직후 무음 재생으로 오디오 컨텍스트 언락 */
+  /* 브라우저 자동재생 정책 우회 */
   const unlockAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
     try {
-      // 최소 WAV 파일 (무음 0.1초) — data URI로 서버 요청 없이 즉시 언락
       const sil = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==');
       sil.volume = 0;
       sil.play().then(() => { audioUnlockedRef.current = true; }).catch(() => {});
@@ -255,7 +262,6 @@ export default function TravelTalk() {
   const unmuteSTTRef    = useRef<() => void>(() => {});
   const unmuteTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 안전한 unmute — 이전 예약된 타이머를 취소하고 새로 예약
   const scheduleUnmute = useCallback((delayMs: number) => {
     if (unmuteTimerRef.current) clearTimeout(unmuteTimerRef.current);
     unmuteTimerRef.current = setTimeout(() => {
@@ -264,26 +270,19 @@ export default function TravelTalk() {
     }, delayMs);
   }, []);
 
-  // 새 mute 시 기존 unmute 타이머 취소 (타이머 충돌 방지)
   const safeMute = useCallback(() => {
     if (unmuteTimerRef.current) { clearTimeout(unmuteTimerRef.current); unmuteTimerRef.current = null; }
     muteSTTRef.current();
   }, []);
 
   const speakTTS = useCallback((text: string, lang: string) => {
-    if (!ttsEnabledRef.current) {
-      scheduleUnmute(0); // TTS 꺼짐: 즉시 unmute
-      return;
-    }
-    if (!text) {
-      scheduleUnmute(0); // 빈 텍스트: 즉시 unmute
+    if (!ttsEnabledRef.current || !text) {
+      scheduleUnmute(0);
       return;
     }
     safeMute();
-    // 비상 안전타이머: TTS 오류로 onEnd가 절대 안 오는 극단적 경우에도 60초 후 강제 unmute
     scheduleUnmute(60000);
     playPremiumAudio(text, lang, voiceGenderRef.current, () => {
-      // TTS 정상 종료: 60초 타이머를 2000ms로 교체 (VAD silenceDuration 1500ms + 여유)
       scheduleUnmute(2000);
     });
   }, [safeMute, scheduleUnmute]);
@@ -295,7 +294,7 @@ export default function TravelTalk() {
     const ch = supabase.channel(`travel-${code}`, {
       config: {
         presence:  { key: myRole },
-        broadcast: { self: false }, // 내가 보낸 브로드캐스트 자기수신 차단
+        broadcast: { self: false },
       },
     });
 
@@ -319,14 +318,11 @@ export default function TravelTalk() {
       .on('broadcast', { event: 'new-message' }, ({ payload }: { payload: Message }) => {
         setPartnerSpeaking(false);
         setMessages(prev => [...prev, { ...payload, mine: false }]);
-        // speakTTS 내부에서 mute/unmute 처리 (TTS on: mute→재생→unmute, TTS off: 즉시 unmute)
         speakTTS(payload.translated, myLangRef.current);
       })
       .on('broadcast', { event: 'speaking-start' }, () => {
         setPartnerSpeaking(true);
-        // 대화 모드: 파트너 발화 중 내 STT 뮤트 (교차 간섭 방지)
-        // 동시통역 모드: 양쪽이 동시에 말하는 게 정상 — 뮤트 안 함
-        if (modeRef.current !== 'simultaneous') {
+        if (modeRef.current === 'conversation') {
           safeMute();
           scheduleUnmute(8000);
         }
@@ -347,14 +343,18 @@ export default function TravelTalk() {
     unlockAudio();
     setTranslating(true);
     setInputText('');
-    // 상대방에게 "말하는 중" 신호 전송 — 교차 발화 억제
-    channelRef.current?.send({ type: 'broadcast', event: 'speaking-start', payload: {} });
-    const sl = myLangRef.current;
-    const tl = partnerLangRef.current || (sl === 'ko' ? 'ja' : 'ko');
+
+    const isSoloPartner = soloModeRef.current && soloTurnRef.current === 'partner';
+    const sl = isSoloPartner ? (partnerLangRef.current || 'ja') : myLangRef.current;
+    const tl = isSoloPartner ? myLangRef.current : (partnerLangRef.current || (sl === 'ko' ? 'ja' : 'ko'));
+
+    if (!soloModeRef.current) {
+      channelRef.current?.send({ type: 'broadcast', event: 'speaking-start', payload: {} });
+    }
+
     try {
       let translated = '', pronunciation = '', reverse_translated = '';
 
-      // 토큰 미준비 시 대기, 실패했으면 1회 재시도
       if (!travelTokenRef.current) {
         await travelTokenReadyRef.current;
         if (!travelTokenRef.current) {
@@ -366,8 +366,7 @@ export default function TravelTalk() {
       }
       const authHeader = { 'x-travel-token': travelTokenRef.current };
 
-      if (learningModeRef.current) {
-        /* 학습 모드: 발음 + 역번역 포함 (Gemini 호출 → 1~2초 추가) */
+      if (learningModeRef.current && !soloModeRef.current) {
         const res = await fetch('/api/translate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeader },
@@ -375,7 +374,6 @@ export default function TravelTalk() {
         });
         ({ translated = '', pronunciation = '', reverse_translated = '' } = await res.json());
       } else {
-        /* 빠른 대화 모드: 번역만 (딜레이 최소) */
         const res = await fetch('/api/travel/translate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeader },
@@ -387,7 +385,8 @@ export default function TravelTalk() {
       const msg: Message = {
         id: Date.now(), original: text, translated,
         pronunciation, reverse_translated,
-        mine: true, lang: sl, targetLang: tl,
+        mine: !isSoloPartner,
+        lang: sl, targetLang: tl,
         time: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -396,54 +395,81 @@ export default function TravelTalk() {
         return next.length > 200 ? next.slice(-200) : next;
       });
 
-      if (translated) {
+      if (!soloModeRef.current && translated) {
+        // 2폰 모드: 채널로 브로드캐스트
         channelRef.current?.send({
           type: 'broadcast',
           event: 'new-message',
           payload: { ...msg, mine: false },
         });
-        // TTS 에코 픽업 방지 — 동시통역 1.5초, 대화 모드 3초
         safeMute();
         scheduleUnmute(modeRef.current === 'simultaneous' ? 1500 : 3000);
+      }
+
+      if (soloModeRef.current && translated) {
+        // 1폰 모드: 번역된 텍스트를 직접 TTS로 재생 (speakTTS가 내부적으로 mute 처리)
+        speakTTS(translated, tl);
       }
     } catch (e) {
       console.error(e);
     } finally {
       setTranslating(false);
-      channelRef.current?.send({ type: 'broadcast', event: 'speaking-end', payload: {} });
+      if (!soloModeRef.current) {
+        channelRef.current?.send({ type: 'broadcast', event: 'speaking-end', payload: {} });
+      }
     }
-  }, [unlockAudio, safeMute, scheduleUnmute]);
+  }, [unlockAudio, safeMute, scheduleUnmute, speakTTS]);
 
-  // [2차 방어] 파트너 발화 중 도착한 STT 결과 폐기 — 타이밍 갭 보완
   const handleTranscript = useCallback((text: string) => {
-    // 대화 모드에서만 파트너 발화 중 차단 (동시통역은 양쪽 동시 발화가 정상)
-    if (partnerSpeakingRef.current && modeRef.current !== 'simultaneous') {
-      return;
-    }
+    // 2폰 모드에서만 파트너 발화 중 억제
+    if (!soloModeRef.current && partnerSpeakingRef.current && modeRef.current === 'conversation') return;
     sendMessage(text);
   }, [sendMessage]);
 
-  // [1차 방어] VAD 음성 감지 즉시 파트너에게 speaking-start 조기 전달
   const handleSpeechStart = useCallback(() => {
-    channelRef.current?.send({ type: 'broadcast', event: 'speaking-start', payload: {} });
+    if (!soloModeRef.current) {
+      channelRef.current?.send({ type: 'broadcast', event: 'speaking-start', payload: {} });
+    }
   }, []);
 
-  /* ── Cloud STT ── */
+  /* ── solo 모드 턴 전환 ──
+     muteSTT 먼저 호출 → 인플라이트 청크 폐기 (race condition 방지)
+     이후 toggleSTT로 중지, setSoloTurn으로 activeSttLang 업데이트
+     다음 탭에서 unmuteSTT + toggleSTT로 새 언어로 시작 */
+  const handleSoloSpeak = useCallback((turn: 'mine' | 'partner', isRecording: boolean, toggleSTT: () => void) => {
+    if (soloTurnRef.current !== turn) {
+      // 다른 사람으로 전환: 인플라이트 청크 폐기 후 중지
+      muteSTTRef.current();
+      if (isRecording) toggleSTT();
+      setSoloTurn(turn);
+      return; // 한 번 더 탭하면 새 언어로 녹음 시작
+    }
+    // 같은 사람: 시작 or 중지
+    if (!isRecording) {
+      unmuteSTTRef.current();
+      toggleSTT();
+    } else {
+      toggleSTT();
+    }
+  }, []);
+
+  /* activeSttLang: solo 모드에서 턴에 따라 STT 언어 전환 */
+  const activeSttLang = (soloMode && soloTurn === 'partner')
+    ? (LANGS[partnerLang || 'ja']?.stt || 'ja-JP')
+    : (LANGS[myLang]?.stt || 'ko-KR');
+
   const { isRecording, toggle: toggleSTT, mute: muteSTT, unmute: unmuteSTT } = useCloudSTT({
-    lang: LANGS[myLang]?.stt || 'ko-KR',
+    lang: activeSttLang,
     onTranscript: handleTranscript,
     onSpeechStart: handleSpeechStart,
     live: true,
     silenceDuration: mode === 'simultaneous' ? 800 : 1500,
   });
-  // ref에 연결 — subscribeChannel / speakTTS 클로저에서 접근
   useEffect(() => { muteSTTRef.current = muteSTT; }, [muteSTT]);
   useEffect(() => { unmuteSTTRef.current = unmuteSTT; }, [unmuteSTT]);
 
   const createRoom = useCallback(async () => {
     unlockAudio();
-    // iOS Safari: 클릭 컨텍스트에서 마이크 권한 미리 요청
-    // 이후 effect에서 toggleSTT() 호출 시 이미 허가된 상태라 다이얼로그 없이 통과
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach(t => t.stop());
@@ -462,9 +488,16 @@ export default function TravelTalk() {
     setMyRole('guest');
     setPhase('chat');
     subscribeChannel(code, 'guest', lang);
-    // STT 자동 시작 제거 — 게스트도 버튼을 눌러서 말하는 대화 모드로 시작
   }, [subscribeChannel, unlockAudio]);
 
+  /* ── solo 모드 진입: 상대 언어 선택 후 바로 채팅 시작 ── */
+  const enterSoloMode = useCallback((pLang: string) => {
+    unlockAudio();
+    setSoloMode(true);
+    setPartnerLang(pLang);
+    setMyRole('host');
+    setPhase('chat');
+  }, [unlockAudio]);
 
   const isKorean = myLang === 'ko';
   const isHost   = myRole === 'host';
@@ -495,8 +528,20 @@ export default function TravelTalk() {
           ))}
         </div>
 
+        {/* 2폰 모드 */}
         <button onClick={createRoom} style={{ width: '100%', padding: 18, background: RED, border: 'none', borderRadius: 16, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 10 }}>
           새 대화 시작 &nbsp;·&nbsp; 新しい会話を始める
+        </button>
+
+        {/* 1폰 solo 모드 */}
+        <button onClick={() => setPhase('solo-setup')} style={{
+          width: '100%', padding: 15, marginBottom: 14,
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: 16, color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 700,
+          cursor: 'pointer',
+        }}>
+          📱 폰 하나로 대화 &nbsp;·&nbsp; 1台で会話
         </button>
 
         <div style={{ display: 'flex', gap: 8 }}>
@@ -513,6 +558,42 @@ export default function TravelTalk() {
         </p>
       </div>
       <style>{`*{box-sizing:border-box;margin:0;padding:0}input::placeholder{color:#333}`}</style>
+    </div>
+  );
+
+  /* ════ SOLO SETUP: 상대방 언어 선택 ════ */
+  if (phase === 'solo-setup') return (
+    <div style={{ ...PAGE, alignItems: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 420, padding: '0 28px', textAlign: 'center' }}>
+        <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 40 }}>SAFE-LINK · TRAVEL TALK</p>
+
+        <div style={{ marginBottom: 40, lineHeight: 2.6 }}>
+          <p style={{ fontSize: 16, color: '#ede8e3', fontWeight: 300 }}>상대방 언어를 선택하세요</p>
+          <p style={{ fontSize: 14, color: '#888' }}>相手の言語を選んでください</p>
+          <p style={{ fontSize: 13, color: '#666' }}>Select partner&apos;s language</p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: 48 }}>
+          {Object.entries(LANGS)
+            .filter(([code]) => code !== myLang)
+            .map(([code, info]) => (
+              <button key={code} onClick={() => enterSoloMode(code)} style={{
+                padding: '18px 4px', background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.09)', borderRadius: 16,
+                color: '#ede8e3', cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+              }}>
+                <span style={{ fontSize: 32 }}>{info.flag}</span>
+                <span style={{ fontSize: 11, color: '#aaa' }}>{info.label}</span>
+              </button>
+            ))}
+        </div>
+
+        <button onClick={() => setPhase('home')} style={{
+          fontSize: 12, color: '#444', background: 'none', border: 'none', cursor: 'pointer',
+        }}>← 돌아가기</button>
+      </div>
+      <style>{`*{box-sizing:border-box;margin:0;padding:0}`}</style>
     </div>
   );
 
@@ -554,7 +635,6 @@ export default function TravelTalk() {
         <div style={{ textAlign: 'center', padding: 36, maxWidth: 380 }}>
           <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 16 }}>SAFE-LINK · TRAVEL TALK</p>
 
-          {/* 외국인에게 폰 화면을 보여주면 자기 언어로 읽고 QR 스캔 */}
           <div style={{ marginBottom: 20, padding: '14px 18px', background: 'rgba(192,57,43,0.07)', border: '1px solid rgba(192,57,43,0.2)', borderRadius: 16 }}>
             <p style={{ fontSize: 14, color: '#e74c3c', fontWeight: 700, marginBottom: 10 }}>📷 이 화면을 상대방에게 보여주세요</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, lineHeight: 1.8 }}>
@@ -586,7 +666,7 @@ export default function TravelTalk() {
 
   /* ════ CHAT ════ */
   const pLang = partnerLang || (myLang === 'ko' ? 'ja' : 'ko');
-  const isSim = mode === 'simultaneous';
+  const isSim = !soloMode && mode === 'simultaneous';
 
   return (
     <div style={PAGE}>
@@ -597,14 +677,26 @@ export default function TravelTalk() {
 
           {/* 연결 상태 + 언어 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 'auto' }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: partnerOnline ? '#2ecc71' : '#3a3a4a', display: 'inline-block' }} />
-            <span style={{ fontSize: 16 }}>{LANGS[myLang]?.flag}</span>
-            <span style={{ fontSize: 10, color: '#333' }}>↔</span>
-            <span style={{ fontSize: 16 }}>{LANGS[pLang]?.flag}</span>
-            <span style={{ fontSize: 9, color: '#2a2a3a', letterSpacing: 3 }}>#{roomCode}</span>
+            {soloMode ? (
+              <>
+                <span style={{ fontSize: 14 }}>📱</span>
+                <span style={{ fontSize: 16 }}>{LANGS[myLang]?.flag}</span>
+                <span style={{ fontSize: 10, color: '#333' }}>↔</span>
+                <span style={{ fontSize: 16 }}>{LANGS[pLang]?.flag}</span>
+                <span style={{ fontSize: 9, color: '#c0392b', letterSpacing: 2 }}>1폰</span>
+              </>
+            ) : (
+              <>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: partnerOnline ? '#2ecc71' : '#3a3a4a', display: 'inline-block' }} />
+                <span style={{ fontSize: 16 }}>{LANGS[myLang]?.flag}</span>
+                <span style={{ fontSize: 10, color: '#333' }}>↔</span>
+                <span style={{ fontSize: 16 }}>{LANGS[pLang]?.flag}</span>
+                <span style={{ fontSize: 9, color: '#2a2a3a', letterSpacing: 3 }}>#{roomCode}</span>
+              </>
+            )}
           </div>
 
-          {/* TTS 음성 켜기/끄기 */}
+          {/* TTS 켜기/끄기 */}
           <Toggle
             on={ttsEnabled}
             onToggle={() => setTtsEnabled(v => !v)}
@@ -622,16 +714,18 @@ export default function TravelTalk() {
             color="#5dade2"
           />
 
-          {/* 대화 / 동시통역 모드 — 호스트만 표시 */}
-          {isHost && (
+          {/* 대화 / 동시통역 모드 — 2폰 호스트만 */}
+          {!soloMode && isHost && (
             <Toggle
               on={isSim}
               onToggle={() => {
                 const next: ChatMode = isSim ? 'conversation' : 'simultaneous';
                 setMode(next);
-                // 클릭 컨텍스트에서 직접 STT 시작/정지 (iOS Safari effect 차단 우회)
-                if (next === 'simultaneous' && !isRecording) toggleSTT();
-                if (next === 'conversation' && isRecording) toggleSTT();
+                if (next === 'simultaneous') {
+                  if (!isRecording) toggleSTT();
+                } else {
+                  if (isRecording) toggleSTT();
+                }
               }}
               labelOn="동시통역"
               labelOff="대화"
@@ -639,8 +733,8 @@ export default function TravelTalk() {
             />
           )}
 
-          {/* 학습 모드 토글 — 한국인 호스트만 표시 */}
-          {isHost && isKorean && (
+          {/* 학습 모드 — 2폰 한국인 호스트만 */}
+          {!soloMode && isHost && isKorean && (
             <Toggle
               on={learningMode}
               onToggle={() => setLearningMode(v => !v)}
@@ -651,7 +745,7 @@ export default function TravelTalk() {
           )}
         </div>
 
-        {/* 동시통역 배너 */}
+        {/* 동시통역 배너 (2폰 모드만) */}
         {isSim && (
           <div style={{ padding: '5px 14px', background: 'rgba(192,57,43,0.07)', borderBottom: '1px solid rgba(192,57,43,0.15)', display: 'flex', alignItems: 'center', gap: 7, fontSize: 11 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: isRecording ? RED : '#444', animation: isRecording ? 'blink 1s infinite' : 'none', display: 'inline-block' }} />
@@ -661,8 +755,8 @@ export default function TravelTalk() {
           </div>
         )}
 
-        {/* 상대방 발화 중 알림 — 교차 발화 억제 시각적 신호 */}
-        {partnerSpeaking && (
+        {/* 상대방 발화 중 알림 (2폰 모드만) */}
+        {!soloMode && partnerSpeaking && (
           <div style={{ padding: '4px 14px', background: 'rgba(46,204,113,0.07)', borderBottom: '1px solid rgba(46,204,113,0.15)', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2ecc71', animation: 'blink 0.8s infinite', display: 'inline-block' }} />
             <span style={{ color: '#2ecc71' }}>
@@ -677,9 +771,14 @@ export default function TravelTalk() {
             <div style={{ textAlign: 'center', paddingTop: 60, color: '#2e2e3e' }}>
               <p style={{ fontSize: 34, marginBottom: 16 }}>💬</p>
               <p style={{ fontSize: 12, lineHeight: 2.4, color: '#2e2e3e' }}>
-                {isSim ? '말하면 자동으로 번역됩니다 · 話すと自動翻訳' : '버튼을 눌러 대화를 시작하세요 · タップして話す'}
+                {soloMode
+                  ? `${LANGS[myLang]?.flag} 나 → ${LANGS[pLang]?.flag} 상대 버튼을 눌러 말하세요`
+                  : isSim
+                    ? '말하면 자동으로 번역됩니다 · 話すと自動翻訳'
+                    : '버튼을 눌러 대화를 시작하세요 · タップして話す'
+                }
               </p>
-              {isKorean && learningMode && (
+              {!soloMode && isKorean && learningMode && (
                 <div style={{ marginTop: 16, padding: '10px 14px', background: BLUE, borderRadius: 12, fontSize: 11, color: 'rgba(100,180,255,0.7)', lineHeight: 2 }}>
                   한글 발음 · 역번역 자동 표시<br />
                   <span style={{ opacity: 0.6 }}>상대방 언어를 따라 읽을 수 있습니다</span>
@@ -689,7 +788,7 @@ export default function TravelTalk() {
           )}
 
           {messages.map(msg => (
-            <MsgBubble key={msg.id} msg={msg} isKorean={isKorean} learningMode={learningMode} onPlay={speakTTS} />
+            <MsgBubble key={msg.id} msg={msg} isKorean={isKorean} learningMode={!soloMode && learningMode} onPlay={speakTTS} />
           ))}
 
           {translating && (
@@ -714,7 +813,55 @@ export default function TravelTalk() {
             <button onClick={() => sendMessage(inputText)} style={{ padding: '13px 17px', background: inputText.trim() ? RED : 'rgba(255,255,255,0.04)', border: 'none', borderRadius: 14, color: '#fff', fontSize: 20, cursor: 'pointer' }}>↑</button>
           </div>
 
-          {!isSim ? (
+          {/* ── solo 1폰 모드 버튼 ── */}
+          {soloMode ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {/* 내 버튼 */}
+              <button
+                onClick={() => handleSoloSpeak('mine', isRecording, toggleSTT)}
+                style={{
+                  padding: '14px 8px',
+                  background: soloTurn === 'mine' && isRecording
+                    ? `linear-gradient(135deg,#7b241c,${RED})`
+                    : soloTurn === 'mine'
+                      ? 'rgba(192,57,43,0.14)'
+                      : 'rgba(255,255,255,0.04)',
+                  border: `1px solid rgba(192,57,43,${soloTurn === 'mine' ? '0.7' : '0.2'})`,
+                  borderRadius: 14, color: soloTurn === 'mine' ? '#fff' : '#666',
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                  transition: 'all 0.18s',
+                }}>
+                <span style={{ fontSize: 20 }}>{LANGS[myLang]?.flag}</span>
+                <span style={{ fontSize: 11 }}>
+                  {soloTurn === 'mine' && isRecording ? '◉ 듣는 중' : '나 · 말하기'}
+                </span>
+              </button>
+
+              {/* 상대 버튼 */}
+              <button
+                onClick={() => handleSoloSpeak('partner', isRecording, toggleSTT)}
+                style={{
+                  padding: '14px 8px',
+                  background: soloTurn === 'partner' && isRecording
+                    ? 'linear-gradient(135deg,#1a3a5c,#2471a3)'
+                    : soloTurn === 'partner'
+                      ? 'rgba(36,113,163,0.18)'
+                      : 'rgba(255,255,255,0.04)',
+                  border: `1px solid rgba(36,113,163,${soloTurn === 'partner' ? '0.7' : '0.2'})`,
+                  borderRadius: 14, color: soloTurn === 'partner' ? '#fff' : '#666',
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                  transition: 'all 0.18s',
+                }}>
+                <span style={{ fontSize: 20 }}>{LANGS[pLang]?.flag}</span>
+                <span style={{ fontSize: 11 }}>
+                  {soloTurn === 'partner' && isRecording ? '◉ 듣는 중' : `상대 · ${LANGS[pLang]?.label}`}
+                </span>
+              </button>
+            </div>
+          ) : !isSim ? (
+            /* ── 2폰 대화 모드 ── */
             <button onClick={toggleSTT} style={{
               width: '100%', padding: 16,
               background: isRecording ? `linear-gradient(135deg,#7b241c,${RED})` : 'rgba(192,57,43,0.1)',
@@ -730,6 +877,7 @@ export default function TravelTalk() {
                 : `${LANGS[myLang]?.flag} 탭해서 말하기 · タップして話す`}
             </button>
           ) : (
+            /* ── 2폰 동시통역 모드 ── */
             <button onClick={toggleSTT} style={{
               width: '100%', padding: 11,
               background: 'rgba(255,255,255,0.03)',
