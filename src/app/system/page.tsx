@@ -23,6 +23,9 @@ import {
     AlertTriangle,
     Users,
     ClipboardCheck,
+    LayoutDashboard,
+    Award,
+    TrendingUp,
 } from "lucide-react";
 
 type Site = {
@@ -41,6 +44,7 @@ const systemUI: Record<string, any> = {
         rootAccess: "최상위 접근 권한",
         orchestration: "전역 통합 관제",
         intelligence: "시스템 지능 제어",
+        dashboard: "전국 현황 대시보드",
         openNewSite: "신규 현장 개설",
         stats: {
             sites: "활성 현장",
@@ -49,11 +53,12 @@ const systemUI: Record<string, any> = {
             alerts: "작업중지 알람",
         },
         sidebar: {
-            sites: "전체 현장 관리",
-            data: "시스템 상태 점검",
-            ai: "AI 에이전트 설정",
-            logs: "시스템 보안 로그",
-            configs: "전역 환경 설정",
+            dashboard: "전국 현황",
+            sites: "현장 관리",
+            data: "시스템 상태",
+            ai: "AI 에이전트",
+            logs: "보안 로그",
+            configs: "전역 설정",
         },
         site: {
             id: "현장 ID",
@@ -96,6 +101,7 @@ const systemUI: Record<string, any> = {
         rootAccess: "ROOT ACCESS",
         orchestration: "Global Orchestration",
         intelligence: "HQ Intelligence",
+        dashboard: "National Overview",
         openNewSite: "Open New Site",
         stats: {
             sites: "Active Sites",
@@ -104,6 +110,7 @@ const systemUI: Record<string, any> = {
             alerts: "Stop-Work Alerts",
         },
         sidebar: {
+            dashboard: "Overview",
             sites: "Site Management",
             data: "System Health",
             ai: "AI Agent Config",
@@ -151,12 +158,15 @@ const systemUI: Record<string, any> = {
 export default function SystemAdminPage() {
     const [sites, setSites] = useState<Site[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState("sites");
+    const [activeTab, setActiveTab] = useState("dashboard");
     const [lang, setLang] = useState("ko");
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingSite, setEditingSite] = useState<Site | null>(null);
     const [siteForm, setSiteForm] = useState({ name: "", address: "" });
+    const [safetyOfficerCount, setSafetyOfficerCount] = useState(0);
+    const [hqAdminCount, setHqAdminCount] = useState(0);
+    const [accidentFreeDays, setAccidentFreeDays] = useState<number | null>(null);
     const t = systemUI[lang];
 
     useEffect(() => {
@@ -182,15 +192,38 @@ export default function SystemAdminPage() {
 
         const [
             { data: sitesData },
-            { data: workersData },
+            { data: allProfilesData },
             { data: tbmData },
             { data: alertsData },
+            { data: lastAlertData },
         ] = await Promise.all([
             supabase.from("sites").select("*"),
-            supabase.from("profiles").select("site_id").eq("role", "WORKER"),
+            supabase.from("profiles").select("site_id, role"),
             supabase.from("tbm_notices").select("site_id").gte("created_at", dayStart).lte("created_at", dayEnd),
             supabase.from("stop_work_alerts").select("site_id").eq("resolved", false),
+            supabase.from("stop_work_alerts").select("created_at").order("created_at", { ascending: false }).limit(1),
         ]);
+
+        const workersData = allProfilesData?.filter(p => p.role === "WORKER") ?? [];
+        const officerData = allProfilesData?.filter(p => p.role === "SAFETY_OFFICER") ?? [];
+        const adminData = allProfilesData?.filter(p => p.role === "HQ_ADMIN" || p.role === "HQ_OFFICER") ?? [];
+
+        setSafetyOfficerCount(officerData.length);
+        setHqAdminCount(adminData.length);
+
+        const lastAlertTs = lastAlertData?.[0]?.created_at;
+        if (lastAlertTs) {
+            const diffMs = Date.now() - new Date(lastAlertTs).getTime();
+            setAccidentFreeDays(Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+        } else if (sitesData && sitesData.length > 0) {
+            const earliest = sitesData.reduce((a, b) =>
+                new Date(a.created_at) < new Date(b.created_at) ? a : b
+            );
+            const diffMs = Date.now() - new Date(earliest.created_at).getTime();
+            setAccidentFreeDays(Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+        } else {
+            setAccidentFreeDays(0);
+        }
 
         if (sitesData) {
             const processed: Site[] = sitesData.map(site => ({
@@ -259,6 +292,11 @@ export default function SystemAdminPage() {
     const totalWorkers = sites.reduce((acc, s) => acc + s.worker_count, 0);
     const totalTbmToday = sites.reduce((acc, s) => acc + s.tbm_today, 0);
     const totalAlerts = sites.reduce((acc, s) => acc + s.alert_count, 0);
+    const sitesWithTbm = sites.filter(s => s.tbm_today > 0).length;
+    const tbmCoverageRate = sites.length > 0 ? Math.round((sitesWithTbm / sites.length) * 100) : 0;
+    const maxWorkerCount = Math.max(...sites.map(s => s.worker_count), 1);
+    const totalPersonnel = totalWorkers + safetyOfficerCount + hqAdminCount;
+    const daysTo1000 = accidentFreeDays !== null ? Math.max(0, 1000 - accidentFreeDays) : null;
 
     return (
         <RoleGuard allowedRole="system">
@@ -283,6 +321,7 @@ export default function SystemAdminPage() {
 
                     <nav className="flex flex-col gap-2 flex-1">
                         {[
+                            { id: "dashboard", icon: LayoutDashboard, label: t.sidebar.dashboard },
                             { id: "sites", icon: MapPin, label: t.sidebar.sites },
                             { id: "stats", icon: Activity, label: t.sidebar.data },
                             { id: "ai", icon: Cpu, label: t.sidebar.ai },
@@ -353,7 +392,7 @@ export default function SystemAdminPage() {
                             animate={{ opacity: 1, x: 0 }}
                         >
                             <h2 className="text-4xl font-bold tracking-tighter text-white mb-2 uppercase italic">
-                                {activeTab === 'sites' ? t.orchestration : t.intelligence}
+                                {activeTab === 'dashboard' ? t.dashboard : activeTab === 'sites' ? t.orchestration : t.intelligence}
                             </h2>
                             <div className="flex items-center gap-2 text-slate-400 font-bold">
                                 <Zap className="w-4 h-4 text-amber-500" />
@@ -377,15 +416,17 @@ export default function SystemAdminPage() {
                                 </button>
                             </div>
 
-                            <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={handleOpenAddModal}
-                                className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2 shadow-xl shadow-blue-500/20 transition-all text-sm"
-                            >
-                                <Plus className="w-5 h-5" />
-                                {t.openNewSite}
-                            </motion.button>
+                            {activeTab === 'sites' && (
+                                <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={handleOpenAddModal}
+                                    className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2 shadow-xl shadow-blue-500/20 transition-all text-sm"
+                                >
+                                    <Plus className="w-5 h-5" />
+                                    {t.openNewSite}
+                                </motion.button>
+                            )}
                         </div>
                     </header>
 
@@ -441,6 +482,231 @@ export default function SystemAdminPage() {
                     </div>
 
                     <AnimatePresence mode="wait">
+
+                        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 대시보드 탭 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+                        {activeTab === "dashboard" && (
+                            <motion.div
+                                key="dashboard"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                className="flex flex-col gap-8"
+                            >
+                                {/* 무사고 영웅 섹션 */}
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    {/* 무사고 연속일 */}
+                                    <div className={`lg:col-span-1 rounded-[40px] border p-8 flex flex-col items-center justify-center gap-4 relative overflow-hidden ${accidentFreeDays === 0 ? 'bg-red-950/30 border-red-500/30' : 'bg-gradient-to-br from-emerald-950/40 to-slate-950/60 border-emerald-500/20'}`}>
+                                        <div className={`absolute inset-0 blur-[60px] rounded-full ${accidentFreeDays === 0 ? 'bg-red-500/10' : 'bg-emerald-500/10'}`} />
+                                        <div className="relative flex flex-col items-center gap-2">
+                                            <Award className={`w-8 h-8 ${accidentFreeDays === 0 ? 'text-red-400' : 'text-emerald-400'}`} />
+                                            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">무사고 연속일</p>
+                                            <div className="flex items-end gap-2">
+                                                <span className={`text-7xl font-black tracking-tighter ${accidentFreeDays === 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                                                    {loading ? "—" : accidentFreeDays ?? "—"}
+                                                </span>
+                                                <span className="text-2xl font-black text-slate-500 mb-2">일</span>
+                                            </div>
+                                            <p className="text-[10px] text-slate-500 font-bold">
+                                                {accidentFreeDays === 0 ? "알람 발생 현장 있음" : "마지막 작업중지 알람 기준"}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* 1000일 카운트다운 + TBM 이행률 */}
+                                    <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                        {/* 1000일 카운트다운 */}
+                                        <div className="bg-slate-900/40 border border-white/5 rounded-[32px] p-6 flex flex-col gap-4">
+                                            <div className="flex items-center gap-2">
+                                                <TrendingUp className="w-5 h-5 text-indigo-400" />
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">1000일 무사고 목표</p>
+                                            </div>
+                                            {loading || daysTo1000 === null ? (
+                                                <div className="h-12 bg-white/5 rounded-xl animate-pulse" />
+                                            ) : daysTo1000 === 0 ? (
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-3xl font-black text-amber-400">달성!</span>
+                                                    <span className="text-xs text-slate-500 font-bold">1000일 무사고 목표 달성</span>
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-col gap-3">
+                                                    <div className="flex items-end gap-2">
+                                                        <span className="text-3xl font-black text-indigo-400">{daysTo1000.toLocaleString()}</span>
+                                                        <span className="text-sm font-black text-slate-500 mb-1">일 남음</span>
+                                                    </div>
+                                                    {/* 진행 바 */}
+                                                    <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-gradient-to-r from-indigo-500 to-blue-400 rounded-full transition-all duration-1000"
+                                                            style={{ width: `${Math.min(100, ((accidentFreeDays ?? 0) / 1000) * 100)}%` }}
+                                                        />
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-600 font-bold">{((accidentFreeDays ?? 0) / 10).toFixed(1)}% 달성</p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* TBM 이행률 */}
+                                        <div className="bg-slate-900/40 border border-white/5 rounded-[32px] p-6 flex flex-col gap-4">
+                                            <div className="flex items-center gap-2">
+                                                <ClipboardCheck className="w-5 h-5 text-purple-400" />
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">당일 TBM 이행률</p>
+                                            </div>
+                                            <div className="flex flex-col gap-3">
+                                                <div className="flex items-end gap-2">
+                                                    <span className={`text-3xl font-black ${tbmCoverageRate >= 80 ? 'text-emerald-400' : tbmCoverageRate >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                                                        {loading ? "—" : `${tbmCoverageRate}%`}
+                                                    </span>
+                                                    <span className="text-xs font-bold text-slate-500 mb-1">
+                                                        ({sitesWithTbm}/{sites.length}현장)
+                                                    </span>
+                                                </div>
+                                                <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                                    <div
+                                                        className={`h-full rounded-full transition-all duration-1000 ${tbmCoverageRate >= 80 ? 'bg-emerald-500' : tbmCoverageRate >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
+                                                        style={{ width: `${tbmCoverageRate}%` }}
+                                                    />
+                                                </div>
+                                                <p className="text-[10px] text-slate-600 font-bold">오늘 TBM 총 {totalTbmToday}건 실시</p>
+                                            </div>
+                                        </div>
+
+                                        {/* 인력 현황 */}
+                                        <div className="sm:col-span-2 bg-slate-900/40 border border-white/5 rounded-[32px] p-6 flex flex-col gap-4">
+                                            <div className="flex items-center gap-2">
+                                                <Users className="w-5 h-5 text-blue-400" />
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">전국 인력 구성</p>
+                                            </div>
+                                            <div className="flex flex-col gap-3">
+                                                {/* 스택 바 */}
+                                                <div className="h-3 flex rounded-full overflow-hidden gap-0.5">
+                                                    {totalPersonnel > 0 ? (
+                                                        <>
+                                                            <div
+                                                                className="h-full bg-blue-500 transition-all duration-1000"
+                                                                style={{ width: `${(totalWorkers / totalPersonnel) * 100}%` }}
+                                                                title={`근로자 ${totalWorkers}명`}
+                                                            />
+                                                            <div
+                                                                className="h-full bg-amber-500 transition-all duration-1000"
+                                                                style={{ width: `${(safetyOfficerCount / totalPersonnel) * 100}%` }}
+                                                                title={`안전관리자 ${safetyOfficerCount}명`}
+                                                            />
+                                                            <div
+                                                                className="h-full bg-purple-500 transition-all duration-1000"
+                                                                style={{ width: `${(hqAdminCount / totalPersonnel) * 100}%` }}
+                                                                title={`본사 관리자 ${hqAdminCount}명`}
+                                                            />
+                                                        </>
+                                                    ) : (
+                                                        <div className="h-full w-full bg-slate-700 animate-pulse" />
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-4 flex-wrap">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                                                        <span className="text-xs font-bold text-slate-400">근로자 <span className="text-white">{totalWorkers}</span>명</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                                                        <span className="text-xs font-bold text-slate-400">안전관리자 <span className="text-white">{safetyOfficerCount}</span>명</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <div className="w-2.5 h-2.5 rounded-full bg-purple-500" />
+                                                        <span className="text-xs font-bold text-slate-400">본사 관리자 <span className="text-white">{hqAdminCount}</span>명</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 전국 현장 현황 바 차트 */}
+                                <div className="bg-slate-900/40 border border-white/5 rounded-[40px] p-8 flex flex-col gap-6">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <MapPin className="w-5 h-5 text-blue-400" />
+                                            <h3 className="text-lg font-black uppercase tracking-tight">전국 현장 근로자 현황</h3>
+                                        </div>
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">전체 {sites.length}개 현장</span>
+                                    </div>
+
+                                    {loading ? (
+                                        <div className="flex flex-col gap-3">
+                                            {[1, 2, 3].map(i => (
+                                                <div key={i} className="h-10 bg-white/5 rounded-xl animate-pulse" />
+                                            ))}
+                                        </div>
+                                    ) : sites.length === 0 ? (
+                                        <p className="text-slate-600 font-bold text-sm text-center py-8">등록된 현장이 없습니다</p>
+                                    ) : (
+                                        <div className="flex flex-col gap-3">
+                                            {[...sites]
+                                                .sort((a, b) => b.worker_count - a.worker_count)
+                                                .map((site) => (
+                                                    <div key={site.id} className="flex items-center gap-4 group">
+                                                        <div className="w-32 flex-shrink-0">
+                                                            <p className="text-xs font-black text-slate-300 truncate leading-tight">{site.name}</p>
+                                                            <p className="text-[9px] font-bold text-slate-600 truncate">{site.address}</p>
+                                                        </div>
+                                                        <div className="flex-1 relative h-8 bg-slate-800/60 rounded-2xl overflow-hidden">
+                                                            <div
+                                                                className={`h-full rounded-2xl transition-all duration-700 flex items-center px-3 ${site.alert_count > 0 ? 'bg-red-500/40' : 'bg-blue-500/30'}`}
+                                                                style={{ width: `${Math.max(4, (site.worker_count / maxWorkerCount) * 100)}%` }}
+                                                            />
+                                                            <div className="absolute inset-0 flex items-center px-3 gap-4">
+                                                                <span className="text-xs font-black text-white">{site.worker_count}명</span>
+                                                                {site.tbm_today > 0 && (
+                                                                    <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">TBM {site.tbm_today}</span>
+                                                                )}
+                                                                {site.alert_count > 0 && (
+                                                                    <span className="text-[9px] font-black text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                                                                        <AlertTriangle className="w-2.5 h-2.5" />
+                                                                        {site.alert_count}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => window.location.href = `/admin?site_id=${site.id}`}
+                                                            className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-[9px] font-black text-blue-400 uppercase tracking-wider flex items-center gap-1"
+                                                        >
+                                                            입장 <ArrowRight className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* 알람 발생 현장 (있을 때만) */}
+                                {totalAlerts > 0 && !loading && (
+                                    <div className="bg-red-950/20 border border-red-500/20 rounded-[40px] p-8 flex flex-col gap-6">
+                                        <div className="flex items-center gap-3">
+                                            <AlertTriangle className="w-5 h-5 text-red-400 animate-pulse" />
+                                            <h3 className="text-lg font-black uppercase tracking-tight text-red-300">작업중지 알람 현장</h3>
+                                            <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-[10px] font-black rounded-full">{totalAlerts}건 미해결</span>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {sites.filter(s => s.alert_count > 0).map(site => (
+                                                <button
+                                                    key={site.id}
+                                                    onClick={() => window.location.href = `/admin?site_id=${site.id}`}
+                                                    className="flex items-center justify-between p-4 bg-red-900/20 border border-red-500/20 rounded-2xl hover:bg-red-900/30 transition-all text-left group"
+                                                >
+                                                    <div>
+                                                        <p className="text-sm font-black text-red-300">{site.name}</p>
+                                                        <p className="text-[10px] font-bold text-red-500 mt-0.5">작업중지 {site.alert_count}건</p>
+                                                    </div>
+                                                    <ArrowRight className="w-4 h-4 text-red-400 group-hover:translate-x-1 transition-transform" />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+
+                        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 현장 관리 탭 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
                         {activeTab === "sites" && (
                             <motion.div
                                 key="site-list"
@@ -533,6 +799,7 @@ export default function SystemAdminPage() {
                             </motion.div>
                         )}
 
+                        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 시스템 상태 탭 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
                         {activeTab === "stats" && (
                             <motion.div
                                 key="health-check"
@@ -544,6 +811,7 @@ export default function SystemAdminPage() {
                             </motion.div>
                         )}
 
+                        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ AI 에이전트 탭 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
                         {activeTab === "ai" && (
                             <motion.div
                                 key="ai-tower"
@@ -576,6 +844,7 @@ export default function SystemAdminPage() {
                                         ) : (
                                             <p className="text-emerald-400">[STATUS] No active stop-work alerts. All systems nominal.</p>
                                         )}
+                                        <p className="text-indigo-300">[SAFETY] Accident-free streak: {accidentFreeDays ?? 0} days.</p>
                                         <p className="opacity-40 animate-pulse mt-2">_ {t.ai.thinking}</p>
                                     </div>
 
