@@ -3,13 +3,19 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import {
+    getDefaultRouteForProfileRole,
+    hasAllowedRole,
+    type AllowedRole,
+    type ProfileRole,
+} from "@/lib/roles";
 
 export default function RoleGuard({
     children,
     allowedRole
 }: {
     children: React.ReactNode,
-    allowedRole: "admin" | "worker" | "hq" | "system"
+    allowedRole: AllowedRole
 }) {
     const router = useRouter();
     const [isAuthorized, setIsAuthorized] = useState(false);
@@ -72,26 +78,17 @@ export default function RoleGuard({
 
             // 역할 vs allowedRole 비교
             // ✨ ROOT와 HQ_OFFICER는 통합 관제(system) 권한을 가집니다.
-            const isAllowed =
-                profile.role === "ROOT" ||
-                (allowedRole === "system" && (profile.role === "ROOT" || profile.role === "HQ_OFFICER")) ||
-                (allowedRole === "admin" && (profile.role === "HQ_ADMIN" || profile.role === "SAFETY_OFFICER")) ||
-                (allowedRole === "hq" && profile.role === "HQ_ADMIN") ||
-                (allowedRole === "worker" && profile.role === "WORKER");
+            const role = profile.role as ProfileRole;
+            const isAllowed = role ? hasAllowedRole(role, allowedRole) : false;
 
             if (!isAllowed) {
-                // 실제 역할에 맞는 경로로 안내
-                if (profile.role === "ROOT" || profile.role === "HQ_OFFICER") {
-                    router.replace("/system");
-                } else if (profile.role === "HQ_ADMIN") {
-                    router.replace("/control"); // 현장소장 전용 페이지가 있다면 이동
-                } else if (profile.role === "SAFETY_OFFICER") {
-                    router.replace("/admin");
-                } else if (profile.role === "WORKER") {
-                    router.replace("/worker");
-                } else {
+                if (!role) {
                     router.replace("/auth/setup");
+                    return;
                 }
+
+                // 실제 역할에 맞는 경로로 안내
+                router.replace(getDefaultRouteForProfileRole(role));
                 return;
             }
 
