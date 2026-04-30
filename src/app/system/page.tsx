@@ -17,7 +17,8 @@ import {
     ArrowRight,
     Edit3,
     Trash2,
-    X
+    X,
+    HardHat,
 } from "lucide-react";
 
 type Site = {
@@ -286,6 +287,20 @@ export default function SystemAdminPage() {
                             </button>
                         ))}
                     </nav>
+
+                    {/* 모드 전환 버튼 */}
+                    <div className="pt-4 border-t border-white/5">
+                        <button
+                            onClick={() => window.location.href = "/admin"}
+                            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl font-bold text-sm transition-all bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/40"
+                        >
+                            <HardHat className="w-5 h-5 flex-shrink-0" />
+                            <div className="flex flex-col items-start">
+                                <span className="text-xs font-black tracking-tight">현장 안전관리 모드</span>
+                                <span className="text-[9px] text-amber-500/60 font-bold uppercase tracking-widest">Field Safety Console</span>
+                            </div>
+                        </button>
+                    </div>
 
                     <div className="mt-auto pt-6 border-t border-white/5 space-y-4">
                         <div className="flex items-center gap-3 px-2">
