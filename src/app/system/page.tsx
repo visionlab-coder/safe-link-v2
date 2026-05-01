@@ -26,7 +26,38 @@ import {
     LayoutDashboard,
     Award,
     TrendingUp,
+    FlaskConical,
 } from "lucide-react";
+
+// ──────────────────────────────────────────────────────────────
+// 시뮬레이션 데이터 — 서원토건 전국 30개 현장 기준
+// ──────────────────────────────────────────────────────────────
+const SIM_SITES: Site[] = [
+    { id: "sim-01", name: "서울 강남 테헤란로 오피스 신축", address: "서울 강남구 테헤란로", created_at: "2025-01-05", worker_count: 94, tbm_today: 3, alert_count: 0 },
+    { id: "sim-02", name: "부산 해운대 레지던스 골조", address: "부산 해운대구 우동", created_at: "2025-02-10", worker_count: 68, tbm_today: 2, alert_count: 1 },
+    { id: "sim-03", name: "인천 송도 물류센터 신축", address: "인천 연수구 송도동", created_at: "2025-01-20", worker_count: 52, tbm_today: 1, alert_count: 0 },
+    { id: "sim-04", name: "대구 수성구 주상복합 골조", address: "대구 수성구 범어동", created_at: "2025-03-01", worker_count: 41, tbm_today: 0, alert_count: 0 },
+    { id: "sim-05", name: "광주 첨단 연구단지 조성", address: "광주 북구 오룡동", created_at: "2025-02-15", worker_count: 37, tbm_today: 1, alert_count: 0 },
+    { id: "sim-06", name: "대전 유성구 아파트 RC골조", address: "대전 유성구 도룡동", created_at: "2025-03-15", worker_count: 58, tbm_today: 2, alert_count: 0 },
+    { id: "sim-07", name: "울산 중구 산업단지 공장", address: "울산 중구 성남동", created_at: "2025-04-01", worker_count: 29, tbm_today: 1, alert_count: 0 },
+    { id: "sim-08", name: "수원 영통 오피스텔 신축", address: "경기 수원시 영통구", created_at: "2025-01-10", worker_count: 76, tbm_today: 2, alert_count: 0 },
+    { id: "sim-09", name: "성남 판교 R&D센터 골조", address: "경기 성남시 분당구 판교", created_at: "2025-02-01", worker_count: 63, tbm_today: 3, alert_count: 0 },
+    { id: "sim-10", name: "고양 덕양 공공주택 골조", address: "경기 고양시 덕양구", created_at: "2025-03-10", worker_count: 85, tbm_today: 2, alert_count: 1 },
+    { id: "sim-11", name: "창원 마산 아파트 신축", address: "경남 창원시 마산합포구", created_at: "2025-02-20", worker_count: 44, tbm_today: 1, alert_count: 0 },
+    { id: "sim-12", name: "전주 효자 공공청사 신축", address: "전북 전주시 완산구", created_at: "2025-04-05", worker_count: 31, tbm_today: 0, alert_count: 0 },
+    { id: "sim-13", name: "청주 흥덕 물류허브 골조", address: "충북 청주시 흥덕구", created_at: "2025-03-20", worker_count: 48, tbm_today: 1, alert_count: 0 },
+    { id: "sim-14", name: "강릉 주문진 관광호텔 신축", address: "강원 강릉시 주문진읍", created_at: "2025-04-10", worker_count: 22, tbm_today: 1, alert_count: 0 },
+    { id: "sim-15", name: "포항 남구 산업단지 골조", address: "경북 포항시 남구", created_at: "2025-02-28", worker_count: 35, tbm_today: 0, alert_count: 0 },
+    { id: "sim-16", name: "천안 불당 대규모 아파트", address: "충남 천안시 서북구 불당동", created_at: "2025-01-25", worker_count: 102, tbm_today: 4, alert_count: 0 },
+    { id: "sim-17", name: "화성 동탄 복합쇼핑몰 RC", address: "경기 화성시 동탄면", created_at: "2025-02-05", worker_count: 88, tbm_today: 2, alert_count: 0 },
+    { id: "sim-18", name: "평택 고덕 반도체 공장 기초", address: "경기 평택시 고덕면", created_at: "2025-03-05", worker_count: 71, tbm_today: 3, alert_count: 0 },
+    { id: "sim-19", name: "김해 장유 아파트 골조", address: "경남 김해시 장유면", created_at: "2025-04-15", worker_count: 39, tbm_today: 0, alert_count: 0 },
+    { id: "sim-20", name: "제주 서귀포 리조트 신축", address: "제주 서귀포시 중문동", created_at: "2025-03-25", worker_count: 27, tbm_today: 1, alert_count: 0 },
+];
+
+const SIM_SAFETY_OFFICER_COUNT = 34;
+const SIM_HQ_ADMIN_COUNT = 11;
+const SIM_ACCIDENT_FREE_DAYS = 143;
 
 type Site = {
     id: string;
@@ -167,7 +198,14 @@ export default function SystemAdminPage() {
     const [safetyOfficerCount, setSafetyOfficerCount] = useState(0);
     const [hqAdminCount, setHqAdminCount] = useState(0);
     const [accidentFreeDays, setAccidentFreeDays] = useState<number | null>(null);
+    const [isSimulation, setIsSimulation] = useState(false);
     const t = systemUI[lang];
+
+    // 시뮬레이션 모드일 때 사용할 데이터
+    const displaySites = isSimulation ? SIM_SITES : sites;
+    const displaySafetyOfficerCount = isSimulation ? SIM_SAFETY_OFFICER_COUNT : safetyOfficerCount;
+    const displayHqAdminCount = isSimulation ? SIM_HQ_ADMIN_COUNT : hqAdminCount;
+    const displayAccidentFreeDays = isSimulation ? SIM_ACCIDENT_FREE_DAYS : accidentFreeDays;
 
     useEffect(() => {
         const init = async () => {
@@ -289,14 +327,14 @@ export default function SystemAdminPage() {
         await fetchSites();
     };
 
-    const totalWorkers = sites.reduce((acc, s) => acc + s.worker_count, 0);
-    const totalTbmToday = sites.reduce((acc, s) => acc + s.tbm_today, 0);
-    const totalAlerts = sites.reduce((acc, s) => acc + s.alert_count, 0);
-    const sitesWithTbm = sites.filter(s => s.tbm_today > 0).length;
-    const tbmCoverageRate = sites.length > 0 ? Math.round((sitesWithTbm / sites.length) * 100) : 0;
-    const maxWorkerCount = Math.max(...sites.map(s => s.worker_count), 1);
-    const totalPersonnel = totalWorkers + safetyOfficerCount + hqAdminCount;
-    const daysTo1000 = accidentFreeDays !== null ? Math.max(0, 1000 - accidentFreeDays) : null;
+    const totalWorkers = displaySites.reduce((acc, s) => acc + s.worker_count, 0);
+    const totalTbmToday = displaySites.reduce((acc, s) => acc + s.tbm_today, 0);
+    const totalAlerts = displaySites.reduce((acc, s) => acc + s.alert_count, 0);
+    const sitesWithTbm = displaySites.filter(s => s.tbm_today > 0).length;
+    const tbmCoverageRate = displaySites.length > 0 ? Math.round((sitesWithTbm / displaySites.length) * 100) : 0;
+    const maxWorkerCount = Math.max(...displaySites.map(s => s.worker_count), 1);
+    const totalPersonnel = totalWorkers + displaySafetyOfficerCount + displayHqAdminCount;
+    const daysTo1000 = displayAccidentFreeDays !== null ? Math.max(0, 1000 - displayAccidentFreeDays) : null;
 
     return (
         <RoleGuard allowedRole="system">
@@ -396,11 +434,24 @@ export default function SystemAdminPage() {
                             </h2>
                             <div className="flex items-center gap-2 text-slate-400 font-bold">
                                 <Zap className="w-4 h-4 text-amber-500" />
-                                <span>{lang === 'ko' ? `${sites.length}개 현장 · ${totalWorkers}명 근로자 실시간 모니터링` : `${sites.length} sites · ${totalWorkers} workers monitored`}</span>
+                                <span>{lang === 'ko' ? `${displaySites.length}개 현장 · ${totalWorkers}명 근로자 실시간 모니터링` : `${displaySites.length} sites · ${totalWorkers} workers monitored`}</span>
                             </div>
                         </motion.div>
 
                         <div className="flex items-center gap-4">
+                            {/* 시뮬레이션 모드 토글 */}
+                            <button
+                                onClick={() => setIsSimulation(v => !v)}
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border ${
+                                    isSimulation
+                                        ? 'bg-violet-500/20 border-violet-500/40 text-violet-300'
+                                        : 'bg-white/5 border-white/10 text-slate-500 hover:text-white hover:bg-white/10'
+                                }`}
+                            >
+                                <FlaskConical className="w-3.5 h-3.5" />
+                                {isSimulation ? "시뮬레이션 ON" : "시뮬레이션"}
+                            </button>
+
                             <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
                                 <button
                                     onClick={() => setLang('ko')}
@@ -430,33 +481,55 @@ export default function SystemAdminPage() {
                         </div>
                     </header>
 
+                    {/* 시뮬레이션 배너 */}
+                    <AnimatePresence>
+                        {isSimulation && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="mb-6 overflow-hidden"
+                            >
+                                <div className="flex items-center gap-3 px-5 py-3 bg-violet-500/10 border border-violet-500/30 rounded-2xl">
+                                    <FlaskConical className="w-4 h-4 text-violet-400 flex-shrink-0" />
+                                    <p className="text-xs font-black text-violet-300">
+                                        시뮬레이션 모드 — 서원토건 전국 20개 현장 가상 데이터 표시 중 (실제 DB 아님)
+                                    </p>
+                                    <button onClick={() => setIsSimulation(false)} className="ml-auto text-violet-500 hover:text-violet-300">
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
                     {/* Stats Bar — real data */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
                         {[
                             {
                                 label: t.stats.sites,
-                                value: loading ? "—" : sites.length.toString(),
+                                value: (loading && !isSimulation) ? "—" : displaySites.length.toString(),
                                 icon: MapPin,
                                 color: "blue",
                                 sub: lang === 'ko' ? "활성 현장" : "active",
                             },
                             {
                                 label: t.stats.workers,
-                                value: loading ? "—" : totalWorkers.toLocaleString(),
+                                value: (loading && !isSimulation) ? "—" : totalWorkers.toLocaleString(),
                                 icon: Users,
                                 color: "emerald",
                                 sub: lang === 'ko' ? "등록 근로자" : "registered",
                             },
                             {
                                 label: t.stats.tbms,
-                                value: loading ? "—" : totalTbmToday.toString(),
+                                value: (loading && !isSimulation) ? "—" : totalTbmToday.toString(),
                                 icon: ClipboardCheck,
                                 color: "purple",
                                 sub: lang === 'ko' ? "오늘 실시" : "today",
                             },
                             {
                                 label: t.stats.alerts,
-                                value: loading ? "—" : totalAlerts.toString(),
+                                value: (loading && !isSimulation) ? "—" : totalAlerts.toString(),
                                 icon: AlertTriangle,
                                 color: totalAlerts > 0 ? "red" : "slate",
                                 sub: totalAlerts > 0 ? (lang === 'ko' ? "미해결" : "unresolved") : (lang === 'ko' ? "이상 없음" : "clear"),
@@ -495,19 +568,19 @@ export default function SystemAdminPage() {
                                 {/* 무사고 영웅 섹션 */}
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                     {/* 무사고 연속일 */}
-                                    <div className={`lg:col-span-1 rounded-[40px] border p-8 flex flex-col items-center justify-center gap-4 relative overflow-hidden ${accidentFreeDays === 0 ? 'bg-red-950/30 border-red-500/30' : 'bg-gradient-to-br from-emerald-950/40 to-slate-950/60 border-emerald-500/20'}`}>
-                                        <div className={`absolute inset-0 blur-[60px] rounded-full ${accidentFreeDays === 0 ? 'bg-red-500/10' : 'bg-emerald-500/10'}`} />
+                                    <div className={`lg:col-span-1 rounded-[40px] border p-8 flex flex-col items-center justify-center gap-4 relative overflow-hidden ${displayAccidentFreeDays === 0 ? 'bg-red-950/30 border-red-500/30' : 'bg-gradient-to-br from-emerald-950/40 to-slate-950/60 border-emerald-500/20'}`}>
+                                        <div className={`absolute inset-0 blur-[60px] rounded-full ${displayAccidentFreeDays === 0 ? 'bg-red-500/10' : 'bg-emerald-500/10'}`} />
                                         <div className="relative flex flex-col items-center gap-2">
-                                            <Award className={`w-8 h-8 ${accidentFreeDays === 0 ? 'text-red-400' : 'text-emerald-400'}`} />
+                                            <Award className={`w-8 h-8 ${displayAccidentFreeDays === 0 ? 'text-red-400' : 'text-emerald-400'}`} />
                                             <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">무사고 연속일</p>
                                             <div className="flex items-end gap-2">
-                                                <span className={`text-7xl font-black tracking-tighter ${accidentFreeDays === 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                                                    {loading ? "—" : accidentFreeDays ?? "—"}
+                                                <span className={`text-7xl font-black tracking-tighter ${displayAccidentFreeDays === 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                                                    {(loading && !isSimulation) ? "—" : displayAccidentFreeDays ?? "—"}
                                                 </span>
                                                 <span className="text-2xl font-black text-slate-500 mb-2">일</span>
                                             </div>
                                             <p className="text-[10px] text-slate-500 font-bold">
-                                                {accidentFreeDays === 0 ? "알람 발생 현장 있음" : "마지막 작업중지 알람 기준"}
+                                                {displayAccidentFreeDays === 0 ? "알람 발생 현장 있음" : "마지막 작업중지 알람 기준"}
                                             </p>
                                         </div>
                                     </div>
@@ -520,7 +593,7 @@ export default function SystemAdminPage() {
                                                 <TrendingUp className="w-5 h-5 text-indigo-400" />
                                                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">1000일 무사고 목표</p>
                                             </div>
-                                            {loading || daysTo1000 === null ? (
+                                            {(loading && !isSimulation) || daysTo1000 === null ? (
                                                 <div className="h-12 bg-white/5 rounded-xl animate-pulse" />
                                             ) : daysTo1000 === 0 ? (
                                                 <div className="flex flex-col gap-1">
@@ -537,10 +610,10 @@ export default function SystemAdminPage() {
                                                     <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
                                                         <div
                                                             className="h-full bg-gradient-to-r from-indigo-500 to-blue-400 rounded-full transition-all duration-1000"
-                                                            style={{ width: `${Math.min(100, ((accidentFreeDays ?? 0) / 1000) * 100)}%` }}
+                                                            style={{ width: `${Math.min(100, ((displayAccidentFreeDays ?? 0) / 1000) * 100)}%` }}
                                                         />
                                                     </div>
-                                                    <p className="text-[10px] text-slate-600 font-bold">{((accidentFreeDays ?? 0) / 10).toFixed(1)}% 달성</p>
+                                                    <p className="text-[10px] text-slate-600 font-bold">{((displayAccidentFreeDays ?? 0) / 10).toFixed(1)}% 달성</p>
                                                 </div>
                                             )}
                                         </div>
@@ -588,13 +661,13 @@ export default function SystemAdminPage() {
                                                             />
                                                             <div
                                                                 className="h-full bg-amber-500 transition-all duration-1000"
-                                                                style={{ width: `${(safetyOfficerCount / totalPersonnel) * 100}%` }}
-                                                                title={`안전관리자 ${safetyOfficerCount}명`}
+                                                                style={{ width: `${(displaySafetyOfficerCount / totalPersonnel) * 100}%` }}
+                                                                title={`안전관리자 ${displaySafetyOfficerCount}명`}
                                                             />
                                                             <div
                                                                 className="h-full bg-purple-500 transition-all duration-1000"
-                                                                style={{ width: `${(hqAdminCount / totalPersonnel) * 100}%` }}
-                                                                title={`본사 관리자 ${hqAdminCount}명`}
+                                                                style={{ width: `${(displayHqAdminCount / totalPersonnel) * 100}%` }}
+                                                                title={`본사 관리자 ${displayHqAdminCount}명`}
                                                             />
                                                         </>
                                                     ) : (
@@ -608,11 +681,11 @@ export default function SystemAdminPage() {
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
                                                         <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                                                        <span className="text-xs font-bold text-slate-400">안전관리자 <span className="text-white">{safetyOfficerCount}</span>명</span>
+                                                        <span className="text-xs font-bold text-slate-400">안전관리자 <span className="text-white">{displaySafetyOfficerCount}</span>명</span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
                                                         <div className="w-2.5 h-2.5 rounded-full bg-purple-500" />
-                                                        <span className="text-xs font-bold text-slate-400">본사 관리자 <span className="text-white">{hqAdminCount}</span>명</span>
+                                                        <span className="text-xs font-bold text-slate-400">본사 관리자 <span className="text-white">{displayHqAdminCount}</span>명</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -627,20 +700,20 @@ export default function SystemAdminPage() {
                                             <MapPin className="w-5 h-5 text-blue-400" />
                                             <h3 className="text-lg font-black uppercase tracking-tight">전국 현장 근로자 현황</h3>
                                         </div>
-                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">전체 {sites.length}개 현장</span>
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">전체 {displaySites.length}개 현장</span>
                                     </div>
 
-                                    {loading ? (
+                                    {(loading && !isSimulation) ? (
                                         <div className="flex flex-col gap-3">
                                             {[1, 2, 3].map(i => (
                                                 <div key={i} className="h-10 bg-white/5 rounded-xl animate-pulse" />
                                             ))}
                                         </div>
-                                    ) : sites.length === 0 ? (
+                                    ) : displaySites.length === 0 ? (
                                         <p className="text-slate-600 font-bold text-sm text-center py-8">등록된 현장이 없습니다</p>
                                     ) : (
                                         <div className="flex flex-col gap-3">
-                                            {[...sites]
+                                            {[...displaySites]
                                                 .sort((a, b) => b.worker_count - a.worker_count)
                                                 .map((site) => (
                                                     <div key={site.id} className="flex items-center gap-4 group">
@@ -687,7 +760,7 @@ export default function SystemAdminPage() {
                                             <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-[10px] font-black rounded-full">{totalAlerts}건 미해결</span>
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                            {sites.filter(s => s.alert_count > 0).map(site => (
+                                            {displaySites.filter(s => s.alert_count > 0).map(site => (
                                                 <button
                                                     key={site.id}
                                                     onClick={() => window.location.href = `/admin?site_id=${site.id}`}
