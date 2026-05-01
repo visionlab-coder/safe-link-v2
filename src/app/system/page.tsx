@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import SystemHealthCheck from "@/components/SystemHealthCheck";
 import { createClient } from "@/utils/supabase/client";
+import { canAccessSystem, type ProfileRole } from "@/lib/roles";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Shield,
@@ -186,6 +187,18 @@ const systemUI: Record<string, any> = {
     }
 };
 
+// ──────────────────────────────────────────────────────────────
+// 권한 검증 로딩 화면 (defense-in-depth 가드용)
+// ──────────────────────────────────────────────────────────────
+function LoadingScreen() {
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-blue-400">
+            <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mb-4" />
+            <p className="animate-pulse tracking-widest font-bold text-sm">권한 확인 중...</p>
+        </div>
+    );
+}
+
 export default function SystemAdminPage() {
     const [sites, setSites] = useState<Site[]>([]);
     const [loading, setLoading] = useState(true);
@@ -199,7 +212,31 @@ export default function SystemAdminPage() {
     const [hqAdminCount, setHqAdminCount] = useState(0);
     const [accidentFreeDays, setAccidentFreeDays] = useState<number | null>(null);
     const [isSimulation, setIsSimulation] = useState(false);
+    const [isVerified, setIsVerified] = useState(false);
     const t = systemUI[lang];
+
+    // defense-in-depth: 클라이언트 사이드 권한 2차 검증
+    useEffect(() => {
+        const verifyAccess = async () => {
+            const supabase = createClient();
+            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            if (authError || !user) {
+                window.location.replace("/auth");
+                return;
+            }
+            const { data: profile } = await supabase
+                .from("profiles")
+                .select("role")
+                .eq("id", user.id)
+                .single();
+            if (!profile || !canAccessSystem(profile.role as ProfileRole)) {
+                window.location.replace("/");
+                return;
+            }
+            setIsVerified(true);
+        };
+        verifyAccess();
+    }, []);
 
     // 시뮬레이션 모드일 때 사용할 데이터
     const displaySites = isSimulation ? SIM_SITES : sites;
@@ -335,6 +372,8 @@ export default function SystemAdminPage() {
     const maxWorkerCount = Math.max(...displaySites.map(s => s.worker_count), 1);
     const totalPersonnel = totalWorkers + displaySafetyOfficerCount + displayHqAdminCount;
     const daysTo1000 = displayAccidentFreeDays !== null ? Math.max(0, 1000 - displayAccidentFreeDays) : null;
+
+    if (!isVerified) return <LoadingScreen />;
 
     return (
         <RoleGuard allowedRole="system">
