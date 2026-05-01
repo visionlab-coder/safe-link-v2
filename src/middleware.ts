@@ -1,8 +1,10 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { canAccessSystem, type ProfileRole } from '@/lib/roles'
 
 export async function middleware(request: NextRequest) {
     let supabaseResponse = NextResponse.next({ request })
+    const { pathname } = request.nextUrl
 
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,6 +31,25 @@ export async function middleware(request: NextRequest) {
     // getUser()는 매번 Auth 서버 왕복 → 모든 요청에 +50-200ms 지연 유발
     // 토큰 갱신은 Supabase SSR이 setAll 콜백에서 자동 처리
     await supabase.auth.getSession()
+
+    // /system 경로: SUPER_ADMIN·ROOT·HQ_OFFICER 전용 보호
+    if (pathname.startsWith('/system')) {
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (!user) {
+            return NextResponse.redirect(new URL('/auth', request.url))
+        }
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        if (!profile || !canAccessSystem(profile.role as ProfileRole)) {
+            return NextResponse.redirect(new URL('/', request.url))
+        }
+    }
 
     return supabaseResponse
 }
