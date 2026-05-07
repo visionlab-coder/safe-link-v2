@@ -58,11 +58,24 @@ export async function POST(req: NextRequest) {
 
   const url = generateWorkerStickerUrl({ workerId, sigVersion: signed.sigVersion, issuedEpoch: signed.issuedEpoch, sig: signed.sig });
 
+  // 청구항 2: NTAG213 NDEF 메시지 길이 138바이트 이내 검증
+  // NDEF URI record 오버헤드: 3 bytes (NDEF header) + 1 byte (URI prefix 'https://')
+  const urlBytes = new TextEncoder().encode(url);
+  const ndefPayloadBytes = 3 + 1 + urlBytes.length; // TNF+type+payload header + URI prefix + URL
+  if (ndefPayloadBytes > 138) {
+    await ctx.service.from("nfc_worker_stickers").delete().eq("id", sticker.id);
+    return NextResponse.json({
+      error: "ndef_too_long",
+      detail: `NDEF payload ${ndefPayloadBytes} bytes exceeds NTAG213 limit of 138 bytes. URL length: ${urlBytes.length}`,
+    }, { status: 422 });
+  }
+
   return NextResponse.json({
     sticker_id: sticker.id,
     url,
     sig_version: signed.sigVersion,
     issued_epoch: signed.issuedEpoch,
+    ndef_bytes: ndefPayloadBytes,
     worker: { id: worker.id, worker_code: worker.worker_code, full_name: worker.full_name },
   });
 }

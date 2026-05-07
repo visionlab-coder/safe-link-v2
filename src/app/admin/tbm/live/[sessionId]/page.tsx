@@ -9,7 +9,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { useParams, useRouter } from "next/navigation";
-import { Nfc, Square, RefreshCw, CheckCircle, Users, AlertTriangle } from "lucide-react";
+import { Nfc, Square, RefreshCw, CheckCircle, Users, AlertTriangle, Brain } from "lucide-react";
 import { NfcScanner, detectNfcSupport, NfcError } from "@/utils/nfc/web-nfc";
 import { NFC_BASE_URL } from "@/utils/nfc/constants";
 
@@ -49,6 +49,9 @@ export default function TbmLiveSessionPage() {
   const [lastWorker, setLastWorker] = useState<{ name: string; code: string; nationality: string } | null>(null);
   const [scanError, setScanError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [quizGenerating, setQuizGenerating] = useState(false);
+  const [quizSent, setQuizSent] = useState(false);
+  const [quizError, setQuizError] = useState("");
 
   const scannerRef = useRef<NfcScanner | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -133,6 +136,44 @@ export default function TbmLiveSessionPage() {
   const stopScan = () => {
     abortRef.current?.abort();
     setScanState("idle");
+  };
+
+  // 청구항 11: TBM 종료 후 AI 퀴즈 자동 생성 → 발송
+  const handleGenerateAndSendQuiz = async () => {
+    if (!sessionId) return;
+    setQuizGenerating(true);
+    setQuizError("");
+    try {
+      // 1. 퀴즈 생성
+      const genRes = await fetch("/api/quiz/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tbmSessionId: sessionId }),
+      });
+      const genData = await genRes.json();
+      if (!genRes.ok) throw new Error(genData.error ?? "generation_failed");
+
+      // 2. 생성된 퀴즈 세션 조회
+      const listRes = await fetch(`/api/quiz/generate?tbmSessionId=${sessionId}`);
+      const listData = await listRes.json();
+      const quizSessionId = listData.quizSessions?.[0]?.id;
+      if (!quizSessionId) throw new Error("quiz_session_not_saved");
+
+      // 3. 근로자에게 발송
+      const sendRes = await fetch("/api/quiz/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quizSessionId, tbmSessionId: sessionId }),
+      });
+      const sendData = await sendRes.json();
+      if (!sendRes.ok) throw new Error(sendData.error ?? "send_failed");
+
+      setQuizSent(true);
+    } catch (err) {
+      setQuizError(err instanceof Error ? err.message : "오류 발생");
+    } finally {
+      setQuizGenerating(false);
+    }
   };
 
   const handleCloseSession = async () => {
@@ -306,6 +347,31 @@ export default function TbmLiveSessionPage() {
               </div>
             )}
           </div>
+
+          {/* 청구항 11: AI 퀴즈 생성 & 발송 */}
+          {!isActive && attendance.some((a) => (a as AttendanceWithWorker).is_certified) && (
+            <div className="bg-gray-800 rounded-2xl p-4 border border-gray-700">
+              <div className="flex items-center gap-2 mb-3">
+                <Brain className="w-5 h-5 text-purple-400" />
+                <h3 className="font-medium text-white">AI 안전 퀴즈</h3>
+              </div>
+              {quizSent ? (
+                <p className="text-green-400 text-sm font-medium">퀴즈가 근로자 모국어로 발송되었습니다.</p>
+              ) : (
+                <>
+                  <p className="text-gray-400 text-sm mb-3">TBM 발화 내용에서 AI가 퀴즈를 자동 생성하여 근로자 모국어로 발송합니다.</p>
+                  {quizError && <p className="text-red-400 text-xs mb-2">{quizError}</p>}
+                  <button
+                    onClick={handleGenerateAndSendQuiz}
+                    disabled={quizGenerating}
+                    className="w-full py-3 bg-purple-700 hover:bg-purple-600 disabled:bg-gray-700 text-white text-sm font-bold rounded-xl transition-colors"
+                  >
+                    {quizGenerating ? "퀴즈 생성 중..." : "AI 퀴즈 생성 & 발송"}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
 
           <button onClick={() => router.push("/admin/tbm/live")} className="text-gray-500 hover:text-gray-300 text-sm transition-colors">
             ← 세션 목록

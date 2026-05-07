@@ -15,6 +15,42 @@ type StopWorkBody = {
   photoUrls?: string[];
 };
 
+// 청구항 16: 위험작업거부·산재 발생 시 SAFETY_OFFICER 우선 라우팅
+const PRIORITY_HAZARD_CATEGORIES = new Set(["위험작업거부", "산업재해", "danger_refusal", "accident"]);
+
+async function routeToAdmins(
+  service: ReturnType<typeof createService>,
+  siteId: string,
+  alertId: string,
+  isPriority: boolean
+) {
+  const targetRoles = isPriority
+    ? ["SAFETY_OFFICER", "HQ_OFFICER"]
+    : ["SAFETY_OFFICER", "HQ_OFFICER", "HQ_ADMIN", "SITE_MANAGER"];
+
+  const { data: admins } = await service
+    .from("profiles")
+    .select("id, role, site_id")
+    .in("role", targetRoles)
+    .or(`site_id.eq.${siteId},role.in.(HQ_ADMIN,HQ_OFFICER)`);
+
+  if (!admins?.length) return { routed: 0, roles: [] };
+
+  await service.from("stop_work_alert_routing").insert(
+    admins.map((admin: { id: string; role: string }) => ({
+      alert_id: alertId,
+      admin_id: admin.id,
+      admin_role: admin.role,
+      is_priority: isPriority,
+      escalation_due_at: isPriority
+        ? new Date(Date.now() + 5 * 60 * 1000).toISOString()
+        : null,
+    }))
+  ).throwOnError();
+
+  return { routed: admins.length, roles: admins.map((a: { role: string }) => a.role) };
+}
+
 function createService() {
   const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
   const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -109,10 +145,19 @@ export async function POST(req: NextRequest) {
     createdBy: user.id,
   });
 
+  // 청구항 16: 위험작업거부·산재 시 SAFETY_OFFICER 우선 라우팅
+  const isPriority = PRIORITY_HAZARD_CATEGORIES.has(body.hazardCategory ?? "");
+  let routing: { routed: number; roles: string[] } = { routed: 0, roles: [] };
+  try {
+    routing = await routeToAdmins(service, siteId, baseAlert.id, isPriority);
+  } catch { /* 라우팅 실패해도 alert는 저장됨 */ }
+
   return NextResponse.json({
     alertId: baseAlert.id,
     intervention,
     audit,
     escalationDueAt,
+    routing,
+    isPriorityRouted: isPriority,
   });
 }

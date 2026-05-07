@@ -536,6 +536,7 @@ function WorkerHomeContent() {
     const [showStopWorkModal, setShowStopWorkModal] = useState(false);
     const [stopWorkReason, setStopWorkReason] = useState("");
     const [stopWorkSent, setStopWorkSent] = useState(false);
+    const [stopWorkCategory, setStopWorkCategory] = useState<"danger_refusal" | "accident" | "other">("other");
 
     const urlLang = searchParams.get("lang");
 
@@ -560,17 +561,37 @@ function WorkerHomeContent() {
 
     const handleStopWork = async () => {
         if (!profile) return;
+        let gps: { lat: number; lng: number; accuracy?: number } | undefined;
         try {
-            const supabase = createClient();
-            await supabase.from("stop_work_alerts").insert({
-                worker_id: profile.id,
-                worker_name: profile.display_name,
-                site_id: profile.site_id,
-                reason: stopWorkReason || "Emergency stop - no reason provided",
-                lang: lang,
+            const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+                navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000 })
+            );
+            gps = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+        } catch { /* GPS 없어도 계속 진행 */ }
+
+        const hazardMap: Record<string, string> = {
+            danger_refusal: "위험작업거부",
+            accident: "산업재해",
+            other: "기타위험",
+        };
+
+        try {
+            const res = await fetch("/api/stop-work/improved", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    siteId: profile.site_id,
+                    reason: stopWorkReason || "Emergency stop - no reason provided",
+                    hazardCategory: hazardMap[stopWorkCategory],
+                    severity: stopWorkCategory === "accident" ? "critical" : "high",
+                    preferredLang: lang,
+                    gps,
+                }),
             });
+            if (!res.ok) throw new Error("api_failed");
             setStopWorkSent(true);
             setStopWorkReason("");
+            setStopWorkCategory("other");
             triggerAlert();
             setTimeout(() => {
                 setShowStopWorkModal(false);
@@ -739,6 +760,25 @@ function WorkerHomeContent() {
                                         <h3 className="text-2xl font-black text-white">{t.stopWork}</h3>
                                     </div>
                                     <p className="text-slate-400 font-bold text-sm">{t.stopWorkFamily}</p>
+                                    <div className="flex gap-2">
+                                        {(["danger_refusal", "accident", "other"] as const).map((cat) => {
+                                            const labels: Record<string, Record<string, string>> = {
+                                                danger_refusal: { ko: "위험작업거부", en: "Danger Refusal", vi: "Từ chối nguy hiểm", zh: "拒绝危险作业", th: "ปฏิเสธงานอันตราย" },
+                                                accident: { ko: "산업재해", en: "Accident", vi: "Tai nạn lao động", zh: "工伤事故", th: "อุบัติเหตุ" },
+                                                other: { ko: "기타위험", en: "Other", vi: "Khác", zh: "其他", th: "อื่นๆ" },
+                                            };
+                                            const label = labels[cat][lang] ?? labels[cat]["en"];
+                                            return (
+                                                <button
+                                                    key={cat}
+                                                    onClick={() => setStopWorkCategory(cat)}
+                                                    className={`flex-1 py-2 rounded-xl text-xs font-black transition-colors ${stopWorkCategory === cat ? "bg-red-600 text-white" : "bg-slate-800 text-slate-400"}`}
+                                                >
+                                                    {label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                     <textarea
                                         value={stopWorkReason}
                                         onChange={(e) => setStopWorkReason(e.target.value)}
