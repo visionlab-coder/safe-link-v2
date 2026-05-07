@@ -5,8 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { languages } from "@/constants";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  getDefaultRouteForProfileRole,
+  getProfileRoleFromSetupRole,
+  type SetupRoleKey,
+} from "@/lib/roles";
 
-type RoleKey = "site_manager" | "safety_officer" | "worker" | "root" | "hq_officer" | "";
+type RoleKey = SetupRoleKey | "";
 type ColorKey = "blue" | "amber" | "green" | "purple" | "indigo";
 type Step = 1 | 2 | 3;
 
@@ -139,15 +144,6 @@ const TRADES: { ko: string; label: Record<string, string> }[] = [
   { ko: "전기", label: { ko:"전기", en:"Electrical", vi:"Điện", zh:"电气", th:"ไฟฟ้า", uz:"Elektr", tl:"Kuryente", km:"អគ្គិសនី", id:"Listrik", mn:"Цахилгаан", my:"လျှပ်စစ်", ne:"विद्युत", bn:"বৈদ্যুতিক", kk:"Электр", ru:"Электрик", ja:"電気", fr:"Électricité", es:"Eléctrico", ar:"كهرباء", hi:"बिजली" }},
   { ko: "설비", label: { ko:"설비", en:"Mechanical", vi:"Cơ điện", zh:"机电", th:"งานระบบ", uz:"Jihozlar", tl:"Mekaniko", km:"ប្រព័ន្ធ", id:"Mekanikal", mn:"Сантехник", my:"စက်ပစ္စည်း", ne:"मेकानिकल", bn:"মেকানিক্যাল", kk:"Жабдық", ru:"Слесарь", ja:"設備", fr:"Équipement", es:"Instalaciones", ar:"أنظمة", hi:"मैकेनिकल" }},
 ];
-
-const roleToDb: Record<string, string> = {
-  site_manager: "HQ_ADMIN", safety_officer: "SAFETY_OFFICER",
-  worker: "WORKER", root: "ROOT", hq_officer: "HQ_OFFICER",
-};
-const roleToPath: Record<string, string> = {
-  site_manager: "/control", safety_officer: "/admin",
-  worker: "/worker", root: "/system", hq_officer: "/system",
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Background orbs (same design as auth page)
@@ -382,7 +378,7 @@ function SetupContent() {
     const { error } = await supabase.from("profiles").upsert({
       id: userId,
       display_name: finalName,
-      role: roleToDb[role],
+      role: getProfileRoleFromSetupRole(role as SetupRoleKey),
       system_role: (role === "root" || role === "hq_officer") ? "ROOT" : null,
       preferred_lang: language,
       phone_number: phone.trim(),
@@ -401,7 +397,8 @@ function SetupContent() {
       localStorage.setItem("safe-link-remember", "false");
     }
     sessionStorage.setItem("safe-link-session-active", "true");
-    window.location.href = `${roleToPath[role]}?lang=${language}`;
+    const redirectPath = getDefaultRouteForProfileRole(getProfileRoleFromSetupRole(role as SetupRoleKey));
+    window.location.href = `${redirectPath}?lang=${language}`;
   };
 
   const roles: { key: RoleKey; emoji: string; color: ColorKey; glow: string }[] = [

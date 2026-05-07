@@ -1,32 +1,97 @@
-# SAFE-LINK Site Vision & Sitemap
+# SAFE-LINK Site Map And Status
 
-## 1. Site Vision
-현장 커뮤니케이션 OS. 외국인 근로자와 관리자가 딜레이 없이 소통하고 TBM을 확실히 전달/확인하는 앱.
+## Product Position
 
-## 2. Global Guidelines
-- **UI First**: 라우팅/화면/흐름 고정.
-- **다크모드/고대비**: 건설현장 환경 최적화.
-- **기기/반응형**: 모바일 웹 베이스 구현 우선.
+SAFE-LINK is a construction-site communication app focused on:
 
-## 3. Tech Stack
-Next.js (App Router), Tailwind CSS, Supabase (Auth/DB/Realtime).
+- TBM delivery in workers' native languages
+- acknowledgment and signature capture
+- translated 1:1 communication between admin and workers
+- field-friendly mobile-first interaction
 
-## 4. Sitemap
-- [x] `/` - Landing Splash
-- [x] `/auth` - Role Selection & Login
-- [x] `/admin` - Admin Dashboard
-- [x] `/worker` - Worker Dashboard
-- [ ] `/admin/tbm/create` - TBM Creation Form
-- [ ] `/worker/tbm/[id]` - TBM Verification (Worker)
-- [ ] `/admin/chat` - Admin Chat
-- [ ] `/worker/chat` - Worker Chat
+This file reflects the implementation status in the current repository, not the original early roadmap.
 
-## 5. Roadmap
-- Phase 2: Supabase Auth 연동 (현재)
-- Phase 3: TBM 발송 및 전자서명 UI 생성
-- Phase 4: 실시간 번역(번역 API) / TTS 연동
-- Phase 5: 실시간 채팅 소켓 (Supabase Realtime)
+## Global UI Direction
 
-## 6. Creative Freedom
-- TBM 입력 폼에 STT(음성인식) 버튼 배치 아이디어.
-- 채팅방에 번역 토글 버튼.
+- Mobile-first layouts
+- Large touch targets
+- High-contrast dark visual system
+- Admin and worker role separation
+- Realtime or near-realtime field communication
+
+## Core Routes
+
+- `[x] /`
+  Landing page
+- `[x] /auth`
+  Sign-in / role entry
+- `[x] /auth/setup`
+  Profile setup
+- `[x] /admin`
+  Admin dashboard
+- `[x] /worker`
+  Worker dashboard
+- `[x] /control`
+  HQ control dashboard
+
+## TBM Flow
+
+- `[x] /admin/tbm/create`
+  Admin writes or records TBM and broadcasts it
+- `[x] /admin/tbm/status`
+  Admin monitors worker acknowledgment and signature status
+- `[x] /worker/tbm/[id]`
+  Worker reviews translated TBM and signs it
+
+## Communication Flow
+
+- `[x] /admin/chat`
+  Admin-side translated chat
+- `[x] /worker/chat`
+  Worker-side translated chat
+
+## Extended Field Features
+
+- `[x] /admin/live`
+  Admin live interpretation view
+- `[x] /worker/live`
+  Worker live interpretation view
+- `[x] /admin/quiz`
+  Safety quiz creation
+- `[x] /worker/quiz`
+  Safety quiz participation
+- `[x] /admin/glossary`
+  Glossary management
+- `[x] /admin/qrcode`
+  QR workflow support
+- `[x] /worker/vision`
+  Vision-based hazard support
+- `[x] /system`
+  System/site administration
+- `[x] /travel`
+  Separate travel-talk style communication feature branch
+
+## Current PoC Baseline
+
+The current PoC should be evaluated against these flows first:
+
+1. Admin login and profile setup
+2. TBM creation and storage
+3. Worker TBM receipt and signature
+4. Admin signature monitoring
+5. Admin-worker translated chat
+
+## Out Of Scope For PoC Pass/Fail
+
+These may support demos, but they should not define PoC success on their own:
+
+- swarm visualization
+- HQ narrative intelligence demos
+- travel sub-product behavior
+- advanced vision and quiz expansion
+
+## Next Cleanup Targets
+
+- align spec route names with real route names
+- align documented API contracts with actual data flow
+- separate core SAFE-LINK scope from experimental feature branches

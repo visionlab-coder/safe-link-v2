@@ -1,5 +1,7 @@
 # SAFE-LINK Master Roadmap & Architecture Spec (v1.0)
 
+> Status: authoritative PoC baseline for the current SAFE-LINK V2 repository.
+
 > 목적: 건설현장에서 **외국인 근로자(최대 15개국)**와 관리자(소장/안전관리자)가  
 > **딜레이 최소**로 소통하고, **TBM(일일 안전브리핑)**을 **확실히 전달/확인(전자서명)**하며,  
 > 대화/지시/서명을 **법적 증빙(블랙박스)**으로 저장하는 “현장 커뮤니케이션 OS” 구축.
@@ -119,31 +121,46 @@
 
 ## 5. 라우팅(Next.js App Router)
 
-권장 라우트(최소 실패 구조)
+현재 저장소 기준 핵심 라우트
 
 - `/` : 랜딩
 - `/auth` : 역할 선택 + 로그인
+- `/auth/setup` : 프로필/현장 정보 설정
 - `/admin` : 관리자 홈(관제)
 - `/worker` : 근로자 홈
-- `/admin/tbm` : TBM 작성/전송
-- `/worker/tbm` : TBM 확인/서명
+- `/admin/tbm/create` : TBM 작성/전송
+- `/admin/tbm/status` : TBM 서명/확인 현황
+- `/worker/tbm/[id]` : 개별 TBM 확인/서명
 - `/admin/chat` : 1:1 대화
 - `/worker/chat` : 1:1 대화
 - `/admin/glossary` : 용어 사전 관리/검수
 - `/control` : 본사 통합 관제 (role=HQ)
 
+보조/확장 라우트
+
+- `/admin/live`, `/worker/live` : 실시간 통역
+- `/admin/quiz`, `/worker/quiz` : 안전 퀴즈
+- `/admin/qrcode` : QR 기반 진입/연결 보조
+- `/worker/vision` : 이미지 기반 위험 인식 보조
+- `/system` : 시스템/현장 관리
+- `/travel` : SAFE-LINK 핵심 PoC와 분리해서 보아야 하는 별도 실험성 커뮤니케이션 플로우
+
 ---
 
 ## 6. DB 설계 (Supabase Postgres)
 
-### 6.1 핵심 테이블
+### 6.1 현재 핵심 테이블
 
 #### `profiles`
 - `id uuid (PK, auth.users.id)`
-- `role text` (admin|worker|hq)
-- `name text`
-- `language text` (ko, vi, th, en, zh, …)
-- `country text` (VN, TH, …)
+- `role text`
+  실제 코드에서는 `ROOT`, `HQ_ADMIN`, `SAFETY_OFFICER`, `WORKER`, `HQ_OFFICER` 등 텍스트 role 사용
+- `display_name text / name 계열`
+- `preferred_lang text`
+- `phone_number text`
+- `trade text`
+- `title text`
+- `site_code text`
 - `site_id uuid (FK sites.id, nullable)`
 - `created_at timestamptz`
 
@@ -151,31 +168,22 @@
 - `id uuid (PK)`
 - `name text`
 - `address text`
+- `code text`
 - `created_at timestamptz`
 
-#### `tbm_sessions`
+#### `tbm_notices`
 - `id uuid`
+- `content_ko text`
+  관리자 원문 또는 정규화된 한국어 본문
 - `site_id uuid`
-- `admin_id uuid`
-- `source_text text` (관리자 원문)
-- `normalized_text text` (은어→표준어 결과)
-- `audio_url text (optional)`
-- `created_at timestamptz`
-
-#### `tbm_translations`
-- `id uuid`
-- `tbm_session_id uuid`
-- `lang text`
-- `translated_text text`
-- `tts_audio_url text (optional)`
+- `created_by uuid`
 - `created_at timestamptz`
 
 #### `tbm_ack`
 - `id uuid`
-- `tbm_session_id uuid`
+- `tbm_id uuid`
 - `worker_id uuid`
-- `ack_type text` (signature|pin|biometric_flag)
-- `signature_url text (optional)`
+- `signature_data text`
 - `ack_at timestamptz`
 
 #### `messages`
@@ -187,43 +195,83 @@
 - `target_lang text`
 - `source_text text`
 - `translated_text text`
+  실제 구현에서는 번역문/발음/역번역 JSON 문자열 저장
 - `audio_url text (optional)`
+- `is_read boolean`
 - `created_at timestamptz`
+
+#### `construction_glossary`
+- `slang text`
+- `standard text`
+- `category text`
+- `origin_lang text`
+- `origin_word text`
+- `note text`
+- `is_active boolean`
+
+#### PoC 보조 테이블
+- `live_translations`
+- `stop_work_alerts`
+- `safety_quizzes`
+- `quiz_responses`
 
 ### 6.2 RLS 정책(원칙)
 - Worker: “본인 관련 TBM/메시지/ack”만 읽기
 - Admin: “본인 site”의 데이터 읽기/쓰기
 - HQ: 전체 읽기(감사/관리)
 
-> MVP에서는 개발 속도를 위해 RLS를 느슨하게 시작하고, 안정화 후 강화.
+> 주의: 현재 저장소에는 마이그레이션 누적과 역할명 변화가 함께 존재한다. 따라서 문서의 이상적인 권한 모델과 실제 RLS 상태가 완전히 동일하다고 가정하면 안 된다. PoC 단계에서는 “실제 마이그레이션 기준 확인”이 우선이다.
 
 ---
 
 ## 7. Backend API 설계 (Next.js Route Handlers)
 
-> Cloudflare Pages 배포를 감안해 Edge 친화 형태로 구성  
-> (`app/api/**/route.ts`)
+> 현재 구현은 “전용 CRUD API를 모두 분리한 구조”가 아니다. 핵심 저장 흐름의 상당 부분은 페이지에서 Supabase client를 직접 사용하고, 음성/번역/보조 AI 기능만 route handler로 분리되어 있다.
 
-### 7.1 프로필
-- `POST /api/profile/upsert`
-  - role/language/country/site_id 저장
+### 7.1 현재 실제 route handler 역할
 
-### 7.2 TBM
-- `POST /api/tbm/create`
-  - 입력: `site_id, source_text | audio_blob`
-  - 처리: normalize → translate(활성 언어) → 저장 → realtime publish
-- `POST /api/tbm/ack`
-  - 입력: `tbm_session_id, ack_type, signature_blob(optional)`
+- `POST /api/translate`
+  - 번역, 발음, 역번역 생성
+- `POST /api/stt`
+  - 음성→텍스트, Whisper/Google 경로 포함
+- `POST /api/tts`
+  - TTS 보조 경로
+- `POST /api/vision`
+  - 이미지 기반 위험 인식 보조
+- `GET /api/check`
+  - 외부 키 및 엔진 상태 점검
+- `POST /api/quiz`
+  - 퀴즈 번역/보조 처리
+- `POST /api/romanize`
+  - 발음 표기 보조
+- `GET /api/tbm/library`
+  - TBM/안전교육 라이브러리 보조
+- `GET /api/tbm/ai-tips`
+  - AI 기반 TBM 팁 생성
+- `GET /api/agents/swarm-status`
+  - HQ/시각화용 시뮬레이션 상태
+- `GET /api/agents/site-briefing`
+  - 현장 브리핑 보조
+- `GET /api/agents/hq-audit`
+  - HQ 감사 보조
 
-### 7.3 Chat
-- `POST /api/chat/send`
-  - 입력: from/to/site_id + (text|audio)
-  - 처리: translate → 저장 → realtime publish
+### 7.2 현재 핵심 저장 흐름
 
-### 7.4 Glossary
-- `GET /api/glossary`
-- `POST /api/glossary/import`
-- `POST /api/glossary/apply` (normalize_ko)
+- 프로필 저장:
+  - `/auth`, `/auth/setup` 화면에서 `profiles`에 직접 upsert
+- TBM 생성:
+  - `/admin/tbm/create` 화면에서 `tbm_notices`에 직접 insert
+- TBM 서명:
+  - `/worker/tbm/[id]` 화면에서 `tbm_ack`에 직접 insert
+- 1:1 대화:
+  - `/admin/chat`, `/worker/chat` 화면에서 `messages`에 직접 insert/update
+- 용어 사전 관리:
+  - `/admin/glossary` 화면에서 `construction_glossary` 직접 조회/수정
+
+### 7.3 설계 원칙
+
+- 현재 PoC는 “UI + Supabase 직접 저장 + 보조 AI API” 조합으로 보는 것이 맞다.
+- 향후 운영 안정화 단계에서만 `/api/profile/upsert`, `/api/tbm/create`, `/api/tbm/ack`, `/api/chat/send` 같은 명시적 backend contract로 재분리하는 것이 바람직하다.
 
 ---
 

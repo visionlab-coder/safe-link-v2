@@ -1,4 +1,8 @@
-# SAFE-LINK Agent Organization Master Spec (v3.0 - Enterprise Swarm)
+# SAFE-LINK Agent Organization Vision Spec (v3.0 - Enterprise Swarm)
+
+> Status: future vision document. This file describes an expansion direction for HQ, site-level, and personal agent layers. It is not the current authoritative PoC delivery spec for SAFE-LINK V2.
+
+> Current execution baseline: `SAFE-LINK_MASTER_SPEC_v1.0.md`
 
 > 목적: 25개 이상의 전국/글로벌 현장, 1,300명 이상의 근로자 및 방대한 관리 인력(소장, 안전관리자, 공무)을 완벽하게 통제하고 지원하기 위해, **3-Tier(본사-현장-개인) 단위의 대규모 Multi-Agent Swarm(다중 에이전트 군집)** 아키텍처를 재설계한다. 고작 5개의 에이전트가 아닌, 부서별/현장별/개인별로 작동하는 수천 개의 에이전트가 유기적으로 협력하는 진정한 "인공지능 건설사"를 구축한다.
 

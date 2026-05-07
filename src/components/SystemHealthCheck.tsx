@@ -7,6 +7,10 @@ interface HealthStatus {
     supabase: { status: string; message: string };
     google_translate: { status: string; message: string };
     google_tts: { status: string; message: string };
+    google_stt: { status: string; message: string };
+    openai: { status: string; message: string };
+    naver_papago: { status: string; message: string };
+    pusher: { status: string; message: string };
 }
 
 export default function SystemHealthCheck() {
@@ -103,10 +107,14 @@ export default function SystemHealthCheck() {
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                 <StatusItem label="Database" itemStatus={status?.supabase} />
                 <StatusItem label="AI Translate" itemStatus={status?.google_translate} />
-                <StatusItem label="Voice Engine" itemStatus={status?.google_tts} />
+                <StatusItem label="Voice TTS" itemStatus={status?.google_tts} />
+                <StatusItem label="Voice STT" itemStatus={status?.google_stt} />
+                <StatusItem label="OpenAI" itemStatus={status?.openai} />
+                <StatusItem label="Papago" itemStatus={status?.naver_papago} />
+                <StatusItem label="Pusher" itemStatus={status?.pusher} />
             </div>
 
             <AnimatePresence>

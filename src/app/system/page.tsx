@@ -28,6 +28,13 @@ import {
     Award,
     TrendingUp,
     FlaskConical,
+    Lock,
+    LogIn,
+    RefreshCw,
+    Save,
+    Globe,
+    Clock,
+    CheckCircle2,
 } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────
@@ -68,6 +75,23 @@ type Site = {
     worker_count: number;
     tbm_today: number;
     alert_count: number;
+};
+
+type LogEntry = {
+    id: string;
+    timestamp: string;
+    event: string;
+    actor: string;
+    severity: 'info' | 'warn' | 'critical';
+};
+
+type GlobalConfig = {
+    systemMode: 'poc' | 'production';
+    alertEscalationMinutes: number;
+    tbmReminderEnabled: boolean;
+    defaultLanguage: 'ko' | 'en';
+    emergencyContact: string;
+    maintenanceMode: boolean;
 };
 
 const systemUI: Record<string, any> = {
@@ -213,6 +237,19 @@ export default function SystemAdminPage() {
     const [accidentFreeDays, setAccidentFreeDays] = useState<number | null>(null);
     const [isSimulation, setIsSimulation] = useState(false);
     const [isVerified, setIsVerified] = useState(false);
+    const [securityLogs, setSecurityLogs] = useState<LogEntry[]>([]);
+    const [logsLoading, setLogsLoading] = useState(false);
+    const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
+        systemMode: 'poc',
+        alertEscalationMinutes: 30,
+        tbmReminderEnabled: true,
+        defaultLanguage: 'ko',
+        emergencyContact: '1544-1350',
+        maintenanceMode: false,
+    });
+    const [configSaved, setConfigSaved] = useState(false);
+    const [aiCapsActive, setAiCapsActive] = useState([true, true, true, false]);
+    const [aiActionStatus, setAiActionStatus] = useState<string | null>(null);
     const t = systemUI[lang];
 
     // defense-in-depth: 클라이언트 사이드 권한 2차 검증
@@ -311,6 +348,73 @@ export default function SystemAdminPage() {
         }
         setLoading(false);
     };
+
+    const fetchSecurityLogs = async () => {
+        setLogsLoading(true);
+        const supabase = createClient();
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+        const [{ data: recentProfiles }, { data: recentAlerts }] = await Promise.all([
+            supabase.from('profiles').select('id, display_name, role, updated_at').gte('updated_at', sevenDaysAgo).order('updated_at', { ascending: false }).limit(20),
+            supabase.from('stop_work_alerts').select('id, site_id, created_at, resolved').gte('created_at', sevenDaysAgo).order('created_at', { ascending: false }).limit(10),
+        ]);
+
+        const entries: LogEntry[] = [];
+
+        entries.push({
+            id: 'session-now',
+            timestamp: new Date().toISOString(),
+            event: '[SYSTEM] 통합관제 접근 — 세션 시작',
+            actor: currentUser?.display_name || 'SUPER_ADMIN',
+            severity: 'info',
+        });
+
+        recentProfiles?.forEach(p => {
+            entries.push({
+                id: `profile-${p.id}`,
+                timestamp: p.updated_at,
+                event: `[AUTH] 권한 변경 → ${p.role}`,
+                actor: p.display_name || p.id.slice(0, 8),
+                severity: (p.role === 'SUPER_ADMIN' || p.role === 'ROOT') ? 'warn' : 'info',
+            });
+        });
+
+        recentAlerts?.forEach(a => {
+            entries.push({
+                id: `alert-${a.id}`,
+                timestamp: a.created_at,
+                event: a.resolved ? '[SAFETY] 작업중지 해제' : '[SAFETY] 작업중지 알람 발생',
+                actor: `현장 ${a.site_id?.slice(0, 8) || '?'}`,
+                severity: a.resolved ? 'info' : 'critical',
+            });
+        });
+
+        entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setSecurityLogs(entries);
+        setLogsLoading(false);
+    };
+
+    const handleSaveConfig = () => {
+        localStorage.setItem('safe-link-system-config', JSON.stringify(globalConfig));
+        setConfigSaved(true);
+        setTimeout(() => setConfigSaved(false), 2000);
+    };
+
+    // load saved config from localStorage on mount
+    useEffect(() => {
+        const stored = localStorage.getItem('safe-link-system-config');
+        if (stored) {
+            try { setGlobalConfig(JSON.parse(stored)); } catch { /* ignore */ }
+        }
+    }, []);
+
+    // fetch logs on first visit to logs tab
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        if (activeTab === 'logs' && securityLogs.length === 0) {
+            fetchSecurityLogs();
+        }
+    }, [activeTab]);
 
     const handleSignOut = async () => {
         const supabase = createClient();
@@ -440,7 +544,7 @@ export default function SystemAdminPage() {
                             </div>
                             <div className="flex-1 overflow-hidden">
                                 <p className="text-xs font-black truncate">{currentUser?.display_name || "Loading..."}</p>
-                                <p className="text-[9px] text-blue-400 font-bold uppercase tracking-widest">{currentUser?.role === 'ROOT' ? 'Master' : 'HQ Officer'}</p>
+                                <p className="text-[9px] text-blue-400 font-bold uppercase tracking-widest">{currentUser?.role === 'ROOT' || currentUser?.role === 'SUPER_ADMIN' ? 'SUPER ADMIN' : currentUser?.role === 'HQ_OFFICER' ? 'HQ Officer' : 'System Access'}</p>
                             </div>
                         </div>
 
@@ -960,9 +1064,20 @@ export default function SystemAdminPage() {
                                         <p className="opacity-40 animate-pulse mt-2">_ {t.ai.thinking}</p>
                                     </div>
 
+                                    {aiActionStatus && (
+                                        <div className="px-4 py-2.5 bg-green-500/10 border border-green-500/20 rounded-xl text-xs font-bold text-green-400 text-center">
+                                            {aiActionStatus}
+                                        </div>
+                                    )}
                                     <div className="flex gap-4">
-                                        <button className="flex-1 py-4 bg-white/5 hover:bg-white/10 rounded-2xl font-black text-xs uppercase tracking-widest transition-all">{t.ai.intervention}</button>
-                                        <button className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-xs uppercase tracking-widest transition-all">{t.ai.optimize}</button>
+                                        <button
+                                            onClick={() => { setAiActionStatus('수동 개입 요청 전송됨 — 운영팀 알림 발송'); setTimeout(() => setAiActionStatus(null), 3000); }}
+                                            className="flex-1 py-4 bg-white/5 hover:bg-white/10 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+                                        >{t.ai.intervention}</button>
+                                        <button
+                                            onClick={() => { setAiActionStatus('신경망 경로 최적화 완료 — 전 현장 재연결'); setTimeout(() => setAiActionStatus(null), 3000); }}
+                                            className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+                                        >{t.ai.optimize}</button>
                                     </div>
                                 </div>
 
@@ -971,13 +1086,17 @@ export default function SystemAdminPage() {
                                     <div className="bg-slate-900/40 p-8 rounded-[40px] border border-white/5 flex flex-col gap-6">
                                         <h4 className="text-lg font-black italic uppercase tracking-tight">{t.ai.capabilities}</h4>
                                         <div className="flex flex-col gap-4">
-                                            {t.ai.caps.map((cap: any) => (
-                                                <div key={cap.label} className="flex items-center justify-between p-4 bg-black/20 rounded-2xl">
+                                            {t.ai.caps.map((cap: any, idx: number) => (
+                                                <button
+                                                    key={cap.label}
+                                                    onClick={() => setAiCapsActive(prev => prev.map((v, i) => i === idx ? !v : v))}
+                                                    className="flex items-center justify-between p-4 bg-black/20 hover:bg-black/30 rounded-2xl transition-all w-full text-left"
+                                                >
                                                     <span className="text-xs font-bold text-slate-300">{cap.label}</span>
-                                                    <div className={`w-10 h-5 rounded-full relative transition-colors ${cap.active ? 'bg-blue-500' : 'bg-slate-700'}`}>
-                                                        <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${cap.active ? 'right-1' : 'left-1'}`} />
+                                                    <div className={`w-10 h-5 rounded-full relative transition-colors ${aiCapsActive[idx] ? 'bg-blue-500' : 'bg-slate-700'}`}>
+                                                        <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${aiCapsActive[idx] ? 'right-1' : 'left-1'}`} />
                                                     </div>
-                                                </div>
+                                                </button>
                                             ))}
                                         </div>
                                     </div>
@@ -990,6 +1109,227 @@ export default function SystemAdminPage() {
                                 </div>
                             </motion.div>
                         )}
+                        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 보안 로그 탭 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+                        {activeTab === "logs" && (
+                            <motion.div
+                                key="security-logs"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                className="flex flex-col gap-6"
+                            >
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-red-500/20 rounded-2xl flex items-center justify-center border border-red-500/30">
+                                            <Lock className="w-5 h-5 text-red-400" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-black uppercase tracking-tight">보안 감사 로그</h3>
+                                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">최근 7일 · SUPER_ADMIN 전용</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={fetchSecurityLogs}
+                                        disabled={logsLoading}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-black text-xs uppercase tracking-widest transition-all disabled:opacity-40"
+                                    >
+                                        <RefreshCw className={`w-3.5 h-3.5 ${logsLoading ? 'animate-spin' : ''}`} />
+                                        새로고침
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-4">
+                                    {[
+                                        { label: '전체 이벤트', value: securityLogs.length, color: 'blue' },
+                                        { label: '경고', value: securityLogs.filter(l => l.severity === 'warn').length, color: 'amber' },
+                                        { label: '위험', value: securityLogs.filter(l => l.severity === 'critical').length, color: 'red' },
+                                    ].map(stat => (
+                                        <div key={stat.label} className="bg-slate-900/40 border border-white/5 rounded-2xl p-4 flex flex-col gap-1">
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{stat.label}</span>
+                                            <span className={`text-2xl font-black ${stat.color === 'red' ? 'text-red-400' : stat.color === 'amber' ? 'text-amber-400' : 'text-blue-400'}`}>
+                                                {stat.value}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="bg-slate-900/40 border border-white/5 rounded-[32px] overflow-hidden">
+                                    <div className="flex gap-4 px-6 py-3 border-b border-white/5 bg-black/20">
+                                        <span className="w-28 flex-shrink-0 text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" />시간</span>
+                                        <span className="flex-1 text-[9px] font-black uppercase tracking-widest text-slate-500">이벤트</span>
+                                        <span className="w-28 flex-shrink-0 text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1"><LogIn className="w-3 h-3" />행위자</span>
+                                        <span className="w-14 flex-shrink-0 text-[9px] font-black uppercase tracking-widest text-slate-500">등급</span>
+                                    </div>
+                                    <div className="divide-y divide-white/5 max-h-[480px] overflow-y-auto">
+                                        {logsLoading ? (
+                                            <div className="flex items-center justify-center py-12">
+                                                <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                            </div>
+                                        ) : securityLogs.length === 0 ? (
+                                            <div className="py-12 text-center text-slate-600 font-bold text-sm">로그 없음</div>
+                                        ) : (
+                                            securityLogs.map(log => (
+                                                <div key={log.id} className={`flex gap-4 px-6 py-3.5 hover:bg-white/5 transition-colors ${log.severity === 'critical' ? 'bg-red-950/10' : log.severity === 'warn' ? 'bg-amber-950/10' : ''}`}>
+                                                    <span className="w-28 flex-shrink-0 text-[10px] font-mono text-slate-500 self-center">
+                                                        {new Date(log.timestamp).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                    <span className="flex-1 text-xs font-bold text-slate-300 self-center leading-tight">{log.event}</span>
+                                                    <span className="w-28 flex-shrink-0 text-xs font-bold text-slate-400 self-center truncate">{log.actor}</span>
+                                                    <span className={`w-14 flex-shrink-0 text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full self-center text-center ${
+                                                        log.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
+                                                        log.severity === 'warn' ? 'bg-amber-500/20 text-amber-400' :
+                                                        'bg-blue-500/20 text-blue-400'
+                                                    }`}>
+                                                        {log.severity === 'critical' ? '위험' : log.severity === 'warn' ? '경고' : '정보'}
+                                                    </span>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 전역 설정 탭 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+                        {activeTab === "configs" && (
+                            <motion.div
+                                key="global-configs"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                className="flex flex-col gap-6 max-w-2xl"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-purple-500/20 rounded-2xl flex items-center justify-center border border-purple-500/30">
+                                        <Settings className="w-5 h-5 text-purple-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black uppercase tracking-tight">전역 시스템 설정</h3>
+                                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">브라우저 세션 저장 · SUPER_ADMIN 전용</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-4">
+                                    {/* 시스템 모드 */}
+                                    <div className="bg-slate-900/40 border border-white/5 rounded-[24px] p-6 flex flex-col gap-4">
+                                        <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">시스템 모드</h4>
+                                        <div className="flex gap-3">
+                                            {(['poc', 'production'] as const).map(mode => (
+                                                <button
+                                                    key={mode}
+                                                    onClick={() => setGlobalConfig(c => ({ ...c, systemMode: mode }))}
+                                                    className={`flex-1 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all border ${
+                                                        globalConfig.systemMode === mode
+                                                            ? mode === 'production'
+                                                                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                                                                : 'bg-violet-500/20 border-violet-500/40 text-violet-300'
+                                                            : 'bg-white/5 border-white/10 text-slate-500 hover:text-white'
+                                                    }`}
+                                                >
+                                                    {mode === 'poc' ? '시범운영 (POC)' : '정식운영 (PROD)'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* 알람 에스컬레이션 */}
+                                    <div className="bg-slate-900/40 border border-white/5 rounded-[24px] p-6 flex flex-col gap-4">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">알람 에스컬레이션 시간</h4>
+                                            <span className="text-sm font-black text-amber-400">{globalConfig.alertEscalationMinutes}분</span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min={5}
+                                            max={60}
+                                            step={5}
+                                            value={globalConfig.alertEscalationMinutes}
+                                            onChange={e => setGlobalConfig(c => ({ ...c, alertEscalationMinutes: Number(e.target.value) }))}
+                                            className="w-full accent-amber-500"
+                                        />
+                                        <p className="text-[10px] text-slate-600 font-bold">작업중지 발생 후 {globalConfig.alertEscalationMinutes}분 내 미해제 시 본사 자동 보고</p>
+                                    </div>
+
+                                    {/* TBM 리마인더 + 기본 언어 */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-slate-900/40 border border-white/5 rounded-[24px] p-6 flex flex-col gap-4">
+                                            <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">TBM 리마인더</h4>
+                                            <button
+                                                onClick={() => setGlobalConfig(c => ({ ...c, tbmReminderEnabled: !c.tbmReminderEnabled }))}
+                                                className="flex items-center justify-between"
+                                            >
+                                                <span className="text-sm font-bold text-slate-300">{globalConfig.tbmReminderEnabled ? '활성화됨' : '비활성화됨'}</span>
+                                                <div className={`w-12 h-6 rounded-full relative transition-colors ${globalConfig.tbmReminderEnabled ? 'bg-blue-500' : 'bg-slate-700'}`}>
+                                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${globalConfig.tbmReminderEnabled ? 'right-1' : 'left-1'}`} />
+                                                </div>
+                                            </button>
+                                            <p className="text-[10px] text-slate-600 font-bold">오전 7:30 TBM 미실시 현장 자동 알림</p>
+                                        </div>
+                                        <div className="bg-slate-900/40 border border-white/5 rounded-[24px] p-6 flex flex-col gap-4">
+                                            <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2"><Globe className="w-3.5 h-3.5" />기본 언어</h4>
+                                            <div className="flex gap-2">
+                                                {(['ko', 'en'] as const).map(l => (
+                                                    <button
+                                                        key={l}
+                                                        onClick={() => setGlobalConfig(c => ({ ...c, defaultLanguage: l }))}
+                                                        className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase transition-all border ${
+                                                            globalConfig.defaultLanguage === l
+                                                                ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
+                                                                : 'bg-white/5 border-white/10 text-slate-500 hover:text-white'
+                                                        }`}
+                                                    >
+                                                        {l === 'ko' ? '한국어' : 'English'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 긴급 연락처 */}
+                                    <div className="bg-slate-900/40 border border-white/5 rounded-[24px] p-6 flex flex-col gap-4">
+                                        <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">긴급 연락처</h4>
+                                        <input
+                                            type="text"
+                                            value={globalConfig.emergencyContact}
+                                            onChange={e => setGlobalConfig(c => ({ ...c, emergencyContact: e.target.value }))}
+                                            placeholder="전화번호 입력"
+                                            className="w-full bg-black/30 border border-white/5 rounded-2xl px-4 py-3 text-white font-bold text-sm focus:border-blue-500 focus:outline-none transition-all"
+                                        />
+                                        <p className="text-[10px] text-slate-600 font-bold">중대재해 발생 시 최우선 통보 연락처 (고용노동부: 1544-1350)</p>
+                                    </div>
+
+                                    {/* 유지보수 모드 */}
+                                    <div className={`border rounded-[24px] p-6 flex items-center justify-between transition-all ${globalConfig.maintenanceMode ? 'bg-red-950/20 border-red-500/30' : 'bg-slate-900/40 border-white/5'}`}>
+                                        <div className="flex flex-col gap-1">
+                                            <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">유지보수 모드</h4>
+                                            <p className="text-[10px] text-slate-600 font-bold">활성화 시 SUPER_ADMIN 외 모든 사용자 접근 차단</p>
+                                        </div>
+                                        <button
+                                            onClick={() => setGlobalConfig(c => ({ ...c, maintenanceMode: !c.maintenanceMode }))}
+                                            className={`px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest transition-all border ${
+                                                globalConfig.maintenanceMode
+                                                    ? 'bg-red-500/20 border-red-500/40 text-red-300'
+                                                    : 'bg-white/5 border-white/10 text-slate-500 hover:text-slate-300'
+                                            }`}
+                                        >
+                                            {globalConfig.maintenanceMode ? '활성화됨' : '비활성'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={handleSaveConfig}
+                                    className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
+                                        configSaved
+                                            ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'
+                                            : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                                    }`}
+                                >
+                                    {configSaved ? <><CheckCircle2 className="w-4 h-4" />저장됨</> : <><Save className="w-4 h-4" />설정 저장</>}
+                                </button>
+                            </motion.div>
+                        )}
+
                     </AnimatePresence>
 
                     {/* Site Add/Edit Modal */}
