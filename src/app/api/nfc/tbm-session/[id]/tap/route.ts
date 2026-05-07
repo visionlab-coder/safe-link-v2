@@ -78,25 +78,54 @@ export async function POST(
 
   if (!worker || !worker.is_active) return NextResponse.json({ error: "worker_inactive" }, { status: 409 });
 
-  // 7) 참석 기록 (UNIQUE 충돌 = 이미 참석)
+  // 7) 참석 기록 조회
   const now = new Date().toISOString();
 
   const { data: existing } = await ctx.service
     .from("nfc_tbm_attendance")
-    .select("id, tapped_at")
+    .select("id, tapped_at, certified_at, is_certified")
     .eq("session_id", sessionId)
     .eq("worker_id", workerId)
     .maybeSingle();
 
-  if (existing) {
+  const workerPayload = {
+    id: worker.id,
+    worker_code: worker.worker_code,
+    full_name: worker.full_name,
+    nationality: worker.nationality,
+    trade: worker.trade,
+  };
+
+  // 이미 이수 인증 완료 (3차+ 탭)
+  if (existing?.is_certified) {
     return NextResponse.json({
-      action: "already_attended",
-      worker: { id: worker.id, worker_code: worker.worker_code, full_name: worker.full_name, nationality: worker.nationality, trade: worker.trade },
+      action: "already_certified",
+      worker: workerPayload,
       tapped_at: existing.tapped_at,
+      certified_at: existing.certified_at,
       timestamp: now,
     });
   }
 
+  // 2차 탭: 이수 인증 처리
+  if (existing && !existing.is_certified) {
+    const { error: updErr } = await ctx.service
+      .from("nfc_tbm_attendance")
+      .update({ certified_at: now, is_certified: true })
+      .eq("id", existing.id);
+
+    if (updErr) return NextResponse.json({ error: "certification_failed", detail: updErr.message }, { status: 500 });
+
+    return NextResponse.json({
+      action: "certified",
+      worker: workerPayload,
+      tapped_at: existing.tapped_at,
+      certified_at: now,
+      timestamp: now,
+    });
+  }
+
+  // 1차 탭: 참석 대기 등록
   const { error: insErr } = await ctx.service
     .from("nfc_tbm_attendance")
     .insert({
@@ -106,6 +135,7 @@ export async function POST(
       tapped_at: now,
       tapped_by: ctx.user.id,
       lang_used: worker.preferred_lang,
+      is_certified: false,
     });
 
   if (insErr) return NextResponse.json({ error: "attendance_insert_failed", detail: insErr.message }, { status: 500 });
@@ -116,8 +146,8 @@ export async function POST(
   }
 
   return NextResponse.json({
-    action: "attended",
-    worker: { id: worker.id, worker_code: worker.worker_code, full_name: worker.full_name, nationality: worker.nationality, trade: worker.trade },
+    action: "checked_in",
+    worker: workerPayload,
     tapped_at: now,
     timestamp: now,
   });

@@ -25,6 +25,8 @@ interface AttendanceWithWorker extends AttendanceRecord {
   full_name?: string;
   nationality?: string;
   trade?: string;
+  certified_at?: string | null;
+  is_certified?: boolean;
 }
 
 interface Session {
@@ -35,7 +37,7 @@ interface Session {
   started_at: string;
 }
 
-type ScanState = "idle" | "scanning" | "success" | "duplicate" | "error";
+type ScanState = "idle" | "scanning" | "checked_in" | "certified" | "already_certified" | "error";
 
 export default function TbmLiveSessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -98,13 +100,15 @@ export default function TbmLiveSessionPage() {
         const data = await res.json();
 
         if (res.ok) {
-          if (data.action === "attended") {
-            setLastWorker({ name: data.worker.full_name, code: data.worker.worker_code, nationality: data.worker.nationality });
-            setScanState("success");
+          setLastWorker({ name: data.worker.full_name, code: data.worker.worker_code, nationality: data.worker.nationality });
+          if (data.action === "checked_in") {
+            setScanState("checked_in");
+            await fetchSession();
+          } else if (data.action === "certified") {
+            setScanState("certified");
             await fetchSession();
           } else {
-            setLastWorker({ name: data.worker.full_name, code: data.worker.worker_code, nationality: data.worker.nationality });
-            setScanState("duplicate");
+            setScanState("already_certified");
           }
           // 2.5초 후 scanning 상태로 복귀
           setTimeout(() => setScanState("scanning"), 2500);
@@ -174,17 +178,19 @@ export default function TbmLiveSessionPage() {
           {/* 스캔 영역 */}
           {isActive && (
             <div className={`rounded-2xl p-6 text-center transition-all ${
-              scanState === "scanning" ? "bg-green-950 border-2 border-green-600" :
-              scanState === "success"  ? "bg-green-800 border-2 border-green-400" :
-              scanState === "duplicate" ? "bg-yellow-900 border-2 border-yellow-600" :
-              scanState === "error"    ? "bg-red-900 border-2 border-red-600" :
+              scanState === "scanning"         ? "bg-green-950 border-2 border-green-600" :
+              scanState === "checked_in"       ? "bg-blue-900 border-2 border-blue-400" :
+              scanState === "certified"        ? "bg-green-800 border-2 border-green-400" :
+              scanState === "already_certified"? "bg-yellow-900 border-2 border-yellow-600" :
+              scanState === "error"            ? "bg-red-900 border-2 border-red-600" :
               "bg-gray-800 border border-gray-700"
             }`}>
               <Nfc className={`w-12 h-12 mx-auto mb-3 ${
-                scanState === "scanning" ? "text-green-400 animate-pulse" :
-                scanState === "success"  ? "text-green-300" :
-                scanState === "duplicate" ? "text-yellow-400" :
-                scanState === "error"    ? "text-red-400" :
+                scanState === "scanning"          ? "text-green-400 animate-pulse" :
+                scanState === "checked_in"        ? "text-blue-300" :
+                scanState === "certified"         ? "text-green-300" :
+                scanState === "already_certified" ? "text-yellow-400" :
+                scanState === "error"             ? "text-red-400" :
                 "text-gray-600"
               }`} />
 
@@ -211,18 +217,28 @@ export default function TbmLiveSessionPage() {
                 </>
               )}
 
-              {scanState === "success" && lastWorker && (
+              {scanState === "checked_in" && lastWorker && (
                 <>
-                  <CheckCircle className="w-12 h-12 text-green-300 mx-auto mb-2" />
-                  <p className="text-green-300 font-bold text-lg">{lastWorker.name}</p>
-                  <p className="text-green-500 text-sm">{lastWorker.code} · {lastWorker.nationality} · 참석 확인</p>
+                  <p className="text-blue-200 font-bold text-lg">{lastWorker.name}</p>
+                  <p className="text-blue-400 text-sm">{lastWorker.code} · {lastWorker.nationality}</p>
+                  <p className="text-blue-300 text-base font-semibold mt-1">① 참석 대기 등록 완료</p>
+                  <p className="text-blue-500 text-xs mt-1">TBM 종료 후 다시 스캔 → 이수 인증</p>
                 </>
               )}
 
-              {scanState === "duplicate" && lastWorker && (
+              {scanState === "certified" && lastWorker && (
+                <>
+                  <CheckCircle className="w-12 h-12 text-green-300 mx-auto mb-2" />
+                  <p className="text-green-300 font-bold text-lg">{lastWorker.name}</p>
+                  <p className="text-green-500 text-sm">{lastWorker.code} · {lastWorker.nationality}</p>
+                  <p className="text-green-300 text-base font-semibold mt-1">② 이수 인증 완료</p>
+                </>
+              )}
+
+              {scanState === "already_certified" && lastWorker && (
                 <>
                   <p className="text-yellow-300 font-bold">{lastWorker.name}</p>
-                  <p className="text-yellow-500 text-sm">이미 참석 확인됨</p>
+                  <p className="text-yellow-500 text-sm">이미 이수 인증 완료됨</p>
                 </>
               )}
 
@@ -260,9 +276,13 @@ export default function TbmLiveSessionPage() {
             ) : (
               <div className="space-y-2">
                 {[...attendance].reverse().map((a, idx) => (
-                  <div key={a.id} className="bg-gray-800 rounded-xl px-4 py-3 flex items-center gap-3 border border-gray-700">
+                  <div key={a.id} className={`rounded-xl px-4 py-3 flex items-center gap-3 border ${
+                    (a as AttendanceWithWorker).is_certified
+                      ? "bg-green-950 border-green-800"
+                      : "bg-gray-800 border-gray-700"
+                  }`}>
                     <span className="text-gray-600 text-sm w-6 shrink-0">{attendance.length - idx}</span>
-                    <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
+                    <CheckCircle className={`w-4 h-4 shrink-0 ${(a as AttendanceWithWorker).is_certified ? "text-green-400" : "text-blue-400"}`} />
                     <div className="flex-1 min-w-0">
                       <span className="text-white text-sm">
                         {(a as AttendanceWithWorker).full_name || `Worker ${a.worker_id.slice(0, 6)}`}
@@ -270,6 +290,13 @@ export default function TbmLiveSessionPage() {
                       {(a as AttendanceWithWorker).worker_code && (
                         <span className="text-gray-500 text-xs ml-2 font-mono">{(a as AttendanceWithWorker).worker_code}</span>
                       )}
+                      <span className={`text-xs ml-2 px-1.5 py-0.5 rounded ${
+                        (a as AttendanceWithWorker).is_certified
+                          ? "bg-green-800 text-green-300"
+                          : "bg-blue-900 text-blue-300"
+                      }`}>
+                        {(a as AttendanceWithWorker).is_certified ? "이수완료" : "대기중"}
+                      </span>
                     </div>
                     <span className="text-gray-500 text-xs shrink-0">
                       {new Date(a.tapped_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
