@@ -11,6 +11,7 @@ type PledgeBody = {
   siteId?: string;
   pledgeContent?: string;
   nfcUid?: string;
+  signatureData?: string;
 };
 
 function createService() {
@@ -53,6 +54,7 @@ export async function POST(req: NextRequest) {
       pledge_content: pledgeContent,
       pledge_content_hash: pledgeContentHash,
       nfc_uid: body.nfcUid ?? null,
+      signature_data: body.signatureData ?? null,
     })
     .select("id, pledge_content_hash")
     .single();

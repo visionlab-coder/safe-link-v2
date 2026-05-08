@@ -536,7 +536,6 @@ function WorkerHomeContent() {
     const [showStopWorkModal, setShowStopWorkModal] = useState(false);
     const [stopWorkReason, setStopWorkReason] = useState("");
     const [stopWorkSent, setStopWorkSent] = useState(false);
-    const [stopWorkCategory, setStopWorkCategory] = useState<"danger_refusal" | "accident" | "other">("other");
 
     const urlLang = searchParams.get("lang");
 
@@ -561,37 +560,17 @@ function WorkerHomeContent() {
 
     const handleStopWork = async () => {
         if (!profile) return;
-        let gps: { lat: number; lng: number; accuracy?: number } | undefined;
         try {
-            const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-                navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000 })
-            );
-            gps = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
-        } catch { /* GPS 없어도 계속 진행 */ }
-
-        const hazardMap: Record<string, string> = {
-            danger_refusal: "위험작업거부",
-            accident: "산업재해",
-            other: "기타위험",
-        };
-
-        try {
-            const res = await fetch("/api/stop-work/improved", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    siteId: profile.site_id,
-                    reason: stopWorkReason || "Emergency stop - no reason provided",
-                    hazardCategory: hazardMap[stopWorkCategory],
-                    severity: stopWorkCategory === "accident" ? "critical" : "high",
-                    preferredLang: lang,
-                    gps,
-                }),
+            const supabase = createClient();
+            await supabase.from("stop_work_alerts").insert({
+                worker_id: profile.id,
+                worker_name: profile.display_name,
+                site_id: profile.site_id,
+                reason: stopWorkReason || "Emergency stop - no reason provided",
+                lang: lang,
             });
-            if (!res.ok) throw new Error("api_failed");
             setStopWorkSent(true);
             setStopWorkReason("");
-            setStopWorkCategory("other");
             triggerAlert();
             setTimeout(() => {
                 setShowStopWorkModal(false);
@@ -760,25 +739,6 @@ function WorkerHomeContent() {
                                         <h3 className="text-2xl font-black text-white">{t.stopWork}</h3>
                                     </div>
                                     <p className="text-slate-400 font-bold text-sm">{t.stopWorkFamily}</p>
-                                    <div className="flex gap-2">
-                                        {(["danger_refusal", "accident", "other"] as const).map((cat) => {
-                                            const labels: Record<string, Record<string, string>> = {
-                                                danger_refusal: { ko: "위험작업거부", en: "Danger Refusal", vi: "Từ chối nguy hiểm", zh: "拒绝危险作业", th: "ปฏิเสธงานอันตราย" },
-                                                accident: { ko: "산업재해", en: "Accident", vi: "Tai nạn lao động", zh: "工伤事故", th: "อุบัติเหตุ" },
-                                                other: { ko: "기타위험", en: "Other", vi: "Khác", zh: "其他", th: "อื่นๆ" },
-                                            };
-                                            const label = labels[cat][lang] ?? labels[cat]["en"];
-                                            return (
-                                                <button
-                                                    key={cat}
-                                                    onClick={() => setStopWorkCategory(cat)}
-                                                    className={`flex-1 py-2 rounded-xl text-xs font-black transition-colors ${stopWorkCategory === cat ? "bg-red-600 text-white" : "bg-slate-800 text-slate-400"}`}
-                                                >
-                                                    {label}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
                                     <textarea
                                         value={stopWorkReason}
                                         onChange={(e) => setStopWorkReason(e.target.value)}
@@ -924,29 +884,6 @@ function WorkerHomeContent() {
                         <div className="flex flex-col">
                             <h2 className="text-2xl font-black text-white">{t.quizTitle}</h2>
                             <p className="text-slate-400 font-bold text-sm tracking-tight">{t.quizDesc}</p>
-                        </div>
-                    </div>
-                </section>
-
-                {/* ✍️ Safety Pledge Section */}
-                <section
-                    onClick={() => router.push('/worker/pledge')}
-                    className="glass rounded-[40px] p-8 border-white/10 hover:border-blue-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
-                >
-                    <div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors" />
-                    <div className="flex items-center gap-6 relative">
-                        <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-blue-400 shadow-lg">
-                            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                            </svg>
-                        </div>
-                        <div className="flex flex-col">
-                            <h2 className="text-2xl font-black text-white">
-                                {lang === "ko" ? "TBM 안전 서약" : lang === "zh" ? "TBM 安全承诺" : lang === "vi" ? "Cam kết an toàn" : lang === "th" ? "คำมั่นสัญญา" : lang === "id" ? "Janji Keselamatan" : "TBM Safety Pledge"}
-                            </h2>
-                            <p className="text-slate-400 font-bold text-sm tracking-tight">
-                                {lang === "ko" ? "서명으로 안전 서약 확인" : lang === "zh" ? "签名确认安全承诺" : lang === "vi" ? "Ký tên xác nhận cam kết" : lang === "th" ? "เซ็นชื่อยืนยันคำมั่น" : lang === "id" ? "Tanda tangan untuk konfirmasi" : "Sign to confirm safety pledge"}
-                            </p>
                         </div>
                     </div>
                 </section>

@@ -103,9 +103,6 @@ function AdminTBMCreateContent() {
 
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
     const [adminSiteId, setAdminSiteId] = useState<string | null>(null);
-    const [briefingCategory, setBriefingCategory] = useState("");
-    const [briefingDraft, setBriefingDraft] = useState("");
-    const [isBriefingLoading, setIsBriefingLoading] = useState(false);
 
     const loadProfile = useCallback(async () => {
         const supabase = createClient();
@@ -140,25 +137,6 @@ function AdminTBMCreateContent() {
         loadProfile();
         fetchHistory();
     }, [loadProfile, fetchHistory]);
-
-    const handleGenerateBriefing = async () => {
-        setIsBriefingLoading(true);
-        setBriefingDraft("");
-        try {
-            const res = await fetch("/api/tbm/briefing-draft", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ category: briefingCategory.trim() }),
-            });
-            const data = await res.json();
-            if (data.draft) setBriefingDraft(data.draft);
-            else alert(`초안 생성 실패: ${data.error ?? "unknown"}`);
-        } catch {
-            alert("연결 오류가 발생했습니다.");
-        } finally {
-            setIsBriefingLoading(false);
-        }
-    };
 
     const handleLibrarySelect = useCallback((text: string) => {
         setTbmText((prev) => {
@@ -341,36 +319,6 @@ function AdminTBMCreateContent() {
                                 ))}
                             </div>
                         )}
-
-                        <div className="border-t border-white/5 mt-4 pt-6 flex flex-col gap-4">
-                            <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">
-                                AI 브리핑 초안 — 위험성평가 DB 기반
-                            </span>
-                            <div className="flex gap-2">
-                                <input
-                                    value={briefingCategory}
-                                    onChange={(e) => setBriefingCategory(e.target.value)}
-                                    placeholder="카테고리 (예: 거푸집, 배근, 타설) — 비워두면 전체"
-                                    className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white placeholder-slate-700 focus:outline-none focus:border-amber-500/40"
-                                />
-                                <button
-                                    onClick={handleGenerateBriefing}
-                                    disabled={isBriefingLoading}
-                                    className="px-5 py-3 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl text-xs font-black shadow-lg tap-effect disabled:opacity-50 whitespace-nowrap"
-                                >
-                                    {isBriefingLoading ? "생성 중…" : "초안 생성"}
-                                </button>
-                            </div>
-                            {briefingDraft && (
-                                <button
-                                    onClick={() => { setTbmText(briefingDraft); setBriefingDraft(""); }}
-                                    className="text-left p-5 glass rounded-2xl text-slate-300 hover:text-white hover:bg-amber-500/5 border border-amber-500/20 transition-all text-sm tap-effect leading-relaxed whitespace-pre-wrap"
-                                >
-                                    {briefingDraft}
-                                    <span className="block mt-3 text-[10px] font-black text-amber-400 uppercase tracking-widest">클릭하여 초안에 적용</span>
-                                </button>
-                            )}
-                        </div>
                     </section>
 
                     {/* 기초교육 라이브러리 섹션 */}

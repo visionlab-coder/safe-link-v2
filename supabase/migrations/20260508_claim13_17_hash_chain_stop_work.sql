@@ -26,11 +26,13 @@ CREATE INDEX IF NOT EXISTS idx_claim13_hash_chain_entity
 
 ALTER TABLE public.claim13_hash_chain_events ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "claim13 hash events readable by authenticated users" ON public.claim13_hash_chain_events;
 CREATE POLICY "claim13 hash events readable by authenticated users"
     ON public.claim13_hash_chain_events FOR SELECT
     TO authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "claim13 hash events service inserted only" ON public.claim13_hash_chain_events;
 CREATE POLICY "claim13 hash events service inserted only"
     ON public.claim13_hash_chain_events FOR INSERT
     TO authenticated
@@ -48,7 +50,7 @@ CREATE OR REPLACE FUNCTION public.append_claim13_audit_event(
 RETURNS public.claim13_hash_chain_events
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
     v_previous_hash TEXT;
@@ -127,7 +129,7 @@ RETURNS TABLE (
 )
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 WITH ordered AS (
     SELECT
@@ -172,6 +174,41 @@ FROM recomputed
 WHERE previous_hash IS DISTINCT FROM lag_hash
    OR current_hash IS DISTINCT FROM recomputed_hash;
 $$;
+
+CREATE TABLE IF NOT EXISTS public.stop_work_alerts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    worker_id UUID NOT NULL,
+    worker_name TEXT NOT NULL DEFAULT '',
+    site_id TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    lang TEXT NOT NULL DEFAULT 'ko',
+    resolved BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_stop_work_alerts_site
+    ON public.stop_work_alerts(site_id, created_at DESC);
+
+ALTER TABLE public.stop_work_alerts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "workers can create stop work alerts" ON public.stop_work_alerts;
+CREATE POLICY "workers can create stop work alerts"
+    ON public.stop_work_alerts FOR INSERT
+    TO authenticated
+    WITH CHECK (auth.uid() = worker_id);
+
+DROP POLICY IF EXISTS "authenticated users can read stop work alerts" ON public.stop_work_alerts;
+CREATE POLICY "authenticated users can read stop work alerts"
+    ON public.stop_work_alerts FOR SELECT
+    TO authenticated
+    USING (true);
+
+DROP POLICY IF EXISTS "authenticated users can update stop work alerts" ON public.stop_work_alerts;
+CREATE POLICY "authenticated users can update stop work alerts"
+    ON public.stop_work_alerts FOR UPDATE
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
 
 CREATE TABLE IF NOT EXISTS public.claim17_stop_work_interventions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
