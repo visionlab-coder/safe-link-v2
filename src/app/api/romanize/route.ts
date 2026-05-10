@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = "nodejs";
+
 interface GeminiResponse {
     candidates?: Array<{
         content?: { parts?: Array<{ text?: string }> };

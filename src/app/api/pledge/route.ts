@@ -49,6 +49,10 @@ export async function POST(req: NextRequest) {
 
   const pledgeContentHash = await sha256Hex(pledgeContent);
   const service = createService();
+  const approvedAt = signatureData ? new Date().toISOString() : null;
+  const clientIp = signatureData
+    ? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? req.headers.get("x-real-ip") ?? null
+    : null;
 
   const { data, error } = await service
     .from("claim13_pledges")
@@ -60,20 +64,38 @@ export async function POST(req: NextRequest) {
       pledge_content_hash: pledgeContentHash,
       nfc_uid: body.nfcUid ?? null,
       signature_data: signatureData,
+      client_ip: clientIp,
+      approved_at: approvedAt,
     })
     .select("id, pledge_content_hash")
     .single();
 
   if (error) return NextResponse.json({ error: "pledge_insert_failed", detail: error.message }, { status: 500 });
 
-  await appendClaim13HashChainEvent(service, {
-    siteId,
-    entityType: "pledge",
-    entityId: data.id,
-    eventType: "claim13_pledge_signed",
-    payload: { worker_id: user.id, pledge_content_hash: pledgeContentHash },
-    createdBy: user.id,
-  });
+  if (signatureData && approvedAt) {
+    const audit = await appendClaim13HashChainEvent(service, {
+      siteId,
+      entityType: "claim13_pledge",
+      entityId: data.id,
+      eventType: "pledge_signed",
+      payload: {
+        pledge_id: data.id,
+        worker_id: user.id,
+        tbm_session_id: body.tbmSessionId ?? null,
+        pledge_content_hash: pledgeContentHash,
+        nfc_uid: body.nfcUid ?? null,
+        approved_at: approvedAt,
+        client_ip: clientIp,
+      },
+      createdBy: user.id,
+    });
+
+    await service
+      .from("claim13_pledges")
+      .update({ hash_chain_event_id: audit.id })
+      .eq("id", data.id)
+      .throwOnError();
+  }
 
   return NextResponse.json({ pledgeId: data.id, pledgeContentHash: data.pledge_content_hash });
 }

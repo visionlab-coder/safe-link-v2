@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
 }
 
 // GET /api/tbm/briefing-draft?category=xxx → 위험성평가 카테고리 목록
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
 

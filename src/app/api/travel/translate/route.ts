@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+export const runtime = "nodejs";
 import { verifyTravelToken } from '@/lib/travel-auth';
 import { formalizeKo, formalizeJa } from '@/utils/politeness';
 

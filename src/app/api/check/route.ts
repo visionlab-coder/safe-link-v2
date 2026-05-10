@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getErrorMessage } from "@/utils/errors";
 
+export const runtime = "nodejs";
+
 interface HealthItem {
   status: "pending" | "ok" | "error";
   message: string;

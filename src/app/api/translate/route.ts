@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+export const runtime = "nodejs";
 import { fetchGlossaryFromDB } from '@/utils/normalize';
 import { getErrorMessage } from '@/utils/errors';
 import { hangulize } from '@/utils/hangulize';

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+export const runtime = "nodejs";
 import { generateTravelToken } from '@/lib/travel-auth';
 
 export async function POST() {

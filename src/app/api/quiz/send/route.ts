@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
   const translatedByLang: Record<string, { question: string; options: string[] }[]> = {};
 
   await Promise.all(
-    Array.from(langGroups.entries()).map(async ([lang, _wIds]) => {
+    Array.from(langGroups.entries()).map(async ([lang]) => {
       const translated = await Promise.all(
         questions.map((q) => translateQuiz(q, lang, apiKey))
       );

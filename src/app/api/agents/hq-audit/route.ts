@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { getErrorMessage } from '@/utils/errors';
 
+export const runtime = "nodejs";
+
 interface GeminiAuditResponse {
     candidates?: Array<{
         content?: {

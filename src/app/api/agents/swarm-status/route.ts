@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
+export const runtime = "nodejs";
+
 /**
  * 📡 Swarm Status API — 실DB 연동 (2026-05-06 PATCH)
  * profiles(근로자 수), stop_work_alerts(경고), tbm_acks(활성률)를

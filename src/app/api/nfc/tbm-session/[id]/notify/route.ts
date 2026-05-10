@@ -10,6 +10,7 @@ type WorkerRow = {
   worker_code?: string | null;
   full_name?: string | null;
   nationality?: string | null;
+  assigned_site_id?: string | null;
   preferred_lang?: string | null;
   trade?: string | null;
 };
@@ -38,9 +39,10 @@ export async function POST(
 
   const [workersResult, attendanceResult, logsResult] = await Promise.all([
     service
-      .from("workers")
-      .select("id, worker_code, full_name, nationality, preferred_lang, trade")
-      .eq("site_id", session.site_id),
+      .from("nfc_workers")
+      .select("id, worker_code, full_name, nationality, assigned_site_id, preferred_lang, trade")
+      .eq("assigned_site_id", session.site_id)
+      .eq("is_active", true),
     service
       .from("nfc_tbm_attendance")
       .select("worker_id, is_certified")

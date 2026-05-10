@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const runtime = "nodejs";
 import { getErrorMessage } from '@/utils/errors';
 import { CONSTRUCTION_SPEECH_HINTS } from '@/constants/construction-terms';
 import { CONSTRUCTION_GLOSSARY } from '@/constants/glossary';
