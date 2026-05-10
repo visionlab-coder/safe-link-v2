@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       tbm_notice_id: body.tbm_notice_id ?? null,
       title: body.title?.trim() || null,
       started_by: ctx.user.id,
-      status: "open",
+      status: "running",
     })
     .select("id, site_id, tbm_notice_id, title, status, started_at")
     .single();
