@@ -63,6 +63,7 @@ type QuizResponse = {
   lang: string;
   questions_translated: TranslatedQuestion[];
   answer_index_correct: number[];
+  answers_submitted: number[] | null;
   score_pct: number | null;
   status: string;
   answered_at: string | null;
@@ -95,7 +96,7 @@ export default function WorkerQuizPage() {
 
       const { data: responses } = await supabase
         .from("tbm_quiz_responses")
-        .select("id, lang, questions_translated, answer_index_correct, score_pct, status, answered_at")
+        .select("id, lang, questions_translated, answer_index_correct, answers_submitted, score_pct, status, answered_at")
         .eq("worker_id", session.user.id)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -108,6 +109,7 @@ export default function WorkerQuizPage() {
           setSubmitted(true);
           const total = qr.answer_index_correct.length;
           setResult({ scorePct: qr.score_pct ?? 0, correct: Math.round(((qr.score_pct ?? 0) / 100) * total), total });
+          setSelectedAnswers(qr.answers_submitted ?? new Array(total).fill(null));
         } else {
           setSelectedAnswers(new Array(qr.questions_translated.length).fill(null));
         }
@@ -263,9 +265,7 @@ export default function WorkerQuizPage() {
 
             {quizResponse.questions_translated.map((q, qIdx) => {
               const correctIdx = quizResponse.answer_index_correct[qIdx];
-              const myAnswer = quizResponse.status === "answered"
-                ? null
-                : selectedAnswers[qIdx];
+              const myAnswer = selectedAnswers[qIdx] ?? null;
               const isCorrect = myAnswer === correctIdx;
               return (
                 <div key={qIdx} className={`glass rounded-[28px] p-5 border

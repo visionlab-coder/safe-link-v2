@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 
 export const runtime = "nodejs";
 
@@ -30,8 +30,10 @@ function verifyToken(token: string): { workerId: string; siteId: string; expires
     if (Date.now() / 1000 > expiresAt) return null;
 
     const payload = `${workerId}|${siteId}|${expiresAt}`;
-    const expectedSig = createHmac("sha256", secret).update(payload).digest("hex").slice(0, 16);
-    if (sig !== expectedSig) return null;
+    const expectedSig = createHmac("sha256", secret).update(payload).digest("hex");
+    const sigBuf = Buffer.from(sig);
+    const expBuf = Buffer.from(expectedSig);
+    if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) return null;
 
     return { workerId, siteId, expiresAt };
   } catch {

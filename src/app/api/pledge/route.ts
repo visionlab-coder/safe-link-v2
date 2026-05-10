@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { requireAdmin } from "@/utils/nfc/require-admin";
-import { sha256Hex } from "@/utils/audit/sha256-hash-chain";
+import { sha256Hex, appendClaim13HashChainEvent } from "@/utils/audit/sha256-hash-chain";
 
 export const runtime = "nodejs";
 
@@ -42,6 +42,11 @@ export async function POST(req: NextRequest) {
   const pledgeContent = String(body.pledgeContent || "").trim();
   if (!siteId || !pledgeContent) return NextResponse.json({ error: "siteId_pledgeContent_required" }, { status: 400 });
 
+  const signatureData = body.signatureData ?? null;
+  if (signatureData && signatureData.length > 200_000) {
+    return NextResponse.json({ error: "signature_too_large" }, { status: 400 });
+  }
+
   const pledgeContentHash = await sha256Hex(pledgeContent);
   const service = createService();
 
@@ -54,12 +59,22 @@ export async function POST(req: NextRequest) {
       pledge_content: pledgeContent,
       pledge_content_hash: pledgeContentHash,
       nfc_uid: body.nfcUid ?? null,
-      signature_data: body.signatureData ?? null,
+      signature_data: signatureData,
     })
     .select("id, pledge_content_hash")
     .single();
 
   if (error) return NextResponse.json({ error: "pledge_insert_failed", detail: error.message }, { status: 500 });
+
+  await appendClaim13HashChainEvent(service, {
+    siteId,
+    entityType: "pledge",
+    entityId: data.id,
+    eventType: "claim13_pledge_signed",
+    payload: { worker_id: user.id, pledge_content_hash: pledgeContentHash },
+    createdBy: user.id,
+  });
+
   return NextResponse.json({ pledgeId: data.id, pledgeContentHash: data.pledge_content_hash });
 }
 

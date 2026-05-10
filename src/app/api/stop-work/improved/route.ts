@@ -5,6 +5,8 @@ import { appendClaim13HashChainEvent, type JsonValue } from "@/utils/audit/sha25
 
 export const runtime = "nodejs";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 type StopWorkBody = {
   siteId?: string;
   reason?: string;
@@ -84,6 +86,7 @@ export async function POST(req: NextRequest) {
   const siteId = String(body.siteId || "").trim();
   const reason = String(body.reason || "").trim();
   if (!siteId || !reason) return NextResponse.json({ error: "siteId_reason_required" }, { status: 400 });
+  if (!UUID_REGEX.test(siteId)) return NextResponse.json({ error: "invalid_siteId_format" }, { status: 400 });
 
   const service = createService();
   const now = new Date();
@@ -147,10 +150,13 @@ export async function POST(req: NextRequest) {
 
   // 청구항 16: 위험작업거부·산재 시 SAFETY_OFFICER 우선 라우팅
   const isPriority = PRIORITY_HAZARD_CATEGORIES.has(body.hazardCategory ?? "");
-  let routing: { routed: number; roles: string[] } = { routed: 0, roles: [] };
+  let routing: { routed: number; roles: string[]; routingError?: string } = { routed: 0, roles: [] };
   try {
     routing = await routeToAdmins(service, siteId, baseAlert.id, isPriority);
-  } catch { /* 라우팅 실패해도 alert는 저장됨 */ }
+  } catch (err) {
+    console.error("[stop-work] routing failed:", err);
+    routing = { routed: 0, roles: [], routingError: err instanceof Error ? err.message : String(err) };
+  }
 
   return NextResponse.json({
     alertId: baseAlert.id,

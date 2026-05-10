@@ -499,6 +499,69 @@ function AdminDashboardContent() {
                             </div>
                         </div>
                     </motion.section>
+
+                    {/* 🎁 Safety Incentive Card (청구항 12) */}
+                    <motion.section
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.45 }}
+                        onClick={() => router.push('/admin/incentive')}
+                        className="glass rounded-[48px] p-10 border-white/10 hover:border-orange-500/30 transition-all cursor-pointer tap-effect group shadow-2xl relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 right-0 w-96 h-96 bg-orange-500/5 blur-[120px] rounded-full -mr-48 -mt-48 transition-all group-hover:bg-orange-500/10" />
+                        <div className="flex flex-col gap-4 relative md:h-full">
+                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-orange-400 mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                                </svg>
+                            </div>
+                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">
+                                {lang === "ko" ? "안전 인센티브" : lang === "zh" ? "安全激励" : "Safety Incentive"}
+                            </h3>
+                            <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
+                                {lang === "ko" ? "퀴즈 우수자에게 안전장비를 지급하고 성과를 기록합니다." : lang === "zh" ? "向测验优秀者发放安全装备并记录成果。" : "Grant safety equipment to top quiz performers and track results."}
+                            </p>
+                            <div className="mt-4 flex items-center gap-2 text-orange-400 font-black tracking-widest text-sm uppercase">
+                                <span>Manage Grants</span>
+                                <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
+                            </div>
+                        </div>
+                    </motion.section>
+
+                    {/* 📊 ESG Report Card (청구항 24) */}
+                    <motion.section
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.5 }}
+                        onClick={() => router.push('/admin/esg')}
+                        className="glass rounded-[48px] p-10 border-white/10 hover:border-emerald-500/30 transition-all cursor-pointer tap-effect group shadow-2xl relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 left-0 w-96 h-96 bg-emerald-500/5 blur-[120px] rounded-full -ml-48 -mt-48 transition-all group-hover:bg-emerald-500/10" />
+                        <div className="flex flex-col gap-4 relative md:h-full">
+                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-emerald-400 mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                            </div>
+                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">
+                                {lang === "ko" ? "ESG 안전 리포트" : lang === "zh" ? "ESG安全报告" : "ESG Safety Report"}
+                            </h3>
+                            <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
+                                {lang === "ko" ? "TBM 인증율·서약·감사체인 기반 ESG 종합 점수를 산출합니다." : lang === "zh" ? "基于TBM认证率、承诺书和审计链计算ESG综合评分。" : "Compute ESG score from TBM certification, pledges, and audit chain."}
+                            </p>
+                            <div className="flex items-center gap-2 mt-4">
+                                <span className="text-[10px] bg-emerald-900/50 text-emerald-400 px-2 py-0.5 rounded font-black">청구항 24</span>
+                            </div>
+                            <div className="mt-2 flex items-center gap-2 text-emerald-400 font-black tracking-widest text-sm uppercase">
+                                <span>View Report</span>
+                                <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
+                            </div>
+                        </div>
+                    </motion.section>
                 </div>
 
                 {/* 🛡️ Footer Brand */}

@@ -15,7 +15,7 @@ function buildToken(workerId: string, siteId: string, expiresAt: number): string
   if (!secret) throw new Error("NFC_HMAC_SECRET not configured");
 
   const payload = `${workerId}|${siteId}|${expiresAt}`;
-  const sig = createHmac("sha256", secret).update(payload).digest("hex").slice(0, 16);
+  const sig = createHmac("sha256", secret).update(payload).digest("hex");
   const tokenRaw = `${payload}|${sig}`;
   return Buffer.from(tokenRaw).toString("base64url");
 }
@@ -29,10 +29,8 @@ export async function GET(
 
   const { id: workerId } = await params;
   const siteId = req.nextUrl.searchParams.get("siteId") ?? "";
-  const ttlMinutes = Math.min(
-    parseInt(req.nextUrl.searchParams.get("ttlMinutes") ?? String(QR_TOKEN_VALIDITY_MINUTES), 10),
-    120
-  );
+  const parsedTtl = parseInt(req.nextUrl.searchParams.get("ttlMinutes") ?? "", 10);
+  const ttlMinutes = Math.min(isNaN(parsedTtl) ? QR_TOKEN_VALIDITY_MINUTES : parsedTtl, 120);
 
   if (!siteId) return NextResponse.json({ error: "siteId_required" }, { status: 400 });
 

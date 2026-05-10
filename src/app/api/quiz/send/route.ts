@@ -42,17 +42,27 @@ async function translateQuiz(
 Korean question: ${question.question_ko}
 Korean options: ${JSON.stringify(question.options_ko)}`;
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
-      }),
-    }
-  );
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+  let res: Response;
+  try {
+    res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
+        }),
+        signal: controller.signal,
+      }
+    );
+  } catch {
+    return { question: question.question_ko, options: question.options_ko };
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!res.ok) return { question: question.question_ko, options: question.options_ko };
 
@@ -109,9 +119,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "no_attendees_found" }, { status: 400 });
   }
 
-  // 근로자 언어 조회
+  // 근로자 언어 조회 (nfc_workers: attendance의 worker_id는 nfc_workers.id)
   const { data: workers } = await guard.ctx.service
-    .from("profiles")
+    .from("nfc_workers")
     .select("id, preferred_lang")
     .in("id", workerIds);
 
