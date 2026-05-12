@@ -31,7 +31,8 @@ export async function fetchGlossaryFromDB(): Promise<Record<string, string>> {
             console.warn("[normalize] DB 사전 불러오기 실패, 로컬 fallback 사용");
             _dbGlossaryCache = CONSTRUCTION_GLOSSARY;
         } else {
-            const dbDict: Record<string, string> = {};
+            // Keep bundled safety terms available even when the DB has a partial glossary.
+            const dbDict: Record<string, string> = { ...CONSTRUCTION_GLOSSARY };
             for (const row of data) {
                 dbDict[row.slang] = row.standard;
             }
