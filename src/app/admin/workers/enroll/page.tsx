@@ -8,7 +8,7 @@ import { createClient } from "@/utils/supabase/client";
 import { detectNfcSupport, NfcError, writeNfcUrl } from "@/utils/nfc/web-nfc";
 import Image from "next/image";
 
-type Step = "form" | "writing" | "done" | "error";
+type Step = "form" | "ready" | "writing" | "done" | "error";
 
 const DEFAULT_WORKER_PROFILE = {
   nationality: "KR",
@@ -111,14 +111,19 @@ function WorkerEnrollInner() {
     setStickerUrl(issueData.url);
     if (!workerCode) setWorkerCode(issueData.worker.worker_code);
 
-    if (!nfcSupport.supported) {
-      setStep("done");
+    setStep(nfcSupport.supported ? "ready" : "done");
+  };
+
+  const handleWriteNfc = async () => {
+    if (!stickerUrl) {
+      setError("NFC URL has not been issued yet.");
+      setStep("form");
       return;
     }
-
+    setError("");
     setStep("writing");
     try {
-      await writeNfcUrl(issueData.url);
+      await writeNfcUrl(stickerUrl);
       setStep("done");
     } catch (err) {
       if (err instanceof NfcError) {
@@ -129,6 +134,29 @@ function WorkerEnrollInner() {
       setStep("error");
     }
   };
+
+  if (step === "ready") {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6">
+        <div className="bg-gray-800 rounded-xl p-8 max-w-sm w-full text-center border border-gray-700">
+          <Nfc className="w-16 h-16 text-blue-400 mx-auto mb-4" />
+          <h2 className="text-white text-xl font-bold mb-2">URL ready</h2>
+          <p className="text-gray-400 text-sm mb-4">
+            Keep the NFC card away now. Tap the write button first, then touch the card when the phone asks.
+          </p>
+          <p className="text-gray-500 text-xs break-all bg-gray-900 p-3 rounded-lg mb-4">{stickerUrl}</p>
+          <button
+            type="button"
+            onClick={handleWriteNfc}
+            className="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+          >
+            <Nfc className="w-4 h-4" />
+            Write to NFC card
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (step === "writing") {
     return (
@@ -204,8 +232,8 @@ function WorkerEnrollInner() {
             </p>
           </div>
           <p className="text-gray-500 text-xs break-all bg-gray-900 p-3 rounded-lg">{stickerUrl}</p>
-          <button onClick={() => setStep("form")} className="mt-4 w-full bg-blue-600 hover:bg-blue-500 py-2 rounded-lg text-sm transition-colors">
-            Try again
+          <button onClick={() => setStep(stickerUrl ? "ready" : "form")} className="mt-4 w-full bg-blue-600 hover:bg-blue-500 py-2 rounded-lg text-sm transition-colors">
+            Try write again
           </button>
         </div>
       </div>
@@ -292,7 +320,7 @@ function WorkerEnrollInner() {
               Back
             </button>
             <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2">
-              {nfcSupport.supported ? <><Nfc className="w-4 h-4" /> Issue + write</> : "Issue short URL"}
+              {nfcSupport.supported ? <><Nfc className="w-4 h-4" /> Issue NFC URL</> : "Issue short URL"}
             </button>
           </div>
         </form>
