@@ -15,6 +15,7 @@ function AdminLiveContent() {
     const [listenerCount, setListenerCount] = useState(0);
     const scrollRef = useRef<HTMLDivElement>(null);
     const [adminId, setAdminId] = useState("");
+    const lastSentRef = useRef<{ text: string; at: number }>({ text: "", at: 0 });
 
     useEffect(() => {
         const load = async () => {
@@ -52,15 +53,22 @@ function AdminLiveContent() {
     }, [adminId, siteId]);
 
     const handleTranscript = useCallback(async (text: string) => {
-        if (!sessionId || !text.trim()) return;
+        const cleanText = text.trim().replace(/\s+/g, " ");
+        if (!sessionId || !cleanText) return;
+
+        const now = Date.now();
+        if (lastSentRef.current.text === cleanText && now - lastSentRef.current.at < 10_000) {
+            return;
+        }
+        lastSentRef.current = { text: cleanText, at: now };
 
         const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        setTranscripts(prev => [...prev, { text: text.trim(), time }]);
+        setTranscripts(prev => [...prev, { text: cleanText, time }]);
 
         const supabase = createClient();
         const payload: any = {
             session_id: sessionId,
-            text_ko: text.trim(),
+            text_ko: cleanText,
             created_by: adminId,
         };
         if (siteId) payload.site_id = siteId;
@@ -81,6 +89,7 @@ function AdminLiveContent() {
     const handleStartBroadcast = () => {
         const newSessionId = `live_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         setSessionId(newSessionId);
+        lastSentRef.current = { text: "", at: 0 };
         setTranscripts([]);
         setIsLive(true);
         setTimeout(() => toggleRecording(), 100);

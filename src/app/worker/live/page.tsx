@@ -51,6 +51,8 @@ export default function WorkerLivePage() {
     const audioEnabledRef = useRef(true);
     const langRef = useRef("ko");
     const genderRef = useRef<VoiceGender>("female");
+    const seenRowsRef = useRef<Set<string>>(new Set());
+    const lastRenderedRef = useRef<{ text: string; at: number }>({ text: "", at: 0 });
 
     // Keep refs in sync
     useEffect(() => { audioEnabledRef.current = audioEnabled; }, [audioEnabled]);
@@ -141,6 +143,13 @@ export default function WorkerLivePage() {
                 ...(siteId ? { filter: `site_id=eq.${siteId}` } : {}),
             }, async (payload) => {
                 const row = payload.new as any;
+                if (seenRowsRef.current.has(row.id)) return;
+                seenRowsRef.current.add(row.id);
+                const cleanTextKo = String(row.text_ko || "").trim().replace(/\s+/g, " ");
+                if (!cleanTextKo) return;
+                const now = Date.now();
+                if (lastRenderedRef.current.text === cleanTextKo && now - lastRenderedRef.current.at < 10_000) return;
+                lastRenderedRef.current = { text: cleanTextKo, at: now };
                 setIsConnected(true);
                 const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                 const myLang = langRef.current;
@@ -155,8 +164,8 @@ export default function WorkerLivePage() {
 
                 if (myLang === 'ko') {
                     addSubAndScroll(
-                        { id: row.id, text_ko: row.text_ko, translated: row.text_ko, reverseTranslated: "", time },
-                        row.text_ko
+                        { id: row.id, text_ko: cleanTextKo, translated: cleanTextKo, reverseTranslated: "", time },
+                        cleanTextKo
                     );
                     return;
                 }
@@ -165,7 +174,7 @@ export default function WorkerLivePage() {
                 const pretranslated = row.translations?.[myLang];
                 if (pretranslated) {
                     addSubAndScroll(
-                        { id: row.id, text_ko: row.text_ko, translated: pretranslated, reverseTranslated: row.text_ko, time },
+                        { id: row.id, text_ko: cleanTextKo, translated: pretranslated, reverseTranslated: cleanTextKo, time },
                         pretranslated
                     );
                     // 발음을 백그라운드로 가져와서 업데이트
@@ -177,19 +186,19 @@ export default function WorkerLivePage() {
                     const res = await fetch("/api/translate", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ text: row.text_ko, sl: "ko", tl: myLang, fast: true, pronunciation: false }),
+                        body: JSON.stringify({ text: cleanTextKo, sl: "ko", tl: myLang, fast: true, pronunciation: false }),
                     });
                     const data = await res.json();
                     const translatedNow = data.translated || row.text_ko;
                     // 번역문 즉시 표시 (발음 없이)
                     addSubAndScroll(
-                        { id: row.id, text_ko: row.text_ko, translated: translatedNow, reverseTranslated: data.reverse_translated || "", time },
+                        { id: row.id, text_ko: cleanTextKo, translated: translatedNow, reverseTranslated: data.reverse_translated || "", time },
                         translatedNow
                     );
                     // 발음은 백그라운드에서 별도 fetch → 완성되면 subtitle 업데이트
                 } catch {
                     addSubAndScroll(
-                        { id: row.id, text_ko: row.text_ko, translated: row.text_ko, reverseTranslated: "", time }
+                        { id: row.id, text_ko: cleanTextKo, translated: cleanTextKo, reverseTranslated: "", time }
                     );
                 }
             })
