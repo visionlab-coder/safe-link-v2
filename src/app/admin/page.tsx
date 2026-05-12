@@ -530,6 +530,36 @@ function AdminDashboardContent() {
                         </div>
                     </motion.section>
 
+                    {/* 📡 NFC 근로자 관리 Card */}
+                    <motion.section
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.425 }}
+                        onClick={() => router.push('/admin/nfc')}
+                        className="glass rounded-[48px] p-10 border-white/10 hover:border-cyan-500/30 transition-all cursor-pointer tap-effect group shadow-2xl relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 blur-[120px] rounded-full -mr-48 -mt-48 transition-all group-hover:bg-cyan-500/10" />
+                        <div className="flex flex-col gap-4 relative md:h-full">
+                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-cyan-400 mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+                                </svg>
+                            </div>
+                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">
+                                {lang === "ko" ? "NFC 근로자 관리" : lang === "zh" ? "NFC工人管理" : "NFC Worker Mgmt"}
+                            </h3>
+                            <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
+                                {lang === "ko" ? "NFC 스티커 등록·발급 및 TBM 참석 현황을 관리합니다." : lang === "zh" ? "管理NFC贴纸注册·发放及TBM出勤情况。" : "Register NFC stickers and manage TBM attendance records."}
+                            </p>
+                            <div className="mt-4 flex items-center gap-2 text-cyan-400 font-black tracking-widest text-sm uppercase">
+                                <span>Manage NFC</span>
+                                <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
+                            </div>
+                        </div>
+                    </motion.section>
+
                     {/* 📊 ESG Report Card (청구항 24) */}
                     <motion.section
                         initial={{ opacity: 0, y: 20 }}

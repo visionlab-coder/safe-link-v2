@@ -1,10 +1,11 @@
 "use client";
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UserPlus, Nfc, CheckCircle, AlertCircle } from "lucide-react";
 import { TRADES } from "@/utils/nfc/constants";
 import { writeNfcUrl, detectNfcSupport } from "@/utils/nfc/web-nfc";
+import { createClient } from "@/utils/supabase/client";
 
 type Step = "form" | "writing" | "done" | "error";
 
@@ -28,6 +29,22 @@ function WorkerEnrollInner() {
   const [workerCode, setWorkerCode] = useState("");
 
   const nfcSupport = detectNfcSupport();
+
+  useEffect(() => {
+    const loadAdminSite = async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("site_id")
+        .eq("id", session.user.id)
+        .maybeSingle();
+      const siteId = (prof as { site_id?: string | null } | null)?.site_id;
+      if (siteId) setForm((prev) => ({ ...prev, assigned_site_id: siteId }));
+    };
+    loadAdminSite();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,6 +210,12 @@ function WorkerEnrollInner() {
                   <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500"
                     placeholder="+821012345678" />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-400 mb-1 block">현장 ID <span className="text-gray-600 text-xs">(관리자 현장 자동입력)</span></label>
+                  <input value={form.assigned_site_id} onChange={(e) => setForm({ ...form, assigned_site_id: e.target.value })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 font-mono text-sm"
+                    placeholder="UUID (자동입력)" />
                 </div>
               </>
             )}
