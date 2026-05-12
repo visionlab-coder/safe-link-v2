@@ -1,0 +1,89 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { NFC_BASE_URL } from "@/utils/nfc/constants";
+import { parseStickerUrl, verifyStickerSignature } from "@/utils/nfc/signing";
+
+export const runtime = "nodejs";
+
+const COUNTRY_TO_LANG: Record<string, string> = {
+  KR: "ko",
+  VN: "vi",
+  CN: "zh",
+  TH: "th",
+  ID: "id",
+  PH: "ph",
+  UZ: "uz",
+  RU: "ru",
+  JP: "jp",
+  MN: "mn",
+  MM: "my",
+  KH: "km",
+  NP: "ne",
+};
+
+function cleanCountry(value: unknown): string | null {
+  const code = String(value || "").trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(code)) return null;
+  return code;
+}
+
+function cleanLang(value: unknown, country: string): string {
+  const lang = String(value || COUNTRY_TO_LANG[country] || "en").trim().toLowerCase();
+  return /^[a-z]{2,5}$/.test(lang) ? lang : "en";
+}
+
+export async function POST(req: NextRequest) {
+  let body: { url?: string; nationality?: string; preferred_lang?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
+  }
+
+  const rawUrl = String(body.url || "").trim();
+  const parsed = parseStickerUrl(rawUrl, NFC_BASE_URL) ?? parseStickerUrl(rawUrl, req.nextUrl.origin);
+  if (!parsed) return NextResponse.json({ error: "url_malformed_or_spoofed" }, { status: 400 });
+
+  const sigOk = await verifyStickerSignature(parsed);
+  if (!sigOk) return NextResponse.json({ error: "signature_invalid" }, { status: 401 });
+
+  const nationality = cleanCountry(body.nationality);
+  if (!nationality) return NextResponse.json({ error: "nationality_invalid" }, { status: 400 });
+  const preferredLang = cleanLang(body.preferred_lang, nationality);
+
+  const service = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  );
+
+  const { data: sticker } = await service
+    .from("nfc_worker_stickers")
+    .select("id, is_active")
+    .eq("worker_id", parsed.workerId)
+    .eq("sig_version", parsed.sigVersion)
+    .eq("issued_epoch", parsed.issuedEpoch)
+    .maybeSingle();
+
+  if (!sticker?.is_active) {
+    return NextResponse.json({ error: "sticker_revoked_or_missing" }, { status: 401 });
+  }
+
+  const { data, error } = await service
+    .from("nfc_workers")
+    .update({
+      nationality,
+      preferred_lang: preferredLang,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", parsed.workerId)
+    .eq("is_active", true)
+    .select("id, worker_code, full_name, nationality, preferred_lang")
+    .single();
+
+  if (error || !data) {
+    return NextResponse.json({ error: "preference_update_failed", detail: error?.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ worker: data });
+}

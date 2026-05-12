@@ -83,8 +83,11 @@ function isValidStickerUrl(rawPayload: string, expectedBaseUrl?: string): boolea
       if (u.origin !== expected.origin) return false;
     }
     // /nfc/w/{workerId} 경로 + v, t, sig 파라미터 필수
-    const hasPath = /^\/nfc\/w\/[A-Za-z0-9\-_]+\/?$/.test(u.pathname);
-    const hasSig = u.searchParams.has("v") && u.searchParams.has("t") && u.searchParams.has("sig");
+    const hasPath = /^\/(?:n|nfc\/w)\/[A-Za-z0-9\-_]+\/?$/.test(u.pathname);
+    const hasSig =
+      u.searchParams.has("v") &&
+      u.searchParams.has("t") &&
+      (u.searchParams.has("s") || u.searchParams.has("sig"));
     return hasPath && hasSig;
   } catch {
     return false;

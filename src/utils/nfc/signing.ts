@@ -115,12 +115,12 @@ export function parseStickerUrl(rawUrl: string, expectedOrigin?: string): Parsed
       const allowed = new URL(expectedOrigin);
       if (u.origin !== allowed.origin) return null;
     }
-    const m = u.pathname.match(/^\/nfc\/w\/([A-Za-z0-9\-_]+)\/?$/);
+    const m = u.pathname.match(/^\/(?:n|nfc\/w)\/([A-Za-z0-9\-_]+)\/?$/);
     if (!m) return null;
     const workerId = decodeURIComponent(m[1]);
     const v = u.searchParams.get("v");
     const t = u.searchParams.get("t");
-    const sig = u.searchParams.get("sig");
+    const sig = u.searchParams.get("s") ?? u.searchParams.get("sig");
     if (!v || !t || !sig) return null;
     const sigVersion = Number(v);
     const issuedEpoch = Number(t);

@@ -61,9 +61,9 @@ export async function POST(req: NextRequest) {
   }
 
   const fullName = String(body.full_name || "").trim();
-  const nationality = String(body.nationality || "").trim().toUpperCase();
-  const trade = String(body.trade || "").trim();
-  const preferredLang = String(body.preferred_lang || "").trim().toLowerCase();
+  const nationality = String(body.nationality || "KR").trim().toUpperCase();
+  const trade = String(body.trade || "general").trim();
+  const preferredLang = String(body.preferred_lang || "ko").trim().toLowerCase();
 
   if (!fullName) return NextResponse.json({ error: "full_name_required" }, { status: 400 });
   if (!nationality || nationality.length < 2) return NextResponse.json({ error: "nationality_required" }, { status: 400 });
