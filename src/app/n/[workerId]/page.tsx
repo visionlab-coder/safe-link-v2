@@ -8,21 +8,22 @@ type CountryOption = {
   code: string;
   lang: string;
   label: string;
+  flag: string;
 };
 
 const COUNTRIES: CountryOption[] = [
-  { code: "KR", lang: "ko", label: "Korea" },
-  { code: "VN", lang: "vi", label: "Vietnam" },
-  { code: "CN", lang: "zh", label: "China" },
-  { code: "TH", lang: "th", label: "Thailand" },
-  { code: "ID", lang: "id", label: "Indonesia" },
-  { code: "PH", lang: "ph", label: "Philippines" },
-  { code: "UZ", lang: "uz", label: "Uzbekistan" },
-  { code: "RU", lang: "ru", label: "Russia" },
-  { code: "MN", lang: "mn", label: "Mongolia" },
-  { code: "NP", lang: "ne", label: "Nepal" },
-  { code: "MM", lang: "my", label: "Myanmar" },
-  { code: "KH", lang: "km", label: "Cambodia" },
+  { code: "KR", lang: "ko", label: "한국",        flag: "🇰🇷" },
+  { code: "VN", lang: "vi", label: "Vietnam",     flag: "🇻🇳" },
+  { code: "CN", lang: "zh", label: "中国",         flag: "🇨🇳" },
+  { code: "TH", lang: "th", label: "ไทย",         flag: "🇹🇭" },
+  { code: "ID", lang: "id", label: "Indonesia",   flag: "🇮🇩" },
+  { code: "PH", lang: "ph", label: "Philippines", flag: "🇵🇭" },
+  { code: "UZ", lang: "uz", label: "Oʻzbekiston", flag: "🇺🇿" },
+  { code: "RU", lang: "ru", label: "Россия",      flag: "🇷🇺" },
+  { code: "MN", lang: "mn", label: "Монгол",      flag: "🇲🇳" },
+  { code: "NP", lang: "ne", label: "नेपाल",       flag: "🇳🇵" },
+  { code: "MM", lang: "my", label: "မြန်မာ",      flag: "🇲🇲" },
+  { code: "KH", lang: "km", label: "កម្ពុជា",     flag: "🇰🇭" },
 ];
 
 function NfcWorkerEntryInner() {
@@ -94,19 +95,20 @@ function NfcWorkerEntryInner() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 mb-5">
+        <div className="grid grid-cols-3 gap-2 mb-5">
           {COUNTRIES.map((country) => (
             <button
               key={country.code}
               type="button"
               onClick={() => setSelected(country)}
-              className={`h-12 rounded-lg border text-sm font-medium transition-colors ${
+              className={`flex flex-col items-center justify-center gap-1 h-20 rounded-xl border transition-all active:scale-95 ${
                 selected.code === country.code
-                  ? "bg-blue-600 border-blue-400 text-white"
+                  ? "bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-900/40"
                   : "bg-gray-900 border-gray-800 text-gray-300 hover:border-gray-600"
               }`}
             >
-              {country.label}
+              <span className="text-3xl leading-none">{country.flag}</span>
+              <span className="text-xs font-semibold">{country.label}</span>
             </button>
           ))}
         </div>
