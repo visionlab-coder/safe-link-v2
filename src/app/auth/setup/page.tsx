@@ -374,6 +374,23 @@ function SetupContent() {
     if (role === "worker" && (!trade || !phone)) { alert(t.err); return; }
     if ((role === "site_manager" || role === "safety_officer" || role === "root" || role === "hq_officer") && !title) { alert(t.err); return; }
 
+    // 관리자 역할: 현장명으로 site_id 자동 해결
+    let resolvedSiteId: string | null = initSiteId || null;
+    const isAdminRole = role === "site_manager" || role === "safety_officer";
+    if (isAdminRole && siteCode.trim()) {
+      try {
+        const res = await fetch("/api/sites/resolve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: siteCode.trim() }),
+        });
+        if (res.ok) {
+          const data = await res.json() as { id: string };
+          resolvedSiteId = data.id;
+        }
+      } catch { /* site_id 없이 진행 */ }
+    }
+
     setLoading(true);
     const { error } = await supabase.from("profiles").upsert({
       id: userId,
@@ -385,7 +402,7 @@ function SetupContent() {
       trade: trade.trim(),
       title: title.trim(),
       site_code: siteCode.trim(),
-      site_id: initSiteId || null,
+      site_id: resolvedSiteId,
     });
     setLoading(false);
     if (error) { alert(error.message); return; }
@@ -533,14 +550,31 @@ function SetupContent() {
                 <motion.div key="step2" initial={{ opacity:0, x:20 }} animate={{ opacity:1, x:0 }}
                   exit={{ opacity:0, x:-20 }} transition={{ duration:0.22 }} className="flex flex-col gap-4">
 
-                  {/* Site code */}
+                  {/* Site name */}
                   <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block" style={{ color:"#475569" }}>{t.siteTitle}</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block" style={{ color:"#475569" }}>
+                      {(role === "site_manager" || role === "safety_officer")
+                        ? (language === "ko" ? "현장명 *" : "Site Name *")
+                        : t.siteTitle}
+                    </label>
                     <div style={fieldBox}>
-                      <input type="text" placeholder={t.siteTitle} value={siteCode}
+                      <input
+                        type="text"
+                        placeholder={
+                          (role === "site_manager" || role === "safety_officer")
+                            ? (language === "ko" ? "예: 강남 테헤란로 오피스 신축" : "e.g. Main Office Building")
+                            : t.siteTitle
+                        }
+                        value={siteCode}
                         onChange={e => setSiteCode(e.target.value)}
-                        className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
+                        className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5"
+                      />
                     </div>
+                    {(role === "site_manager" || role === "safety_officer") && siteCode.trim() && (
+                      <p className="text-[10px] mt-1.5 ml-1" style={{ color:"#22C55E" }}>
+                        ✓ {language === "ko" ? "저장 시 현장이 자동 연결됩니다" : "Site will be auto-linked on save"}
+                      </p>
+                    )}
                   </div>
 
                   {/* Worker: phone + trade / Admin: position */}
