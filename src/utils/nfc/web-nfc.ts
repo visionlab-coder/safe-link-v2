@@ -211,8 +211,27 @@ export async function writeNfcUrl(url: string, options: NfcWriteOptions = {}): P
   }
 
   const Ctor = (window as any).NDEFReader;
-  const writer = new Ctor();
+  if (typeof Ctor !== "function") throw new NfcError("unsupported", "NDEFReader not available");
 
+  // Android Chrome 일부 빌드에서 write() 전에 scan()을 한 번 호출해야
+  // NFC 권한이 활성화되고 write 모드가 정상 동작함 (permission warm-up).
+  const scanAc = new AbortController();
+  try {
+    const scanner = new Ctor();
+    await scanner.scan({ signal: scanAc.signal });
+    // scan() resolved = 하드웨어 스캔 시작 = 권한 확보됨
+  } catch (err) {
+    const e = err as DOMException;
+    if (e?.name === "NotAllowedError") {
+      throw new NfcError("permission_denied", "NFC permission denied — Chrome 주소창 자물쇠 → 사이트 설정 → NFC 허용");
+    }
+    // AbortError: 우리가 직접 중단한 경우 → 정상
+    // 그 외: scan warm-up 실패지만 write는 시도
+  } finally {
+    scanAc.abort();
+  }
+
+  const writer = new Ctor();
   try {
     await writer.write(
       { records: [{ recordType: "url", data: url }] },
@@ -223,10 +242,10 @@ export async function writeNfcUrl(url: string, options: NfcWriteOptions = {}): P
     }
   } catch (err) {
     const e = err as DOMException;
-    if (e?.name === "NotAllowedError") throw new NfcError("permission_denied", "User denied NFC permission");
-    if (e?.name === "NotSupportedError") throw new NfcError("unsupported", "NFC write not supported");
+    if (e?.name === "NotAllowedError") throw new NfcError("permission_denied", "NFC permission denied — Chrome 주소창 자물쇠 → 사이트 설정 → NFC 허용");
+    if (e?.name === "NotSupportedError") throw new NfcError("unsupported", "NFC write not supported on this device/Chrome version");
     if (e?.name === "AbortError") throw new NfcError("aborted", "Write aborted");
-    if (e?.name === "NetworkError") throw new NfcError("write_failed", "Tag read-only or memory insufficient");
+    if (e?.name === "NetworkError") throw new NfcError("write_failed", "Tag is read-only or has insufficient memory");
     throw new NfcError("unknown", e?.message || String(err));
   }
 }
