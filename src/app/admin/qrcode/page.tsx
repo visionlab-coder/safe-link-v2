@@ -131,8 +131,8 @@ export default function QRDistributionPage() {
                     phone_last4: nfcPhoneLast4.trim() || undefined,
                 }),
             });
-            const regData = await regRes.json() as { worker?: { id: string; worker_code: string }; error?: string };
-            if (!regRes.ok) { setNfcError(regData.error || "등록 실패"); setNfcLoading(false); return; }
+            const regData = await regRes.json() as { worker?: { id: string; worker_code: string }; error?: string; detail?: string };
+            if (!regRes.ok) { setNfcError(`${regData.error || "등록 실패"}${regData.detail ? `: ${regData.detail}` : ""}`); setNfcLoading(false); return; }
 
             const workerId = regData.worker!.id;
             setNfcWorkerCode(regData.worker!.worker_code);
