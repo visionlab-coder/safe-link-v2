@@ -10,7 +10,7 @@ interface Subtitle {
     id: string;
     text_ko: string;
     translated: string;
-    pronunciation: string;
+    reverseTranslated: string;
     time: string;
 }
 
@@ -155,7 +155,7 @@ export default function WorkerLivePage() {
 
                 if (myLang === 'ko') {
                     addSubAndScroll(
-                        { id: row.id, text_ko: row.text_ko, translated: row.text_ko, pronunciation: "", time },
+                        { id: row.id, text_ko: row.text_ko, translated: row.text_ko, reverseTranslated: "", time },
                         row.text_ko
                     );
                     return;
@@ -165,21 +165,10 @@ export default function WorkerLivePage() {
                 const pretranslated = row.translations?.[myLang];
                 if (pretranslated) {
                     addSubAndScroll(
-                        { id: row.id, text_ko: row.text_ko, translated: pretranslated, pronunciation: "", time },
+                        { id: row.id, text_ko: row.text_ko, translated: pretranslated, reverseTranslated: row.text_ko, time },
                         pretranslated
                     );
                     // 발음을 백그라운드로 가져와서 업데이트
-                    fetch("/api/translate", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ text: row.text_ko, sl: "ko", tl: myLang }),
-                    }).then(r => r.json()).then(data => {
-                        if (data.pronunciation) {
-                            setSubtitles(prev => prev.map(s =>
-                                s.id === row.id ? { ...s, pronunciation: data.pronunciation } : s
-                            ));
-                        }
-                    }).catch(() => {});
                     return;
                 }
 
@@ -188,30 +177,19 @@ export default function WorkerLivePage() {
                     const res = await fetch("/api/translate", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ text: row.text_ko, sl: "ko", tl: myLang, fast: true }),
+                        body: JSON.stringify({ text: row.text_ko, sl: "ko", tl: myLang, fast: true, pronunciation: false }),
                     });
                     const data = await res.json();
                     const translatedNow = data.translated || row.text_ko;
                     // 번역문 즉시 표시 (발음 없이)
                     addSubAndScroll(
-                        { id: row.id, text_ko: row.text_ko, translated: translatedNow, pronunciation: "", time },
+                        { id: row.id, text_ko: row.text_ko, translated: translatedNow, reverseTranslated: data.reverse_translated || "", time },
                         translatedNow
                     );
                     // 발음은 백그라운드에서 별도 fetch → 완성되면 subtitle 업데이트
-                    fetch("/api/translate", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ text: row.text_ko, sl: "ko", tl: myLang }),
-                    }).then(r => r.json()).then(d => {
-                        if (d.pronunciation) {
-                            setSubtitles(prev => prev.map(s =>
-                                s.id === row.id ? { ...s, pronunciation: d.pronunciation } : s
-                            ));
-                        }
-                    }).catch(() => {});
                 } catch {
                     addSubAndScroll(
-                        { id: row.id, text_ko: row.text_ko, translated: row.text_ko, pronunciation: "", time }
+                        { id: row.id, text_ko: row.text_ko, translated: row.text_ko, reverseTranslated: "", time }
                     );
                 }
             })
@@ -276,11 +254,8 @@ export default function WorkerLivePage() {
                     {subtitles.map((sub) => (
                         <div key={sub.id} className="glass rounded-[28px] p-6 border-white/5 animate-float flex flex-col gap-2">
                             <p className="text-2xl font-black text-white leading-snug">{sub.translated}</p>
-                            {sub.pronunciation && (
-                                <p className="text-sm font-bold text-blue-400/60">{sub.pronunciation}</p>
-                            )}
-                            {lang !== 'ko' && (
-                                <p className="text-sm font-bold text-slate-600 mt-1">{sub.text_ko}</p>
+                            {lang !== 'ko' && sub.reverseTranslated && (
+                                <p className="text-sm font-bold text-slate-600 mt-1">{sub.reverseTranslated}</p>
                             )}
                             <span className="text-[10px] font-black text-slate-700 self-end">{sub.time}</span>
                         </div>
