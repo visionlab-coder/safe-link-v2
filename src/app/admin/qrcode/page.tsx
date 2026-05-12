@@ -16,7 +16,7 @@ type Site = {
     address?: string | null;
 };
 
-type NfcStep = "idle" | "writing" | "done" | "error";
+type NfcStep = "idle" | "ready" | "writing" | "done" | "error";
 
 export default function QRDistributionPage() {
     const router = useRouter();
@@ -148,19 +148,24 @@ export default function QRDistributionPage() {
 
             setNfcUrl(issueData.url!);
             setNfcLoading(false);
+            setNfcStep(nfcSupport.supported ? "ready" : "done");
+        } catch {
+            setNfcError("URL 발급 실패. 다시 시도해주세요.");
+            setNfcStep("error");
+            setNfcLoading(false);
+        }
+    };
 
-            // NFC 쓰기
-            if (nfcSupport.supported) {
-                setNfcStep("writing");
-                await writeNfcUrl(issueData.url!);
-                setNfcStep("done");
-            } else {
-                setNfcStep("done");
-            }
+    const handleWriteNfc = async () => {
+        if (!nfcUrl) return;
+        setNfcError("");
+        setNfcStep("writing");
+        try {
+            await writeNfcUrl(nfcUrl);
+            setNfcStep("done");
         } catch {
             setNfcError("NFC 쓰기 실패. 아래 URL을 QR로 출력하세요.");
             setNfcStep("error");
-            setNfcLoading(false);
         }
     };
 
@@ -334,6 +339,25 @@ export default function QRDistributionPage() {
                                 </div>
                             )}
 
+                            {nfcStep === "ready" && (
+                                <div className="flex flex-col gap-4">
+                                    <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/5 p-5">
+                                        <p className="text-[11px] font-black text-cyan-400 uppercase tracking-widest mb-1">URL 발급 완료</p>
+                                        <p className="text-xs font-mono text-slate-400 break-all">{nfcUrl}</p>
+                                    </div>
+                                    <p className="text-slate-400 text-sm font-bold">
+                                        카드를 아직 대지 마세요. 버튼을 먼저 누른 후 폰이 준비되면 카드를 대세요.
+                                    </p>
+                                    <button
+                                        onClick={handleWriteNfc}
+                                        className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-black rounded-2xl transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <Nfc className="w-5 h-5" />
+                                        Write to NFC card
+                                    </button>
+                                </div>
+                            )}
+
                             {nfcStep === "writing" && (
                                 <div className="flex flex-col items-center gap-4 py-6">
                                     <Nfc className="w-16 h-16 text-cyan-400 animate-pulse" />
@@ -370,6 +394,11 @@ export default function QRDistributionPage() {
                                         )}
                                     </div>
                                     <div className="flex gap-3">
+                                        {nfcStep === "error" && nfcUrl && (
+                                            <button onClick={handleWriteNfc} className="flex-1 bg-cyan-700 hover:bg-cyan-600 py-3 rounded-2xl font-black text-white transition-all flex items-center justify-center gap-2">
+                                                <Nfc className="w-4 h-4" /> 다시 쓰기
+                                            </button>
+                                        )}
                                         <button onClick={resetNfc} className="flex-1 bg-cyan-600 hover:bg-cyan-500 py-3 rounded-2xl font-black text-white transition-all">
                                             다음 카드 발급
                                         </button>
