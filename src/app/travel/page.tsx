@@ -366,7 +366,8 @@ export default function TravelTalk() {
       }
       const authHeader = { 'x-travel-token': travelTokenRef.current };
 
-      if (learningModeRef.current && !soloModeRef.current) {
+      if (learningModeRef.current) {
+        // 학습 모드: 발음(한글표기) + 역번역 포함 (1폰/2폰 공통)
         const res = await fetch('/api/translate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeader },
@@ -733,8 +734,8 @@ export default function TravelTalk() {
             />
           )}
 
-          {/* 학습 모드 — 2폰 한국인 호스트만 */}
-          {!soloMode && isHost && isKorean && (
+          {/* 학습 모드 — 한국인 호스트 (2폰) 또는 한국인 사용자 (1폰) */}
+          {isKorean && (soloMode || isHost) && (
             <Toggle
               on={learningMode}
               onToggle={() => setLearningMode(v => !v)}
@@ -778,7 +779,7 @@ export default function TravelTalk() {
                     : '버튼을 눌러 대화를 시작하세요 · タップして話す'
                 }
               </p>
-              {!soloMode && isKorean && learningMode && (
+              {isKorean && learningMode && (
                 <div style={{ marginTop: 16, padding: '10px 14px', background: BLUE, borderRadius: 12, fontSize: 11, color: 'rgba(100,180,255,0.7)', lineHeight: 2 }}>
                   한글 발음 · 역번역 자동 표시<br />
                   <span style={{ opacity: 0.6 }}>상대방 언어를 따라 읽을 수 있습니다</span>
@@ -788,7 +789,7 @@ export default function TravelTalk() {
           )}
 
           {messages.map(msg => (
-            <MsgBubble key={msg.id} msg={msg} isKorean={isKorean} learningMode={!soloMode && learningMode} onPlay={speakTTS} />
+            <MsgBubble key={msg.id} msg={msg} isKorean={isKorean} learningMode={learningMode} onPlay={speakTTS} />
           ))}
 
           {translating && (
