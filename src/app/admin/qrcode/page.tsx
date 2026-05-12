@@ -28,6 +28,8 @@ export default function QRDistributionPage() {
 
     // NFC 상태
     const [nfcWorkerName, setNfcWorkerName] = useState("");
+    const [nfcNameInitials, setNfcNameInitials] = useState("");
+    const [nfcPhoneLast4, setNfcPhoneLast4] = useState("");
     const [nfcStep, setNfcStep] = useState<NfcStep>("idle");
     const [nfcUrl, setNfcUrl] = useState("");
     const [nfcWorkerCode, setNfcWorkerCode] = useState("");
@@ -125,6 +127,8 @@ export default function QRDistributionPage() {
                     nationality: "KR",
                     trade: "general",
                     preferred_lang: "ko",
+                    name_initials: nfcNameInitials.trim() || undefined,
+                    phone_last4: nfcPhoneLast4.trim() || undefined,
                 }),
             });
             const regData = await regRes.json() as { worker?: { id: string; worker_code: string }; error?: string };
@@ -163,6 +167,8 @@ export default function QRDistributionPage() {
     const resetNfc = () => {
         setNfcStep("idle");
         setNfcWorkerName("");
+        setNfcNameInitials("");
+        setNfcPhoneLast4("");
         setNfcUrl("");
         setNfcWorkerCode("");
         setNfcError("");
@@ -275,24 +281,48 @@ export default function QRDistributionPage() {
                                 <div className="flex flex-col gap-4">
                                     <div>
                                         <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 block">근로자 이름 (카드 라벨용)</label>
-                                        <div className="flex gap-3">
+                                        <input
+                                            value={nfcWorkerName}
+                                            onChange={(e) => setNfcWorkerName(e.target.value)}
+                                            placeholder="홍길동"
+                                            className="w-full bg-slate-900/70 border border-white/10 rounded-2xl px-4 py-3.5 text-white font-bold focus:outline-none focus:border-cyan-500/40 placeholder-slate-700"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 block">이니셜 (로마자, 선택)</label>
                                             <input
-                                                value={nfcWorkerName}
-                                                onChange={(e) => setNfcWorkerName(e.target.value)}
-                                                onKeyDown={(e) => e.key === "Enter" && handleNfcIssue()}
-                                                placeholder="홍길동"
-                                                className="flex-1 bg-slate-900/70 border border-white/10 rounded-2xl px-4 py-3.5 text-white font-bold focus:outline-none focus:border-cyan-500/40 placeholder-slate-700"
+                                                value={nfcNameInitials}
+                                                onChange={(e) => setNfcNameInitials(e.target.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase())}
+                                                placeholder="HGD"
+                                                maxLength={4}
+                                                className="w-full bg-slate-900/70 border border-white/10 rounded-2xl px-4 py-3 text-white font-bold font-mono focus:outline-none focus:border-cyan-500/40 placeholder-slate-700"
                                             />
-                                            <button
-                                                onClick={handleNfcIssue}
-                                                disabled={nfcLoading || !nfcWorkerName.trim()}
-                                                className="px-6 py-3.5 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-black rounded-2xl transition-all flex items-center gap-2 whitespace-nowrap"
-                                            >
-                                                <UserPlus className="w-4 h-4" />
-                                                {nfcLoading ? "처리 중..." : nfcSupport.supported ? "발급 + NFC 쓰기" : "URL 발급"}
-                                            </button>
+                                        </div>
+                                        <div>
+                                            <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 block">전화 뒷자리 (선택)</label>
+                                            <input
+                                                value={nfcPhoneLast4}
+                                                onChange={(e) => setNfcPhoneLast4(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                                                placeholder="1234"
+                                                maxLength={4}
+                                                inputMode="numeric"
+                                                className="w-full bg-slate-900/70 border border-white/10 rounded-2xl px-4 py-3 text-white font-bold font-mono focus:outline-none focus:border-cyan-500/40 placeholder-slate-700"
+                                            />
                                         </div>
                                     </div>
+                                    <p className="text-[11px] font-bold text-slate-600">이니셜 + 전화 뒷자리는 NFC URL에 단축 ID 힌트로 포함됩니다. 개인정보가 아닌 최소 식별 데이터입니다.</p>
+
+                                    <button
+                                        onClick={handleNfcIssue}
+                                        disabled={nfcLoading || !nfcWorkerName.trim()}
+                                        className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-black rounded-2xl transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <UserPlus className="w-4 h-4" />
+                                        {nfcLoading ? "처리 중..." : nfcSupport.supported ? "발급 + NFC 쓰기" : "URL 발급"}
+                                    </button>
+
                                     {nfcError && (
                                         <p className="text-red-400 text-sm font-bold">{nfcError}</p>
                                     )}
