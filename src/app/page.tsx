@@ -64,10 +64,18 @@ function LandingPageInner() {
   const qrSiteId = searchParams.get("site_id");
 
   useEffect(() => {
-    if (qrRole === "admin" || qrRole === "worker") {
+    if (qrRole === "admin") {
+      // 관리자 QR: 역할 버튼 자동 표시
       setShowRoles(true);
+    } else if (qrRole === "worker") {
+      // 근로자 QR: 역할 선택 없이 바로 로그인 진행
+      const params = new URLSearchParams({ lang: selectedLang, role: "worker" });
+      if (qrSiteId) params.set("site_id", qrSiteId);
+      router.replace(`/auth?${params.toString()}`);
     }
-  }, [qrRole]);
+  // selectedLang 의존 제거 — 초기값 "ko"로 리다이렉트, 언어는 이후 선택
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qrRole, qrSiteId, router]);
 
   const startText = startBtnText[selectedLang] || "Start";
   const rt = roleTexts[selectedLang] || roleTexts.en;
