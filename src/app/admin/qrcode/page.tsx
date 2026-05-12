@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { Shield, Users, ArrowLeft, Download, QrCode, Nfc, CheckCircle, AlertCircle, UserPlus } from "lucide-react";
 import RoleGuard from "@/components/RoleGuard";
 import { createClient } from "@/utils/supabase/client";
-import { detectNfcSupport, writeNfcUrl } from "@/utils/nfc/web-nfc";
+import { detectNfcSupport, writeNfcUrl, NfcError } from "@/utils/nfc/web-nfc";
 
 type Site = {
     id: string;
@@ -163,8 +163,14 @@ export default function QRDistributionPage() {
         try {
             await writeNfcUrl(nfcUrl);
             setNfcStep("done");
-        } catch {
-            setNfcError("NFC 쓰기 실패. 아래 URL을 QR로 출력하세요.");
+        } catch (err) {
+            const nfcErr = err instanceof NfcError ? err : null;
+            if (nfcErr?.code === "permission_denied") {
+                setNfcError("NFC 권한이 거부됐습니다. Chrome 주소창 왼쪽 자물쇠 → 사이트 설정 → NFC 허용 후 다시 시도하세요.");
+            } else {
+                const detail = nfcErr ? `[${nfcErr.code}] ${nfcErr.message}` : String(err);
+                setNfcError(`쓰기 실패: ${detail}`);
+            }
             setNfcStep("error");
         }
     };
@@ -345,12 +351,17 @@ export default function QRDistributionPage() {
                                         <p className="text-[11px] font-black text-cyan-400 uppercase tracking-widest mb-1">URL 발급 완료</p>
                                         <p className="text-xs font-mono text-slate-400 break-all">{nfcUrl}</p>
                                     </div>
-                                    <p className="text-slate-400 text-sm font-bold">
-                                        카드를 아직 대지 마세요. 버튼을 먼저 누른 후 폰이 준비되면 카드를 대세요.
+                                    <ol className="flex flex-col gap-1.5 text-sm font-bold text-slate-400 list-none">
+                                        <li>① 카드를 폰에서 떼어놓으세요</li>
+                                        <li>② 아래 버튼을 누르세요 → 폰이 "NFC 쓰기 대기" 모드 진입</li>
+                                        <li>③ 시스템 NFC 준비 알림이 뜨면 카드를 갖다 대세요</li>
+                                    </ol>
+                                    <p className="text-[11px] font-bold text-amber-400/80">
+                                        최초 실행 시 Chrome이 NFC 권한을 요청합니다. 반드시 "허용"을 눌러야 합니다.
                                     </p>
                                     <button
                                         onClick={handleWriteNfc}
-                                        className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-black rounded-2xl transition-all flex items-center justify-center gap-2"
+                                        className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-black rounded-2xl transition-all flex items-center justify-center gap-2 active:scale-95"
                                     >
                                         <Nfc className="w-5 h-5" />
                                         Write to NFC card
