@@ -112,10 +112,10 @@ export async function verifyStickerSignature(input: VerifyStickerInput): Promise
       : `${workerId}|${sigVersion}|${issuedEpoch}`;
     const key = await getSigningKey();
     const expected = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)));
-    const provided = base64urlDecode(sig);
     if (isCompact) {
       return base64urlEncode(expected).slice(0, 22) === sig;
     }
+    const provided = base64urlDecode(sig);
     return timingSafeEqual(expected, provided);
   } catch {
     return false;
