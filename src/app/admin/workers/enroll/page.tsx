@@ -90,7 +90,7 @@ function WorkerEnrollInner() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Worker registration failed.");
+        setError(`${data.error || "Worker registration failed."}${data.detail ? `: ${data.detail}` : ""}`);
         return;
       }
       workerId = data.worker.id;
