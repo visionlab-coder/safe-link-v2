@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const { text, sl, tl, fast } = await request.json();
+        const { text, sl, tl, fast, pronunciation: includePronunciation = true } = await request.json();
 
         if (!text || !sl || !tl) {
             return NextResponse.json({ error: "Missing required texts" }, { status: 400 });
@@ -128,6 +128,7 @@ export async function POST(request: NextRequest) {
 
         // 2단계: 역번역 + 발음 생성을 완전 병렬 실행
         // fast=true: Gemini 발음 생성 스킵 → 번역 즉시 반환 (실시간 통역 폴백 경로 고속화)
+        const shouldGeneratePronunciation = includePronunciation !== false && !fast;
         const pronTarget = tl === 'ko' ? processedText : translatedText;
         const pronLang = tl === 'ko' ? sl : tl;
         const isChinese = pronLang === 'zh' || pronLang === 'zh-CN';
@@ -143,19 +144,19 @@ export async function POST(request: NextRequest) {
 
         const [reverseResult, pronEnglish, chinesePron, japPron, thaiPron, nonLatinPron] = await Promise.all([
             cloudTranslateFast(translatedText, targetLang, sourceLang),
-            (!fast && needsEnglishBridge)
+            (shouldGeneratePronunciation && needsEnglishBridge)
                 ? cloudTranslateFast(pronTarget, (tl === 'ko' ? sourceLang : targetLang), 'en')
                 : Promise.resolve(null),
-            (!fast && isChinese)
+            (shouldGeneratePronunciation && isChinese)
                 ? generateChinesePronunciation(apiKey, pronTarget)
                 : Promise.resolve(""),
-            (!fast && isJapanese)
+            (shouldGeneratePronunciation && isJapanese)
                 ? generateJapanesePronunciation(apiKey, pronTarget)
                 : Promise.resolve(""),
-            (!fast && isThai)
+            (shouldGeneratePronunciation && isThai)
                 ? generateThaiPronunciation(apiKey, pronTarget)
                 : Promise.resolve(""),
-            (!fast && isNonLatinOther)
+            (shouldGeneratePronunciation && isNonLatinOther)
                 ? generateNonLatinPronunciation(apiKey, pronTarget, pronLang)
                 : Promise.resolve(""),
         ]);
@@ -164,7 +165,9 @@ export async function POST(request: NextRequest) {
 
         // 한글 발음 생성
         let pronunciation: string;
-        if (isChinese) {
+        if (!shouldGeneratePronunciation) {
+            pronunciation = "";
+        } else if (isChinese) {
             if (chinesePron) {
                 pronunciation = chinesePron;
             } else {
