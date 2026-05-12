@@ -1,8 +1,8 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { HardHat, ShieldCheck } from 'lucide-react';
 import { languages } from '@/constants';
@@ -53,13 +53,30 @@ const roleTexts: Record<string, any> = {
   hi: { admin: "प्रशासक", worker: "क्षेत्र कार्यकर्ता", selectRole: "अपनी भूमिका चुनें" },
 };
 
-export default function LandingPage() {
+function LandingPageInner() {
   const [selectedLang, setSelectedLang] = useState("ko");
   const [showRoles, setShowRoles] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // QR 진입: role과 site_id를 URL에서 읽어 auth로 바로 전달
+  const qrRole = searchParams.get("role");
+  const qrSiteId = searchParams.get("site_id");
+
+  useEffect(() => {
+    if (qrRole === "admin" || qrRole === "worker") {
+      setShowRoles(true);
+    }
+  }, [qrRole]);
 
   const startText = startBtnText[selectedLang] || "Start";
   const rt = roleTexts[selectedLang] || roleTexts.en;
+
+  const buildAuthUrl = (role: "admin" | "worker") => {
+    const params = new URLSearchParams({ lang: selectedLang, role });
+    if (qrSiteId) params.set("site_id", qrSiteId);
+    return `/auth?${params.toString()}`;
+  };
 
   return (
     <main className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-mesh p-4 py-10 selection:bg-blue-500/30">
@@ -156,7 +173,7 @@ export default function LandingPage() {
 
               {/* Admin role card */}
               <button
-                onClick={() => router.push(`/auth?lang=${selectedLang}&role=admin`)}
+                onClick={() => router.push(buildAuthUrl("admin"))}
                 className="group w-full glass-card rounded-2xl p-5 transition-all duration-300 hover:border-blue-500/40 hover:bg-blue-600/5 hover:shadow-[0_8px_32px_rgba(59,130,246,0.15)] tap-effect"
               >
                 <div className="flex items-center gap-4">
@@ -176,7 +193,7 @@ export default function LandingPage() {
 
               {/* Worker role card */}
               <button
-                onClick={() => router.push(`/auth?lang=${selectedLang}&role=worker`)}
+                onClick={() => router.push(buildAuthUrl("worker"))}
                 className="group w-full glass-card rounded-2xl p-5 transition-all duration-300 hover:border-emerald-500/40 hover:bg-emerald-600/5 hover:shadow-[0_8px_32px_rgba(16,185,129,0.15)] tap-effect"
               >
                 <div className="flex items-center gap-4">
@@ -223,5 +240,13 @@ export default function LandingPage() {
         }
       `}</style>
     </main>
+  );
+}
+
+export default function LandingPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-mesh" />}>
+      <LandingPageInner />
+    </Suspense>
   );
 }
