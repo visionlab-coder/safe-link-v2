@@ -134,23 +134,43 @@ async function transcribeWithWhisper(
 }
 
 const MIN_CONFIDENCE = 0.6;
+/** live 모드(TBM 방송·Travel Talk) — 다국어 혼재 환경, 더 엄격한 신뢰도 요구 */
+const MIN_CONFIDENCE_LIVE = 0.75;
 
 /** 음성 어시스턴트 wake word — STT가 잡아도 즉시 폐기 */
 const WAKE_WORD_RE = /^(ok\s*google|okay\s*google|hey\s*google|ok\s*구글|오케이\s*구글|hey\s*siri|하이\s*빅스비|hi\s*bixby|ok\s*bixby|알렉사|alexa)\.?$/i;
 
 /**
- * 교차 음성 오염 필터 — 상대방 언어가 내 마이크에 섞였을 때 폐기
- * 원리: 각 언어 고유 문자 범위로 판별 (한글·가나·CJK 구분)
+ * 일본어 음성을 한국어 STT가 한글 발음으로 전사한 패턴
+ * 가나 문자 없이 한글로만 표기된 일본어 음소를 탐지 (문자 기반 필터 우회 방지)
+ */
+const JA_PHONETIC_IN_KO_RE = /고자이마스|고자이마시다|아리가또|아리가토|코니치와|고니치와|스미마셍|스미마센|와카리마스|와카리마셍|와카리마시타|나니?데스까|도코데스|도코카라|오하이오\s*고자|이키마스|이키마셍|오야스미/i;
+
+/**
+ * 교차 음성 오염 필터 — 주변 타국 근로자 음성이 관리자 마이크에 섞였을 때 폐기
+ * Layer 1: 문자 범위 감지 (가나·한글·CJK)
+ * Layer 2 (ko 전용): 한국어 STT가 일본어 음소를 한글로 전사한 패턴 감지
+ * Layer 3 (ko 전용): 한글 없는 전사 = 주변 소음/비한국어 발화를 억지 전사한 것으로 폐기
  */
 function isCrossTalkContamination(transcript: string, shortLang: string): boolean {
-    const hasHangul = /[\uAC00-\uD7A3\u3131-\u318E]/.test(transcript);
-    const hasKana   = /[\u3040-\u309F\u30A0-\u30FF]/.test(transcript);
+    const hasHangul = /[가-힣ㄱ-ㆎ]/.test(transcript);
+    const hasKana   = /[぀-ゟ゠-ヿ]/.test(transcript);
 
     switch (shortLang) {
-        case 'ko': return hasKana;
-        case 'ja': return hasHangul;
-        case 'zh': return hasHangul || hasKana;
-        default:   return false;
+        case 'ko':
+            if (hasKana) return true;
+            if (JA_PHONETIC_IN_KO_RE.test(transcript)) return true;
+            // 한국어 발화는 반드시 한글 포함 — 한글 없으면 주변 타국어 소음 오염
+            if (!hasHangul) return true;
+            return false;
+        case 'ja':
+            return hasHangul;
+        case 'zh':
+            return hasHangul || hasKana;
+        case 'vi': case 'en':
+            return false;
+        default:
+            return false;
     }
 }
 
@@ -265,11 +285,13 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: data.error.message }, { status: 400 });
         }
 
+        // live 모드(TBM 방송)는 다국어 혼재 환경 → 더 엄격한 신뢰도 적용
+        const confidenceThreshold = live ? MIN_CONFIDENCE_LIVE : MIN_CONFIDENCE;
         const transcript = data.results
             ?.map((res) => {
                 const alt = res.alternatives?.[0];
                 if (!alt?.transcript) return "";
-                if (alt.confidence !== undefined && alt.confidence < MIN_CONFIDENCE) return "";
+                if (alt.confidence !== undefined && alt.confidence < confidenceThreshold) return "";
                 return alt.transcript;
             })
             .filter(Boolean)
