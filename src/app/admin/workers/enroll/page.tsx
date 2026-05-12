@@ -5,7 +5,7 @@ import RoleGuard from "@/components/RoleGuard";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, CheckCircle, Nfc, UserPlus } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { detectNfcSupport, writeNfcUrl } from "@/utils/nfc/web-nfc";
+import { detectNfcSupport, NfcError, writeNfcUrl } from "@/utils/nfc/web-nfc";
 import Image from "next/image";
 
 type Step = "form" | "writing" | "done" | "error";
@@ -121,7 +121,11 @@ function WorkerEnrollInner() {
       await writeNfcUrl(issueData.url);
       setStep("done");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "NFC write failed.");
+      if (err instanceof NfcError) {
+        setError(`${err.code}: ${err.message}`);
+      } else {
+        setError(err instanceof Error ? err.message : "NFC write failed.");
+      }
       setStep("error");
     }
   };
@@ -193,6 +197,12 @@ function WorkerEnrollInner() {
           <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
           <h2 className="text-white text-xl font-bold mb-2">NFC write failed</h2>
           {error && <p className="text-red-300 text-sm mb-4">{error}</p>}
+          <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-3 mb-4 text-left">
+            <p className="text-yellow-200 text-xs font-semibold mb-1">Field check</p>
+            <p className="text-yellow-100 text-xs">
+              Keep the card away until this screen asks for a touch. If it still fails, format the card as NDEF with NFC Tools, or write the fallback URL below with NFC Tools.
+            </p>
+          </div>
           <p className="text-gray-500 text-xs break-all bg-gray-900 p-3 rounded-lg">{stickerUrl}</p>
           <button onClick={() => setStep("form")} className="mt-4 w-full bg-blue-600 hover:bg-blue-500 py-2 rounded-lg text-sm transition-colors">
             Try again
