@@ -202,7 +202,7 @@ export default function QRDistributionPage() {
                             <ArrowLeft className="w-6 h-6" />
                         </button>
                         <div>
-                            <h1 className="text-4xl font-black italic tracking-tighter text-white uppercase text-gradient">Distribution Center</h1>
+                            <h1 className="text-4xl font-black italic tracking-tighter text-white uppercase text-gradient">Access Center</h1>
                             <p className="text-slate-500 font-bold tracking-tight uppercase text-sm">QR 배포 · NFC 카드 발급 통합</p>
                         </div>
                     </header>

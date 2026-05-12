@@ -5,9 +5,11 @@ export const NFC_BASE_URL =
 
 export interface StickerUrlParams {
   workerId: string;
+  workerCode?: string;
   sigVersion: number;
   issuedEpoch: number;
   sig: string;
+  identityHint?: string;
   baseUrl?: string;
 }
 
@@ -18,7 +20,9 @@ export function generateWorkerStickerUrl(params: StickerUrlParams): string {
     t: String(params.issuedEpoch),
     s: params.sig,
   });
-  return `${base}/n/${encodeURIComponent(params.workerId)}?${q.toString()}`;
+  if (params.identityHint) q.set("h", params.identityHint);
+  const ref = params.workerCode || params.workerId;
+  return `${base}/n/${encodeURIComponent(ref)}?${q.toString()}`;
 }
 
 export const WORKER_STICKER_PATH_PREFIX = "/n/";

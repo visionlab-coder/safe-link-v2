@@ -44,23 +44,35 @@ export async function POST(req: NextRequest) {
   const parsed = parseStickerUrl(rawUrl, NFC_BASE_URL) ?? parseStickerUrl(rawUrl, req.nextUrl.origin);
   if (!parsed) return NextResponse.json({ error: "url_malformed_or_spoofed" }, { status: 400 });
 
-  const sigOk = await verifyStickerSignature(parsed);
-  if (!sigOk) return NextResponse.json({ error: "signature_invalid" }, { status: 401 });
-
-  const nationality = cleanCountry(body.nationality);
-  if (!nationality) return NextResponse.json({ error: "nationality_invalid" }, { status: 400 });
-  const preferredLang = cleanLang(body.preferred_lang, nationality);
-
   const service = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { persistSession: false, autoRefreshToken: false } }
   );
 
+  let workerId = parsed.workerId;
+  if (!workerId && parsed.workerCode) {
+    const { data: worker } = await service
+      .from("nfc_workers")
+      .select("id")
+      .eq("worker_code", parsed.workerCode)
+      .maybeSingle();
+    workerId = worker?.id;
+  }
+  if (!workerId) return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
+  if (!parsed.issuedEpoch) return NextResponse.json({ error: "issued_epoch_required" }, { status: 400 });
+
+  const sigOk = await verifyStickerSignature({ ...parsed, workerId });
+  if (!sigOk) return NextResponse.json({ error: "signature_invalid" }, { status: 401 });
+
+  const nationality = cleanCountry(body.nationality);
+  if (!nationality) return NextResponse.json({ error: "nationality_invalid" }, { status: 400 });
+  const preferredLang = cleanLang(body.preferred_lang, nationality);
+
   const { data: sticker } = await service
     .from("nfc_worker_stickers")
     .select("id, is_active")
-    .eq("worker_id", parsed.workerId)
+    .eq("worker_id", workerId)
     .eq("sig_version", parsed.sigVersion)
     .eq("issued_epoch", parsed.issuedEpoch)
     .maybeSingle();
@@ -76,7 +88,7 @@ export async function POST(req: NextRequest) {
       preferred_lang: preferredLang,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", parsed.workerId)
+    .eq("id", workerId)
     .eq("is_active", true)
     .select("id, worker_code, full_name, nationality, preferred_lang")
     .single();

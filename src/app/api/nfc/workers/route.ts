@@ -53,6 +53,8 @@ export async function POST(req: NextRequest) {
     preferred_lang?: string;
     consent_signed_at?: string;
     consent_doc_url?: string;
+    name_initials?: string;
+    phone_last4?: string;
   };
   try {
     body = await req.json();
@@ -64,6 +66,8 @@ export async function POST(req: NextRequest) {
   const nationality = String(body.nationality || "KR").trim().toUpperCase();
   const trade = String(body.trade || "general").trim();
   const preferredLang = String(body.preferred_lang || "ko").trim().toLowerCase();
+  const nameInitials = String(body.name_initials || "").trim().replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase() || null;
+  const phoneLast4 = String(body.phone_last4 || "").trim().replace(/\D/g, "").slice(-4) || null;
 
   if (!fullName) return NextResponse.json({ error: "full_name_required" }, { status: 400 });
   if (!nationality || nationality.length < 2) return NextResponse.json({ error: "nationality_required" }, { status: 400 });
@@ -83,6 +87,8 @@ export async function POST(req: NextRequest) {
       preferred_lang: preferredLang,
       consent_signed_at: consentSignedAt,
       consent_doc_url: body.consent_doc_url?.trim() || null,
+      name_initials: nameInitials,
+      phone_last4: phoneLast4,
       is_active: true,
       created_by: ctx.user.id,
     })

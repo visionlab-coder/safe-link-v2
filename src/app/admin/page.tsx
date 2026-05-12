@@ -487,12 +487,12 @@ function AdminDashboardContent() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                                 </svg>
                             </div>
-                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">Distribution Center</h3>
+                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">Access Center</h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
-                                Generate QR codes to quickly onboard workers and officers.
+                                Issue SAFE-LINK access cards and fallback codes.
                             </p>
                             <div className="mt-4 flex items-center gap-2 text-purple-400 font-black tracking-widest text-sm uppercase">
-                                <span>Generate QRs</span>
+                                <span>Open Access Center</span>
                                 <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                 </svg>

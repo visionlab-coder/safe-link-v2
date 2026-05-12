@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
   const { data: worker, error: workerErr } = await ctx.service
     .from("nfc_workers")
-    .select("id, is_active, full_name, worker_code")
+    .select("id, is_active, full_name, worker_code, name_initials, phone_last4")
     .eq("id", workerId)
     .maybeSingle();
 
@@ -46,7 +46,15 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   const nextVersion = Math.max((latest?.sig_version as number | undefined) ?? 0, NFC_SIG_CURRENT_VERSION - 1) + 1;
-  const signed = await signSticker(workerId, { sigVersion: nextVersion });
+  const identityHint = [
+    String(worker.name_initials || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase(),
+    String(worker.phone_last4 || "").replace(/\D/g, "").slice(-4),
+  ].filter(Boolean).join("");
+  const signed = await signSticker(workerId, {
+    sigVersion: nextVersion,
+    workerCode: worker.worker_code,
+    identityHint,
+  });
 
   const { data: sticker, error: insertErr } = await ctx.service
     .from("nfc_worker_stickers")
@@ -56,7 +64,14 @@ export async function POST(req: NextRequest) {
 
   if (insertErr || !sticker) return NextResponse.json({ error: "sticker_insert_failed", detail: insertErr?.message }, { status: 500 });
 
-  const url = generateWorkerStickerUrl({ workerId, sigVersion: signed.sigVersion, issuedEpoch: signed.issuedEpoch, sig: signed.sig });
+  const url = generateWorkerStickerUrl({
+    workerId,
+    workerCode: worker.worker_code,
+    sigVersion: signed.sigVersion,
+    issuedEpoch: signed.issuedEpoch,
+    sig: signed.sig,
+    identityHint,
+  });
 
   // 청구항 2: NTAG213 NDEF 메시지 길이 138바이트 이내 검증
   // NDEF URI record 오버헤드: 3 bytes (NDEF header) + 1 byte (URI prefix 'https://')

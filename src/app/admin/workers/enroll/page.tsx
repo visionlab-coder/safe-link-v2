@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, CheckCircle, Nfc, UserPlus } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { detectNfcSupport, writeNfcUrl } from "@/utils/nfc/web-nfc";
+import Image from "next/image";
 
 type Step = "form" | "writing" | "done" | "error";
 
@@ -23,6 +24,8 @@ function WorkerEnrollInner() {
 
   const [step, setStep] = useState<Step>("form");
   const [fullName, setFullName] = useState("");
+  const [nameInitials, setNameInitials] = useState("");
+  const [phoneLast4, setPhoneLast4] = useState("");
   const [siteId, setSiteId] = useState("");
   const [error, setError] = useState("");
   const [stickerUrl, setStickerUrl] = useState("");
@@ -47,6 +50,8 @@ function WorkerEnrollInner() {
   const resetForm = () => {
     setStep("form");
     setFullName("");
+    setNameInitials("");
+    setPhoneLast4("");
     setError("");
     setStickerUrl("");
     setWorkerCode("");
@@ -64,12 +69,20 @@ function WorkerEnrollInner() {
         setError("Worker name is required for card labeling and ERP matching.");
         return;
       }
+      const cleanInitials = nameInitials.trim().replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase();
+      const cleanLast4 = phoneLast4.trim().replace(/\D/g, "").slice(-4);
+      if (!cleanInitials || cleanLast4.length !== 4) {
+        setError("Enter name initials and the last 4 digits of the phone number.");
+        return;
+      }
 
       const res = await fetch("/api/nfc/workers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           full_name: name,
+          name_initials: cleanInitials,
+          phone_last4: cleanLast4,
           assigned_site_id: siteId || undefined,
           consent_signed_at: new Date().toISOString(),
           ...DEFAULT_WORKER_PROFILE,
@@ -137,6 +150,21 @@ function WorkerEnrollInner() {
           <p className="text-gray-500 text-xs mt-3">
             Label the physical card with the worker name. The tag stores only a signed SAFE-LINK URL.
           </p>
+          {stickerUrl && (
+            <div className="bg-white p-3 rounded-xl mt-4">
+              <Image
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(stickerUrl)}`}
+                alt="Worker SAFE-LINK QR"
+                width={220}
+                height={220}
+                unoptimized
+                className="mx-auto"
+              />
+            </div>
+          )}
+          <p className="text-gray-400 text-xs mt-3">
+            Workers can scan this QR if NFC reading is inconvenient.
+          </p>
           {!nfcSupport.supported && (
             <div className="bg-gray-900 rounded-lg p-3 mt-4">
               <p className="text-yellow-300 text-xs mb-1">This device cannot write Web NFC. Use this fallback URL for QR/NFC encoding.</p>
@@ -189,6 +217,31 @@ function WorkerEnrollInner() {
                 <p className="text-sm text-gray-300">
                   Enter only the worker name for card labeling and future ERP matching. The worker selects country/language after tapping the card.
                 </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm text-gray-400 mb-1 block">Name initials *</label>
+                  <input
+                    required
+                    value={nameInitials}
+                    onChange={(event) => setNameInitials(event.target.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase())}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 uppercase"
+                    placeholder="KDH"
+                    maxLength={4}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-400 mb-1 block">Phone last 4 *</label>
+                  <input
+                    required
+                    value={phoneLast4}
+                    onChange={(event) => setPhoneLast4(event.target.value.replace(/\D/g, "").slice(-4))}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500"
+                    placeholder="1234"
+                    inputMode="numeric"
+                    maxLength={4}
+                  />
+                </div>
               </div>
               <div>
                 <label className="text-sm text-gray-400 mb-1 block">Worker name *</label>

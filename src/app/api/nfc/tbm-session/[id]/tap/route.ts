@@ -1,21 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/utils/nfc/require-admin";
-import { parseStickerUrl, verifyStickerSignature } from "@/utils/nfc/signing";
 import { NFC_BASE_URL } from "@/utils/nfc/constants";
+import { parseStickerUrl, verifyStickerSignature } from "@/utils/nfc/signing";
 
-/**
- * POST /api/nfc/tbm-session/[id]/tap
- *
- * 관리자 라이브 스캔 화면에서 근로자 NFC 스티커를 감지했을 때 호출.
- * 탭 1회 = TBM 참석 확인 (출퇴근 아님 — 홍채인식이 담당).
- * 같은 세션에 이미 탭한 근로자는 멱등 처리 (already_attended).
- *
- * Body:
- *   { url: string }  ← 스캔된 스티커 URL 전체
- *
- * Returns:
- *   { action: "attended" | "already_attended", worker, timestamp }
- */
 export const runtime = "nodejs";
 
 export async function POST(
@@ -27,7 +14,6 @@ export async function POST(
   const { ctx } = guard;
   const { id: sessionId } = await params;
 
-  // 1) 세션 조회
   const { data: session, error: sessErr } = await ctx.service
     .from("nfc_tbm_sessions")
     .select("id, status, site_id")
@@ -37,7 +23,6 @@ export async function POST(
   if (sessErr || !session) return NextResponse.json({ error: "session_not_found" }, { status: 404 });
   if (session.status === "closed") return NextResponse.json({ error: "session_closed" }, { status: 409 });
 
-  // 2) Body 파싱
   let body: { url?: string };
   try {
     body = await req.json();
@@ -48,17 +33,26 @@ export async function POST(
   const rawUrl = String(body.url || "").trim();
   if (!rawUrl) return NextResponse.json({ error: "url_required" }, { status: 400 });
 
-  // 3) URL 파싱 (origin 검증)
-  const parsed = parseStickerUrl(rawUrl, NFC_BASE_URL);
+  const parsed = parseStickerUrl(rawUrl, NFC_BASE_URL) ?? parseStickerUrl(rawUrl, req.nextUrl.origin);
   if (!parsed) return NextResponse.json({ error: "url_malformed_or_spoofed" }, { status: 400 });
 
-  const { workerId, sigVersion, issuedEpoch, sig } = parsed;
+  let { workerId } = parsed;
+  const { workerCode, sigVersion, issuedEpoch, sig, identityHint } = parsed;
 
-  // 4) HMAC 검증
-  const sigOk = await verifyStickerSignature({ workerId, sigVersion, issuedEpoch, sig });
+  if (!workerId && workerCode) {
+    const { data: resolvedWorker } = await ctx.service
+      .from("nfc_workers")
+      .select("id")
+      .eq("worker_code", workerCode)
+      .maybeSingle();
+    workerId = resolvedWorker?.id;
+  }
+  if (!workerId) return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
+  if (!issuedEpoch) return NextResponse.json({ error: "issued_epoch_required" }, { status: 400 });
+
+  const sigOk = await verifyStickerSignature({ workerId, workerCode, sigVersion, issuedEpoch, sig, identityHint });
   if (!sigOk) return NextResponse.json({ error: "signature_invalid" }, { status: 401 });
 
-  // 5) 스티커 활성 확인
   const { data: sticker } = await ctx.service
     .from("nfc_worker_stickers")
     .select("id, is_active")
@@ -67,9 +61,10 @@ export async function POST(
     .eq("issued_epoch", issuedEpoch)
     .maybeSingle();
 
-  if (!sticker || !sticker.is_active) return NextResponse.json({ error: "sticker_revoked_or_missing" }, { status: 401 });
+  if (!sticker || !sticker.is_active) {
+    return NextResponse.json({ error: "sticker_revoked_or_missing" }, { status: 401 });
+  }
 
-  // 6) 근로자 활성 확인
   const { data: worker } = await ctx.service
     .from("nfc_workers")
     .select("id, worker_code, full_name, nationality, trade, preferred_lang, assigned_site_id, is_active")
@@ -78,7 +73,6 @@ export async function POST(
 
   if (!worker || !worker.is_active) return NextResponse.json({ error: "worker_inactive" }, { status: 409 });
 
-  // 7) 참석 기록 조회
   const now = new Date().toISOString();
 
   const { data: existing } = await ctx.service
@@ -96,7 +90,6 @@ export async function POST(
     trade: worker.trade,
   };
 
-  // 이미 이수 인증 완료 (3차+ 탭)
   if (existing?.is_certified) {
     return NextResponse.json({
       action: "already_certified",
@@ -107,7 +100,6 @@ export async function POST(
     });
   }
 
-  // 2차 탭: 이수 인증 처리
   if (existing && !existing.is_certified) {
     const { error: updErr } = await ctx.service
       .from("nfc_tbm_attendance")
@@ -125,7 +117,6 @@ export async function POST(
     });
   }
 
-  // 1차 탭: 참석 대기 등록
   const { error: insErr } = await ctx.service
     .from("nfc_tbm_attendance")
     .insert({
@@ -140,7 +131,6 @@ export async function POST(
 
   if (insErr) return NextResponse.json({ error: "attendance_insert_failed", detail: insErr.message }, { status: 500 });
 
-  // 8) 세션이 open이면 running으로 전이 (첫 탭 감지)
   if (session.status === "open") {
     await ctx.service.from("nfc_tbm_sessions").update({ status: "running" }).eq("id", sessionId);
   }
