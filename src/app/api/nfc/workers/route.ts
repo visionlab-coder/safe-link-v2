@@ -21,8 +21,8 @@ export async function GET(req: NextRequest) {
 
   let query = guard.ctx.service
     .from("nfc_workers")
-    .select("id, worker_code, full_name, nationality, phone, assigned_site_id, trade, preferred_lang, is_active, consent_signed_at, created_at")
-    .order("created_at", { ascending: false })
+    .select("id, worker_code, full_name, nationality, phone, assigned_site_id, trade, preferred_lang, is_active, consent_signed_at")
+    .order("id", { ascending: false })
     .limit(limit);
 
   if (siteId) query = query.eq("assigned_site_id", siteId);
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
       is_active: true,
       created_by: ctx.user.id,
     })
-    .select("id, worker_code, full_name, nationality, phone, assigned_site_id, trade, preferred_lang, is_active, consent_signed_at, created_at")
+    .select("id, worker_code, full_name, nationality, phone, assigned_site_id, trade, preferred_lang, is_active, consent_signed_at")
     .single();
 
   if (error || !data) return NextResponse.json({ error: "worker_create_failed", detail: error?.message }, { status: 500 });
