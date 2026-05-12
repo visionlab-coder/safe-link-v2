@@ -353,11 +353,11 @@ export default function QRDistributionPage() {
                                     </div>
                                     <ol className="flex flex-col gap-1.5 text-sm font-bold text-slate-400 list-none">
                                         <li>① 카드를 폰에서 떼어놓으세요</li>
-                                        <li>② 아래 버튼을 누르세요 → 폰이 "NFC 쓰기 대기" 모드 진입</li>
+                                        <li>② 아래 버튼을 누르세요 → 폰이 &quot;NFC 쓰기 대기&quot; 모드 진입</li>
                                         <li>③ 시스템 NFC 준비 알림이 뜨면 카드를 갖다 대세요</li>
                                     </ol>
                                     <p className="text-[11px] font-bold text-amber-400/80">
-                                        최초 실행 시 Chrome이 NFC 권한을 요청합니다. 반드시 "허용"을 눌러야 합니다.
+                                        최초 실행 시 Chrome이 NFC 권한을 요청합니다. 반드시 &quot;허용&quot;을 눌러야 합니다.
                                     </p>
                                     <button
                                         onClick={handleWriteNfc}
