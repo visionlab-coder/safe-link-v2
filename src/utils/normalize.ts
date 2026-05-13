@@ -1,6 +1,5 @@
 import { CONSTRUCTION_GLOSSARY } from "@/constants/glossary";
 import { createClient } from "@/utils/supabase/client";
-import { createServiceClient } from "@/utils/supabase/service";
 
 export interface NormalizeResult {
     original: string;
@@ -24,10 +23,7 @@ export async function fetchGlossaryFromDB(): Promise<Record<string, string>> {
     if (_dbGlossaryCache) return _dbGlossaryCache;
 
     try {
-        // 서버사이드(API Route)에서는 서비스 롤로 RLS 우회
-        const isServer = typeof window === "undefined";
-        const supabase = isServer ? createServiceClient() : createClient();
-
+        const supabase = createClient();
         const { data, error } = await supabase
             .from("construction_glossary")
             .select("slang, standard")

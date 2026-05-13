@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 export const runtime = "nodejs";
-import { fetchGlossaryFromDB } from '@/utils/normalize';
+import { createServiceClient } from '@/utils/supabase/service';
+import { CONSTRUCTION_GLOSSARY } from '@/constants/glossary';
 import { getErrorMessage } from '@/utils/errors';
 import { hangulize } from '@/utils/hangulize';
 import pinyin from 'tiny-pinyin';
@@ -47,11 +48,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Text too long (max 5000 characters)" }, { status: 400 });
         }
 
-        // 건설 현장 용어집 전처리
+        // 건설 현장 용어집 전처리 (서버사이드: 서비스 롤로 RLS 우회하여 DB glossary 직접 로드)
         let processedText = text;
         if (sl === 'ko') {
-            // 한국어 출발: 은어→표준어 치환
-            const glossary = await fetchGlossaryFromDB();
+            const glossary = await fetchGlossaryServer();
             for (const [slang, std] of Object.entries(glossary)) {
                 processedText = processedText.replace(new RegExp(slang, 'g'), std as string);
             }
@@ -240,7 +240,31 @@ export async function POST(request: NextRequest) {
 }
 
 
-/** Gemini 풀 fallback (Cloud Translation 실패 시) */
+/** 서버사이드 glossary fetch — 서비스 롤 클라이언트로 RLS 우회 */
+let _serverGlossaryCache: Record<string, string> | null = null;
+
+async function fetchGlossaryServer(): Promise<Record<string, string>> {
+    if (_serverGlossaryCache) return _serverGlossaryCache;
+    try {
+        const sb = createServiceClient();
+        const { data, error } = await sb
+            .from('construction_glossary')
+            .select('slang, standard')
+            .eq('is_active', true);
+        if (error || !data?.length) {
+            _serverGlossaryCache = CONSTRUCTION_GLOSSARY;
+        } else {
+            const dict: Record<string, string> = { ...CONSTRUCTION_GLOSSARY };
+            for (const row of data) dict[row.slang] = row.standard;
+            _serverGlossaryCache = dict;
+            console.info(`[translate] DB glossary 로드: ${data.length}개`);
+        }
+    } catch {
+        _serverGlossaryCache = CONSTRUCTION_GLOSSARY;
+    }
+    return _serverGlossaryCache;
+}
+
 /** 중국어 → 한글 발음 생성 (Gemini 2.5 Flash, 국립국어원 표준 기반) */
 async function generateChinesePronunciation(apiKey: string, chineseText: string): Promise<string> {
     if (!chineseText || chineseText.length > 2000) return "";
