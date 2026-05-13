@@ -19,6 +19,10 @@ const COUNTRY_TO_LANG: Record<string, string> = {
   MM: "my",
   KH: "km",
   NP: "ne",
+  BD: "bn",
+  KZ: "kk",
+  IN: "hi",
+  SA: "ar",
 };
 
 function cleanCountry(value: unknown): string | null {
@@ -30,6 +34,11 @@ function cleanCountry(value: unknown): string | null {
 function cleanLang(value: unknown, country: string): string {
   const lang = String(value || COUNTRY_TO_LANG[country] || "en").trim().toLowerCase();
   return /^[a-z]{2,5}$/.test(lang) ? lang : "en";
+}
+
+/** NFC 매직링크 이메일 (실제 이메일 아님 — auth 전용 식별자) */
+function nfcEmail(workerId: string): string {
+  return `nfc.${workerId}@safe-link.internal`;
 }
 
 export async function POST(req: NextRequest) {
@@ -86,16 +95,55 @@ export async function POST(req: NextRequest) {
     .update({
       nationality,
       preferred_lang: preferredLang,
+      nationality_confirmed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq("id", workerId)
     .eq("is_active", true)
-    .select("id, worker_code, full_name, nationality, preferred_lang")
+    .select("id, worker_code, full_name, nationality, preferred_lang, auth_user_id")
     .single();
 
   if (error || !data) {
     return NextResponse.json({ error: "preference_update_failed", detail: error?.message }, { status: 500 });
   }
 
-  return NextResponse.json({ worker: data });
+  // === Auth 계정 lazy 생성 + 매직링크 토큰 발급 ===
+  let authUserId: string | null = data.auth_user_id ?? null;
+  const email = nfcEmail(workerId);
+
+  if (!authUserId) {
+    const { data: authData, error: authErr } = await service.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      user_metadata: { nfc_worker_id: workerId },
+    });
+
+    if (!authErr && authData?.user) {
+      authUserId = authData.user.id;
+
+      await Promise.all([
+        service.from("profiles").upsert(
+          { id: authUserId, role: "worker", display_name: data.full_name, preferred_lang: preferredLang },
+          { onConflict: "id" }
+        ),
+        service.from("nfc_workers").update({ auth_user_id: authUserId }).eq("id", workerId),
+      ]);
+    }
+  }
+
+  let tokenHash: string | null = null;
+  if (authUserId) {
+    const { data: linkData } = await service.auth.admin.generateLink({
+      type: "magiclink",
+      email,
+    });
+    tokenHash = linkData?.properties?.hashed_token ?? null;
+  }
+
+  const { auth_user_id: _omit, ...workerPublic } = data;
+
+  return NextResponse.json({
+    worker: workerPublic,
+    ...(tokenHash && { token_hash: tokenHash }),
+  });
 }

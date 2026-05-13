@@ -1,6 +1,6 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
@@ -105,6 +105,105 @@ export default function GlossaryPage() {
             setTerms(terms.filter(t => t.id !== id));
         }
     };
+
+    // ── Excel Import ──────────────────────────────────────────────
+    type PreviewRow = {
+        slang: string;
+        standard: string;
+        category: string;
+        valid: boolean;      // 은어·표준어 모두 있음
+        duplicate: boolean;  // DB에 이미 존재하는 은어
+    };
+
+    const VALID_CATEGORIES = ["시설","자재","도구","장비","작업","검사","설비","구조","안전","인원","상태","단위","행정","기타"];
+
+    const [isDragging, setIsDragging] = useState(false);
+    const [preview, setPreview] = useState<PreviewRow[]>([]);
+    const [importStatus, setImportStatus] = useState<{ ok: number; dup: number; invalid: number } | null>(null);
+    const [isImporting, setIsImporting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const parseExcelFile = useCallback(async (file: File) => {
+        const xlsx = await import("xlsx");
+        const buffer = await file.arrayBuffer();
+        const wb = xlsx.read(buffer, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows: string[][] = xlsx.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+        // 헤더 행 자동 감지
+        const headerKeywords = ["은어","표준어","slang","standard","카테고리","category"];
+        const startIdx = rows.length > 0 && headerKeywords.some(k =>
+            String(rows[0][0] ?? "").toLowerCase().includes(k) ||
+            String(rows[0][1] ?? "").toLowerCase().includes(k)
+        ) ? 1 : 0;
+
+        const parsed = rows.slice(startIdx).map(row => {
+            const slang    = String(row[0] ?? "").trim();
+            const standard = String(row[1] ?? "").trim();
+            const rawCat   = String(row[2] ?? "").trim();
+            const category = VALID_CATEGORIES.includes(rawCat) ? rawCat : "기타";
+            return { slang, standard, category, valid: Boolean(slang && standard), duplicate: false };
+        }).filter(r => r.slang || r.standard);
+
+        if (parsed.length === 0) { setPreview([]); return; }
+
+        // DB에서 기존 은어 목록 조회 → 중복 표시
+        const supabase = createClient();
+        const slugs = parsed.filter(r => r.slang).map(r => r.slang);
+        const { data: existing } = await supabase
+            .from("construction_glossary")
+            .select("slang")
+            .in("slang", slugs);
+
+        const existingSet = new Set((existing ?? []).map((e: { slang: string }) => e.slang));
+
+        // 엑셀 내부 중복도 체크 (같은 은어가 여러 행에 있을 때 첫 번째만 유효)
+        const seenInFile = new Set<string>();
+        const withDup = parsed.map(r => {
+            const dup = existingSet.has(r.slang) || seenInFile.has(r.slang);
+            if (r.slang) seenInFile.add(r.slang);
+            return { ...r, duplicate: dup };
+        });
+
+        setPreview(withDup);
+        setImportStatus(null);
+    }, []);
+
+    const handleFileDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const file = e.dataTransfer.files[0];
+        if (file) parseExcelFile(file);
+    }, [parseExcelFile]);
+
+    const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) parseExcelFile(file);
+        e.target.value = "";
+    }, [parseExcelFile]);
+
+    const handleImport = async () => {
+        // valid이고 duplicate가 아닌 행만 삽입
+        const newRows = preview.filter(r => r.valid && !r.duplicate);
+        if (newRows.length === 0) return;
+        setIsImporting(true);
+        const supabase = createClient();
+        const { error } = await supabase
+            .from("construction_glossary")
+            .insert(newRows.map(r => ({ slang: r.slang, standard: r.standard, category: r.category, is_active: true })));
+        if (!error) {
+            clearGlossaryCache();
+            const dup     = preview.filter(r => r.duplicate).length;
+            const invalid = preview.filter(r => !r.valid).length;
+            setImportStatus({ ok: newRows.length, dup, invalid });
+            setPreview([]);
+            await fetchTerms();
+        } else {
+            alert("가져오기 실패: " + error.message);
+        }
+        setIsImporting(false);
+    };
+    // ──────────────────────────────────────────────────────────────
 
     const handleTestNormalize = async () => {
         if (!testInput.trim()) return;
@@ -357,6 +456,130 @@ export default function GlossaryPage() {
                                     {isSubmitting ? "저장 중..." : "추가/수정하기"}
                                 </button>
                             </form>
+                        </section>
+
+                        {/* Excel Import */}
+                        <section className="glass rounded-[32px] p-6 border-white/10 shadow-3xl flex flex-col gap-5">
+                            <h2 className="text-xl font-black text-white italic tracking-tight uppercase flex items-center gap-2">
+                                <div className="w-1 h-6 bg-green-500 rounded-full" />
+                                엑셀 일괄 가져오기
+                            </h2>
+                            <p className="text-xs text-slate-500 font-bold leading-relaxed">
+                                A열: 은어 &nbsp;|&nbsp; B열: 표준어 &nbsp;|&nbsp; C열: 카테고리(선택)<br />
+                                헤더 행이 있으면 자동으로 건너뜁니다.
+                            </p>
+
+                            {/* Drop Zone */}
+                            <div
+                                onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+                                onDragLeave={() => setIsDragging(false)}
+                                onDrop={handleFileDrop}
+                                onClick={() => fileInputRef.current?.click()}
+                                className={`cursor-pointer rounded-2xl border-2 border-dashed px-5 py-8 flex flex-col items-center gap-3 transition-all
+                                    ${isDragging ? "border-green-400 bg-green-500/10" : "border-white/10 hover:border-green-500/40 hover:bg-green-500/5"}`}
+                            >
+                                <svg className={`w-10 h-10 ${isDragging ? "text-green-400" : "text-slate-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <p className="text-sm font-bold text-slate-400">
+                                    {isDragging ? "여기에 놓으세요!" : "엑셀 파일을 끌어다 놓거나 클릭"}
+                                </p>
+                                <p className="text-xs text-slate-600">.xlsx · .xls 지원</p>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".xlsx,.xls"
+                                    className="hidden"
+                                    onChange={handleFileChange}
+                                />
+                            </div>
+
+                            {/* 완료 메시지 */}
+                            {importStatus && (
+                                <div className="bg-green-900/30 border border-green-700/40 rounded-xl px-4 py-3 text-sm font-bold space-y-1">
+                                    <p className="text-green-300">✅ {importStatus.ok}개 신규 추가 완료</p>
+                                    {importStatus.dup > 0 && (
+                                        <p className="text-yellow-400">⏭ {importStatus.dup}개 중복 — 자동 제외됨</p>
+                                    )}
+                                    {importStatus.invalid > 0 && (
+                                        <p className="text-red-400">❌ {importStatus.invalid}개 누락 — 건너뜀</p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* 미리보기 */}
+                            {preview.length > 0 && (() => {
+                                const newCount  = preview.filter(r => r.valid && !r.duplicate).length;
+                                const dupCount  = preview.filter(r => r.duplicate).length;
+                                const badCount  = preview.filter(r => !r.valid).length;
+                                return (
+                                    <div className="flex flex-col gap-3">
+                                        {/* 요약 뱃지 */}
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex gap-2 flex-wrap">
+                                                <span className="text-[11px] bg-green-900/40 text-green-400 border border-green-700/40 px-2 py-0.5 rounded-full font-bold">
+                                                    🟢 신규 {newCount}
+                                                </span>
+                                                {dupCount > 0 && (
+                                                    <span className="text-[11px] bg-yellow-900/40 text-yellow-400 border border-yellow-700/40 px-2 py-0.5 rounded-full font-bold">
+                                                        🟡 중복 {dupCount}
+                                                    </span>
+                                                )}
+                                                {badCount > 0 && (
+                                                    <span className="text-[11px] bg-red-900/40 text-red-400 border border-red-700/40 px-2 py-0.5 rounded-full font-bold">
+                                                        🔴 누락 {badCount}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => setPreview([])}
+                                                className="text-xs text-slate-500 hover:text-red-400 transition-colors"
+                                            >
+                                                취소
+                                            </button>
+                                        </div>
+
+                                        {/* 행별 미리보기 */}
+                                        <div className="max-h-52 overflow-y-auto rounded-xl border border-white/10 divide-y divide-white/5">
+                                            {preview.map((row, i) => {
+                                                const isNew = row.valid && !row.duplicate;
+                                                const isDup = row.duplicate;
+                                                const isBad = !row.valid;
+                                                return (
+                                                    <div key={i} className={`flex items-center gap-2 px-3 py-2 text-xs
+                                                        ${isNew ? "bg-slate-800/50"
+                                                        : isDup ? "bg-yellow-900/10"
+                                                        : "bg-red-900/10"}`}>
+                                                        <span className={`w-2 h-2 rounded-full shrink-0
+                                                            ${isNew ? "bg-green-500"
+                                                            : isDup ? "bg-yellow-500"
+                                                            : "bg-red-500"}`}
+                                                        />
+                                                        <span className={`font-bold w-20 truncate ${isDup ? "text-yellow-600 line-through" : isBad ? "text-red-500" : "text-amber-400"}`}>
+                                                            {row.slang || "—"}
+                                                        </span>
+                                                        <span className="text-slate-600">→</span>
+                                                        <span className={`flex-1 truncate ${isDup || isBad ? "text-slate-600" : "text-white"}`}>
+                                                            {row.standard || "—"}
+                                                        </span>
+                                                        <span className="text-slate-700 w-12 text-right shrink-0">{row.category}</span>
+                                                        {isDup && <span className="text-[10px] text-yellow-600 shrink-0">중복</span>}
+                                                        {isBad && <span className="text-[10px] text-red-600 shrink-0">누락</span>}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <button
+                                            onClick={handleImport}
+                                            disabled={isImporting || newCount === 0}
+                                            className="w-full py-4 bg-gradient-to-br from-green-500 to-green-700 text-white font-black rounded-2xl shadow-lg disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                                        >
+                                            {isImporting ? "저장 중..." : `신규 ${newCount}개 추가 (중복 ${dupCount}개 제외)`}
+                                        </button>
+                                    </div>
+                                );
+                            })()}
                         </section>
 
                         {/* Test Normalizer */}

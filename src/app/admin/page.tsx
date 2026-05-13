@@ -560,6 +560,36 @@ function AdminDashboardContent() {
                         </div>
                     </motion.section>
 
+                    {/* 📖 Guide Card */}
+                    <motion.section
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.55 }}
+                        onClick={() => router.push('/admin/guide')}
+                        className="glass rounded-[48px] p-10 border-white/10 hover:border-blue-400/30 transition-all cursor-pointer tap-effect group shadow-2xl relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-400/5 blur-[120px] rounded-full -mr-48 -mt-48 transition-all group-hover:bg-blue-400/10" />
+                        <div className="flex flex-col gap-4 relative md:h-full">
+                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-blue-300 mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                </svg>
+                            </div>
+                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">
+                                {lang === "ko" ? "기능 사용 가이드" : lang === "zh" ? "功能使用指南" : "Feature Guide"}
+                            </h3>
+                            <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
+                                {lang === "ko" ? "NFC 근로자 관리·인센티브·ESG 리포트 단계별 안내. 처음 담당하는 직원도 바로 시작 가능." : lang === "zh" ? "NFC工人管理·激励·ESG报告分步指南。新担当人员也可立即开始。" : "Step-by-step guide for NFC, incentives, and ESG report."}
+                            </p>
+                            <div className="mt-4 flex items-center gap-2 text-blue-300 font-black tracking-widest text-sm uppercase">
+                                <span>Open Guide</span>
+                                <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
+                            </div>
+                        </div>
+                    </motion.section>
+
                     {/* 📊 ESG Report Card (청구항 24) */}
                     <motion.section
                         initial={{ opacity: 0, y: 20 }}
