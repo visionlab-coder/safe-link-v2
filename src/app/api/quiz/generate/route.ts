@@ -117,9 +117,10 @@ export async function POST(req: NextRequest) {
   try {
     const questions = await generateQuizFromText(tbmText, apiKey);
 
-    // 생성된 퀴즈를 DB에 저장
+    let quizSessionId: string | null = null;
+
     if (tbmSessionId && questions.length > 0) {
-      await guard.ctx.service
+      const { data: inserted } = await guard.ctx.service
         .from("tbm_quiz_sessions")
         .insert({
           tbm_session_id: tbmSessionId,
@@ -128,10 +129,12 @@ export async function POST(req: NextRequest) {
           created_by: guard.ctx.user.id,
           status: "draft",
         })
-        .throwOnError();
+        .select("id")
+        .single();
+      quizSessionId = inserted?.id ?? null;
     }
 
-    return NextResponse.json({ questions, tbmSessionId });
+    return NextResponse.json({ questions, tbmSessionId, quizSessionId });
   } catch (err) {
     return NextResponse.json(
       { error: "quiz_generation_failed", detail: err instanceof Error ? err.message : String(err) },
