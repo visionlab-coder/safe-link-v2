@@ -77,6 +77,8 @@ export async function POST(request: NextRequest) {
 
         if (usePapago) {
             try {
+                const papagoCtrl = new AbortController();
+                const papagoTimeout = setTimeout(() => papagoCtrl.abort(), 5000);
                 const papagoRes = await fetch('https://papago.apigw.ntruss.com/nmt/v1/translation', {
                     method: 'POST',
                     headers: {
@@ -89,7 +91,9 @@ export async function POST(request: NextRequest) {
                         target: targetLang,
                         text: processedText,
                     }),
+                    signal: papagoCtrl.signal,
                 });
+                clearTimeout(papagoTimeout);
 
                 if (papagoRes.ok) {
                     const papagoData = await papagoRes.json();
@@ -101,17 +105,37 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        // === 1.5. Gemini 건설현장 번역 (비Papago 언어, non-fast 모드) ===
+        // uz, km, my, ne, bn, kk, ar, hi, mn, tl/ph — Google만 쓰면 문맥 없이 직역됨
+        // fast=false(일반 통역) 시 Gemini로 건설 현장 문맥 보정 번역 우선 시도
+        if (!translatedText && !usePapago && !fast) {
+            const geminiTranslated = await geminiConstructionTranslate(processedText, sl, tl, apiKey);
+            if (geminiTranslated) {
+                translatedText = geminiTranslated;
+                engine = "gemini";
+            }
+        }
+
         // === 2. Google Cloud Translation (기본 및 폴백) ===
         if (!translatedText) {
+            const googleCtrl = new AbortController();
+            const googleTimeout = setTimeout(() => googleCtrl.abort(), 5000);
             const cloudTranslate = (q: string, source: string, target: string) =>
                 fetch(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ q, source, target, format: 'text' }),
+                    signal: googleCtrl.signal,
                 }).then(r => r.json() as Promise<CloudTranslateResponse>);
 
-            const translated = await cloudTranslate(processedText, sourceLang, targetLang);
-            translatedText = translated.data?.translations?.[0]?.translatedText || "";
+            try {
+                const translated = await cloudTranslate(processedText, sourceLang, targetLang);
+                clearTimeout(googleTimeout);
+                translatedText = translated.data?.translations?.[0]?.translatedText || "";
+            } catch (err) {
+                clearTimeout(googleTimeout);
+                console.error("[Translation API] Google Translate error:", err);
+            }
         }
 
         if (!translatedText) {
@@ -408,6 +432,58 @@ async function generateNonLatinPronunciation(apiKey: string, text: string, lang:
         const koreanOnly = result.replace(/[^\uAC00-\uD7A3\s]/g, "").trim();
         return koreanOnly.length >= 1 ? koreanOnly : "";
     } catch {
+        return "";
+    }
+}
+
+/** 건설현장 문맥 Gemini 번역 (비Papago 언어: uz, km, my, ne, bn, kk, ar, hi, mn, tl/ph) */
+async function geminiConstructionTranslate(text: string, sl: string, tl: string, apiKey: string): Promise<string> {
+    if (!text || text.length > 3000) return "";
+
+    const langNames: Record<string, string> = {
+        ko: '한국어', en: '영어', zh: '중국어', vi: '베트남어', id: '인도네시아어',
+        th: '태국어', ru: '러시아어', ja: '일본어', jp: '일본어', fr: '프랑스어', es: '스페인어',
+        uz: '우즈베크어', km: '크메르어', mn: '몽골어', my: '미얀마어', ne: '네팔어',
+        bn: '벵골어', kk: '카자흐어', ar: '아랍어', hi: '힌디어', tl: '필리핀어', ph: '필리핀어',
+    };
+    const sourceName = langNames[sl] || sl;
+    const targetName = langNames[tl] || tl;
+
+    const prompt = `당신은 건설현장 안전교육 전문 번역가입니다.
+다음 텍스트를 ${sourceName}에서 ${targetName}으로 번역하세요.
+
+번역 규칙:
+1. 건설현장 안전 용어를 정확하게 번역 (헬멧, 안전모, 추락방지, 거푸집, 철근 등)
+2. 현장 근로자가 이해하기 쉬운 자연스러운 표현
+3. 안전 지시는 명확하고 직접적으로
+4. 번역문만 반환 (설명·원문·따옴표 없이)
+
+원문: ${text}
+
+번역:`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    try {
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+                signal: controller.signal,
+                body: JSON.stringify({
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                    generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
+                }),
+            }
+        );
+        clearTimeout(timeout);
+        if (!response.ok) return "";
+        const data = await response.json() as GeminiResponse;
+        return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+    } catch {
+        clearTimeout(timeout);
         return "";
     }
 }

@@ -107,7 +107,7 @@ async function transcribeWithWhisper(
     formData.append('response_format', 'json');
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
+    const timeout = setTimeout(() => controller.abort(), 8000);
 
     try {
         const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
@@ -134,8 +134,8 @@ async function transcribeWithWhisper(
 }
 
 const MIN_CONFIDENCE = 0.6;
-/** live 모드(TBM 방송·Travel Talk) — 다국어 혼재 환경, 더 엄격한 신뢰도 요구 */
-const MIN_CONFIDENCE_LIVE = 0.75;
+/** live 모드(TBM 방송·Travel Talk) — 0.65로 완화: 0.75는 너무 엄격해 유효 발화 폐기 */
+const MIN_CONFIDENCE_LIVE = 0.65;
 
 /** 음성 어시스턴트 wake word — STT가 잡아도 즉시 폐기 */
 const WAKE_WORD_RE = /^(ok\s*google|okay\s*google|hey\s*google|ok\s*구글|오케이\s*구글|hey\s*siri|하이\s*빅스비|hi\s*bixby|ok\s*bixby|알렉사|alexa)\.?$/i;
