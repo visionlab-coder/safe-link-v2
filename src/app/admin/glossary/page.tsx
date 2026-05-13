@@ -347,24 +347,34 @@ export default function GlossaryPage() {
     };
 
     const handleImport = async () => {
-        // valid이고 duplicate가 아닌 행만 삽입
-        const newRows = preview.filter(r => r.valid && !r.duplicate);
-        if (newRows.length === 0) return;
+        const validRows = preview.filter(r => r.valid);
+        if (validRows.length === 0) {
+            setImportError("유효한 행이 없습니다. 은어와 표준어 컬럼을 확인해주세요.");
+            return;
+        }
         setIsImporting(true);
         setImportError("");
-        const supabase = createClient();
-        const { error } = await supabase
-            .from("construction_glossary")
-            .insert(newRows.map(r => ({ slang: r.slang, standard: r.standard, category: r.category, is_active: true })));
-        if (!error) {
-            clearGlossaryCache();
-            const dup     = preview.filter(r => r.duplicate).length;
-            const invalid = preview.filter(r => !r.valid).length;
-            setImportStatus({ ok: newRows.length, dup, invalid });
-            setPreview([]);
-            await fetchTerms();
+
+        // 서버 API 경유 — 서비스 롤로 RLS 우회하여 안정적 저장
+        const res = await fetch("/api/glossary/import", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(validRows.map(r => ({ slang: r.slang, standard: r.standard, category: r.category }))),
+        });
+        const result = await res.json();
+
+        if (!res.ok) {
+            setImportError("저장 실패: " + (result.error ?? res.statusText));
         } else {
-            setImportError("Supabase 입력 실패: " + error.message);
+            clearGlossaryCache();
+            const invalid = preview.filter(r => !r.valid).length;
+            setImportStatus({ ok: result.ok, dup: result.dup, invalid });
+            if (result.ok === 0) {
+                setImportError(result.message ?? "저장된 항목이 없습니다. 모두 이미 등록된 항목이거나 중복입니다.");
+            } else {
+                setPreview([]);
+                await fetchTerms();
+            }
         }
         setIsImporting(false);
     };
