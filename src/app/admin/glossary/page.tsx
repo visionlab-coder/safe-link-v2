@@ -15,6 +15,65 @@ type GlossaryTerm = {
     is_active: boolean;
 };
 
+type PreviewRow = {
+    slang: string;
+    standard: string;
+    category: string;
+    valid: boolean;
+    duplicate: boolean;
+    source?: string;
+};
+
+const VALID_CATEGORIES = ["시설", "자재", "도구", "장비", "작업", "검사", "설비", "구조", "안전", "인원", "상태", "단위", "행정", "기타"];
+
+const HEADER_KEYWORDS = ["용어", "은어", "현장용어", "표준어", "standard", "slang", "category", "분류", "카테고리"];
+
+function splitDelimitedLine(line: string) {
+    if (line.includes("\t")) return line.split("\t");
+
+    const commaParts = line.split(",");
+    if (commaParts.length >= 2) return commaParts;
+
+    const arrowParts = line.split(/\s*(?:=>|->|→|:|=|\|)\s*/);
+    if (arrowParts.length >= 2) return arrowParts;
+
+    return [line];
+}
+
+function normalizeCategory(rawCategory: string) {
+    const category = rawCategory.trim();
+    return VALID_CATEGORIES.includes(category) ? category : "기타";
+}
+
+function rowsFromText(text: string, source: string): PreviewRow[] {
+    const lines = text
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean);
+
+    return lines
+        .map<PreviewRow | null>((line, index) => {
+            const parts = splitDelimitedLine(line).map(part => part.trim()).filter(Boolean);
+            const isHeader = index === 0 && parts.some(part => HEADER_KEYWORDS.some(keyword => part.toLowerCase().includes(keyword.toLowerCase())));
+
+            if (isHeader || parts.length < 2) return null;
+
+            const slang = parts[0] || "";
+            const standard = parts[1] || "";
+            const category = normalizeCategory(parts[2] || "");
+
+            return {
+                slang,
+                standard,
+                category,
+                valid: Boolean(slang && standard),
+                duplicate: false,
+                source,
+            };
+        })
+        .filter((row): row is PreviewRow => row !== null);
+}
+
 export default function GlossaryPage() {
     const router = useRouter();
     const [terms, setTerms] = useState<GlossaryTerm[]>([]);
@@ -115,12 +174,14 @@ export default function GlossaryPage() {
         duplicate: boolean;  // DB에 이미 존재하는 은어
     };
 
-    const VALID_CATEGORIES = ["시설","자재","도구","장비","작업","검사","설비","구조","안전","인원","상태","단위","행정","기타"];
-
     const [isDragging, setIsDragging] = useState(false);
     const [preview, setPreview] = useState<PreviewRow[]>([]);
     const [importStatus, setImportStatus] = useState<{ ok: number; dup: number; invalid: number } | null>(null);
     const [isImporting, setIsImporting] = useState(false);
+    const [webUrl, setWebUrl] = useState("");
+    const [pasteText, setPasteText] = useState("");
+    const [isFetchingUrl, setIsFetchingUrl] = useState(false);
+    const [importError, setImportError] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const parseExcelFile = useCallback(async (file: File) => {
@@ -141,7 +202,7 @@ export default function GlossaryPage() {
             const slang    = String(row[0] ?? "").trim();
             const standard = String(row[1] ?? "").trim();
             const rawCat   = String(row[2] ?? "").trim();
-            const category = VALID_CATEGORIES.includes(rawCat) ? rawCat : "기타";
+            const category = normalizeCategory(rawCat);
             return { slang, standard, category, valid: Boolean(slang && standard), duplicate: false };
         }).filter(r => r.slang || r.standard);
 
@@ -169,24 +230,113 @@ export default function GlossaryPage() {
         setImportStatus(null);
     }, []);
 
+    const annotateImportedRows = useCallback(async (rows: PreviewRow[]) => {
+        const parsed = rows.filter(row => row.slang || row.standard);
+
+        if (parsed.length === 0) {
+            setPreview([]);
+            setImportStatus(null);
+            setImportError("가져올 수 있는 용어가 없습니다. 한 줄에 '현장용어, 표준어, 분류' 형식으로 입력해 주세요.");
+            return;
+        }
+
+        const supabase = createClient();
+        const slangs = Array.from(new Set(parsed.filter(row => row.slang).map(row => row.slang)));
+        const { data: existing, error } = await supabase
+            .from("construction_glossary")
+            .select("slang")
+            .in("slang", slangs);
+
+        if (error) {
+            setImportError("기존 용어 확인 실패: " + error.message);
+            return;
+        }
+
+        const existingSet = new Set((existing ?? []).map((row: { slang: string }) => row.slang));
+        const seenInInput = new Set<string>();
+        const withDup = parsed.map(row => {
+            const duplicate = Boolean(row.slang && (existingSet.has(row.slang) || seenInInput.has(row.slang)));
+            if (row.slang) seenInInput.add(row.slang);
+            return { ...row, duplicate };
+        });
+
+        setPreview(withDup);
+        setImportStatus(null);
+        setImportError("");
+    }, []);
+
+    const parseDocumentFile = useCallback(async (file: File) => {
+        const lowerName = file.name.toLowerCase();
+
+        if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
+            await parseExcelFile(file);
+            return;
+        }
+
+        if (lowerName.endsWith(".docx")) {
+            const mammoth = await import("mammoth");
+            const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+            await annotateImportedRows(rowsFromText(result.value, file.name));
+            return;
+        }
+
+        if (lowerName.endsWith(".txt") || lowerName.endsWith(".md") || lowerName.endsWith(".csv") || lowerName.endsWith(".tsv") || lowerName.endsWith(".html") || lowerName.endsWith(".htm")) {
+            await annotateImportedRows(rowsFromText(await file.text(), file.name));
+            return;
+        }
+
+        setImportError("지원하지 않는 파일입니다. xlsx, xls, docx, csv, tsv, txt, md, html 파일을 사용해 주세요.");
+    }, [annotateImportedRows, parseExcelFile]);
+
     const handleFileDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
         const file = e.dataTransfer.files[0];
-        if (file) parseExcelFile(file);
-    }, [parseExcelFile]);
+        if (file) parseDocumentFile(file);
+    }, [parseDocumentFile]);
 
     const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) parseExcelFile(file);
+        if (file) parseDocumentFile(file);
         e.target.value = "";
-    }, [parseExcelFile]);
+    }, [parseDocumentFile]);
+
+    const handlePastePreview = async () => {
+        await annotateImportedRows(rowsFromText(pasteText, "직접 입력"));
+    };
+
+    const handleFetchWebPage = async () => {
+        if (!webUrl.trim()) return;
+
+        setIsFetchingUrl(true);
+        setImportError("");
+
+        try {
+            const response = await fetch("/api/glossary/fetch-url", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url: webUrl.trim() }),
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.message || result.error || "웹 페이지를 가져오지 못했습니다.");
+            }
+
+            await annotateImportedRows(rowsFromText(result.text || "", result.title || webUrl));
+        } catch (error: any) {
+            setImportError(error.message || "웹 페이지를 가져오지 못했습니다.");
+        } finally {
+            setIsFetchingUrl(false);
+        }
+    };
 
     const handleImport = async () => {
         // valid이고 duplicate가 아닌 행만 삽입
         const newRows = preview.filter(r => r.valid && !r.duplicate);
         if (newRows.length === 0) return;
         setIsImporting(true);
+        setImportError("");
         const supabase = createClient();
         const { error } = await supabase
             .from("construction_glossary")
@@ -199,7 +349,7 @@ export default function GlossaryPage() {
             setPreview([]);
             await fetchTerms();
         } else {
-            alert("가져오기 실패: " + error.message);
+            setImportError("Supabase 입력 실패: " + error.message);
         }
         setIsImporting(false);
     };
@@ -469,6 +619,40 @@ export default function GlossaryPage() {
                                 헤더 행이 있으면 자동으로 건너뜁니다.
                             </p>
 
+                            <div className="flex flex-col gap-3">
+                                <div className="flex gap-2">
+                                    <input
+                                        value={webUrl}
+                                        onChange={e => setWebUrl(e.target.value)}
+                                        placeholder="https://example.com/glossary"
+                                        className="min-w-0 flex-1 bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-green-500/50"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleFetchWebPage}
+                                        disabled={isFetchingUrl || !webUrl.trim()}
+                                        className="shrink-0 px-4 py-3 bg-green-600/20 text-green-300 hover:bg-green-600/35 disabled:opacity-40 rounded-xl text-xs font-black transition-colors"
+                                    >
+                                        {isFetchingUrl ? "가져오는 중" : "웹 가져오기"}
+                                    </button>
+                                </div>
+
+                                <textarea
+                                    value={pasteText}
+                                    onChange={e => setPasteText(e.target.value)}
+                                    placeholder={"현장용어, 표준어, 분류\n오함마, 대형 망치, 도구"}
+                                    className="w-full h-24 bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-green-500/50 resize-none"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handlePastePreview}
+                                    disabled={!pasteText.trim()}
+                                    className="w-full py-3 bg-white/5 text-slate-300 hover:bg-white/10 disabled:opacity-40 rounded-xl text-xs font-black transition-colors"
+                                >
+                                    붙여넣은 문서 미리보기
+                                </button>
+                            </div>
+
                             {/* Drop Zone */}
                             <div
                                 onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
@@ -488,13 +672,19 @@ export default function GlossaryPage() {
                                 <input
                                     ref={fileInputRef}
                                     type="file"
-                                    accept=".xlsx,.xls"
+                                    accept=".xlsx,.xls,.docx,.csv,.tsv,.txt,.md,.html,.htm"
                                     className="hidden"
                                     onChange={handleFileChange}
                                 />
                             </div>
 
                             {/* 완료 메시지 */}
+                            {importError && (
+                                <div className="bg-red-900/25 border border-red-700/40 rounded-xl px-4 py-3 text-sm font-bold text-red-300">
+                                    {importError}
+                                </div>
+                            )}
+
                             {importStatus && (
                                 <div className="bg-green-900/30 border border-green-700/40 rounded-xl px-4 py-3 text-sm font-bold space-y-1">
                                     <p className="text-green-300">✅ {importStatus.ok}개 신규 추가 완료</p>
