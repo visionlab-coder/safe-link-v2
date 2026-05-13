@@ -1,3 +1,4 @@
+import "server-only";
 import { createClient } from '@supabase/supabase-js';
 
 /** 서버사이드 전용 — RLS 우회. API Route에서만 사용할 것 */
