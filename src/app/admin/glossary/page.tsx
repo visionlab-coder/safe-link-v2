@@ -612,63 +612,28 @@ export default function GlossaryPage() {
                         <section className="glass rounded-[32px] p-6 border-white/10 shadow-3xl flex flex-col gap-5">
                             <h2 className="text-xl font-black text-white italic tracking-tight uppercase flex items-center gap-2">
                                 <div className="w-1 h-6 bg-green-500 rounded-full" />
-                                엑셀 일괄 가져오기
+                                일괄 가져오기
                             </h2>
-                            <p className="text-xs text-slate-500 font-bold leading-relaxed">
-                                A열: 은어 &nbsp;|&nbsp; B열: 표준어 &nbsp;|&nbsp; C열: 카테고리(선택)<br />
-                                헤더 행이 있으면 자동으로 건너뜁니다.
-                            </p>
 
-                            <div className="flex flex-col gap-3">
-                                <div className="flex gap-2">
-                                    <input
-                                        value={webUrl}
-                                        onChange={e => setWebUrl(e.target.value)}
-                                        placeholder="https://example.com/glossary"
-                                        className="min-w-0 flex-1 bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-green-500/50"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={handleFetchWebPage}
-                                        disabled={isFetchingUrl || !webUrl.trim()}
-                                        className="shrink-0 px-4 py-3 bg-green-600/20 text-green-300 hover:bg-green-600/35 disabled:opacity-40 rounded-xl text-xs font-black transition-colors"
-                                    >
-                                        {isFetchingUrl ? "가져오는 중" : "웹 가져오기"}
-                                    </button>
-                                </div>
-
-                                <textarea
-                                    value={pasteText}
-                                    onChange={e => setPasteText(e.target.value)}
-                                    placeholder={"현장용어, 표준어, 분류\n오함마, 대형 망치, 도구"}
-                                    className="w-full h-24 bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-green-500/50 resize-none"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={handlePastePreview}
-                                    disabled={!pasteText.trim()}
-                                    className="w-full py-3 bg-white/5 text-slate-300 hover:bg-white/10 disabled:opacity-40 rounded-xl text-xs font-black transition-colors"
-                                >
-                                    붙여넣은 문서 미리보기
-                                </button>
-                            </div>
-
-                            {/* Drop Zone */}
+                            {/* 파일 첨부 버튼 — 가장 눈에 띄게 상단 배치 */}
                             <div
                                 onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
                                 onDragLeave={() => setIsDragging(false)}
                                 onDrop={handleFileDrop}
                                 onClick={() => fileInputRef.current?.click()}
-                                className={`cursor-pointer rounded-2xl border-2 border-dashed px-5 py-8 flex flex-col items-center gap-3 transition-all
-                                    ${isDragging ? "border-green-400 bg-green-500/10" : "border-white/10 hover:border-green-500/40 hover:bg-green-500/5"}`}
+                                className={`cursor-pointer rounded-2xl border-2 border-dashed px-5 py-7 flex flex-col items-center gap-3 transition-all
+                                    ${isDragging ? "border-green-400 bg-green-500/15" : "border-green-500/40 bg-green-500/5 hover:border-green-400 hover:bg-green-500/10"}`}
                             >
-                                <svg className={`w-10 h-10 ${isDragging ? "text-green-400" : "text-slate-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                <svg className={`w-10 h-10 ${isDragging ? "text-green-300" : "text-green-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                 </svg>
-                                <p className="text-sm font-bold text-slate-400">
-                                    {isDragging ? "여기에 놓으세요!" : "엑셀 파일을 끌어다 놓거나 클릭"}
-                                </p>
-                                <p className="text-xs text-slate-600">.xlsx · .xls 지원</p>
+                                <div className="text-center">
+                                    <p className="text-sm font-black text-green-300">
+                                        {isDragging ? "여기에 놓으세요!" : "📎 엑셀 파일 첨부"}
+                                    </p>
+                                    <p className="text-xs text-slate-500 mt-1">클릭하거나 파일을 끌어다 놓으세요</p>
+                                    <p className="text-[10px] text-slate-600 mt-1">.xlsx · .xls · .csv · .docx</p>
+                                </div>
                                 <input
                                     ref={fileInputRef}
                                     type="file"
@@ -677,6 +642,52 @@ export default function GlossaryPage() {
                                     onChange={handleFileChange}
                                 />
                             </div>
+
+                            <p className="text-xs text-slate-600 font-bold leading-relaxed text-center">
+                                A열: 은어 &nbsp;|&nbsp; B열: 표준어 &nbsp;|&nbsp; C열: 카테고리(선택) · 헤더 행 자동 건너뜀
+                            </p>
+
+                            {/* 다른 방법: 웹 URL / 텍스트 붙여넣기 */}
+                            <details className="group">
+                                <summary className="cursor-pointer text-xs font-black text-slate-500 hover:text-slate-300 transition-colors list-none flex items-center gap-2">
+                                    <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                    다른 방법으로 가져오기 (웹 URL · 텍스트 붙여넣기)
+                                </summary>
+                                <div className="flex flex-col gap-3 mt-3">
+                                    <div className="flex gap-2">
+                                        <input
+                                            value={webUrl}
+                                            onChange={e => setWebUrl(e.target.value)}
+                                            placeholder="https://example.com/glossary"
+                                            className="min-w-0 flex-1 bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-green-500/50"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleFetchWebPage}
+                                            disabled={isFetchingUrl || !webUrl.trim()}
+                                            className="shrink-0 px-4 py-3 bg-green-600/20 text-green-300 hover:bg-green-600/35 disabled:opacity-40 rounded-xl text-xs font-black transition-colors"
+                                        >
+                                            {isFetchingUrl ? "가져오는 중" : "웹 가져오기"}
+                                        </button>
+                                    </div>
+                                    <textarea
+                                        value={pasteText}
+                                        onChange={e => setPasteText(e.target.value)}
+                                        placeholder={"현장용어, 표준어, 분류\n오함마, 대형 망치, 도구"}
+                                        className="w-full h-24 bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-green-500/50 resize-none"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handlePastePreview}
+                                        disabled={!pasteText.trim()}
+                                        className="w-full py-3 bg-white/5 text-slate-300 hover:bg-white/10 disabled:opacity-40 rounded-xl text-xs font-black transition-colors"
+                                    >
+                                        붙여넣은 내용 미리보기
+                                    </button>
+                                </div>
+                            </details>
 
                             {/* 완료 메시지 */}
                             {importError && (
