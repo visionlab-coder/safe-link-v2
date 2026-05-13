@@ -191,17 +191,32 @@ export default function GlossaryPage() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows: string[][] = xlsx.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
-        // 헤더 행 자동 감지
-        const headerKeywords = ["은어","표준어","slang","standard","카테고리","category"];
-        const startIdx = rows.length > 0 && headerKeywords.some(k =>
-            String(rows[0][0] ?? "").toLowerCase().includes(k) ||
-            String(rows[0][1] ?? "").toLowerCase().includes(k)
-        ) ? 1 : 0;
+        if (rows.length === 0) { setPreview([]); return; }
+
+        // 헤더 행에서 각 컬럼 의미 자동 감지 (어느 열에 있어도 OK)
+        const SLANG_KW    = ["은어", "슬랭", "현장용어", "속어", "slang"];
+        const STANDARD_KW = ["표준어", "표준", "standard", "정식", "정식명칭"];
+        const CATEGORY_KW = ["카테고리", "소분류", "분류", "category"];
+
+        const headerRow = rows[0].map(c => String(c ?? "").toLowerCase().trim());
+        let slangIdx = -1, standardIdx = -1, categoryIdx = -1;
+        headerRow.forEach((cell, i) => {
+            if (SLANG_KW.some(k => cell.includes(k)))    slangIdx    = i;
+            if (STANDARD_KW.some(k => cell.includes(k))) standardIdx = i;
+            if (CATEGORY_KW.some(k => cell.includes(k))) categoryIdx = i;
+        });
+
+        // 헤더를 찾으면 1행부터, 못 찾으면 0열=은어·1열=표준어로 가정
+        const hasHeader = slangIdx >= 0 && standardIdx >= 0;
+        const startIdx  = hasHeader ? 1 : 0;
+        const sIdx      = hasHeader ? slangIdx    : 0;
+        const tIdx      = hasHeader ? standardIdx : 1;
+        const cIdx      = hasHeader ? (categoryIdx >= 0 ? categoryIdx : -1) : 2;
 
         const parsed = rows.slice(startIdx).map(row => {
-            const slang    = String(row[0] ?? "").trim();
-            const standard = String(row[1] ?? "").trim();
-            const rawCat   = String(row[2] ?? "").trim();
+            const slang    = String(row[sIdx] ?? "").trim();
+            const standard = String(row[tIdx] ?? "").trim();
+            const rawCat   = cIdx >= 0 ? String(row[cIdx] ?? "").trim() : "";
             const category = normalizeCategory(rawCat);
             return { slang, standard, category, valid: Boolean(slang && standard), duplicate: false };
         }).filter(r => r.slang || r.standard);

@@ -1,5 +1,6 @@
 import { CONSTRUCTION_GLOSSARY } from "@/constants/glossary";
 import { createClient } from "@/utils/supabase/client";
+import { createServiceClient } from "@/utils/supabase/service";
 
 export interface NormalizeResult {
     original: string;
@@ -15,23 +16,27 @@ let _dbGlossaryCache: Record<string, string> | null = null;
 /**
  * fetchGlossaryFromDB
  * Supabase의 전역 construction_glossary 테이블에서 사전을 가져옵니다.
+ * 서버사이드(API Route): 서비스 롤 클라이언트로 RLS 우회
+ * 클라이언트사이드: anon 클라이언트 사용 (SELECT RLS 필요)
  * 실패 시 로컬 상수(CONSTRUCTION_GLOSSARY)를 fallback으로 사용합니다.
  */
 export async function fetchGlossaryFromDB(): Promise<Record<string, string>> {
     if (_dbGlossaryCache) return _dbGlossaryCache;
 
     try {
-        const supabase = createClient();
+        // 서버사이드(API Route)에서는 서비스 롤로 RLS 우회
+        const isServer = typeof window === "undefined";
+        const supabase = isServer ? createServiceClient() : createClient();
+
         const { data, error } = await supabase
             .from("construction_glossary")
             .select("slang, standard")
             .eq("is_active", true);
 
         if (error || !data || data.length === 0) {
-            console.warn("[normalize] DB 사전 불러오기 실패, 로컬 fallback 사용");
+            console.warn("[normalize] DB 사전 불러오기 실패, 로컬 fallback 사용", error?.message);
             _dbGlossaryCache = CONSTRUCTION_GLOSSARY;
         } else {
-            // Keep bundled safety terms available even when the DB has a partial glossary.
             const dbDict: Record<string, string> = { ...CONSTRUCTION_GLOSSARY };
             for (const row of data) {
                 dbDict[row.slang] = row.standard;
