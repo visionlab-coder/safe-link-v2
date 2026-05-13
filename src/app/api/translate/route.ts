@@ -6,6 +6,12 @@ import { hangulize } from '@/utils/hangulize';
 import pinyin from 'tiny-pinyin';
 import { preProcessWithGlossary } from '@/utils/construction-glossary';
 import { formalizeKo } from '@/utils/politeness';
+import {
+    PAPAGO_TIMEOUT_MS,
+    GOOGLE_TRANSLATE_TIMEOUT_MS,
+    GEMINI_TRANSLATE_TIMEOUT_MS,
+    GEMINI_PRONUNCIATION_TIMEOUT_MS,
+} from '@/constants/quality-config';
 
 interface CloudTranslateResponse {
     data?: { translations?: Array<{ translatedText?: string }> };
@@ -78,7 +84,7 @@ export async function POST(request: NextRequest) {
         if (usePapago) {
             try {
                 const papagoCtrl = new AbortController();
-                const papagoTimeout = setTimeout(() => papagoCtrl.abort(), 5000);
+                const papagoTimeout = setTimeout(() => papagoCtrl.abort(), PAPAGO_TIMEOUT_MS);
                 const papagoRes = await fetch('https://papago.apigw.ntruss.com/nmt/v1/translation', {
                     method: 'POST',
                     headers: {
@@ -119,7 +125,7 @@ export async function POST(request: NextRequest) {
         // === 2. Google Cloud Translation (기본 및 폴백) ===
         if (!translatedText) {
             const googleCtrl = new AbortController();
-            const googleTimeout = setTimeout(() => googleCtrl.abort(), 5000);
+            const googleTimeout = setTimeout(() => googleCtrl.abort(), GOOGLE_TRANSLATE_TIMEOUT_MS);
             const cloudTranslate = (q: string, source: string, target: string) =>
                 fetch(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, {
                     method: 'POST',
@@ -254,7 +260,7 @@ async function generateChinesePronunciation(apiKey: string, chineseText: string)
 발음:`;
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 7000);
+        const timeout = setTimeout(() => controller.abort(), GEMINI_PRONUNCIATION_TIMEOUT_MS);
 
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
@@ -302,7 +308,7 @@ async function generateJapanesePronunciation(apiKey: string, japaneseText: strin
 발음:`;
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 7000);
+        const timeout = setTimeout(() => controller.abort(), GEMINI_PRONUNCIATION_TIMEOUT_MS);
 
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
@@ -348,7 +354,7 @@ async function generateThaiPronunciation(apiKey: string, thaiText: string): Prom
 발음:`;
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 7000);
+        const timeout = setTimeout(() => controller.abort(), GEMINI_PRONUNCIATION_TIMEOUT_MS);
 
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
@@ -408,7 +414,7 @@ async function generateNonLatinPronunciation(apiKey: string, text: string, lang:
 발음:`;
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 7000);
+        const timeout = setTimeout(() => controller.abort(), GEMINI_PRONUNCIATION_TIMEOUT_MS);
 
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
@@ -463,7 +469,7 @@ async function geminiConstructionTranslate(text: string, sl: string, tl: string,
 번역:`;
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), GEMINI_TRANSLATE_TIMEOUT_MS);
 
     try {
         const response = await fetch(

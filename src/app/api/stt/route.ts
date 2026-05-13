@@ -3,6 +3,13 @@ export const runtime = "nodejs";
 import { getErrorMessage } from '@/utils/errors';
 import { CONSTRUCTION_SPEECH_HINTS } from '@/constants/construction-terms';
 import { CONSTRUCTION_GLOSSARY } from '@/constants/glossary';
+import {
+    WHISPER_TIMEOUT_MS,
+    GOOGLE_STT_TIMEOUT_MS,
+    GEMINI_STT_CORRECTION_TIMEOUT_MS,
+    STT_MIN_CONFIDENCE,
+    STT_MIN_CONFIDENCE_LIVE,
+} from '@/constants/quality-config';
 
 /** 동기 정규화: 은어→표준어 (서버사이드, DB 미사용) */
 function normalizeServerSide(text: string): { normalized: string; changes: { from: string; to: string }[] } {
@@ -47,7 +54,7 @@ async function correctWithLLM(transcript: string, apiKey: string): Promise<strin
 반드시 교정된 텍스트만 반환하세요. 설명이나 따옴표 없이 텍스트만 출력하세요.`;
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 3000);
+        const timeout = setTimeout(() => controller.abort(), GEMINI_STT_CORRECTION_TIMEOUT_MS);
 
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
@@ -107,7 +114,7 @@ async function transcribeWithWhisper(
     formData.append('response_format', 'json');
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), WHISPER_TIMEOUT_MS);
 
     try {
         const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
@@ -133,9 +140,9 @@ async function transcribeWithWhisper(
     }
 }
 
-const MIN_CONFIDENCE = 0.6;
-/** live 모드(TBM 방송·Travel Talk) — 0.65로 완화: 0.75는 너무 엄격해 유효 발화 폐기 */
-const MIN_CONFIDENCE_LIVE = 0.65;
+// 신뢰도 임계값 — quality-config.ts 에서 중앙 관리 (임의 변경 금지)
+const MIN_CONFIDENCE = STT_MIN_CONFIDENCE;
+const MIN_CONFIDENCE_LIVE = STT_MIN_CONFIDENCE_LIVE;
 
 /** 음성 어시스턴트 wake word — STT가 잡아도 즉시 폐기 */
 const WAKE_WORD_RE = /^(ok\s*google|okay\s*google|hey\s*google|ok\s*구글|오케이\s*구글|hey\s*siri|하이\s*빅스비|hi\s*bixby|ok\s*bixby|알렉사|alexa)\.?$/i;
@@ -259,7 +266,7 @@ export async function POST(req: Request) {
         const tryEnhanced = !live;
         const callSTT = async (enhanced: boolean): Promise<Response> => {
             const ctrl = new AbortController();
-            const t = setTimeout(() => ctrl.abort(), 3000);
+            const t = setTimeout(() => ctrl.abort(), GOOGLE_STT_TIMEOUT_MS);
             const res = await fetch(`https://speech.googleapis.com/v1/speech:recognize`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "x-goog-api-key": GOOGLE_API_KEY },
