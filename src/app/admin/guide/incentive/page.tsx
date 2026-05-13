@@ -144,7 +144,7 @@ export default function GuideIncentivePage() {
               </div>
               <div className="bg-green-900/20 border border-green-800/40 rounded-xl p-3">
                 <p className="text-xs text-green-400">
-                  ✅ 지급 확정 시 버튼이 "지급완료"로 변경되고 이력 자동 저장
+                  ✅ 지급 확정 시 버튼이 &quot;지급완료&quot;로 변경되고 이력 자동 저장
                 </p>
               </div>
             </StepCard>

@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
     tokenHash = linkData?.properties?.hashed_token ?? null;
   }
 
-  const { auth_user_id: _omit, ...workerPublic } = data;
+  const { auth_user_id: _, ...workerPublic } = data;
 
   return NextResponse.json({
     worker: workerPublic,

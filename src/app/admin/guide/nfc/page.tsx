@@ -163,7 +163,7 @@ export default function GuideNfcPage() {
 
               <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-2">3-1. 세션 개설</p>
               <div className="bg-gray-800 rounded-xl p-3 mb-4 text-sm text-gray-300 space-y-1">
-                <p>1. "새 TBM 세션 시작" 클릭</p>
+                <p>1. &quot;새 TBM 세션 시작&quot; 클릭</p>
                 <p>2. 세션 제목 입력: <span className="font-mono text-white">2026-05-13 오전 TBM</span></p>
                 <p>3. 시작 → 상태: <span className="text-green-400 font-bold">running</span></p>
               </div>
@@ -176,7 +176,7 @@ export default function GuideNfcPage() {
               </div>
 
               <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-2">3-3. 세션 종료</p>
-              <p className="text-sm text-gray-300">모든 근로자 태그 완료 후 "세션 종료" 클릭 → 상태: <span className="text-gray-400">closed</span></p>
+              <p className="text-sm text-gray-300">모든 근로자 태그 완료 후 &quot;세션 종료&quot; 클릭 → 상태: <span className="text-gray-400">closed</span></p>
             </StepCard>
 
             {/* Step 4 */}
@@ -186,7 +186,7 @@ export default function GuideNfcPage() {
               </p>
               <ol className="space-y-2 text-sm text-gray-300">
                 <li>1. 이름 또는 코드로 근로자 검색</li>
-                <li>2. <strong className="text-white">"재발급"</strong> 클릭 → 이전 스티커 자동 폐기</li>
+                <li>2. <strong className="text-white">&quot;재발급&quot;</strong> 클릭 → 이전 스티커 자동 폐기</li>
                 <li>3. 새 NFC 스티커에 기록</li>
                 <li>4. 기존 스티커 회수 후 파기</li>
               </ol>

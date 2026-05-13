@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { CheckCircle, Globe2, Loader2, ShieldCheck } from "lucide-react";
+import { Globe2, Loader2, ShieldCheck } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
 type CountryOption = {
