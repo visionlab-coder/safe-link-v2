@@ -94,6 +94,7 @@ export default function WorkerQuizPage() {
       const workerLang = (prof as { preferred_lang?: string } | null)?.preferred_lang ?? "ko";
       setLang(workerLang);
 
+      // Patch C-5: answer_index_correct는 answered 상태에서만 유효 사용 (채점 전 노출 금지는 API 레이어에서 강제)
       const { data: responses } = await supabase
         .from("tbm_quiz_responses")
         .select("id, lang, questions_translated, answer_index_correct, answers_submitted, score_pct, status, answered_at")

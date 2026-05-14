@@ -9,27 +9,32 @@ type CountryOption = {
   code: string;
   lang: string;
   label: string;
-  flag: string;
+};
+
+type DeviceLocation = {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
 };
 
 const COUNTRIES: CountryOption[] = [
-  { code: "KR", lang: "ko", label: "한국",        flag: "🇰🇷" },
-  { code: "VN", lang: "vi", label: "Vietnam",     flag: "🇻🇳" },
-  { code: "CN", lang: "zh", label: "中国",         flag: "🇨🇳" },
-  { code: "TH", lang: "th", label: "ไทย",         flag: "🇹🇭" },
-  { code: "ID", lang: "id", label: "Indonesia",   flag: "🇮🇩" },
-  { code: "PH", lang: "ph", label: "Philippines", flag: "🇵🇭" },
-  { code: "UZ", lang: "uz", label: "Oʻzbekiston", flag: "🇺🇿" },
-  { code: "RU", lang: "ru", label: "Россия",      flag: "🇷🇺" },
-  { code: "MN", lang: "mn", label: "Монгол",      flag: "🇲🇳" },
-  { code: "NP", lang: "ne", label: "नेपाल",       flag: "🇳🇵" },
-  { code: "MM", lang: "my", label: "မြန်မာ",      flag: "🇲🇲" },
-  { code: "KH", lang: "km", label: "កម្ពុជា",     flag: "🇰🇭" },
-  { code: "JP", lang: "jp", label: "日本",         flag: "🇯🇵" },
-  { code: "BD", lang: "bn", label: "বাংলাদেশ",    flag: "🇧🇩" },
-  { code: "KZ", lang: "kk", label: "Қазақстан",   flag: "🇰🇿" },
-  { code: "IN", lang: "hi", label: "भारत",         flag: "🇮🇳" },
-  { code: "SA", lang: "ar", label: "العربية",      flag: "🇸🇦" },
+  { code: "KR", lang: "ko", label: "Korea" },
+  { code: "VN", lang: "vi", label: "Vietnam" },
+  { code: "CN", lang: "zh", label: "China" },
+  { code: "TH", lang: "th", label: "Thailand" },
+  { code: "ID", lang: "id", label: "Indonesia" },
+  { code: "PH", lang: "ph", label: "Philippines" },
+  { code: "UZ", lang: "uz", label: "Uzbekistan" },
+  { code: "RU", lang: "ru", label: "Russia" },
+  { code: "MN", lang: "mn", label: "Mongolia" },
+  { code: "NP", lang: "ne", label: "Nepal" },
+  { code: "MM", lang: "my", label: "Myanmar" },
+  { code: "KH", lang: "km", label: "Cambodia" },
+  { code: "JP", lang: "jp", label: "Japan" },
+  { code: "BD", lang: "bn", label: "Bangladesh" },
+  { code: "KZ", lang: "kk", label: "Kazakhstan" },
+  { code: "IN", lang: "hi", label: "India" },
+  { code: "SA", lang: "ar", label: "Saudi Arabia" },
 ];
 
 function NfcWorkerEntryInner() {
@@ -38,8 +43,10 @@ function NfcWorkerEntryInner() {
   const searchParams = useSearchParams();
   const supabase = createClient();
 
-  const [phase, setPhase] = useState<"checking" | "select" | "saving">("checking");
+  const [phase, setPhase] = useState<"checking" | "select" | "saving" | "active_options" | "checked_out">("checking");
   const [selected, setSelected] = useState<CountryOption>(COUNTRIES[0]);
+  const [activePreference, setActivePreference] = useState<{ nationality: string; preferred_lang: string } | null>(null);
+  const [siteChallengeCode, setSiteChallengeCode] = useState("");
   const [error, setError] = useState("");
 
   const isValidShape =
@@ -53,22 +60,59 @@ function NfcWorkerEntryInner() {
     return `${window.location.origin}/n/${encodeURIComponent(workerId)}${qs ? `?${qs}` : ""}`;
   };
 
-  /** preference POST → verifyOtp → /worker 이동 */
-  const applyPreference = async (nationality: string, preferred_lang: string) => {
+  const getDeviceLocation = async (): Promise<DeviceLocation> => {
+    if (!navigator.geolocation) {
+      throw new Error("Location is required to use SAFE-LINK at the worksite.");
+    }
+
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        }),
+        () => reject(new Error("Allow location access at the worksite, then tap the NFC card again.")),
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+      );
+    });
+  };
+
+  const applyPreference = async (nationality: string, preferred_lang: string, intent: "open" | "checkout" = "open") => {
+    const location = await getDeviceLocation();
     const res = await fetch("/api/nfc/worker-preference", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: buildSignedUrl(), nationality, preferred_lang }),
+      body: JSON.stringify({
+        url: buildSignedUrl(),
+        nationality,
+        preferred_lang,
+        location,
+        intent,
+        site_challenge_code: siteChallengeCode,
+      }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || data.error || "Preference update failed.");
+    if (!res.ok) throw new Error(data.detail || data.error || "NFC access failed.");
 
-    if (data.token_hash) {
-      const { error: otpErr } = await supabase.auth.verifyOtp({
-        token_hash: data.token_hash,
-        type: "magiclink",
-      });
-      if (otpErr) throw new Error(otpErr.message);
+    if (data.access?.action === "checked_out" || data.access?.active === false) {
+      await supabase.auth.signOut();
+      window.sessionStorage.removeItem("safe-link-session-active");
+      setPhase("checked_out");
+      return;
+    }
+
+    // Session is now established server-side via Set-Cookie headers —
+    // no token_hash exchange needed on the client (patch C-4/C-6).
+    // We call getSession to pick up the cookie the server just wrote.
+    if (data.session_established) {
+      await supabase.auth.getSession();
+    }
+
+    if (data.access?.action === "checkout_required") {
+      setActivePreference({ nationality, preferred_lang });
+      setPhase("active_options");
+      return;
     }
 
     window.localStorage.setItem("safe-link-worker-lang", preferred_lang);
@@ -76,7 +120,25 @@ function NfcWorkerEntryInner() {
     router.replace(`/worker?lang=${encodeURIComponent(preferred_lang)}&nfc=1`);
   };
 
-  // 마운트 시: 기존 국가 선택 여부 확인
+  const continueToSafeLink = async () => {
+    const preferredLang = activePreference?.preferred_lang ?? selected.lang;
+    window.localStorage.setItem("safe-link-worker-lang", preferredLang);
+    router.replace(`/worker?lang=${encodeURIComponent(preferredLang)}&nfc=1`);
+  };
+
+  const checkout = async () => {
+    const nationality = activePreference?.nationality ?? selected.code;
+    const preferredLang = activePreference?.preferred_lang ?? selected.lang;
+    setPhase("saving");
+    setError("");
+    try {
+      await applyPreference(nationality, preferredLang, "checkout");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Checkout failed.");
+      setPhase("active_options");
+    }
+  };
+
   useEffect(() => {
     if (!isValidShape) {
       setPhase("select");
@@ -85,22 +147,19 @@ function NfcWorkerEntryInner() {
 
     const check = async () => {
       try {
-        const res = await fetch(
-          `/api/nfc/worker-info?url=${encodeURIComponent(buildSignedUrl())}`
-        );
+        const res = await fetch(`/api/nfc/worker-info?url=${encodeURIComponent(buildSignedUrl())}`);
         if (!res.ok) {
           setPhase("select");
           return;
         }
-        const d = await res.json();
-        if (d.has_confirmed) {
-          // 재진입 — 저장된 국가로 자동 로그인
-          await applyPreference(d.nationality, d.preferred_lang);
+        const data = await res.json();
+        if (data.has_confirmed) {
+          await applyPreference(data.nationality, data.preferred_lang);
         } else {
-          // 최초 진입 — 국가 선택 UI 표시
           setPhase("select");
         }
-      } catch {
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "NFC access failed.");
         setPhase("select");
       }
     };
@@ -119,12 +178,11 @@ function NfcWorkerEntryInner() {
     try {
       await applyPreference(selected.code, selected.lang);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Preference update failed.");
+      setError(err instanceof Error ? err.message : "NFC access failed.");
       setPhase("select");
     }
   };
 
-  // 로딩 / 자동 로그인 중
   if (phase === "checking" || (phase === "saving" && !error)) {
     return (
       <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
@@ -134,6 +192,66 @@ function NfcWorkerEntryInner() {
             {phase === "checking" ? "Verifying NFC..." : "Logging in..."}
           </p>
         </div>
+      </main>
+    );
+  }
+
+  if (phase === "checked_out") {
+    return (
+      <main className="min-h-screen bg-gray-950 text-white p-5 flex items-center justify-center">
+        <section className="w-full max-w-md text-center bg-gray-900 border border-gray-800 rounded-xl p-6">
+          <ShieldCheck className="w-12 h-12 mx-auto text-green-400 mb-4" />
+          <h1 className="text-xl font-bold mb-2">Checked out</h1>
+          <p className="text-sm text-gray-400">
+            SAFE-LINK access is inactive for today. Tap the NFC card again tomorrow morning at the worksite to activate it.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+  if (phase === "active_options") {
+    return (
+      <main className="min-h-screen bg-gray-950 text-white p-5 flex items-center justify-center">
+        <section className="w-full max-w-md bg-gray-900 border border-gray-800 rounded-xl p-6">
+          <ShieldCheck className="w-12 h-12 text-blue-400 mb-4" />
+          <h1 className="text-xl font-bold mb-2">Already checked in</h1>
+          <p className="text-sm text-gray-400 mb-5">
+            You are active for today. Choose SAFE-LINK access or finish work and upload today&apos;s safety log.
+          </p>
+          {error && (
+            <div className="bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-red-300 text-sm mb-4">
+              {error}
+            </div>
+          )}
+          <div className="mb-4">
+            <label className="text-xs text-gray-400 mb-1 block">Today&apos;s site code</label>
+            <input
+              value={siteChallengeCode}
+              onChange={(event) => setSiteChallengeCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="000000"
+              className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white text-center text-2xl tracking-[0.35em] font-mono focus:outline-none focus:border-blue-500"
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-3">
+            <button
+              type="button"
+              onClick={continueToSafeLink}
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-colors"
+            >
+              Open SAFE-LINK
+            </button>
+            <button
+              type="button"
+              onClick={checkout}
+              className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl transition-colors"
+            >
+              Check out and upload safety log
+            </button>
+          </div>
+        </section>
       </main>
     );
   }
@@ -155,7 +273,7 @@ function NfcWorkerEntryInner() {
           <div className="flex items-start gap-3">
             <Globe2 className="w-5 h-5 text-blue-400 mt-0.5 shrink-0" />
             <p className="text-sm text-gray-300">
-              Select your country. No name or phone number is required on this phone.
+              Select your country. Location access is required so SAFE-LINK only works at the assigned worksite.
             </p>
           </div>
         </div>
@@ -172,8 +290,8 @@ function NfcWorkerEntryInner() {
                   : "bg-gray-900 border-gray-800 text-gray-300 hover:border-gray-600"
               }`}
             >
-              <span className="text-3xl leading-none">{country.flag}</span>
-              <span className="text-xs font-semibold">{country.label}</span>
+              <span className="text-sm font-semibold">{country.label}</span>
+              <span className="text-xs text-gray-400">{country.code}</span>
             </button>
           ))}
         </div>
@@ -183,6 +301,18 @@ function NfcWorkerEntryInner() {
             {error}
           </div>
         )}
+
+        <div className="mb-5">
+          <label className="text-xs text-gray-400 mb-1 block">Today&apos;s site code</label>
+          <input
+            value={siteChallengeCode}
+            onChange={(event) => setSiteChallengeCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+            inputMode="numeric"
+            maxLength={6}
+            placeholder="000000"
+            className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-white text-center text-2xl tracking-[0.35em] font-mono focus:outline-none focus:border-blue-500"
+          />
+        </div>
 
         <button
           type="button"

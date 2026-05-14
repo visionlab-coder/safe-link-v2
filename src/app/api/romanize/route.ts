@@ -38,19 +38,24 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ romanized: name.trim() });
     }
 
-    const prompt = `You are a name romanization expert.
-Convert the following person's name into standard English romanization (Latin alphabet).
-Source language: ${lang}
-Name: "${name}"
+    // Sanitize inputs to prevent LLM prompt injection
+    // name: strip control characters, limit to 100 chars
+    const safeName = name.trim().slice(0, 100).replace(/[\x00-\x1f\x7f]/g, '');
+    // lang: allowlist of valid BCP-47-style language codes only
+    const safeLang = /^[a-z]{2,5}$/.test((lang ?? '').trim()) ? lang.trim() : 'unknown';
+
+    // User values are placed inside a JSON block so they are clearly data,
+    // not instructions, making prompt injection ineffective.
+    const prompt = `You are a name romanization expert. Convert the name to standard English romanization.
+
+Input (JSON):
+${JSON.stringify({ language: safeLang, name: safeName })}
 
 Rules:
-- Output ONLY the romanized name, nothing else
+- Output ONLY the romanized name in plain text. No explanations.
 - Use standard romanization for the given language (e.g. Korean: Revised Romanization, Chinese: Pinyin, Japanese: Hepburn)
 - Capitalize each word
-- No explanations, no punctuation except hyphens within syllables if standard
-- If the name is already in Latin script, clean it up (remove diacritics for readability)
-
-Romanized name:`;
+- No punctuation except hyphens within syllables if standard`;
 
     try {
         const response = await fetch(

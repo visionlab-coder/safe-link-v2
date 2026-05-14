@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { canAccessSystem, type ProfileRole } from '@/lib/roles'
+import { canAccessSystem, hasAllowedRole, type ProfileRole } from '@/lib/roles'
 
 // AI API 엔드포인트 — 미인증 외부 호출 차단 대상
 // /api/translate 제외: Travel Talk 비인증 사용자도 호출함 (travel_token 전용 흐름)
@@ -51,8 +51,18 @@ export async function middleware(request: NextRequest) {
         return supabaseResponse
     }
 
-    // /system 경로: SUPER_ADMIN·ROOT·HQ_OFFICER 전용 보호
-    if (pathname.startsWith('/system')) {
+    // /admin, /worker, /system 경로: 역할 기반 접근 제어
+    const needsRoleCheck =
+        pathname.startsWith('/admin') ||
+        pathname.startsWith('/worker') ||
+        pathname.startsWith('/system')
+
+    if (needsRoleCheck) {
+        if (!session) {
+            return NextResponse.redirect(new URL('/auth', request.url))
+        }
+
+        // getUser(): 서버에서 JWT 검증 (세션 위변조 방지)
         const { data: { user } } = await supabase.auth.getUser()
 
         if (!user) {
@@ -65,8 +75,20 @@ export async function middleware(request: NextRequest) {
             .eq('id', user.id)
             .single()
 
-        if (!profile || !canAccessSystem(profile.role as ProfileRole)) {
-            return NextResponse.redirect(new URL('/', request.url))
+        const role = (profile?.role as string | undefined)?.toUpperCase() as ProfileRole | undefined
+
+        if (pathname.startsWith('/system')) {
+            if (!role || !canAccessSystem(role)) {
+                return NextResponse.redirect(new URL('/', request.url))
+            }
+        } else if (pathname.startsWith('/admin')) {
+            if (!role || !hasAllowedRole(role, 'admin')) {
+                return NextResponse.redirect(new URL('/auth', request.url))
+            }
+        } else if (pathname.startsWith('/worker')) {
+            if (!role || !hasAllowedRole(role, 'worker')) {
+                return NextResponse.redirect(new URL('/auth', request.url))
+            }
         }
     }
 
@@ -77,6 +99,9 @@ export const config = {
     matcher: [
         // 정적 파일, _next 제외 — 페이지 네비게이션 처리
         '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        // /admin, /worker 서버 가드
+        '/admin/:path*',
+        '/worker/:path*',
         // AI API 엔드포인트 — 미인증 외부 호출 차단 (/api/translate 제외)
         '/api/stt/:path*',
         '/api/tts/:path*',

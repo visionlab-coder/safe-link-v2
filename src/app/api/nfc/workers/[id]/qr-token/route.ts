@@ -36,11 +36,18 @@ export async function GET(
 
   const { data: worker } = await guard.ctx.service
     .from("nfc_workers")
-    .select("id, worker_code, full_name, preferred_lang")
+    .select("id, worker_code, full_name, preferred_lang, assigned_site_id")
     .eq("id", workerId)
     .maybeSingle();
 
   if (!worker) return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
+
+  // siteId가 근로자의 배정 현장과 일치하는지 검증 (글로벌 관리자는 예외)
+  const GLOBAL_ROLES = ["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER"];
+  const isGlobal = GLOBAL_ROLES.includes(guard.ctx.user.role.toUpperCase());
+  if (!isGlobal && siteId !== worker.assigned_site_id) {
+    return NextResponse.json({ error: "site_mismatch" }, { status: 403 });
+  }
 
   let token: string;
   try {

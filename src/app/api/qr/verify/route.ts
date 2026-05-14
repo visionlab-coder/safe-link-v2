@@ -63,11 +63,16 @@ export async function POST(req: NextRequest) {
   // 근로자 정보 조회
   const { data: worker } = await service
     .from("nfc_workers")
-    .select("id, worker_code, full_name, preferred_lang, nationality")
+    .select("id, worker_code, full_name, preferred_lang, nationality, assigned_site_id")
     .eq("id", workerId)
     .maybeSingle();
 
   if (!worker) return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
+
+  // Patch H-3: 현장 소속 검증
+  if (worker.assigned_site_id !== siteId) {
+    return NextResponse.json({ error: "worker_site_mismatch" }, { status: 403 });
+  }
 
   // 진행 중인 TBM 세션 자동 매칭
   const { data: session } = await service

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getErrorMessage } from "@/utils/errors";
+import { requireAdmin } from "@/utils/nfc/require-admin";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,9 @@ function fail(message: string): HealthItem {
 }
 
 export async function GET() {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard.response;
+
   const results: Record<string, HealthItem> = {
     supabase: { status: "pending", message: "" },
     google_translate: { status: "pending", message: "" },

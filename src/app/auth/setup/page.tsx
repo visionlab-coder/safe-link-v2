@@ -264,21 +264,24 @@ function SetupContent() {
   const [isHQAuthorized, setIsHQAuthorized] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
-  // 마스터/HQ 이메일 목록은 환경변수에서 로드 (클라이언트 코드에 하드코딩 금지)
-  const masterEmails = useMemo(() =>
-    (process.env.NEXT_PUBLIC_MASTER_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean),
-  []);
-  const hqOfficerEmails = useMemo(() =>
-    (process.env.NEXT_PUBLIC_HQ_OFFICER_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean),
-  []);
-
+  // 마스터/HQ 이메일 여부는 서버 API를 통해 확인 — NEXT_PUBLIC_ 환경변수 클라이언트 노출 금지 (H-11)
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/auth"); return; }
       setUserId(user.id);
-      const isMaster = masterEmails.includes(user.email || "");
-      const isHQ = hqOfficerEmails.includes(user.email || "");
+
+      // 서버에서 역할 확인 — 이메일 목록 자체는 클라이언트에 반환되지 않음
+      let isMaster = false;
+      let isHQ = false;
+      try {
+        const res = await fetch("/api/auth/check-role");
+        if (res.ok) {
+          const data = await res.json() as { role: "root" | "hq_officer" | null };
+          isMaster = data.role === "root";
+          isHQ = data.role === "hq_officer";
+        }
+      } catch { /* 네트워크 오류 시 기본값(false) 유지 */ }
       setIsMasterEmail(isMaster);
       setIsHQAuthorized(isHQ);
 
@@ -314,7 +317,7 @@ function SetupContent() {
       setAdminExists((count ?? 0) > 0);
     };
     init();
-  }, [hqOfficerEmails, masterEmails, router, searchParams]);
+  }, [router, searchParams, supabase]);
 
   const isNonLatin = (n: string) =>
     !/^[a-zA-Z\s\-'.]+$/.test(n.trim()) && !/\(.+\)/.test(n.trim());
@@ -341,6 +344,25 @@ function SetupContent() {
         setName(`${trimmed} (${romanized})`);
       }
     } finally { setRomanizing(false); }
+  };
+
+  const getCurrentLocation = async () => {
+    if (!navigator.geolocation) return null;
+    try {
+      return await new Promise<{ latitude: number; longitude: number; accuracy: number } | null>((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          }),
+          () => resolve(null),
+          { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+        );
+      });
+    } catch {
+      return null;
+    }
   };
 
   const canProceedStep1 = () => !!(name.trim() && role);
@@ -379,10 +401,11 @@ function SetupContent() {
     const isAdminRole = role === "site_manager" || role === "safety_officer";
     if (isAdminRole && siteCode.trim()) {
       try {
+        const location = await getCurrentLocation();
         const res = await fetch("/api/sites/resolve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: siteCode.trim() }),
+          body: JSON.stringify({ name: siteCode.trim(), location, geofence_radius_m: 300 }),
         });
         if (res.ok) {
           const data = await res.json() as { id: string };

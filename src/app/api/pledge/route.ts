@@ -42,6 +42,19 @@ export async function POST(req: NextRequest) {
   const pledgeContent = String(body.pledgeContent || "").trim();
   if (!siteId || !pledgeContent) return NextResponse.json({ error: "siteId_pledgeContent_required" }, { status: 400 });
 
+  // Patch H-9: Cross-site pledge 방지 (ADMIN 역할 예외)
+  const { data: userProfile } = await supabase
+    .from("profiles")
+    .select("site_id, role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const userRole = String(userProfile?.role ?? "").toUpperCase();
+  const isAdminRole = ["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER", "SAFETY_OFFICER"].includes(userRole);
+  if (!isAdminRole && userProfile?.site_id && userProfile.site_id !== siteId) {
+    return NextResponse.json({ error: "cross_site_pledge_denied" }, { status: 403 });
+  }
+
   const signatureData = body.signatureData ?? null;
   if (signatureData && signatureData.length > 200_000) {
     return NextResponse.json({ error: "signature_too_large" }, { status: 400 });

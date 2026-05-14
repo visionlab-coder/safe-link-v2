@@ -1,6 +1,7 @@
 import Pusher from 'pusher';
 export const runtime = "nodejs";
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyTravelToken } from '@/lib/travel-auth';
 
 const pusherServer = new Pusher({
   appId:   process.env.PUSHER_APP_ID!,
@@ -11,6 +12,12 @@ const pusherServer = new Pusher({
 });
 
 export async function POST(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!verifyTravelToken(token)) {
+    return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+  }
+
   const body = await request.json();
   const { room, lang } = body;
 

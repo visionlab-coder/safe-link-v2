@@ -1,17 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
+import { promises as dns } from "dns";
 
 const MAX_BYTES = 1_000_000;
 const BLOCKED_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
 
 function isBlockedHost(hostname: string) {
   const host = hostname.toLowerCase();
-  return (
-    BLOCKED_HOSTS.has(host) ||
-    host.endsWith(".local") ||
+
+  // Exact-match blocklist and common private/loopback names
+  if (BLOCKED_HOSTS.has(host) || host.endsWith(".local")) return true;
+
+  // RFC-1918 private ranges
+  if (
     host.startsWith("10.") ||
     host.startsWith("192.168.") ||
     /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
-  );
+  ) return true;
+
+  // 169.254.x.x — link-local / AWS IMDS
+  if (/^169\.254\./.test(host)) return true;
+
+  // 100.64.x.x – 100.127.x.x — CGNAT shared address space (RFC 6598)
+  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host)) return true;
+
+  // 0.x.x.x — "this" network
+  if (/^0\./.test(host)) return true;
+
+  // IPv4 decimal / hex encoding bypasses (e.g. 2130706433 = 127.0.0.1, 0x7f000001)
+  if (/^(0x[0-9a-f]+|\d{8,10})$/i.test(host)) return true;
+
+  // IPv6 loopback / link-local / unique-local
+  if (
+    host.startsWith("fe80:") ||
+    host.startsWith("fc00:") ||
+    host.startsWith("fd00:") ||
+    host === "::1"
+  ) return true;
+
+  return false;
+}
+
+async function resolveAndCheckHost(hostname: string): Promise<boolean> {
+  try {
+    const [v4Result, v6Result] = await Promise.allSettled([
+      dns.lookup(hostname, { family: 4 }),
+      dns.lookup(hostname, { family: 6 }),
+    ]);
+    if (v4Result.status === "fulfilled" && isBlockedHost(v4Result.value.address)) return true;
+    if (v6Result.status === "fulfilled" && isBlockedHost(v6Result.value.address)) return true;
+    // If both lookups failed entirely, block
+    if (v4Result.status === "rejected" && v6Result.status === "rejected") return true;
+    return false;
+  } catch {
+    return true; // If DNS fails, block it
+  }
 }
 
 function htmlToText(html: string) {
@@ -33,6 +76,21 @@ function htmlToText(html: string) {
 }
 
 export async function POST(request: NextRequest) {
+  // Admin-only endpoint — reject unauthenticated or non-admin requests
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (profile?.role !== "ADMIN" && profile?.role !== "SUPER_ADMIN") {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
   let body: { url?: string };
 
   try {
@@ -54,7 +112,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "unsupported_protocol" }, { status: 400 });
   }
 
-  if (isBlockedHost(target.hostname)) {
+  if (isBlockedHost(target.hostname) || await resolveAndCheckHost(target.hostname)) {
     return NextResponse.json({ error: "blocked_host" }, { status: 400 });
   }
 
@@ -68,8 +126,14 @@ export async function POST(request: NextRequest) {
         "user-agent": "SAFE-LINK glossary importer/1.0",
         accept: "text/html,text/plain,application/xhtml+xml;q=0.9,*/*;q=0.5",
       },
-      redirect: "follow",
+      // redirect: "manual" — block SSRF via open redirects to internal hosts.
+      // Any 3xx response is treated as an error rather than followed silently.
+      redirect: "manual",
     });
+
+    if (response.status >= 300 && response.status < 400) {
+      return NextResponse.json({ error: "redirect_blocked" }, { status: 400 });
+    }
 
     if (!response.ok) {
       return NextResponse.json(

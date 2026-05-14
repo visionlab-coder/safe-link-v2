@@ -57,7 +57,7 @@ export function detectNfcSupport(): NfcSupportInfo {
 
 export type NfcErrorCode =
   | "unsupported" | "permission_denied" | "invalid_payload"
-  | "read_error" | "write_failed" | "timeout" | "aborted" | "unknown";
+  | "read_error" | "write_failed" | "erase_failed" | "timeout" | "aborted" | "unknown";
 
 export class NfcError extends Error {
   readonly code: NfcErrorCode;
@@ -246,6 +246,29 @@ export async function writeNfcUrl(url: string, options: NfcWriteOptions = {}): P
     if (e?.name === "NotSupportedError") throw new NfcError("unsupported", "NFC write not supported on this device/Chrome version");
     if (e?.name === "AbortError") throw new NfcError("aborted", "Write aborted");
     if (e?.name === "NetworkError") throw new NfcError("write_failed", "Tag is read-only or has insufficient memory");
+    throw new NfcError("unknown", e?.message || String(err));
+  }
+}
+
+export async function eraseNfcTag(options: NfcWriteOptions = {}): Promise<void> {
+  const support = detectNfcSupport();
+  if (!support.supported) throw new NfcError("unsupported", "NFC not supported");
+
+  const Ctor = (window as any).NDEFReader;
+  if (typeof Ctor !== "function") throw new NfcError("unsupported", "NDEFReader not available");
+
+  const writer = new Ctor();
+  try {
+    await writer.write(
+      { records: [{ recordType: "empty" }] },
+      { signal: options.signal, overwrite: options.overwrite ?? true }
+    );
+  } catch (err) {
+    const e = err as DOMException;
+    if (e?.name === "NotAllowedError") throw new NfcError("permission_denied", "NFC permission denied");
+    if (e?.name === "NotSupportedError") throw new NfcError("unsupported", "NFC erase not supported on this device/Chrome version");
+    if (e?.name === "AbortError") throw new NfcError("aborted", "Erase aborted");
+    if (e?.name === "NetworkError") throw new NfcError("erase_failed", "Tag is read-only or could not be overwritten");
     throw new NfcError("unknown", e?.message || String(err));
   }
 }

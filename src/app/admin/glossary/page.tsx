@@ -185,6 +185,10 @@ export default function GlossaryPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const parseExcelFile = useCallback(async (file: File) => {
+        // TODO: CVE-2023-30533 — migrate to ExcelJS for reading user-uploaded files
+        // xlsx 0.18.x is vulnerable to prototype pollution when parsing untrusted Excel files.
+        // This call reads a user-supplied buffer, which is the affected path.
+        // Migration: replace xlsx.read() with ExcelJS Workbook.xlsx.load() from the 'exceljs' package.
         const xlsx = await import("xlsx");
         const buffer = await file.arrayBuffer();
         const wb = xlsx.read(buffer, { type: "array" });

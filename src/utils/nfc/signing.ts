@@ -74,8 +74,12 @@ export async function signSticker(
   if (!workerId || typeof workerId !== "string") throw new Error("signSticker: workerId required");
   const sigVersion = opts.sigVersion ?? SIG_VERSION_CURRENT;
   const issuedEpoch = opts.issuedEpoch ?? Math.floor(Date.now() / 1000);
+  // Compact path (workerCode): include issuedEpoch so each sticker issuance
+  // produces a unique HMAC — prevents cross-sticker signature reuse.
+  // NOTE: Stickers issued before this change (sig_version=1 without epoch in
+  //       payload) must be re-issued; see verifyStickerSignature for fallback.
   const payload = opts.workerCode
-    ? `${opts.workerCode}|${sigVersion}|${opts.identityHint ?? ""}`
+    ? `${opts.workerCode}|${sigVersion}|${issuedEpoch}|${opts.identityHint ?? ""}`
     : `${workerId}|${sigVersion}|${issuedEpoch}`;
   const key = await getSigningKey();
   const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
@@ -107,14 +111,54 @@ export async function verifyStickerSignature(input: VerifyStickerInput): Promise
     if (!sig || !Number.isFinite(sigVersion)) return false;
     const isCompact = Boolean(workerCode);
     if (!isCompact && (!workerId || !Number.isFinite(issuedEpoch))) return false;
-    const payload = isCompact
-      ? `${workerCode}|${sigVersion}|${input.identityHint ?? ""}`
-      : `${workerId}|${sigVersion}|${issuedEpoch}`;
-    const key = await getSigningKey();
-    const expected = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)));
-    if (isCompact) {
-      return base64urlEncode(expected).slice(0, 22) === sig;
+
+    // Patch 4: TTL expiry check — reject stickers older than NFC_STICKER_TTL_DAYS
+    if (Number.isFinite(issuedEpoch)) {
+      const ttlDays = Number(process.env.NFC_STICKER_TTL_DAYS ?? 365);
+      const ttlSeconds = ttlDays * 24 * 60 * 60;
+      const nowEpoch = Math.floor(Date.now() / 1000);
+      if (nowEpoch - issuedEpoch > ttlSeconds) return false;
     }
+
+    const key = await getSigningKey();
+
+    if (isCompact) {
+      // Current payload format: workerCode|sigVersion|issuedEpoch|identityHint
+      // Legacy format (sig_version=1 issued before 2026-05-14):
+      //   workerCode|sigVersion|identityHint  (no issuedEpoch)
+      // We try the current format first; fall back to legacy only for v1
+      // stickers so existing printed cards keep working.
+      // ACTION REQUIRED: Re-issue all sig_version=1 compact stickers and then
+      // remove the legacy fallback block below.
+      const payloadCurrent = `${workerCode}|${sigVersion}|${issuedEpoch}|${input.identityHint ?? ""}`;
+      const expectedCurrent = new Uint8Array(
+        await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payloadCurrent))
+      );
+      const encodedCurrent = base64urlEncode(expectedCurrent).slice(0, 22);
+      // Use a timing-safe comparison on the truncated base64url strings
+      const sigBytes = new TextEncoder().encode(sig.padEnd(22, "\0"));
+      const expBytes = new TextEncoder().encode(encodedCurrent.padEnd(22, "\0"));
+      if (timingSafeEqual(sigBytes, expBytes) && sig === encodedCurrent) return true;
+
+      // Legacy fallback for already-issued compact stickers (no issuedEpoch in payload)
+      if (sigVersion === 1) {
+        const payloadLegacy = `${workerCode}|${sigVersion}|${input.identityHint ?? ""}`;
+        const expectedLegacy = new Uint8Array(
+          await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payloadLegacy))
+        );
+        const encodedLegacy = base64urlEncode(expectedLegacy).slice(0, 22);
+        const legacyExpBytes = new TextEncoder().encode(encodedLegacy.padEnd(22, "\0"));
+        if (timingSafeEqual(sigBytes, legacyExpBytes) && sig === encodedLegacy) return true;
+      }
+
+      return false;
+    }
+
+    // Full (non-compact) path — always uses issuedEpoch
+    const payload = `${workerId}|${sigVersion}|${issuedEpoch}`;
+    const expected = new Uint8Array(
+      await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload))
+    );
     const provided = base64urlDecode(sig);
     return timingSafeEqual(expected, provided);
   } catch {

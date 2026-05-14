@@ -32,12 +32,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "workerId_equipmentType_required" }, { status: 400 });
   }
 
+  const quizSessionId = body.quizSessionId ?? null;
+  let dupQuery = guard.ctx.service
+    .from("safety_equipment_grants")
+    .select("id")
+    .eq("worker_id", workerId)
+    .eq("equipment_type", equipmentType);
+  if (quizSessionId !== null) {
+    dupQuery = dupQuery.eq("quiz_session_id", quizSessionId);
+  } else {
+    dupQuery = dupQuery.is("quiz_session_id", null);
+  }
+  const { data: existing } = await dupQuery.maybeSingle();
+  if (existing) {
+    return NextResponse.json({ error: "ALREADY_GRANTED", grantId: existing.id }, { status: 409 });
+  }
+
   const { data, error } = await guard.ctx.service
     .from("safety_equipment_grants")
     .insert({
       worker_id: workerId,
       site_id: body.siteId ?? null,
-      quiz_session_id: body.quizSessionId ?? null,
+      quiz_session_id: quizSessionId,
       score_pct: body.scorePct ?? null,
       equipment_type: equipmentType,
       granted_by: guard.ctx.user.id,
@@ -46,7 +62,7 @@ export async function POST(req: NextRequest) {
     .select("id")
     .single();
 
-  if (error) return NextResponse.json({ error: "grant_insert_failed", detail: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "grant_insert_failed" }, { status: 500 });
   return NextResponse.json({ grantId: data.id, ok: true });
 }
 
@@ -67,6 +83,6 @@ export async function GET(req: NextRequest) {
   if (siteId) query = query.eq("site_id", siteId);
 
   const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "query_failed" }, { status: 500 });
   return NextResponse.json({ grants: data ?? [] });
 }

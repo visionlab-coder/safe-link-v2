@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   const total = correctAnswers.length;
   const scorePct = total > 0 ? Math.round((correct / total) * 100) : 0;
 
-  const { error: updateErr } = await service
+  const { data: updatedData, error: updateErr } = await service
     .from("tbm_quiz_responses")
     .update({
       answers_submitted: answers,
@@ -61,10 +61,16 @@ export async function POST(req: NextRequest) {
       status: "answered",
       answered_at: new Date().toISOString(),
     })
-    .eq("id", quizResponseId);
+    .eq("id", quizResponseId)
+    .eq("status", "sent") // atomic guard — only one concurrent request wins
+    .select("id")
+    .maybeSingle();
 
   if (updateErr) {
-    return NextResponse.json({ error: "update_failed", detail: updateErr.message }, { status: 500 });
+    return NextResponse.json({ error: "update_failed" }, { status: 500 });
+  }
+  if (!updatedData) {
+    return NextResponse.json({ error: "already_answered", score_pct: response.score_pct }, { status: 409 });
   }
 
   return NextResponse.json({ ok: true, scorePct, correct, total });
@@ -80,6 +86,7 @@ export async function GET(req: NextRequest) {
   if (!quizSessionId) return NextResponse.json({ error: "quizSessionId_required" }, { status: 400 });
 
   const service = createService();
+  // answer_index_correct는 제출 완료(answered) 후 결과 화면에만 반환 — 미제출 시 노출 금지 (C-5)
   const { data, error } = await service
     .from("tbm_quiz_responses")
     .select("id, lang, questions_translated, answer_index_correct, score_pct, status, answered_at")
@@ -87,6 +94,14 @@ export async function GET(req: NextRequest) {
     .eq("worker_id", user.id)
     .maybeSingle();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ response: data ?? null });
+  if (error) return NextResponse.json({ error: "query_failed" }, { status: 500 });
+  if (!data) return NextResponse.json({ response: null });
+
+  // 미제출 상태에서는 answer_index_correct 제거
+  if (data.status !== "answered") {
+    const { answer_index_correct: _omit, ...safeData } = data as typeof data & { answer_index_correct: unknown };
+    return NextResponse.json({ response: { ...safeData, answer_index_correct: null } });
+  }
+
+  return NextResponse.json({ response: data });
 }

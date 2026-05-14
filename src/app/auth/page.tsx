@@ -10,7 +10,10 @@ import { getT } from "./translations";
 
 /** 원시 API 에러를 사용자 친화적 한국어로 변환. 절대 내부 에러 메시지를 그대로 노출하지 않음. */
 function sanitizeAuthError(msg: string): string {
-  console.error("[Auth] Raw error:", msg);
+  // production에서 원시 에러 로그 비활성화 — 민감 정보 노출 방지
+  if (process.env.NODE_ENV !== 'production') {
+    console.error("[Auth] Raw error:", msg);
+  }
   const m = msg.toLowerCase();
   if (m.includes("api key") || m.includes("apikey") || m.includes("unauthorized") || m.includes("authentication")) {
     return "서버 연결 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
@@ -177,8 +180,6 @@ function AuthContent() {
     setMode("role");
   };
 
-  const getVirtualEmail = (num: string) => `${num.replace(/[^0-9]/g, "")}@safe-link.local`;
-
   // No auto-login — worker enters fresh every time
 
   const redirectByRole = async (userId: string) => {
@@ -197,39 +198,45 @@ function AuthContent() {
     if (!phone || !workerName.trim()) return;
     setLoading(true);
     const activeLang = lang || "ko";
-    const email = getVirtualEmail(phone);
-    const autoPassword = `sl_${phone.replace(/[^0-9]/g, "")}_safe`;
-    const phoneDigits = phone.replace(/[^0-9]/g, "");
 
-    // 로그인 시도
-    const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password: autoPassword });
-    if (signInErr) {
-      // 신규 가입 → 즉시 프로필 생성까지 한 번에 처리
-      const { error: signUpErr } = await supabase.auth.signUp({
-        email, password: autoPassword,
-        options: { data: { phone_number: phoneDigits, display_name: workerName.trim() } },
+    try {
+      // Server issues a session via magic link — no password ever leaves the client
+      const res = await fetch("/api/auth/worker-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          phoneNumber: phone,
+          displayName: workerName.trim(),
+          lang: activeLang,
+        }),
       });
-      if (signUpErr) { alert(sanitizeAuthError(signUpErr.message)); setLoading(false); return; }
-      const { error: signInErr2 } = await supabase.auth.signInWithPassword({ email, password: autoPassword });
-      if (signInErr2) { alert(sanitizeAuthError(signInErr2.message)); setLoading(false); return; }
-    }
 
-    // 세션에서 유저 정보 가져와서 프로필 upsert (신규든 기존이든 동일)
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      sessionStorage.setItem("safe-link-session-active", "true");
-      // 근로자는 setup 페이지를 거치지 않으므로 기본 자동로그인 비활성화
-      if (!localStorage.getItem("safe-link-remember")) {
-        localStorage.setItem("safe-link-remember", "false");
+      if (res.status === 429) {
+        alert(sanitizeAuthError("rate limit"));
+        setLoading(false);
+        return;
       }
-      await supabase.from("profiles").upsert({
-        id: session.user.id,
-        display_name: workerName.trim(),
-        role: "WORKER",
-        preferred_lang: activeLang,
-        phone_number: phoneDigits,
-      });
-      router.push(`/worker?lang=${activeLang}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        alert(sanitizeAuthError(body.error ?? "unknown"));
+        setLoading(false);
+        return;
+      }
+
+      // Pick up the session cookies the server just set
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        sessionStorage.setItem("safe-link-session-active", "true");
+        if (!localStorage.getItem("safe-link-remember")) {
+          localStorage.setItem("safe-link-remember", "false");
+        }
+        router.push(`/worker?lang=${activeLang}`);
+      } else {
+        alert(sanitizeAuthError("session not established"));
+      }
+    } catch {
+      alert(sanitizeAuthError("network"));
     }
     setLoading(false);
   };

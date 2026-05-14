@@ -50,27 +50,41 @@ export async function POST(
   if (pledgeError || !pledge) return NextResponse.json({ error: "pledge_not_found" }, { status: 404 });
   if (pledge.worker_id !== user.id) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
 
+  // Patch H-4: 재서명 방지
+  if (pledge.approved_at !== null) {
+    return NextResponse.json({ error: "pledge_already_signed" }, { status: 409 });
+  }
+
   const approvedAt = new Date().toISOString();
   const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? req.headers.get("x-real-ip") ?? null;
 
-  const audit = await appendClaim13HashChainEvent(service, {
-    siteId: pledge.site_id,
-    entityType: "claim13_pledge",
-    entityId: pledge.id,
-    eventType: "pledge_signed",
-    payload: {
-      pledge_id: pledge.id,
-      worker_id: pledge.worker_id,
-      tbm_session_id: pledge.tbm_session_id,
-      pledge_content_hash: pledge.pledge_content_hash,
-      nfc_uid: pledge.nfc_uid,
-      approved_at: approvedAt,
-      client_ip: clientIp,
-    },
-    createdBy: user.id,
-  });
+  // Patch C-11: 해시체인 삽입 후 pledge UPDATE 실패 시 해시체인 이벤트 삭제 시도
+  let audit;
+  try {
+    audit = await appendClaim13HashChainEvent(service, {
+      siteId: pledge.site_id,
+      entityType: "claim13_pledge",
+      entityId: pledge.id,
+      eventType: "pledge_signed",
+      payload: {
+        pledge_id: pledge.id,
+        worker_id: pledge.worker_id,
+        tbm_session_id: pledge.tbm_session_id,
+        pledge_content_hash: pledge.pledge_content_hash,
+        nfc_uid: pledge.nfc_uid,
+        approved_at: approvedAt,
+        client_ip: clientIp,
+      },
+      createdBy: user.id,
+    });
+  } catch (auditErr) {
+    return NextResponse.json(
+      { error: "audit_chain_failed", detail: auditErr instanceof Error ? auditErr.message : String(auditErr) },
+      { status: 500 }
+    );
+  }
 
-  const { error: updateError } = await service
+  const { data: updatedPledge, error: updateError } = await service
     .from("claim13_pledges")
     .update({
       signature_data: signatureData,
@@ -78,9 +92,24 @@ export async function POST(
       client_ip: clientIp,
       hash_chain_event_id: audit.id,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .is("approved_at", null) // atomic guard — only one concurrent request wins
+    .select("id")
+    .maybeSingle();
 
-  if (updateError) return NextResponse.json({ error: "pledge_sign_failed", detail: updateError.message }, { status: 500 });
+  if (updateError) {
+    // 롤백: 해시체인 이벤트 삭제 시도 (best-effort)
+    try {
+      await service.from("claim13_audit_events").delete().eq("id", audit.id);
+    } catch {
+      // 삭제 실패는 무시 — 감사 로그 정합성 우선
+    }
+    return NextResponse.json({ error: "pledge_sign_failed", detail: updateError.message }, { status: 500 });
+  }
+  if (!updatedPledge) {
+    // Another concurrent request already signed it
+    return NextResponse.json({ error: "pledge_already_signed" }, { status: 409 });
+  }
 
   return NextResponse.json({ ok: true, approvedAt, hashChainEventId: audit.id });
 }

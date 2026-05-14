@@ -50,20 +50,40 @@ export async function POST(request: NextRequest) {
             if (p.site_code) siteCounts[p.site_code] = (siteCounts[p.site_code] || 0) + 1;
         });
 
-        // [위험 대화 스캔]
-        const { data: recentMsgs } = await supabase
+        // [위험 대화 통계 스캔] — 원문/번역문은 수집하지 않음 (PIPA 준수)
+        // 집계 메타데이터만 사용: 총 메시지 수, 시간대별 분포, 언어별 분포
+        const { data: recentMsgsMeta } = await supabase
             .from('messages')
-            .select('source_text, translated_text')
+            .select('created_at, source_lang')
             .order('created_at', { ascending: false })
-            .limit(20);
+            .limit(200);
+
+        const totalMessages = recentMsgsMeta?.length ?? 0;
+
+        // 시간대별 분포 (0-23시)
+        const hourlyDist: Record<number, number> = {};
+        recentMsgsMeta?.forEach(m => {
+            const hour = new Date(m.created_at).getHours();
+            hourlyDist[hour] = (hourlyDist[hour] || 0) + 1;
+        });
+
+        // 언어별 분포
+        const langDist: Record<string, number> = {};
+        recentMsgsMeta?.forEach(m => {
+            const lang = m.source_lang ?? 'unknown';
+            langDist[lang] = (langDist[lang] || 0) + 1;
+        });
 
         // 2. HQ 요원 프롬프트 (Risk Watchdog + Compliance Auditor)
+        // 외부 데이터는 모두 JSON.stringify 처리하여 Prompt Injection 방지
         const prompt = `You are a group of 'HQ Command Agents' for a massive construction project (25+ sites).
-        
+
 Data Context:
 - Active Sites: ${Object.keys(siteCounts).length}
 - Worker Distribution: ${JSON.stringify(siteCounts)}
-- Recent Chat Snippets: ${JSON.stringify(recentMsgs?.map(m => m.source_text) ?? [])}
+- Total Recent Messages (last 200): ${totalMessages}
+- Language Distribution: ${JSON.stringify(langDist)}
+- Hourly Activity Distribution: ${JSON.stringify(hourlyDist)}
 
 Task: Provide a high-level command briefing for the HQ Control Center in [${lang}].
 Focus on broad risks, compliance gaps across all sites, and resource allocation.

@@ -10,14 +10,27 @@ function sanitizeSearchTerm(raw: string): string {
   return raw.replace(/[,()*"\\%_]/g, "").slice(0, 64);
 }
 
+const GLOBAL_ROLES = ["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER"];
+
 export async function GET(req: NextRequest) {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
 
-  const siteId = req.nextUrl.searchParams.get("site_id");
+  const requestedSiteId = req.nextUrl.searchParams.get("site_id");
   const q = req.nextUrl.searchParams.get("q")?.trim();
   const activeOnly = req.nextUrl.searchParams.get("active") !== "0";
   const limit = Math.min(Number(req.nextUrl.searchParams.get("limit") || 50), 200);
+
+  let enforcedSiteId: string | null = requestedSiteId;
+  if (!GLOBAL_ROLES.includes(guard.ctx.user.role)) {
+    const { data: profile } = await guard.ctx.service
+      .from("profiles")
+      .select("site_id")
+      .eq("id", guard.ctx.user.id)
+      .maybeSingle();
+    if (!profile?.site_id) return NextResponse.json({ error: "profile_site_required" }, { status: 409 });
+    enforcedSiteId = profile.site_id;
+  }
 
   let query = guard.ctx.service
     .from("nfc_workers")
@@ -25,6 +38,7 @@ export async function GET(req: NextRequest) {
     .order("id", { ascending: false })
     .limit(limit);
 
+  const siteId = enforcedSiteId;
   if (siteId) query = query.eq("assigned_site_id", siteId);
   if (activeOnly) query = query.eq("is_active", true);
   if (q) {

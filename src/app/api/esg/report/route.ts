@@ -20,6 +20,17 @@ export async function GET(req: NextRequest) {
   const siteId = req.nextUrl.searchParams.get("siteId");
   if (!siteId) return NextResponse.json({ error: "siteId_required" }, { status: 400 });
 
+  const { data: callerProfile } = await guard.ctx.service
+    .from("profiles")
+    .select("site_id, role")
+    .eq("id", guard.ctx.user.id)
+    .maybeSingle();
+
+  const isGlobalRole = ["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER"].includes(guard.ctx.user.role);
+  if (!isGlobalRole && callerProfile?.site_id !== siteId) {
+    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
+
   const from = requireDate(req.nextUrl.searchParams.get("from"), "1970-01-01");
   const to = requireDate(req.nextUrl.searchParams.get("to"), new Date().toISOString().slice(0, 10));
   const fromIso = `${from}T00:00:00.000Z`;
@@ -71,7 +82,7 @@ export async function GET(req: NextRequest) {
       .lte("created_at", toIso),
   ]);
 
-  if (sessionsResult.error) return NextResponse.json({ error: "sessions_query_failed", detail: sessionsResult.error.message }, { status: 500 });
+  if (sessionsResult.error) return NextResponse.json({ error: "sessions_query_failed" }, { status: 500 });
 
   const sessionIds = (sessionsResult.data ?? []).map((session) => session.id);
   const attendanceResult = sessionIds.length
@@ -81,11 +92,11 @@ export async function GET(req: NextRequest) {
         .in("session_id", sessionIds)
     : { data: [], error: null };
 
-  if (attendanceResult.error) return NextResponse.json({ error: "attendance_query_failed", detail: attendanceResult.error.message }, { status: 500 });
-  if (grantsResult.error) return NextResponse.json({ error: "grants_query_failed", detail: grantsResult.error.message }, { status: 500 });
-  if (stopWorkResult.error) return NextResponse.json({ error: "stop_work_query_failed", detail: stopWorkResult.error.message }, { status: 500 });
-  if (pledgesResult.error) return NextResponse.json({ error: "pledges_query_failed", detail: pledgesResult.error.message }, { status: 500 });
-  if (auditResult.error) return NextResponse.json({ error: "audit_query_failed", detail: auditResult.error.message }, { status: 500 });
+  if (attendanceResult.error) return NextResponse.json({ error: "attendance_query_failed" }, { status: 500 });
+  if (grantsResult.error) return NextResponse.json({ error: "grants_query_failed" }, { status: 500 });
+  if (stopWorkResult.error) return NextResponse.json({ error: "stop_work_query_failed" }, { status: 500 });
+  if (pledgesResult.error) return NextResponse.json({ error: "pledges_query_failed" }, { status: 500 });
+  if (auditResult.error) return NextResponse.json({ error: "audit_query_failed" }, { status: 500 });
 
   const attendance = attendanceResult.data ?? [];
   const certifiedCount = attendance.filter((row) => row.is_certified).length;

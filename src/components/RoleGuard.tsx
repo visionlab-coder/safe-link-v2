@@ -76,9 +76,8 @@ export default function RoleGuard({
                 return;
             }
 
-            // 역할 vs allowedRole 비교
-            // ✨ ROOT와 HQ_OFFICER는 통합 관제(system) 권한을 가집니다.
-            const role = profile.role as ProfileRole;
+            // 역할 vs allowedRole 비교 (DB에 소문자로 저장된 경우 대비 정규화)
+            const role = (String(profile.role || "")).toUpperCase() as ProfileRole;
             const isAllowed = role ? hasAllowedRole(role, allowedRole) : false;
 
             if (!isAllowed) {
@@ -87,8 +86,9 @@ export default function RoleGuard({
                     return;
                 }
 
-                // 실제 역할에 맞는 경로로 안내
-                router.replace(getDefaultRouteForProfileRole(role));
+                // 실제 역할에 맞는 경로로 안내 (매핑 없으면 /auth/setup)
+                const fallbackRoute = getDefaultRouteForProfileRole(role) ?? "/auth/setup";
+                router.replace(fallbackRoute);
                 return;
             }
 

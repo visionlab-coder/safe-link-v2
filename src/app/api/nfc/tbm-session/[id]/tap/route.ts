@@ -73,6 +73,11 @@ export async function POST(
 
   if (!worker || !worker.is_active) return NextResponse.json({ error: "worker_inactive" }, { status: 409 });
 
+  // Patch H-3: 현장 소속 검증
+  if (worker.assigned_site_id !== session.site_id) {
+    return NextResponse.json({ error: "worker_site_mismatch" }, { status: 403 });
+  }
+
   const now = new Date().toISOString();
 
   const { data: existing } = await ctx.service

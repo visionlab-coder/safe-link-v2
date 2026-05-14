@@ -7,6 +7,16 @@ export const runtime = "nodejs";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const STOP_WORK_RATE_WINDOW_MS = 10 * 60 * 1000; // 10분
+const STOP_WORK_RATE_MAX = 3;
+
+interface StopWorkRateEntry {
+  count: number;
+  resetAt: number;
+}
+
+const stopWorkRateMap = new Map<string, StopWorkRateEntry>();
+
 type StopWorkBody = {
   siteId?: string;
   reason?: string;
@@ -76,6 +86,17 @@ export async function POST(req: NextRequest) {
 
   if (userError || !user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
+  const rlNow = Date.now();
+  const rateEntry = stopWorkRateMap.get(user.id);
+  if (rateEntry && rlNow < rateEntry.resetAt) {
+    if (rateEntry.count >= STOP_WORK_RATE_MAX) {
+      return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
+    }
+    rateEntry.count += 1;
+  } else {
+    stopWorkRateMap.set(user.id, { count: 1, resetAt: rlNow + STOP_WORK_RATE_WINDOW_MS });
+  }
+
   let body: StopWorkBody;
   try {
     body = await req.json();
@@ -89,6 +110,17 @@ export async function POST(req: NextRequest) {
   if (!UUID_REGEX.test(siteId)) return NextResponse.json({ error: "invalid_siteId_format" }, { status: 400 });
 
   const service = createService();
+
+  const { data: callerProfile } = await service
+    .from("profiles")
+    .select("site_id, role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const isAdmin = ["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER", "SAFETY_OFFICER"].includes(String(callerProfile?.role || ""));
+  if (!isAdmin && callerProfile?.site_id !== siteId) {
+    return NextResponse.json({ error: "SITE_MISMATCH" }, { status: 403 });
+  }
   const now = new Date();
   const escalationDueAt = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
 
@@ -105,7 +137,7 @@ export async function POST(req: NextRequest) {
     .select("id, created_at")
     .single();
 
-  if (baseError) return NextResponse.json({ error: "base_alert_insert_failed", detail: baseError.message }, { status: 500 });
+  if (baseError) return NextResponse.json({ error: "base_alert_insert_failed" }, { status: 500 });
 
   const gps = body.gps
     ? {
@@ -136,7 +168,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (interventionError) {
-    return NextResponse.json({ error: "intervention_insert_failed", detail: interventionError.message }, { status: 500 });
+    return NextResponse.json({ error: "intervention_insert_failed" }, { status: 500 });
   }
 
   const audit = await appendClaim13HashChainEvent(service, {

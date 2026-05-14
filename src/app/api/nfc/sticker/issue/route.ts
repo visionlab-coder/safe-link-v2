@@ -30,11 +30,26 @@ export async function POST(req: NextRequest) {
   if (worker.is_active === false) return NextResponse.json({ error: "worker_inactive" }, { status: 409 });
 
   if (body.revoke_previous) {
-    await ctx.service
+    const { data: revoked } = await ctx.service
       .from("nfc_worker_stickers")
       .update({ is_active: false, revoked_at: new Date().toISOString(), revoked_by: ctx.user.id, revoke_reason: "reissued" })
       .eq("worker_id", workerId)
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .select("id, sig_version, issued_epoch");
+
+    if (revoked?.length) {
+      await ctx.service.from("nfc_card_lifecycle_events").insert(
+        revoked.map((item) => ({
+          worker_id: workerId,
+          sticker_id: item.id,
+          event_type: "reissued",
+          actor_id: ctx.user.id,
+          sig_version: item.sig_version,
+          issued_epoch: item.issued_epoch,
+          reason: "reissued",
+        }))
+      );
+    }
   }
 
   const { data: latest } = await ctx.service
@@ -62,7 +77,7 @@ export async function POST(req: NextRequest) {
     .select("id")
     .single();
 
-  if (insertErr || !sticker) return NextResponse.json({ error: "sticker_insert_failed", detail: insertErr?.message }, { status: 500 });
+  if (insertErr || !sticker) return NextResponse.json({ error: "sticker_insert_failed" }, { status: 500 });
 
   const url = generateWorkerStickerUrl({
     workerId,
@@ -78,12 +93,30 @@ export async function POST(req: NextRequest) {
   const urlBytes = new TextEncoder().encode(url);
   const ndefPayloadBytes = 3 + 1 + urlBytes.length; // TNF+type+payload header + URI prefix + URL
   if (ndefPayloadBytes > 138) {
-    await ctx.service.from("nfc_worker_stickers").delete().eq("id", sticker.id);
+    await ctx.service
+      .from("nfc_worker_stickers")
+      .update({ is_active: false, revoked_at: new Date().toISOString(), revoked_by: ctx.user.id, revoke_reason: "ndef_too_long" })
+      .eq("id", sticker.id);
     return NextResponse.json({
       error: "ndef_too_long",
       detail: `NDEF payload ${ndefPayloadBytes} bytes exceeds NTAG213 limit of 138 bytes. URL length: ${urlBytes.length}`,
     }, { status: 422 });
   }
+
+  await ctx.service.from("nfc_card_lifecycle_events").insert({
+    worker_id: workerId,
+    sticker_id: sticker.id,
+    event_type: "issued",
+    actor_id: ctx.user.id,
+    sig_version: signed.sigVersion,
+    issued_epoch: signed.issuedEpoch,
+    ndef_bytes: ndefPayloadBytes,
+    metadata: {
+      worker_code: worker.worker_code,
+      has_identity_hint: Boolean(identityHint),
+      revoke_previous: Boolean(body.revoke_previous),
+    },
+  });
 
   return NextResponse.json({
     sticker_id: sticker.id,

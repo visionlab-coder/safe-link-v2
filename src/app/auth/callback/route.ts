@@ -17,8 +17,9 @@ export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url)
     const code = searchParams.get('code')
     const rawNext = searchParams.get('next') ?? '/auth/setup'
-    // 오픈 리다이렉트 방지: 반드시 /로 시작하고 //로 시작하지 않아야 함
-    const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/auth/setup'
+    // 오픈 리다이렉트 방지: /로 시작하되 //나 \로 시작하지 않아야 함 (백슬래시 우회 차단)
+    const isSafeRelative = /^\/[^\/\\]/.test(rawNext)
+    const next = isSafeRelative ? rawNext : '/auth/setup'
 
     if (code) {
         const cookieHeader = request.headers.get('cookie') ?? '';

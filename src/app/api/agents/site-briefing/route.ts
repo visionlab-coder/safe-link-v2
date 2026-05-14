@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { getErrorMessage } from '@/utils/errors';
+import { requireAdmin } from '@/utils/nfc/require-admin';
 
 export const runtime = "nodejs";
 
@@ -27,19 +28,19 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();
     if (!apiKey) return NextResponse.json({ error: "Missing API Key" }, { status: 500 });
 
+    // 관리자 전용 엔드포인트 — requireAdmin으로 인증 + role 검증
+    const guard = await requireAdmin();
+    if (!guard.ok) return guard.response;
+
     try {
         const { lang = "ko" } = await request.json() as SiteBriefingRequest;
         const supabase = await createClient();
 
-        // 인증 + 서버 측 role 확인 (클라이언트 제공 role 무시)
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
+        // 서버 측 role + site_id 확인 (클라이언트 제공 role 무시)
         const { data: profile } = await supabase
             .from('profiles')
             .select('role, site_id')
-            .eq('id', user.id)
+            .eq('id', guard.ctx.user.id)
             .single();
         if (!profile) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });

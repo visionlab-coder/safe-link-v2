@@ -18,6 +18,13 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        // 관리자 role 확인 — 이 엔드포인트는 집계 데이터를 노출하므로 admin-only
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+        const ADMIN_ROLES = ["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER", "SAFETY_OFFICER", "SITE_MANAGER"];
+        if (!profile || !ADMIN_ROLES.includes(String(profile.role || "").toUpperCase())) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
         // 1. 현장별 근로자 수 (profiles 실집계)
         const { data: workerProfiles } = await supabase
             .from('profiles')

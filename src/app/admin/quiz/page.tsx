@@ -71,11 +71,10 @@ function AdminQuizContent() {
     setPhase("generating");
     setError(null);
     try {
-      const tbmText = selectedSession.tbm_notices?.content_ko ?? "";
       const res = await fetch("/api/quiz/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tbmSessionId: selectedSession.id, tbmText }),
+        body: JSON.stringify({ tbmSessionId: selectedSession.id }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "generation_failed");
@@ -259,7 +258,7 @@ function AdminQuizContent() {
               <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
               <div className="text-center">
                 <p className="text-xl font-black text-white">AI 퀴즈 생성 중...</p>
-                <p className="text-slate-500 text-sm mt-2">TBM 내용에서 안전 핵심 문제를 출제합니다 (약 10~20초)</p>
+                <p className="text-slate-500 text-sm mt-2">TBM 교육 공지 + 현장 발화 내용을 분석해 문제를 출제합니다 (약 10~20초)</p>
               </div>
             </section>
           )}

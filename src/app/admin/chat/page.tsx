@@ -88,6 +88,7 @@ function AdminChatContent() {
     const urlLang = searchParams.get("lang");
 
     const [adminLang, setAdminLang] = useState("ko");
+    const [siteId, setSiteId] = useState<string | null>(null);
     const [workers, setWorkers] = useState<WorkerProfile[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [activeWorker, setActiveWorker] = useState<WorkerProfile | null>(null);
@@ -119,10 +120,11 @@ function AdminChatContent() {
 
         // 프로필 조회 + 근로자 목록을 병렬 실행 (워터폴 제거)
         const [profileRes, workersRes] = await Promise.all([
-            supabase.from("profiles").select("preferred_lang").eq("id", session.user.id).single(),
+            supabase.from("profiles").select("preferred_lang, site_id").eq("id", session.user.id).single(),
             supabase.from("profiles").select("id, display_name, preferred_lang, role").eq("role", "WORKER").not("role", "eq", "ROOT"),
         ]);
 
+        if (profileRes.data?.site_id) setSiteId(profileRes.data.site_id);
         let finalLang = profileRes.data?.preferred_lang || "ko";
         if (urlLang && urlLang !== profileRes.data?.preferred_lang) {
             supabase.from("profiles").update({ preferred_lang: urlLang }).eq("id", session.user.id);
@@ -131,10 +133,13 @@ function AdminChatContent() {
         setAdminLang(finalLang);
         if (workersRes.data) setWorkers(workersRes.data);
 
-        // 🆕 새로운 근로자 가입 시 사이드바 실시간 업데이트
+        // 🆕 새로운 근로자 가입 시 사이드바 실시간 업데이트 (site_id 스코프)
+        const mySiteId = profileRes.data?.site_id ?? null;
         const profileSubscription = supabase
-            .channel('sidebar_updates')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload: { eventType: string; new: Partial<WorkerProfile> & { role?: string } }) => {
+            .channel(`sidebar_updates_${mySiteId ?? session.user.id}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload: { eventType: string; new: Partial<WorkerProfile> & { role?: string; site_id?: string | null } }) => {
+                // 다른 현장 근로자 가입은 무시 (site_id 있는 경우에만 필터)
+                if (payload.new.site_id && mySiteId && payload.new.site_id !== mySiteId) return;
                 if (payload.eventType === 'INSERT' && payload.new.role === 'WORKER' && payload.new.id && payload.new.display_name && payload.new.preferred_lang) {
                     setWorkers(prev => [...prev, payload.new as WorkerProfile]);
                 }
@@ -285,10 +290,12 @@ function AdminChatContent() {
         const supabase = createClient();
 
         const channel = supabase
-            .channel('global_admin_monitor')
+            .channel(`global_admin_monitor_${siteId ?? myId}`)
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-                const msg = payload.new as Message;
+                const msg = payload.new as Message & { site_id?: string | null };
                 if (!msg || msg.from_user === myId) return;
+                // 다른 현장 메시지 차단 (site_id가 있고 내 현장과 다를 때만 필터, NULL은 통과)
+                if (msg.site_id && siteId && msg.site_id !== siteId) return;
 
                 // 1. 현재 대화 중인 근로자의 메시지라면 메시지 목록 업데이트
                 if (activeWorkerRef.current && msg.from_user === activeWorkerRef.current.id) {
@@ -322,7 +329,7 @@ function AdminChatContent() {
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, [myId]); // activeWorker에 의존하지 않음
+    }, [myId, siteId]); // siteId 추가: 현장 확인 후 채널 재생성
 
     const playAudio = (text: string, langCode: string) => {
         // 프리미엄 AI 음성을 위해 Proxy(클라우드) 엔진 우선 사용
@@ -388,7 +395,7 @@ function AdminChatContent() {
             }
 
             const supabase = createClient();
-            const payload = {
+            const payload: Record<string, unknown> = {
                 from_user: myId,
                 to_user: activeWorker.id,
                 source_lang: "ko",
@@ -397,6 +404,7 @@ function AdminChatContent() {
                 translated_text: JSON.stringify({ norm: normalized, text: translated, pron, rev }),
                 is_read: false,
             };
+            if (siteId) payload.site_id = siteId;
 
             const { data: inserted, error } = await supabase.from("messages").insert(payload).select().single();
             if (!error && inserted) {

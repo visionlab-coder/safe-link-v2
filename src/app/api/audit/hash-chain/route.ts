@@ -28,6 +28,12 @@ export async function POST(req: NextRequest) {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
 
+  // Patch H-7: ROOT/SUPER_ADMIN만 직접 호출 가능
+  const role = guard.ctx.user.role.toUpperCase();
+  if (role !== "ROOT" && role !== "SUPER_ADMIN") {
+    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
+
   let body: AuditRequestBody;
   try {
     body = await req.json();

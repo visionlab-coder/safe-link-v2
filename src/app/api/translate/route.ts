@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 export const runtime = "nodejs";
 import { createServiceClient } from '@/utils/supabase/service';
+import { createClient } from '@/utils/supabase/server';
+import { verifyTravelToken } from '@/lib/travel-auth';
 import { CONSTRUCTION_GLOSSARY } from '@/constants/glossary';
 import { getErrorMessage } from '@/utils/errors';
 import { hangulize } from '@/utils/hangulize';
@@ -31,6 +33,21 @@ interface GeminiResponse {
  * 2단계: Gemini 2.5 Flash (발음 + 역번역) — 1단계와 병렬 실행
  */
 export async function POST(request: NextRequest) {
+    // 인증: travel_token (Travel Talk 흐름) 또는 Supabase 세션
+    const authHeader = request.headers.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.slice(7);
+        if (!verifyTravelToken(token)) {
+            return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+        }
+    } else {
+        const supa = await createClient();
+        const { data: { user }, error: userErr } = await supa.auth.getUser();
+        if (userErr || !user) {
+            return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+        }
+    }
+
     const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();
 
     if (!apiKey) {

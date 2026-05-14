@@ -348,12 +348,14 @@ function WorkerChatContent() {
         };
         fetchMessages();
 
-        const monitorId = `msg_wrk_${myId}_${activeAdmin.id}`;
+        const monitorId = `msg_wrk_${siteId ?? myId}_${myId}_${activeAdmin.id}`;
         const channel = supabase
             .channel(monitorId)
             .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload: RealtimeMessagePayload) => {
-                const msg = payload.new as Message;
+                const msg = payload.new as Message & { site_id?: string | null };
                 if (!msg || processedAudioIds.current.has(msg.id)) return;
+                // 다른 현장 메시지 차단 (site_id가 있고 내 현장과 다를 때만 필터, NULL은 통과)
+                if (msg.site_id && siteId && msg.site_id !== siteId) return;
 
                 const isForMe = msg.to_user === myId && msg.from_user === activeAdmin.id;
 
@@ -387,10 +389,12 @@ function WorkerChatContent() {
         if (!myId) return;
         const supabase = createClient();
         const globalChannel = supabase
-            .channel(`worker_global_${myId}`)
+            .channel(`worker_global_${myId}_${siteId ?? 'all'}`)
             .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
-                const msg = payload.new as Message;
+                const msg = payload.new as Message & { site_id?: string | null };
                 if (!msg || msg.from_user === myId) return;
+                // 다른 현장 메시지 차단 (site_id 있는 경우만 필터)
+                if (msg.site_id && siteId && msg.site_id !== siteId) return;
 
                 // If message is for me but not from the active admin, mark as unread
                 if (msg.to_user === myId && (!activeAdminRef.current || msg.from_user !== activeAdminRef.current.id)) {
@@ -403,7 +407,7 @@ function WorkerChatContent() {
             })
             .subscribe();
         return () => { supabase.removeChannel(globalChannel); };
-    }, [myId]);
+    }, [myId, siteId]);
 
     const handleSend = async (overrideText?: string | React.MouseEvent) => {
         const messageText = typeof overrideText === 'string' ? overrideText : text;

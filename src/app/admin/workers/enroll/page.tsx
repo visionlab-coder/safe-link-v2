@@ -3,12 +3,12 @@
 import { Suspense, useEffect, useState } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, CheckCircle, Nfc, UserPlus } from "lucide-react";
+import { AlertCircle, CheckCircle, Eraser, Nfc, UserPlus } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { detectNfcSupport, NfcError, writeNfcUrl } from "@/utils/nfc/web-nfc";
+import { detectNfcSupport, eraseNfcTag, NfcError, writeNfcUrl } from "@/utils/nfc/web-nfc";
 import Image from "next/image";
 
-type Step = "form" | "ready" | "writing" | "done" | "error";
+type Step = "form" | "ready" | "writing" | "erasing" | "done" | "erased" | "error";
 
 const DEFAULT_WORKER_PROFILE = {
   nationality: "KR",
@@ -29,6 +29,8 @@ function WorkerEnrollInner() {
   const [siteId, setSiteId] = useState("");
   const [error, setError] = useState("");
   const [stickerUrl, setStickerUrl] = useState("");
+  const [stickerId, setStickerId] = useState("");
+  const [issuedWorkerId, setIssuedWorkerId] = useState("");
   const [workerCode, setWorkerCode] = useState("");
 
   useEffect(() => {
@@ -54,6 +56,8 @@ function WorkerEnrollInner() {
     setPhoneLast4("");
     setError("");
     setStickerUrl("");
+    setStickerId("");
+    setIssuedWorkerId("");
     setWorkerCode("");
   };
 
@@ -109,6 +113,8 @@ function WorkerEnrollInner() {
     }
 
     setStickerUrl(issueData.url);
+    setStickerId(issueData.sticker_id || "");
+    setIssuedWorkerId(workerId || "");
     if (!workerCode) setWorkerCode(issueData.worker.worker_code);
 
     setStep(nfcSupport.supported ? "ready" : "done");
@@ -130,6 +136,41 @@ function WorkerEnrollInner() {
         setError(`${err.code}: ${err.message}`);
       } else {
         setError(err instanceof Error ? err.message : "NFC write failed.");
+      }
+      setStep("error");
+    }
+  };
+
+  const handleEraseNfc = async () => {
+    if (!nfcSupport.supported) {
+      setError("Web NFC erase requires Android Chrome over HTTPS.");
+      setStep("error");
+      return;
+    }
+    if (!confirm("Erase this NFC card so it can be reused? This removes the SAFE-LINK URL from the tag.")) return;
+    setError("");
+    setStep("erasing");
+    try {
+      await eraseNfcTag();
+      const eventRes = await fetch("/api/nfc/sticker/event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event_type: "erased",
+          worker_id: issuedWorkerId || existingWorkerId || undefined,
+          sticker_id: stickerId || undefined,
+          reason: "card_reuse",
+          metadata: { source: "admin_workers_enroll" },
+        }),
+      });
+      const eventData = await eventRes.json();
+      if (!eventRes.ok) throw new Error(eventData.detail || eventData.error || "NFC erase log failed.");
+      setStep("erased");
+    } catch (err) {
+      if (err instanceof NfcError) {
+        setError(`${err.code}: ${err.message}`);
+      } else {
+        setError(err instanceof Error ? err.message : "NFC erase failed.");
       }
       setStep("error");
     }
@@ -165,6 +206,18 @@ function WorkerEnrollInner() {
           <Nfc className="w-16 h-16 text-green-400 mx-auto mb-4 animate-pulse" />
           <h2 className="text-white text-xl font-bold mb-2">Touch the NFC card</h2>
           <p className="text-gray-400 text-sm">Hold the worker card near this Android phone to write the SAFE-LINK access URL.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "erasing") {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6">
+        <div className="bg-gray-800 rounded-xl p-8 max-w-sm w-full text-center border border-gray-700">
+          <Eraser className="w-16 h-16 text-yellow-400 mx-auto mb-4 animate-pulse" />
+          <h2 className="text-white text-xl font-bold mb-2">Touch the NFC card</h2>
+          <p className="text-gray-400 text-sm">Hold the reusable card near this Android phone to erase the stored SAFE-LINK URL.</p>
         </div>
       </div>
     );
@@ -212,6 +265,35 @@ function WorkerEnrollInner() {
                 Next card
               </button>
             )}
+          </div>
+          {nfcSupport.supported && (
+            <button
+              onClick={handleEraseNfc}
+              className="mt-3 w-full bg-yellow-700 hover:bg-yellow-600 text-white py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+            >
+              <Eraser className="w-4 h-4" />
+              Erase card for reuse
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "erased") {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6">
+        <div className="bg-gray-800 rounded-xl p-8 max-w-sm w-full text-center border border-gray-700">
+          <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
+          <h2 className="text-white text-xl font-bold mb-2">Card erased</h2>
+          <p className="text-gray-400 text-sm">The NFC card can now be assigned to another worker.</p>
+          <div className="flex gap-3 mt-5">
+            <button onClick={() => router.push("/admin/workers")} className="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded-lg text-sm transition-colors">
+              Worker list
+            </button>
+            <button onClick={resetForm} className="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded-lg text-sm transition-colors">
+              Issue again
+            </button>
           </div>
         </div>
       </div>
@@ -323,6 +405,16 @@ function WorkerEnrollInner() {
               {nfcSupport.supported ? <><Nfc className="w-4 h-4" /> Issue NFC URL</> : "Issue short URL"}
             </button>
           </div>
+          {nfcSupport.supported && (
+            <button
+              type="button"
+              onClick={handleEraseNfc}
+              className="w-full bg-gray-800 hover:bg-gray-700 border border-gray-700 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+            >
+              <Eraser className="w-4 h-4" />
+              Erase reusable NFC card
+            </button>
+          )}
         </form>
       </div>
     </div>

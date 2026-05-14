@@ -2,8 +2,10 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 export async function createClient() {
-    const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co').trim();
-    const key = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder').trim();
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+    if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not configured');
+    if (!key) throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY is not configured');
 
     const cookieStore = await cookies();
 

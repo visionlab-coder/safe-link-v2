@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
 
     const { error } = await sb.from("construction_glossary").insert(toInsert);
     if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "insert_failed" }, { status: 500 });
     }
 
     return NextResponse.json({

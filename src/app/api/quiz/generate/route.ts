@@ -27,16 +27,20 @@ async function generateQuizFromText(
   apiKey: string
 ): Promise<QuizQuestion[]> {
   const prompt = `당신은 건설현장 안전교육 퀴즈 출제 전문가입니다.
-아래 TBM(Tool Box Meeting) 발화 텍스트에서 안전 핵심 키워드를 최대 5개 추출하고,
+아래는 오늘 TBM(Tool Box Meeting)에서 실제로 다룬 내용입니다.
+(TBM 교육 공지문 + 현장 발화 내용이 포함될 수 있습니다)
+
+이 내용에서 안전 핵심 키워드를 최대 5개 추출하고,
 각 키워드에 대해 객관식 또는 OX 형식의 퀴즈 문항을 생성하세요.
 
 규칙:
+- 오늘 TBM에서 실제로 언급된 내용만 출제 (추측 금지)
 - 각 문항: 정답 1개 + 오답 2~3개 (총 3~4개 선지)
 - 건설현장 맥락에 맞는 실용적인 문제
 - 한국어로 작성
 
-TBM 발화 텍스트:
-${tbmText.slice(0, 3000)}
+오늘 TBM 내용:
+${tbmText.slice(0, 4000)}
 
 반드시 아래 JSON 배열 형식으로만 응답하세요:
 [
@@ -96,18 +100,33 @@ export async function POST(req: NextRequest) {
   const tbmSessionId = String(body.tbmSessionId ?? "").trim();
   let tbmText = String(body.tbmText ?? "").trim();
 
-  // tbmText 없으면 세션 ID로 live_translations에서 발화 텍스트 조회
-  if (!tbmText && tbmSessionId) {
-    const { data: translations } = await guard.ctx.service
-      .from("live_translations")
-      .select("original_text")
-      .eq("session_id", tbmSessionId)
-      .order("created_at", { ascending: true })
-      .limit(100);
+  // tbmSessionId가 있으면 서버에서 모든 소스를 직접 조회·결합
+  if (tbmSessionId) {
+    const [sessionRes, translationsRes] = await Promise.all([
+      guard.ctx.service
+        .from("nfc_tbm_sessions")
+        .select("tbm_notices(content_ko)")
+        .eq("id", tbmSessionId)
+        .maybeSingle(),
+      guard.ctx.service
+        .from("live_translations")
+        .select("original_text")
+        .eq("session_id", tbmSessionId)
+        .order("created_at", { ascending: true })
+        .limit(150),
+    ]);
 
-    if (translations?.length) {
-      tbmText = translations.map((t: { original_text: string }) => t.original_text).join(" ");
-    }
+    const noticeText =
+      (sessionRes.data?.tbm_notices as { content_ko?: string } | null)?.content_ko ?? "";
+    const liveText = (translationsRes.data ?? [])
+      .map((t: { original_text: string }) => t.original_text)
+      .join(" ");
+
+    const parts: string[] = [];
+    if (noticeText) parts.push(noticeText);
+    if (liveText) parts.push(`[현장 발화 내용]\n${liveText}`);
+
+    if (parts.length) tbmText = parts.join("\n\n");
   }
 
   if (!tbmText) {

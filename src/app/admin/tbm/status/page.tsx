@@ -292,7 +292,7 @@ function TBMStatusPageContent() {
                                     <td class="name">${escapeHtml(w.display_name)}</td>
                                     <td>${escapeHtml(w.preferred_lang.toUpperCase())}</td>
                                     <td>${w.signed ? escapeHtml(new Date(w.signed_at!).toLocaleString("ko-KR")) : '<span class="unsigned">미서명</span>'}</td>
-                                    <td>${w.signed && w.signature_data ? `<img src="${w.signature_data}" class="signature-img" />` : '-'}</td>
+                                    <td>${w.signed && w.signature_data ? `<img src="${escapeHtml(w.signature_data)}" class="signature-img" />` : '-'}</td>
                                     <td></td>
                                 </tr>
                             `).join('')}
@@ -315,11 +315,16 @@ function TBMStatusPageContent() {
                 </body>
                 </html>
             `;
-            const win = window.open('', '_blank');
+            const blob = new Blob([printContent], { type: 'text/html;charset=utf-8' });
+            const blobUrl = URL.createObjectURL(blob);
+            const win = window.open(blobUrl, '_blank');
             if (win) {
-                win.document.write(printContent);
-                win.document.close();
-                win.print();
+                win.addEventListener('load', () => {
+                    win.print();
+                    URL.revokeObjectURL(blobUrl);
+                });
+            } else {
+                URL.revokeObjectURL(blobUrl);
             }
         } else if (mode === 'sheets' || mode === 'drive') {
             const csvRows = [
