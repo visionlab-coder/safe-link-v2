@@ -40,13 +40,16 @@ export default function AdminNfcHubPage() {
   const router = useRouter();
   const [siteName, setSiteName] = useState("");
   const [siteCode, setSiteCode] = useState("");
+  const [mySiteId, setMySiteId] = useState<string | null>(null);
+  const [siteList, setSiteList] = useState<{ id: string; name: string }[]>([]);
   const [locationStatus, setLocationStatus] = useState("");
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [challengeStatus, setChallengeStatus] = useState("");
   const [challengeLoading, setChallengeLoading] = useState(false);
 
-  const fetchChallenge = useCallback(async () => {
-    const res = await fetch("/api/nfc/site-challenge");
+  const fetchChallenge = useCallback(async (siteId?: string | null) => {
+    const qs = siteId ? `?site_id=${encodeURIComponent(siteId)}` : "";
+    const res = await fetch(`/api/nfc/site-challenge${qs}`);
     if (!res.ok) return;
     const data = await res.json();
     setChallenge(data.challenge ?? null);
@@ -63,18 +66,28 @@ export default function AdminNfcHubPage() {
         .maybeSingle();
       const siteId = (profile as { site_id?: string | null; site_code?: string | null } | null)?.site_id;
       setSiteName((profile as { site_code?: string | null } | null)?.site_code ?? "");
-      if (!siteId) return;
-      const { data: site } = await supabase
-        .from("sites")
-        .select("name, site_code")
-        .eq("id", siteId)
-        .maybeSingle();
-      if ((site as { name?: string } | null)?.name) setSiteName((site as { name: string }).name);
-      if ((site as { site_code?: string } | null)?.site_code) {
-        setSiteCode((site as { site_code: string }).site_code);
+      if (siteId) {
+        setMySiteId(siteId);
+        const { data: site } = await supabase
+          .from("sites")
+          .select("name, site_code")
+          .eq("id", siteId)
+          .maybeSingle();
+        if ((site as { name?: string } | null)?.name) setSiteName((site as { name: string }).name);
+        if ((site as { site_code?: string } | null)?.site_code) {
+          setSiteCode((site as { site_code: string }).site_code);
+        }
+        fetchChallenge(siteId);
+      } else {
+        // No site_id in profile — load available sites so admin can pick one
+        const { data: sites } = await supabase
+          .from("sites")
+          .select("id, name")
+          .order("name");
+        if (sites) setSiteList(sites as { id: string; name: string }[]);
+        fetchChallenge(undefined);
       }
     });
-    fetchChallenge();
   }, [fetchChallenge]);
 
   const saveCurrentSiteLocation = async () => {
@@ -110,6 +123,15 @@ export default function AdminNfcHubPage() {
     );
   };
 
+  const selectSite = (id: string) => {
+    const site = siteList.find((s) => s.id === id);
+    if (site) {
+      setMySiteId(id);
+      setSiteName(site.name);
+      fetchChallenge(id);
+    }
+  };
+
   const createChallenge = async (rotate = false) => {
     setChallengeLoading(true);
     setChallengeStatus("");
@@ -117,7 +139,7 @@ export default function AdminNfcHubPage() {
       const res = await fetch("/api/nfc/site-challenge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rotate }),
+        body: JSON.stringify({ rotate, ...(mySiteId ? { site_id: mySiteId } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || data.error || "확인코드 생성 실패");
@@ -146,19 +168,34 @@ export default function AdminNfcHubPage() {
 
           <div className="mb-5 bg-gray-900 border border-gray-800 rounded-xl p-4">
             <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs text-gray-500">내 현장</p>
-                <p className="text-sm font-semibold text-white truncate">{siteName || "프로필 현장명 필요"}</p>
+                {!mySiteId && siteList.length > 0 ? (
+                  <select
+                    className="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                    value=""
+                    onChange={(e) => selectSite(e.target.value)}
+                  >
+                    <option value="" disabled>현장 선택...</option>
+                    {siteList.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-sm font-semibold text-white truncate">{siteName || "프로필 현장명 필요"}</p>
+                )}
                 {siteCode && <p className="text-xs font-mono text-green-300 mt-1">현장코드 {siteCode}</p>}
               </div>
-              <button
-                type="button"
-                onClick={saveCurrentSiteLocation}
-                className="shrink-0 bg-green-700 hover:bg-green-600 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-              >
-                <LocateFixed className="w-4 h-4" />
-                현장 위치 저장
-              </button>
+              {mySiteId && (
+                <button
+                  type="button"
+                  onClick={saveCurrentSiteLocation}
+                  className="shrink-0 bg-green-700 hover:bg-green-600 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                >
+                  <LocateFixed className="w-4 h-4" />
+                  현장 위치 저장
+                </button>
+              )}
             </div>
             {locationStatus && <p className="text-xs text-gray-400 mt-3">{locationStatus}</p>}
           </div>

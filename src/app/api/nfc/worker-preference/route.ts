@@ -91,11 +91,6 @@ async function verifySiteChallenge(args: {
   workDate: string;
   challengeCode?: unknown;
 }): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
-  const code = String(args.challengeCode || "").trim();
-  if (!/^[0-9]{6}$/.test(code)) {
-    return { ok: false, status: 428, error: "site_challenge_required" };
-  }
-
   const { data } = await args.service
     .from("nfc_site_daily_challenges")
     .select("challenge_code, expires_at, is_active")
@@ -104,13 +99,21 @@ async function verifySiteChallenge(args: {
     .eq("is_active", true)
     .maybeSingle();
 
-  if (!data) return { ok: false, status: 428, error: "site_challenge_not_created" };
+  // 오늘 챌린지 미설정 → 지오펜스만으로 충분, 통과
+  if (!data) return { ok: true };
+
   if (new Date(data.expires_at).getTime() < Date.now()) {
     return { ok: false, status: 403, error: "site_challenge_expired" };
   }
-  if (String(data.challenge_code) !== code) {
-    return { ok: false, status: 403, error: "site_challenge_invalid" };
+
+  const code = String(args.challengeCode || "").trim();
+  // 코드가 자동 주입됐거나 직접 입력된 경우 검증
+  if (code && /^[0-9]{6}$/.test(code)) {
+    if (String(data.challenge_code) !== code) {
+      return { ok: false, status: 403, error: "site_challenge_invalid" };
+    }
   }
+  // 코드 미입력 상태지만 챌린지는 존재 → 자동 통과 (지오펜스 검증 완료)
   return { ok: true };
 }
 

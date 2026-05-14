@@ -39,23 +39,24 @@ function makeCode(): string {
   return String(randomInt(100000, 1000000));
 }
 
-async function getAdminSiteId(ctx: AdminContext) {
+async function getAdminSiteId(ctx: AdminContext, explicitSiteId?: string | null): Promise<string | null> {
   const { data: profile } = await ctx.service
     .from("profiles")
     .select("site_id")
     .eq("id", ctx.user.id)
     .maybeSingle();
-  return (profile as { site_id?: string | null } | null)?.site_id ?? null;
+  return (profile as { site_id?: string | null } | null)?.site_id ?? explicitSiteId ?? null;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
   const { ctx } = guard;
   if (!checkChallengeRate(ctx.user.id)) {
     return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   }
-  const siteId = await getAdminSiteId(ctx);
+  const explicitSiteId = req.nextUrl.searchParams.get("site_id");
+  const siteId = await getAdminSiteId(ctx, explicitSiteId);
   if (!siteId) return NextResponse.json({ error: "profile_site_required" }, { status: 409 });
 
   const workDate = todayInSeoul();
@@ -78,15 +79,15 @@ export async function POST(req: NextRequest) {
   if (!checkChallengeRate(ctx.user.id)) {
     return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   }
-  const siteId = await getAdminSiteId(ctx);
-  if (!siteId) return NextResponse.json({ error: "profile_site_required" }, { status: 409 });
-
-  let body: { rotate?: boolean };
+  let body: { rotate?: boolean; site_id?: string };
   try {
     body = await req.json();
   } catch {
     body = {};
   }
+
+  const siteId = await getAdminSiteId(ctx, body.site_id);
+  if (!siteId) return NextResponse.json({ error: "profile_site_required" }, { status: 409 });
 
   const workDate = todayInSeoul();
   const existing = await ctx.service
