@@ -153,6 +153,9 @@ function NfcWorkerEntryInner() {
           return;
         }
         const data = await res.json();
+        if (data.site_challenge_code) {
+          setSiteChallengeCode(data.site_challenge_code);
+        }
         if (data.has_confirmed) {
           await applyPreference(data.nationality, data.preferred_lang);
         } else {
