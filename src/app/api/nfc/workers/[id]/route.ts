@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/utils/nfc/require-admin";
+import { requireAdmin, requireSameSite } from "@/utils/nfc/require-admin";
 
 export const runtime = "nodejs";
 
@@ -20,6 +20,8 @@ export async function GET(
     .maybeSingle();
 
   if (error || !data) return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
+  const denied = requireSameSite(guard.ctx.user, data.assigned_site_id);
+  if (denied) return denied;
   return NextResponse.json({ worker: data });
 }
 
@@ -38,7 +40,6 @@ export async function PATCH(
     return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
   }
 
-  // 화이트리스트 필드만 업데이트
   const patch: Record<string, unknown> = {};
   for (const field of ALLOWED_UPDATE_FIELDS) {
     if (field in body) patch[field] = body[field];
@@ -46,6 +47,21 @@ export async function PATCH(
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "no_valid_fields" }, { status: 400 });
   }
+
+  const { data: currentWorker } = await guard.ctx.service
+    .from("nfc_workers")
+    .select("assigned_site_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!currentWorker) return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
+
+  const denied = requireSameSite(guard.ctx.user, currentWorker.assigned_site_id);
+  if (denied) return denied;
+  if ("assigned_site_id" in patch) {
+    const moveDenied = requireSameSite(guard.ctx.user, String(patch.assigned_site_id || ""));
+    if (moveDenied) return moveDenied;
+  }
+
   patch.updated_at = new Date().toISOString();
 
   const { data, error } = await guard.ctx.service
@@ -67,7 +83,16 @@ export async function DELETE(
   if (!guard.ok) return guard.response;
   const { id } = await params;
 
-  // 소프트 삭제: is_active=false + 모든 스티커 revoke
+  const { data: currentWorker } = await guard.ctx.service
+    .from("nfc_workers")
+    .select("assigned_site_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!currentWorker) return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
+
+  const denied = requireSameSite(guard.ctx.user, currentWorker.assigned_site_id);
+  if (denied) return denied;
+
   await guard.ctx.service
     .from("nfc_worker_stickers")
     .update({ is_active: false, revoked_at: new Date().toISOString(), revoked_by: guard.ctx.user.id, revoke_reason: "worker_deactivated" })

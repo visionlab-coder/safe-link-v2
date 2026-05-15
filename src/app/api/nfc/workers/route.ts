@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/utils/nfc/require-admin";
+import { requireAdmin, requireSameSite } from "@/utils/nfc/require-admin";
 import { TRADES } from "@/utils/nfc/constants";
 
 export const runtime = "nodejs";
@@ -92,13 +92,10 @@ export async function POST(req: NextRequest) {
   let assignedSiteId = body.assigned_site_id?.trim() || null;
 
   if (!assignedSiteId) {
-    const { data: profile } = await ctx.service
-      .from("profiles")
-      .select("site_id")
-      .eq("id", ctx.user.id)
-      .maybeSingle();
-    assignedSiteId = profile?.site_id ?? null;
+    assignedSiteId = ctx.user.site_id ?? null;
   }
+  const denied = requireSameSite(ctx.user, assignedSiteId);
+  if (denied) return denied;
 
   const { data, error } = await ctx.service
     .from("nfc_workers")

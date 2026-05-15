@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/utils/nfc/require-admin";
+import { requireAdmin, requireSameSite } from "@/utils/nfc/require-admin";
 import { signSticker, NFC_SIG_CURRENT_VERSION } from "@/utils/nfc/signing";
 import { generateWorkerStickerUrl } from "@/utils/nfc/constants";
 
@@ -22,12 +22,14 @@ export async function POST(req: NextRequest) {
 
   const { data: worker, error: workerErr } = await ctx.service
     .from("nfc_workers")
-    .select("id, is_active, full_name, worker_code, name_initials, phone_last4")
+    .select("id, is_active, full_name, worker_code, assigned_site_id, name_initials, phone_last4")
     .eq("id", workerId)
     .maybeSingle();
 
   if (workerErr || !worker) return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
   if (worker.is_active === false) return NextResponse.json({ error: "worker_inactive" }, { status: 409 });
+  const denied = requireSameSite(ctx.user, worker.assigned_site_id);
+  if (denied) return denied;
 
   const { data: revoked } = await ctx.service
     .from("nfc_worker_stickers")

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/utils/nfc/require-admin";
+import { requireAdmin, requireSameSite } from "@/utils/nfc/require-admin";
 
 export const runtime = "nodejs";
 
@@ -29,38 +29,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "event_type_invalid" }, { status: 400 });
   }
 
-  // Patch H-8: 스티커 취소 시 현장 소속 검증 (erased / revoked)
-  if ((eventType === "erased" || eventType === "revoked") && body.sticker_id) {
-    const adminRole = guard.ctx.user.role.toUpperCase();
-    const isGlobalAdmin = adminRole === "ROOT" || adminRole === "SUPER_ADMIN";
+  let workerSiteId: string | null = null;
+  if (body.sticker_id) {
+    const { data: stickerData } = await ctx.service
+      .from("nfc_worker_stickers")
+      .select("worker_id, nfc_workers(assigned_site_id)")
+      .eq("id", body.sticker_id)
+      .maybeSingle();
 
-    if (!isGlobalAdmin) {
-      // 관리자의 site_id 조회
-      const { data: adminProfile } = await ctx.service
-        .from("profiles")
-        .select("site_id")
-        .eq("id", ctx.user.id)
-        .maybeSingle();
-
-      // 스티커 소유 근로자의 assigned_site_id 조회
-      const { data: stickerData } = await ctx.service
-        .from("nfc_worker_stickers")
-        .select("worker_id, nfc_workers(assigned_site_id)")
-        .eq("id", body.sticker_id)
-        .maybeSingle();
-
-      const nfcWorkers = stickerData?.nfc_workers;
-      const workerSiteId = Array.isArray(nfcWorkers) && nfcWorkers.length > 0
-        ? (nfcWorkers[0] as { assigned_site_id: string })?.assigned_site_id
-        : !Array.isArray(nfcWorkers) && nfcWorkers
-          ? (nfcWorkers as unknown as { assigned_site_id: string })?.assigned_site_id
-          : null;
-
-      if (!adminProfile?.site_id || adminProfile.site_id !== workerSiteId) {
-        return NextResponse.json({ error: "cross_site_revoke_denied" }, { status: 403 });
-      }
-    }
+    const nfcWorkers = stickerData?.nfc_workers;
+    workerSiteId = Array.isArray(nfcWorkers) && nfcWorkers.length > 0
+      ? (nfcWorkers[0] as { assigned_site_id: string })?.assigned_site_id
+      : !Array.isArray(nfcWorkers) && nfcWorkers
+        ? (nfcWorkers as unknown as { assigned_site_id: string })?.assigned_site_id
+        : null;
+  } else if (body.worker_id) {
+    const { data: worker } = await ctx.service
+      .from("nfc_workers")
+      .select("assigned_site_id")
+      .eq("id", body.worker_id)
+      .maybeSingle();
+    workerSiteId = worker?.assigned_site_id ?? null;
   }
+
+  const denied = requireSameSite(ctx.user, workerSiteId);
+  if (denied) return denied;
 
   if (eventType === "erased" && body.sticker_id) {
     const { error: revokeErr } = await ctx.service

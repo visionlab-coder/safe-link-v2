@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/utils/nfc/require-admin";
+import { isGlobalAdmin, requireAdmin, requireSameSite } from "@/utils/nfc/require-admin";
 
 export const runtime = "nodejs";
 
@@ -7,8 +7,13 @@ export async function GET(req: NextRequest) {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
 
-  const siteId = req.nextUrl.searchParams.get("site_id");
+  let siteId = req.nextUrl.searchParams.get("site_id");
   const statusFilter = req.nextUrl.searchParams.get("status");
+  if (!isGlobalAdmin(guard.ctx.user.role)) {
+    const denied = requireSameSite(guard.ctx.user, siteId || guard.ctx.user.site_id);
+    if (denied) return denied;
+    siteId = guard.ctx.user.site_id ?? null;
+  }
 
   let query = guard.ctx.service
     .from("nfc_tbm_sessions")
@@ -39,6 +44,8 @@ export async function POST(req: NextRequest) {
 
   const siteId = String(body.site_id || "").trim();
   if (!siteId) return NextResponse.json({ error: "site_id_required" }, { status: 400 });
+  const denied = requireSameSite(ctx.user, siteId);
+  if (denied) return denied;
 
   const { data, error } = await ctx.service
     .from("nfc_tbm_sessions")

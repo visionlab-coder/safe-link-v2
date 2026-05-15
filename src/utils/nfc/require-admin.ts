@@ -11,7 +11,7 @@ import { createClient as createServiceClient, type SupabaseClient } from "@supab
 const ADMIN_ROLES = new Set(["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER", "SAFETY_OFFICER"]);
 
 export interface AdminContext {
-  user: { id: string; email?: string | null; role: string };
+  user: { id: string; email?: string | null; role: string; site_id?: string | null };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   service: SupabaseClient<any, any, any>;
 }
@@ -30,7 +30,7 @@ export async function requireAdmin(): Promise<AdminGuardResult> {
 
   const { data: profile, error: profErr } = await supa
     .from("profiles")
-    .select("role")
+    .select("role, site_id")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -54,6 +54,31 @@ export async function requireAdmin(): Promise<AdminGuardResult> {
 
   return {
     ok: true,
-    ctx: { user: { id: user.id, email: user.email ?? null, role: String(profile.role) }, service },
+    ctx: {
+      user: {
+        id: user.id,
+        email: user.email ?? null,
+        role: String(profile.role),
+        site_id: profile.site_id ?? null,
+      },
+      service,
+    },
   };
+}
+
+export function isGlobalAdmin(role: string): boolean {
+  return ["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER"].includes(role.toUpperCase());
+}
+
+export function canAccessSite(user: AdminContext["user"], siteId?: string | null): boolean {
+  if (isGlobalAdmin(user.role)) return true;
+  return Boolean(user.site_id && siteId && String(user.site_id) === String(siteId));
+}
+
+export function requireSameSite(user: AdminContext["user"], siteId?: string | null): NextResponse | null {
+  if (canAccessSite(user, siteId)) return null;
+  if (!user.site_id) {
+    return NextResponse.json({ error: "admin_site_required" }, { status: 409 });
+  }
+  return NextResponse.json({ error: "cross_site_access_denied" }, { status: 403 });
 }
