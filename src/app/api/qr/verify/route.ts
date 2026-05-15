@@ -321,8 +321,16 @@ export async function POST(req: NextRequest) {
         last_seen_at: nowIso,
         checkin_location: { source: "worker_qr" },
       });
-    if (checkinErr) return NextResponse.json({ error: "checkin_failed" }, { status: 500 });
-    accessAction = "checked_in";
+    if (checkinErr) {
+      // B2: 동시 더블 탭으로 unique 충돌 → already_checked_in으로 처리
+      if (checkinErr.code === "23505") {
+        accessAction = "already_checked_in";
+      } else {
+        return NextResponse.json({ error: "checkin_failed" }, { status: 500 });
+      }
+    } else {
+      accessAction = "checked_in";
+    }
   }
 
   const tbm = accessActive

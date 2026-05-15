@@ -141,6 +141,8 @@ function SiteQrEntryInner() {
         return;
       }
 
+      // RoleGuard rememberMe=false 체크 우회 — QR 입장 세션은 항상 활성으로 표시
+      sessionStorage.setItem("safe-link-session-active", "true");
       window.location.replace(`/worker?lang=${encodeURIComponent(country.lang)}&qr=1`);
     } catch {
       setErrMsg("NETWORK_ERROR");
