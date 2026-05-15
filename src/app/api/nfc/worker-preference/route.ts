@@ -282,7 +282,7 @@ export async function POST(req: NextRequest) {
 
   const workerLoad = await service
     .from("nfc_workers")
-    .select("id, worker_code, full_name, nationality, preferred_lang, auth_user_id, assigned_site_id")
+    .select("id, worker_code, full_name, nationality, preferred_lang, auth_user_id, assigned_site_id, created_by")
     .eq("id", workerId)
     .eq("is_active", true)
     .single();
@@ -291,6 +291,21 @@ export async function POST(req: NextRequest) {
 
   if (error || !data) {
     return NextResponse.json({ error: "worker_load_failed" }, { status: 500 });
+  }
+
+  if (!data.assigned_site_id && data.created_by) {
+    const { data: creatorProfile } = await service
+      .from("profiles")
+      .select("site_id")
+      .eq("id", data.created_by)
+      .maybeSingle();
+    if (creatorProfile?.site_id) {
+      data.assigned_site_id = String(creatorProfile.site_id);
+      await service
+        .from("nfc_workers")
+        .update({ assigned_site_id: data.assigned_site_id })
+        .eq("id", workerId);
+    }
   }
 
   if (!data.assigned_site_id) {
@@ -349,7 +364,7 @@ export async function POST(req: NextRequest) {
     })
     .eq("id", workerId)
     .eq("is_active", true)
-    .select("id, worker_code, full_name, nationality, preferred_lang, auth_user_id, assigned_site_id")
+    .select("id, worker_code, full_name, nationality, preferred_lang, auth_user_id, assigned_site_id, created_by")
     .single();
 
   if (preferenceErr || !updatedWorker) {
@@ -359,6 +374,7 @@ export async function POST(req: NextRequest) {
 
   let authUserId: string | null = data.auth_user_id ?? null;
   const email = nfcEmail(workerId);
+  let generatedTokenHash: string | null = null;
 
   if (!authUserId) {
     const { data: authData, error: authErr } = await service.auth.admin.createUser({
@@ -369,15 +385,32 @@ export async function POST(req: NextRequest) {
 
     if (!authErr && authData?.user) {
       authUserId = authData.user.id;
-
-      await Promise.all([
-        service.from("profiles").upsert(
-          { id: authUserId, role: "WORKER", display_name: data.full_name, preferred_lang: preferredLang },
-          { onConflict: "id" }
-        ),
-        service.from("nfc_workers").update({ auth_user_id: authUserId }).eq("id", workerId),
-      ]);
+    } else {
+      const { data: linkData } = await service.auth.admin.generateLink({
+        type: "magiclink",
+        email,
+        options: { data: { nfc_worker_id: workerId } },
+      });
+      authUserId = linkData?.user?.id ?? null;
+      generatedTokenHash = linkData?.properties?.hashed_token ?? null;
     }
+  }
+
+  if (authUserId) {
+    await Promise.all([
+      service.from("profiles").upsert(
+        {
+          id: authUserId,
+          role: "WORKER",
+          display_name: data.full_name,
+          preferred_lang: preferredLang,
+          site_id: data.assigned_site_id,
+          site_code: (site as { name?: string | null }).name ?? null,
+        },
+        { onConflict: "id" }
+      ),
+      service.from("nfc_workers").update({ auth_user_id: authUserId }).eq("id", workerId),
+    ]);
   }
 
   const workDate = todayInSeoul();
@@ -492,11 +525,12 @@ export async function POST(req: NextRequest) {
   }
 
   // Generate a one-time token and exchange it immediately on the server
-  const { data: linkData } = await service.auth.admin.generateLink({
-    type: "magiclink",
-    email,
-  });
-  const tokenHash = linkData?.properties?.hashed_token ?? null;
+  const tokenHash = generatedTokenHash ?? (
+    await service.auth.admin.generateLink({
+      type: "magiclink",
+      email,
+    })
+  ).data?.properties?.hashed_token ?? null;
 
   if (!tokenHash) {
     // Session creation failed non-fatally — still allow access, just without

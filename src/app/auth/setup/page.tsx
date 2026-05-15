@@ -396,23 +396,7 @@ function SetupContent() {
     if (role === "worker" && (!trade || !phone)) { alert(t.err); return; }
     if ((role === "site_manager" || role === "safety_officer" || role === "root" || role === "hq_officer") && !title) { alert(t.err); return; }
 
-    // 관리자 역할: 현장명으로 site_id 자동 해결
-    let resolvedSiteId: string | null = initSiteId || null;
     const isAdminRole = role === "site_manager" || role === "safety_officer";
-    if (isAdminRole && siteCode.trim()) {
-      try {
-        const location = await getCurrentLocation();
-        const res = await fetch("/api/sites/resolve", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: siteCode.trim(), location, geofence_radius_m: 300 }),
-        });
-        if (res.ok) {
-          const data = await res.json() as { id: string };
-          resolvedSiteId = data.id;
-        }
-      } catch { /* site_id 없이 진행 */ }
-    }
 
     setLoading(true);
     const { error } = await supabase.from("profiles").upsert({
@@ -425,10 +409,40 @@ function SetupContent() {
       trade: trade.trim(),
       title: title.trim(),
       site_code: siteCode.trim(),
-      site_id: resolvedSiteId,
+      site_id: initSiteId || null,
     });
+    if (error) {
+      setLoading(false);
+      alert(error.message);
+      return;
+    }
+
+    if (isAdminRole && siteCode.trim()) {
+      try {
+        const location = await getCurrentLocation();
+        const res = await fetch("/api/sites/resolve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: siteCode.trim(), location, geofence_radius_m: 300 }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => null) as { error?: string } | null;
+          throw new Error(data?.error || "현장코드 생성에 실패했습니다.");
+        }
+        const data = await res.json() as { id: string };
+        const { error: siteUpdateError } = await supabase
+          .from("profiles")
+          .update({ site_id: data.id })
+          .eq("id", userId);
+        if (siteUpdateError) throw siteUpdateError;
+      } catch (siteError) {
+        setLoading(false);
+        alert(siteError instanceof Error ? siteError.message : "현장코드 생성에 실패했습니다.");
+        return;
+      }
+    }
+
     setLoading(false);
-    if (error) { alert(error.message); return; }
 
     if (rememberMe) {
       localStorage.setItem("safe-link-remember", "true");

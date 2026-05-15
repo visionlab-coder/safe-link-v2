@@ -422,6 +422,8 @@ function AdminChatContent() {
 
     const [hiddenWorkers, setHiddenWorkers] = useState<Set<string>>(new Set());
     const [showQR, setShowQR] = useState(false);
+    const [workerNfcUrl, setWorkerNfcUrl] = useState<string | null>(null);
+    const [workerNfcLoading, setWorkerNfcLoading] = useState(false);
 
     useEffect(() => {
         const saved = localStorage.getItem("adm_hidden_workers");
@@ -487,9 +489,33 @@ function AdminChatContent() {
                         {activeWorker && (
                             <div className="flex items-center gap-1">
                                 <button
-                                    onClick={() => setShowQR(true)}
+                                    onClick={async () => {
+                                        setShowQR(true);
+                                        setWorkerNfcUrl(null);
+                                        if (!activeWorker) return;
+                                        setWorkerNfcLoading(true);
+                                        try {
+                                            const supabase = createClient();
+                                            const { data: nfcWorker } = await supabase
+                                                .from("nfc_workers")
+                                                .select("id")
+                                                .eq("auth_user_id", activeWorker.id)
+                                                .maybeSingle();
+                                            if (nfcWorker?.id) {
+                                                const res = await fetch("/api/nfc/sticker/issue", {
+                                                    method: "POST",
+                                                    headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify({ worker_id: nfcWorker.id, revoke_previous: false }),
+                                                });
+                                                const data = await res.json() as { url?: string };
+                                                if (res.ok && data.url) setWorkerNfcUrl(data.url);
+                                            }
+                                        } finally {
+                                            setWorkerNfcLoading(false);
+                                        }
+                                    }}
                                     className="p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-all border border-slate-100"
-                                    title="Add Friend QR"
+                                    title="근로자 NFC QR"
                                 >
                                     <QrCode className="w-5 h-5" />
                                 </button>
@@ -585,19 +611,34 @@ function AdminChatContent() {
                                     className="bg-white rounded-[40px] p-8 max-w-sm w-full shadow-2xl flex flex-col items-center gap-6"
                                     onClick={e => e.stopPropagation()}
                                 >
-                                    <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">친구 추가 QR</h3>
+                                    <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">
+                                        근로자 NFC QR
+                                    </h3>
+                                    <p className="text-xs text-slate-400 font-bold text-center -mt-4">
+                                        {activeWorker?.display_name}
+                                    </p>
                                     <div className="bg-slate-50 p-6 rounded-[32px] border-4 border-slate-100 shadow-inner">
-                                        <Image
-                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${window.location.origin}/worker/chat?add_friend=${myId}`)}`}
-                                            alt="Add Friend QR"
-                                            width={250}
-                                            height={250}
-                                            className="w-48 h-48 md:w-64 md:h-64"
-                                            unoptimized
-                                        />
+                                        {workerNfcLoading ? (
+                                            <div className="w-48 h-48 flex items-center justify-center">
+                                                <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                                            </div>
+                                        ) : workerNfcUrl ? (
+                                            <Image
+                                                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(workerNfcUrl)}`}
+                                                alt="Worker NFC QR"
+                                                width={250}
+                                                height={250}
+                                                className="w-48 h-48 md:w-64 md:h-64"
+                                                unoptimized
+                                            />
+                                        ) : (
+                                            <div className="w-48 h-48 flex items-center justify-center">
+                                                <p className="text-center text-xs text-slate-400 leading-relaxed">NFC 카드가<br />등록되지 않은<br />근로자입니다</p>
+                                            </div>
+                                        )}
                                     </div>
                                     <p className="text-center text-slate-500 font-bold leading-tight">
-                                        이 관리자를 근로자의 대화 목록에<br />추가하려면 QR 코드를 스캔하세요.
+                                        근로자 NFC 카드 URL을<br />스캔하세요.
                                     </p>
                                     <button
                                         onClick={() => setShowQR(false)}

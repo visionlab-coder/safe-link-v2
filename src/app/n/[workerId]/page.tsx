@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { Globe2, Loader2, ShieldCheck } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
@@ -38,7 +38,6 @@ const COUNTRIES: CountryOption[] = [
 ];
 
 function NfcWorkerEntryInner() {
-  const router = useRouter();
   const { workerId } = useParams<{ workerId: string }>();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -117,13 +116,15 @@ function NfcWorkerEntryInner() {
 
     window.localStorage.setItem("safe-link-worker-lang", preferred_lang);
     window.localStorage.setItem("safe-link-worker-country", nationality);
-    router.replace(`/worker?lang=${encodeURIComponent(preferred_lang)}&nfc=1`);
+    window.sessionStorage.setItem("safe-link-session-active", "true");
+    window.location.replace(`/worker?lang=${encodeURIComponent(preferred_lang)}&nfc=1`);
   };
 
   const continueToSafeLink = async () => {
     const preferredLang = activePreference?.preferred_lang ?? selected.lang;
     window.localStorage.setItem("safe-link-worker-lang", preferredLang);
-    router.replace(`/worker?lang=${encodeURIComponent(preferredLang)}&nfc=1`);
+    window.sessionStorage.setItem("safe-link-session-active", "true");
+    window.location.replace(`/worker?lang=${encodeURIComponent(preferredLang)}&nfc=1`);
   };
 
   const checkout = async () => {

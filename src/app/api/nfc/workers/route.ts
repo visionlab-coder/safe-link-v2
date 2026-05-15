@@ -89,6 +89,16 @@ export async function POST(req: NextRequest) {
   if (!preferredLang || preferredLang.length < 2) return NextResponse.json({ error: "preferred_lang_required" }, { status: 400 });
 
   const consentSignedAt = body.consent_signed_at ? new Date(body.consent_signed_at).toISOString() : null;
+  let assignedSiteId = body.assigned_site_id?.trim() || null;
+
+  if (!assignedSiteId) {
+    const { data: profile } = await ctx.service
+      .from("profiles")
+      .select("site_id")
+      .eq("id", ctx.user.id)
+      .maybeSingle();
+    assignedSiteId = profile?.site_id ?? null;
+  }
 
   const { data, error } = await ctx.service
     .from("nfc_workers")
@@ -96,7 +106,7 @@ export async function POST(req: NextRequest) {
       full_name: fullName,
       nationality,
       phone: body.phone?.trim() || null,
-      assigned_site_id: body.assigned_site_id?.trim() || null,
+      assigned_site_id: assignedSiteId,
       trade,
       preferred_lang: preferredLang,
       consent_signed_at: consentSignedAt,
