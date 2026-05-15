@@ -114,7 +114,7 @@ export default function AdminNfcDailyLogsPage() {
                 type="button"
                 onClick={fetchLogs}
                 className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-2"
-                aria-label="Refresh"
+                aria-label="새로고침"
               >
                 <RefreshCw className="w-4 h-4" />
               </button>
@@ -153,7 +153,7 @@ export default function AdminNfcDailyLogsPage() {
                   return (
                     <tr key={log.id}>
                       <td className="px-3 py-3">
-                        <p className="font-medium text-white">{log.worker?.full_name ?? "Unknown"}</p>
+                        <p className="font-medium text-white">{log.worker?.full_name ?? "이름 없음"}</p>
                         <p className="text-xs text-gray-500 font-mono">{log.worker?.worker_code ?? log.worker_id}</p>
                       </td>
                       <td className="px-3 py-3 text-gray-300">{timeLabel(log.check_in_at)}</td>
@@ -182,7 +182,7 @@ export default function AdminNfcDailyLogsPage() {
                 {loading && (
                   <tr>
                     <td colSpan={5} className="px-3 py-10 text-center text-gray-500">
-                      Loading...
+                      불러오는 중...
                     </td>
                   </tr>
                 )}

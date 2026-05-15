@@ -128,6 +128,9 @@ function NfcWorkerEntryInner() {
   };
 
   const checkout = async () => {
+    if (!window.confirm("퇴근 처리 후 오늘은 SAFE-LINK 모든 기능이 중지됩니다. 계속하시겠습니까?")) {
+      return;
+    }
     const nationality = activePreference?.nationality ?? selected.code;
     const preferredLang = activePreference?.preferred_lang ?? selected.lang;
     setPhase("saving");

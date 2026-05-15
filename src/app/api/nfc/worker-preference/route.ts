@@ -33,6 +33,8 @@ type LocationPayload = {
 };
 
 const DEFAULT_GEOFENCE_RADIUS_M = 300;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SITE_SELECT = "id, name, code, site_code, latitude, longitude, geofence_radius_m";
 
 function cleanCountry(value: unknown): string | null {
   const code = String(value || "").trim().toUpperCase();
@@ -66,9 +68,7 @@ function asFiniteNumber(value: unknown): number | null {
 function pickSiteNumber(site: Record<string, unknown>, key: string): number | null {
   const direct = asFiniteNumber(site[key]);
   if (direct != null) return direct;
-  const metadata = site.metadata as Record<string, unknown> | null | undefined;
-  if (!metadata || typeof metadata !== "object") return null;
-  return asFiniteNumber(metadata[key]);
+  return null;
 }
 
 function haversineMeters(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) {
@@ -223,6 +223,60 @@ async function uploadDailySafetyLog(args: {
     .throwOnError();
 }
 
+async function isSiteAccessEnabled(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  service: SupabaseClient<any, any, any>,
+  siteId: string
+): Promise<boolean> {
+  const { data } = await service
+    .from("nfc_site_access_controls")
+    .select("is_enabled")
+    .eq("site_id", siteId)
+    .maybeSingle();
+  return data?.is_enabled !== false;
+}
+
+async function resolveSiteByRef(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  service: SupabaseClient<any, any, any>,
+  siteRef: string
+) {
+  const ref = String(siteRef || "").trim();
+  if (!ref) return null;
+
+  if (UUID_PATTERN.test(ref)) {
+    const { data } = await service
+      .from("sites")
+      .select(SITE_SELECT)
+      .eq("id", ref)
+      .maybeSingle();
+    if (data) return data;
+  }
+
+  const upperRef = ref.toUpperCase();
+  const { data: byCode } = await service
+    .from("sites")
+    .select(SITE_SELECT)
+    .eq("code", upperRef)
+    .maybeSingle();
+  if (byCode) return byCode;
+
+  const { data: bySiteCode } = await service
+    .from("sites")
+    .select(SITE_SELECT)
+    .eq("site_code", upperRef)
+    .maybeSingle();
+  if (bySiteCode) return bySiteCode;
+
+  const { data: byName } = await service
+    .from("sites")
+    .select(SITE_SELECT)
+    .ilike("name", ref)
+    .limit(1)
+    .maybeSingle();
+  return byName ?? null;
+}
+
 export async function POST(req: NextRequest) {
   let body: {
     url?: string;
@@ -312,20 +366,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "worker_site_required" }, { status: 403 });
   }
 
+  const site = await resolveSiteByRef(service, data.assigned_site_id);
+  if (!site) return NextResponse.json({ error: "site_not_found" }, { status: 404 });
+
+  if (String(site.id) !== String(data.assigned_site_id)) {
+    data.assigned_site_id = String(site.id);
+    await service
+      .from("nfc_workers")
+      .update({ assigned_site_id: data.assigned_site_id })
+      .eq("id", workerId);
+  }
+
+  if (!(await isSiteAccessEnabled(service, String(site.id)))) {
+    return NextResponse.json({ error: "site_access_disabled" }, { status: 403 });
+  }
+
   const latitude = asFiniteNumber(body.location?.latitude);
   const longitude = asFiniteNumber(body.location?.longitude);
   const accuracy = Math.max(0, asFiniteNumber(body.location?.accuracy) ?? 0);
   if (latitude == null || longitude == null) {
     return NextResponse.json({ error: "location_required" }, { status: 428 });
   }
-
-  const { data: site } = await service
-    .from("sites")
-    .select("id, name, latitude, longitude, geofence_radius_m, metadata")
-    .eq("id", data.assigned_site_id)
-    .maybeSingle();
-
-  if (!site) return NextResponse.json({ error: "site_not_found" }, { status: 404 });
 
   const siteLatitude = pickSiteNumber(site as Record<string, unknown>, "latitude");
   const siteLongitude = pickSiteNumber(site as Record<string, unknown>, "longitude");
@@ -404,7 +465,7 @@ export async function POST(req: NextRequest) {
           role: "WORKER",
           display_name: data.full_name,
           preferred_lang: preferredLang,
-          site_id: data.assigned_site_id,
+          site_id: site.id,
           site_code: (site as { name?: string | null }).name ?? null,
         },
         { onConflict: "id" }
@@ -491,7 +552,7 @@ export async function POST(req: NextRequest) {
       .from("nfc_worker_daily_access")
       .insert({
         worker_id: workerId,
-        site_id: data.assigned_site_id,
+          site_id: data.assigned_site_id,
         work_date: workDate,
         status: "active",
         checked_in_at: nowIso,

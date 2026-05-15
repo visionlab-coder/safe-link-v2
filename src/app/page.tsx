@@ -8,49 +8,49 @@ import { HardHat, ShieldCheck } from 'lucide-react';
 import { languages } from '@/constants';
 
 const startBtnText: Record<string, string> = {
-  ko: "시스템 시작하기",
-  vi: "Bắt đầu hệ thống",
-  zh: "启动系统",
-  th: "เริ่มระบบ",
-  uz: "Tizimni boshlash",
-  ph: "Simulan ang System",
-  km: "ចាប់ផ្តើមប្រព័ន្ធ",
-  id: "Mulai Sistem",
-  mn: "Системийг эхлүүлэх",
-  my: "စနစ်စတင်ရန်",
-  ne: "प्रणाली सुरु गर्नुहोस्",
-  bn: "সিস্টেম শুরু করুন",
-  kk: "Жүйені іске қосу",
-  ru: "Запустить систему",
-  en: "Start System",
-  jp: "システムを開始",
-  fr: "Démarrer le système",
-  es: "Iniciar sistema",
-  ar: "بدء النظام",
-  hi: "सिस्टम शुरू करें",
+  ko: "시작하기",
+  en: "Start",
+  vi: "Bắt đầu",
+  zh: "开始",
+  th: "เริ่มต้น",
+  uz: "Boshlash",
+  ph: "Simulan",
+  km: "Start",
+  id: "Mulai",
+  mn: "Start",
+  my: "Start",
+  ne: "Start",
+  bn: "Start",
+  kk: "Start",
+  ru: "Start",
+  jp: "Start",
+  fr: "Start",
+  es: "Start",
+  ar: "Start",
+  hi: "Start",
 };
 
 const roleTexts: Record<string, any> = {
-  ko: { admin: "관리자 (Admin)", worker: "현장 근로자 (Worker)", selectRole: "시작할 역할을 선택해주세요" },
-  en: { admin: "Administrator", worker: "Field Worker", selectRole: "Select your role to start" },
-  vi: { admin: "Quản trị viên", worker: "Công nhân hiện trường", selectRole: "Vui lòng chọn vai trò của bạn" },
-  zh: { admin: "管理员", worker: "现场工人", selectRole: "请选择您的角色" },
-  th: { admin: "ผู้ดูแลระบบ", worker: "คนงานในสนาม", selectRole: "โปรดเลือกบทบาทของคุณ" },
-  uz: { admin: "Admin", worker: "Dala ishchisi", selectRole: "Rolingizni tanlang" },
-  ph: { admin: "Admin", worker: "Worker sa Field", selectRole: "Pumili ng iyong role" },
-  km: { admin: "អ្នកគ្រប់គ្រង", worker: "កម្មករវាល", selectRole: "សូមជ្រើសរើសតួនាទីរបស់អ្នក" },
-  id: { admin: "Admin", worker: "Pekerja Lapangan", selectRole: "Pilih peran Anda" },
-  mn: { admin: "Админ", worker: "Талбайн ажилтан", selectRole: "Үүргээ сонгоно уу" },
-  my: { admin: "မန်နေဂျာ", worker: "ကွင်းဆင်းအလုပ်သမား", selectRole: "သင်၏အခန်းကဏ္ဍကိုရွေးချယ်ပါ" },
-  ne: { admin: "प्रशासक", worker: "फिल्ड कार्यकर्ता", selectRole: "आफ्नो भूमिका चयन गर्नुहोस्" },
-  bn: { admin: "প্রশাসক", worker: "ফিল্ড কর্মী", selectRole: "আপনার ভূমিকা নির্বাচন করুন" },
-  kk: { admin: "Админ", worker: "Дала жұмысшысы", selectRole: "Рөліңізді таңдаңыз" },
-  ru: { admin: "Админ", worker: "Полевой рабочий", selectRole: "Выберите вашу роль" },
-  jp: { admin: "管理者", worker: "現場作業員", selectRole: "役割を選択してください" },
-  fr: { admin: "Administrateur", worker: "Ouvrier de chantier", selectRole: "Sélectionnez votre rôle" },
-  es: { admin: "Administrador", worker: "Trabajador de campo", selectRole: "Seleccione su rol" },
-  ar: { admin: "مسؤول", worker: "عامل ميداني", selectRole: "اختر دورك للبدء" },
-  hi: { admin: "प्रशासक", worker: "क्षेत्र कार्यकर्ता", selectRole: "अपनी भूमिका चुनें" },
+  ko: { admin: "관리자", worker: "현장 근로자", selectRole: "역할을 선택하세요" },
+  en: { admin: "Administrator", worker: "Field Worker", selectRole: "Select your role" },
+  vi: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
+  zh: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
+  th: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
+  uz: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
+  ph: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
+  km: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
+  id: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
+  mn: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
+  my: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
+  ne: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
+  bn: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
+  kk: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
+  ru: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
+  jp: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
+  fr: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
+  es: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
+  ar: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
+  hi: { admin: "Admin", worker: "Worker", selectRole: "Select your role" },
 };
 
 function LandingPageInner() {
@@ -59,21 +59,16 @@ function LandingPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // QR 진입: role과 site_id를 URL에서 읽어 auth로 바로 전달
+  // QR 吏꾩엯: role怨?site_id瑜?URL?먯꽌 ?쎌뼱 auth濡?諛붾줈 ?꾨떖
   const qrRole = searchParams.get("role");
   const qrSiteId = searchParams.get("site_id");
 
   useEffect(() => {
     if (qrRole === "admin") {
-      // 관리자 QR: 역할 버튼 자동 표시
+      // 愿由ъ옄 QR: ??븷 踰꾪듉 ?먮룞 ?쒖떆
       setShowRoles(true);
-    } else if (qrRole === "worker") {
-      // 근로자 QR: 역할 선택 없이 바로 로그인 진행
-      const params = new URLSearchParams({ lang: selectedLang, role: "worker" });
-      if (qrSiteId) params.set("site_id", qrSiteId);
-      router.replace(`/auth?${params.toString()}`);
     }
-  // selectedLang 의존 제거 — 초기값 "ko"로 리다이렉트, 언어는 이후 선택
+  // selectedLang ?섏〈 ?쒓굅 ??珥덇린媛?"ko"濡?由щ떎?대젆?? ?몄뼱???댄썑 ?좏깮
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qrRole, qrSiteId, router]);
 
@@ -81,6 +76,11 @@ function LandingPageInner() {
   const rt = roleTexts[selectedLang] || roleTexts.en;
 
   const buildAuthUrl = (role: "admin" | "worker") => {
+    if (role === "worker" && qrRole === "worker") {
+      const params = new URLSearchParams({ lang: selectedLang });
+      if (qrSiteId) params.set("site_id", qrSiteId);
+      return `/qr/site?${params.toString()}`;
+    }
     const params = new URLSearchParams({ lang: selectedLang, role });
     if (qrSiteId) params.set("site_id", qrSiteId);
     return `/auth?${params.toString()}`;
@@ -89,7 +89,7 @@ function LandingPageInner() {
   return (
     <main className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-mesh p-4 py-10 selection:bg-blue-500/30">
 
-      {/* 💎 Background Ambient Lights */}
+      {/* ?뭿 Background Ambient Lights */}
       <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-blue-600/10 blur-[160px] rounded-full pointer-events-none animate-pulse-soft" />
       <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-red-600/5 blur-[120px] rounded-full pointer-events-none animate-float" />
 
@@ -114,7 +114,7 @@ function LandingPageInner() {
           </div>
         </div>
 
-        {/* ── Language Picker ── */}
+        {/* ?? Language Picker ?? */}
         <div className="w-full mb-12 glass-card rounded-[48px] p-8 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
 
@@ -164,7 +164,7 @@ function LandingPageInner() {
         <div className="w-full px-4 relative flex flex-col items-center gap-6">
           {!showRoles ? (
             <button
-              onClick={() => setShowRoles(true)}
+              onClick={() => qrRole === "worker" ? router.push(buildAuthUrl("worker")) : setShowRoles(true)}
               className="group w-full max-w-[320px] py-6 glass-blue rounded-[32px] text-white font-black text-2xl transition-all duration-500 tap-effect shadow-[0_20px_40px_-15px_rgba(59,130,246,0.3)] flex items-center justify-center gap-4 relative overflow-hidden tech-border"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
@@ -191,7 +191,7 @@ function LandingPageInner() {
                   </div>
                   <div className="text-left">
                     <span className="text-base font-black text-white group-hover:text-blue-300 transition-colors block">{rt.admin}</span>
-                    <span className="text-xs text-slate-600 group-hover:text-slate-500 transition-colors">Admin · Safety Officer</span>
+                    <span className="text-xs text-slate-600 group-hover:text-slate-500 transition-colors">Admin / Safety Officer</span>
                   </div>
                   <svg className="w-4 h-4 text-slate-700 group-hover:text-blue-400 ml-auto transition-all duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
@@ -211,7 +211,7 @@ function LandingPageInner() {
                   </div>
                   <div className="text-left">
                     <span className="text-base font-black text-white group-hover:text-emerald-300 transition-colors block">{rt.worker}</span>
-                    <span className="text-xs text-slate-600 group-hover:text-slate-500 transition-colors">Field Worker · 현장 근로자</span>
+                    <span className="text-xs text-slate-600 group-hover:text-slate-500 transition-colors">Field Worker / 현장 근로자</span>
                   </div>
                   <svg className="w-4 h-4 text-slate-700 group-hover:text-emerald-400 ml-auto transition-all duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
@@ -236,7 +236,7 @@ function LandingPageInner() {
               Powered by SAFE-LINK Engine
             </p>
             <p className="text-[8px] text-slate-700 font-bold uppercase tracking-widest">
-              © 2026 NEXT-GEN FIELD COMMUNICATION
+              짤 2026 NEXT-GEN FIELD COMMUNICATION
             </p>
           </div>
         </div>
@@ -258,3 +258,6 @@ export default function LandingPage() {
     </Suspense>
   );
 }
+
+
+

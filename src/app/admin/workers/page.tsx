@@ -80,7 +80,7 @@ export default function AdminWorkersPage() {
   };
 
   const handleDeactivate = async (id: string, name: string) => {
-    if (!confirm(`Deactivate ${name}? Active NFC/QR links will be revoked.`)) return;
+    if (!confirm(`${name} 근로자를 비활성화하시겠습니까? 활성 NFC/QR 링크가 모두 폐기됩니다.`)) return;
     await fetch(`/api/nfc/workers/${id}`, { method: "DELETE" });
     fetchWorkers();
   };
@@ -100,7 +100,7 @@ export default function AdminWorkersPage() {
         error?: string;
         detail?: string;
       };
-      if (!res.ok || !data.url) throw new Error(data.detail ?? data.error ?? "QR URL issue failed");
+      if (!res.ok || !data.url) throw new Error(data.detail ?? data.error ?? "QR URL 발급에 실패했습니다.");
       const qrUrl = data.url;
       setQrModal((prev) => prev ? {
         ...prev,
@@ -124,7 +124,7 @@ export default function AdminWorkersPage() {
             <div className="flex items-center gap-3">
               <Users className="w-6 h-6 text-blue-400" />
               <div>
-                <h1 className="text-xl font-bold">NFC Workers</h1>
+                <h1 className="text-xl font-bold">NFC 근로자 관리</h1>
                 {adminSiteId && <p className="text-xs text-gray-500 font-mono">{adminSiteId}</p>}
               </div>
             </div>
@@ -133,7 +133,7 @@ export default function AdminWorkersPage() {
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             >
               <Plus className="w-4 h-4" />
-              Issue card
+              카드 발급
             </button>
           </div>
 
@@ -143,12 +143,12 @@ export default function AdminWorkersPage() {
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search name or worker code"
+                placeholder="이름 또는 근로자 코드 검색"
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
               />
             </div>
             <button type="submit" className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg text-sm transition-colors">
-              Search
+              검색
             </button>
             <button type="button" onClick={fetchWorkers} className="bg-gray-700 hover:bg-gray-600 p-2.5 rounded-lg transition-colors">
               <RefreshCw className="w-4 h-4" />
@@ -156,7 +156,7 @@ export default function AdminWorkersPage() {
           </form>
 
           <p className="text-gray-500 text-sm mb-3">
-            {loading ? "Loading..." : `${workers.length} workers`}
+            {loading ? "불러오는 중..." : `근로자 ${workers.length}명`}
           </p>
 
           <div className="space-y-2">
@@ -181,7 +181,7 @@ export default function AdminWorkersPage() {
                   <button
                     onClick={() => handleOpenQr(worker)}
                     className="bg-purple-800 hover:bg-purple-700 text-purple-100 text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
-                    title="Worker SAFE-LINK QR fallback"
+                    title="NFC 사용이 어려울 때 쓰는 근로자 SAFE-LINK QR"
                   >
                     <QrCode className="w-3.5 h-3.5" />
                     QR
@@ -189,7 +189,7 @@ export default function AdminWorkersPage() {
                   <button
                     onClick={() => handleDeactivate(worker.id, worker.full_name)}
                     className="p-1.5 text-gray-500 hover:text-red-400 transition-colors"
-                    title="Deactivate"
+                    title="비활성화"
                   >
                     <UserX className="w-4 h-4" />
                   </button>
@@ -200,13 +200,13 @@ export default function AdminWorkersPage() {
             {!loading && workers.length === 0 && (
               <div className="text-center py-12 text-gray-500">
                 <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p>No workers found.</p>
+                <p>등록된 근로자가 없습니다.</p>
               </div>
             )}
           </div>
 
           <button onClick={() => router.back()} className="mt-6 text-gray-500 hover:text-gray-300 text-sm transition-colors">
-            Back
+            뒤로 가기
           </button>
         </div>
       </div>
@@ -224,7 +224,7 @@ export default function AdminWorkersPage() {
               </button>
             </div>
             <p className="text-xs text-purple-400 font-bold uppercase tracking-widest mb-4">
-              Worker SAFE-LINK QR
+              근로자 SAFE-LINK QR
             </p>
             {qrModal.loading && (
               <div className="flex items-center justify-center py-12">
@@ -239,7 +239,7 @@ export default function AdminWorkersPage() {
                 <div className="bg-white p-4 rounded-xl">
                   <Image
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrModal.token.qrUrl)}`}
-                    alt="Worker SAFE-LINK QR"
+                    alt="근로자 SAFE-LINK QR"
                     width={240}
                     height={240}
                     unoptimized
@@ -247,13 +247,13 @@ export default function AdminWorkersPage() {
                 </div>
                 <p className="text-xs font-mono text-blue-400 break-all text-center">{qrModal.token.qrUrl}</p>
                 <p className="text-xs text-gray-500 text-center">
-                  Workers can scan this QR if NFC reading is inconvenient.
+                  NFC 인식이 어려울 때 근로자가 이 QR을 스캔할 수 있습니다.
                 </p>
                 <button
                   onClick={() => handleOpenQr(qrModal.worker)}
                   className="w-full bg-purple-700 hover:bg-purple-600 text-white text-sm font-bold py-2.5 rounded-lg transition-colors"
                 >
-                  New QR
+                  새 QR 발급
                 </button>
               </div>
             )}

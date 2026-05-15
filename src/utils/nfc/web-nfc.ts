@@ -273,6 +273,11 @@ export async function eraseNfcTag(options: NfcWriteOptions = {}): Promise<void> 
   }
 }
 
+export async function readNfcUrl(options: NfcScanOptions = {}): Promise<NfcScanResult> {
+  const scanner = new NfcScanner();
+  return scanner.scanOnce({ timeoutMs: 45_000, ...options });
+}
+
 function mergeSignals(...signals: Array<AbortSignal | undefined>): AbortSignal {
   const controller = new AbortController();
   for (const sig of signals) {

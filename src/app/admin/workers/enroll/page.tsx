@@ -3,12 +3,12 @@
 import { Suspense, useEffect, useState } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, CheckCircle, Eraser, Nfc, UserPlus } from "lucide-react";
+import { AlertCircle, CheckCircle, Eraser, Nfc, ScanLine, UserPlus } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { detectNfcSupport, eraseNfcTag, NfcError, writeNfcUrl } from "@/utils/nfc/web-nfc";
+import { detectNfcSupport, eraseNfcTag, NfcError, readNfcUrl, writeNfcUrl } from "@/utils/nfc/web-nfc";
 import Image from "next/image";
 
-type Step = "form" | "ready" | "writing" | "erasing" | "done" | "erased" | "error";
+type Step = "form" | "ready" | "writing" | "reading" | "erasing" | "done" | "erased" | "error";
 
 const DEFAULT_WORKER_PROFILE = {
   nationality: "KR",
@@ -32,6 +32,7 @@ function WorkerEnrollInner() {
   const [stickerId, setStickerId] = useState("");
   const [issuedWorkerId, setIssuedWorkerId] = useState("");
   const [workerCode, setWorkerCode] = useState("");
+  const [readPayload, setReadPayload] = useState("");
 
   useEffect(() => {
     const loadAdminSite = async () => {
@@ -59,6 +60,7 @@ function WorkerEnrollInner() {
     setStickerId("");
     setIssuedWorkerId("");
     setWorkerCode("");
+    setReadPayload("");
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -70,13 +72,13 @@ function WorkerEnrollInner() {
     if (!workerId) {
       const name = fullName.trim();
       if (!name) {
-        setError("Worker name is required for card labeling and ERP matching.");
+        setError("카드 라벨과 향후 ERP 매칭을 위해 근로자 이름이 필요합니다.");
         return;
       }
       const cleanInitials = nameInitials.trim().replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase();
       const cleanLast4 = phoneLast4.trim().replace(/\D/g, "").slice(-4);
       if (!cleanInitials || cleanLast4.length !== 4) {
-        setError("Enter name initials and the last 4 digits of the phone number.");
+        setError("이름 이니셜과 휴대폰 번호 뒤 4자리를 입력하세요.");
         return;
       }
 
@@ -94,7 +96,7 @@ function WorkerEnrollInner() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(`${data.error || "Worker registration failed."}${data.detail ? `: ${data.detail}` : ""}`);
+        setError(`${data.error || "근로자 등록에 실패했습니다."}${data.detail ? `: ${data.detail}` : ""}`);
         return;
       }
       workerId = data.worker.id;
@@ -108,7 +110,7 @@ function WorkerEnrollInner() {
     });
     const issueData = await issueRes.json();
     if (!issueRes.ok) {
-      setError(issueData.detail || issueData.error || "NFC URL issue failed.");
+      setError(issueData.detail || issueData.error || "NFC URL 발급에 실패했습니다.");
       return;
     }
 
@@ -122,7 +124,7 @@ function WorkerEnrollInner() {
 
   const handleWriteNfc = async () => {
     if (!stickerUrl) {
-      setError("NFC URL has not been issued yet.");
+      setError("아직 NFC URL이 발급되지 않았습니다.");
       setStep("form");
       return;
     }
@@ -135,7 +137,7 @@ function WorkerEnrollInner() {
       if (err instanceof NfcError) {
         setError(`${err.code}: ${err.message}`);
       } else {
-        setError(err instanceof Error ? err.message : "NFC write failed.");
+        setError(err instanceof Error ? err.message : "NFC 쓰기에 실패했습니다.");
       }
       setStep("error");
     }
@@ -143,11 +145,11 @@ function WorkerEnrollInner() {
 
   const handleEraseNfc = async () => {
     if (!nfcSupport.supported) {
-      setError("Web NFC erase requires Android Chrome over HTTPS.");
+      setError("NFC 지우기는 HTTPS 환경의 Android Chrome에서 사용할 수 있습니다.");
       setStep("error");
       return;
     }
-    if (!confirm("Erase this NFC card so it can be reused? This removes the SAFE-LINK URL from the tag.")) return;
+    if (!confirm("이 NFC 카드를 지워 재사용 가능하게 하시겠습니까? 태그에 저장된 SAFE-LINK URL이 삭제됩니다.")) return;
     setError("");
     setStep("erasing");
     try {
@@ -164,13 +166,36 @@ function WorkerEnrollInner() {
         }),
       });
       const eventData = await eventRes.json();
-      if (!eventRes.ok) throw new Error(eventData.detail || eventData.error || "NFC erase log failed.");
+      if (!eventRes.ok) throw new Error(eventData.detail || eventData.error || "NFC 지우기 기록 저장에 실패했습니다.");
       setStep("erased");
     } catch (err) {
       if (err instanceof NfcError) {
         setError(`${err.code}: ${err.message}`);
       } else {
-        setError(err instanceof Error ? err.message : "NFC erase failed.");
+        setError(err instanceof Error ? err.message : "NFC 지우기에 실패했습니다.");
+      }
+      setStep("error");
+    }
+  };
+
+  const handleReadNfc = async () => {
+    if (!nfcSupport.supported) {
+      setError("NFC 읽기는 HTTPS 환경의 Android Chrome에서 사용할 수 있습니다.");
+      setStep("error");
+      return;
+    }
+    setError("");
+    setReadPayload("");
+    setStep("reading");
+    try {
+      const result = await readNfcUrl();
+      setReadPayload(result.rawPayload);
+      setStep("form");
+    } catch (err) {
+      if (err instanceof NfcError) {
+        setError(`${err.code}: ${err.message}`);
+      } else {
+        setError(err instanceof Error ? err.message : "NFC 읽기에 실패했습니다.");
       }
       setStep("error");
     }
@@ -181,9 +206,9 @@ function WorkerEnrollInner() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6">
         <div className="bg-gray-800 rounded-xl p-8 max-w-sm w-full text-center border border-gray-700">
           <Nfc className="w-16 h-16 text-blue-400 mx-auto mb-4" />
-          <h2 className="text-white text-xl font-bold mb-2">URL ready</h2>
+          <h2 className="text-white text-xl font-bold mb-2">URL 준비 완료</h2>
           <p className="text-gray-400 text-sm mb-4">
-            Keep the NFC card away now. Tap the write button first, then touch the card when the phone asks.
+            지금은 NFC 카드를 가까이 대지 마세요. 먼저 쓰기 버튼을 누른 뒤, 휴대폰이 요청할 때 카드를 태그하세요.
           </p>
           <p className="text-gray-500 text-xs break-all bg-gray-900 p-3 rounded-lg mb-4">{stickerUrl}</p>
           <button
@@ -192,7 +217,7 @@ function WorkerEnrollInner() {
             className="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
           >
             <Nfc className="w-4 h-4" />
-            Write to NFC card
+            NFC 카드에 쓰기
           </button>
         </div>
       </div>
@@ -204,8 +229,8 @@ function WorkerEnrollInner() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6">
         <div className="bg-gray-800 rounded-xl p-8 max-w-sm w-full text-center border border-gray-700">
           <Nfc className="w-16 h-16 text-green-400 mx-auto mb-4 animate-pulse" />
-          <h2 className="text-white text-xl font-bold mb-2">Touch the NFC card</h2>
-          <p className="text-gray-400 text-sm">Hold the worker card near this Android phone to write the SAFE-LINK access URL.</p>
+          <h2 className="text-white text-xl font-bold mb-2">NFC 카드를 태그하세요</h2>
+          <p className="text-gray-400 text-sm">근로자 카드를 이 Android 휴대폰 가까이에 대면 SAFE-LINK 접속 URL이 기록됩니다.</p>
         </div>
       </div>
     );
@@ -216,8 +241,20 @@ function WorkerEnrollInner() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6">
         <div className="bg-gray-800 rounded-xl p-8 max-w-sm w-full text-center border border-gray-700">
           <Eraser className="w-16 h-16 text-yellow-400 mx-auto mb-4 animate-pulse" />
-          <h2 className="text-white text-xl font-bold mb-2">Touch the NFC card</h2>
-          <p className="text-gray-400 text-sm">Hold the reusable card near this Android phone to erase the stored SAFE-LINK URL.</p>
+          <h2 className="text-white text-xl font-bold mb-2">NFC 카드를 태그하세요</h2>
+          <p className="text-gray-400 text-sm">재사용할 카드를 이 Android 휴대폰 가까이에 대면 저장된 SAFE-LINK URL이 삭제됩니다.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "reading") {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6">
+        <div className="bg-gray-800 rounded-xl p-8 max-w-sm w-full text-center border border-gray-700">
+          <ScanLine className="w-16 h-16 text-blue-400 mx-auto mb-4 animate-pulse" />
+          <h2 className="text-white text-xl font-bold mb-2">NFC 카드를 태그하세요</h2>
+          <p className="text-gray-400 text-sm">카드를 이 Android 휴대폰 가까이에 대면 저장된 SAFE-LINK URL을 읽습니다.</p>
         </div>
       </div>
     );
@@ -228,18 +265,18 @@ function WorkerEnrollInner() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6">
         <div className="bg-gray-800 rounded-xl p-8 max-w-sm w-full text-center border border-gray-700">
           <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
-          <h2 className="text-white text-xl font-bold mb-2">Card ready</h2>
+          <h2 className="text-white text-xl font-bold mb-2">카드 준비 완료</h2>
           <p className="text-gray-400 text-sm">
-            Worker code: <span className="text-white font-mono">{workerCode}</span>
+            근로자 코드: <span className="text-white font-mono">{workerCode}</span>
           </p>
           <p className="text-gray-500 text-xs mt-3">
-            Label the physical card with the worker name. The tag stores only a signed SAFE-LINK URL.
+            실물 카드에는 근로자 이름을 표시하세요. 태그에는 서명된 SAFE-LINK URL만 저장됩니다.
           </p>
           {stickerUrl && (
             <div className="bg-white p-3 rounded-xl mt-4">
               <Image
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(stickerUrl)}`}
-                alt="Worker SAFE-LINK QR"
+                alt="근로자 SAFE-LINK QR"
                 width={220}
                 height={220}
                 unoptimized
@@ -248,32 +285,41 @@ function WorkerEnrollInner() {
             </div>
           )}
           <p className="text-gray-400 text-xs mt-3">
-            Workers can scan this QR if NFC reading is inconvenient.
+            NFC 인식이 어려울 때 근로자가 이 QR을 스캔할 수 있습니다.
           </p>
           {!nfcSupport.supported && (
             <div className="bg-gray-900 rounded-lg p-3 mt-4">
-              <p className="text-yellow-300 text-xs mb-1">This device cannot write Web NFC. Use this fallback URL for QR/NFC encoding.</p>
+              <p className="text-yellow-300 text-xs mb-1">이 기기에서는 Web NFC 쓰기를 사용할 수 없습니다. QR/NFC 인코딩용 대체 URL을 사용하세요.</p>
               <p className="text-gray-400 text-xs break-all">{stickerUrl}</p>
             </div>
           )}
           <div className="flex gap-3 mt-5">
             <button onClick={() => router.push("/admin/workers")} className="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded-lg text-sm transition-colors">
-              Worker list
+              근로자 목록
             </button>
             {!existingWorkerId && (
               <button onClick={resetForm} className="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded-lg text-sm transition-colors">
-                Next card
+                다음 카드
               </button>
             )}
           </div>
           {nfcSupport.supported && (
-            <button
-              onClick={handleEraseNfc}
-              className="mt-3 w-full bg-yellow-700 hover:bg-yellow-600 text-white py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
-            >
-              <Eraser className="w-4 h-4" />
-              Erase card for reuse
-            </button>
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <button
+                onClick={handleReadNfc}
+                className="bg-blue-800 hover:bg-blue-700 text-white py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                <ScanLine className="w-4 h-4" />
+                카드 읽기
+              </button>
+              <button
+                onClick={handleEraseNfc}
+                className="bg-yellow-700 hover:bg-yellow-600 text-white py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                <Eraser className="w-4 h-4" />
+                카드 지우기
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -285,14 +331,14 @@ function WorkerEnrollInner() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6">
         <div className="bg-gray-800 rounded-xl p-8 max-w-sm w-full text-center border border-gray-700">
           <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
-          <h2 className="text-white text-xl font-bold mb-2">Card erased</h2>
-          <p className="text-gray-400 text-sm">The NFC card can now be assigned to another worker.</p>
+          <h2 className="text-white text-xl font-bold mb-2">카드 지우기 완료</h2>
+          <p className="text-gray-400 text-sm">이 NFC 카드는 이제 다른 근로자에게 재배정할 수 있습니다.</p>
           <div className="flex gap-3 mt-5">
             <button onClick={() => router.push("/admin/workers")} className="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded-lg text-sm transition-colors">
-              Worker list
+              근로자 목록
             </button>
             <button onClick={resetForm} className="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded-lg text-sm transition-colors">
-              Issue again
+              다시 발급
             </button>
           </div>
         </div>
@@ -305,17 +351,17 @@ function WorkerEnrollInner() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6">
         <div className="bg-gray-800 rounded-xl p-8 max-w-sm w-full text-center border border-gray-700">
           <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <h2 className="text-white text-xl font-bold mb-2">NFC write failed</h2>
+          <h2 className="text-white text-xl font-bold mb-2">NFC 작업 실패</h2>
           {error && <p className="text-red-300 text-sm mb-4">{error}</p>}
           <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-3 mb-4 text-left">
-            <p className="text-yellow-200 text-xs font-semibold mb-1">Field check</p>
+            <p className="text-yellow-200 text-xs font-semibold mb-1">현장 확인</p>
             <p className="text-yellow-100 text-xs">
-              Keep the card away until this screen asks for a touch. If it still fails, format the card as NDEF with NFC Tools, or write the fallback URL below with NFC Tools.
+              이 화면에서 태그하라고 안내하기 전까지 카드를 가까이 대지 마세요. 계속 실패하면 NFC Tools로 카드를 NDEF 형식으로 초기화하거나 아래 대체 URL을 기록하세요.
             </p>
           </div>
           <p className="text-gray-500 text-xs break-all bg-gray-900 p-3 rounded-lg">{stickerUrl}</p>
           <button onClick={() => setStep(stickerUrl ? "ready" : "form")} className="mt-4 w-full bg-blue-600 hover:bg-blue-500 py-2 rounded-lg text-sm transition-colors">
-            Try write again
+            다시 시도
           </button>
         </div>
       </div>
@@ -327,7 +373,7 @@ function WorkerEnrollInner() {
       <div className="max-w-lg mx-auto">
         <div className="flex items-center gap-3 mb-6">
           <UserPlus className="w-6 h-6 text-blue-400" />
-          <h1 className="text-xl font-bold">{existingWorkerId ? "Reissue worker NFC card" : "Issue worker NFC card"}</h1>
+          <h1 className="text-xl font-bold">{existingWorkerId ? "근로자 NFC 카드 재발급" : "근로자 NFC 카드 발급"}</h1>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -335,12 +381,12 @@ function WorkerEnrollInner() {
             <>
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
                 <p className="text-sm text-gray-300">
-                  Enter only the worker name for card labeling and future ERP matching. The worker selects country/language after tapping the card.
+                  카드 라벨과 향후 ERP 매칭을 위해 필요한 최소 정보만 입력합니다. 근로자는 카드 태그 후 국가와 언어를 직접 선택합니다.
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm text-gray-400 mb-1 block">Name initials *</label>
+                  <label className="text-sm text-gray-400 mb-1 block">이름 이니셜 *</label>
                   <input
                     required
                     value={nameInitials}
@@ -351,7 +397,7 @@ function WorkerEnrollInner() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-400 mb-1 block">Phone last 4 *</label>
+                  <label className="text-sm text-gray-400 mb-1 block">휴대폰 뒤 4자리 *</label>
                   <input
                     required
                     value={phoneLast4}
@@ -364,22 +410,22 @@ function WorkerEnrollInner() {
                 </div>
               </div>
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">Worker name *</label>
+                <label className="text-sm text-gray-400 mb-1 block">근로자 이름 *</label>
                 <input
                   required
                   value={fullName}
                   onChange={(event) => setFullName(event.target.value)}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500"
-                  placeholder="Name printed on card"
+                  placeholder="카드에 표시할 이름"
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">Site ID</label>
+                <label className="text-sm text-gray-400 mb-1 block">현장 ID</label>
                 <input
                   value={siteId}
                   onChange={(event) => setSiteId(event.target.value)}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 font-mono text-sm"
-                  placeholder="Admin site ID"
+                  placeholder="관리자 현장 ID"
                 />
               </div>
             </>
@@ -390,30 +436,46 @@ function WorkerEnrollInner() {
               {error}
             </div>
           )}
+          {readPayload && (
+            <div className="bg-blue-950/50 border border-blue-800 rounded-lg px-4 py-3 text-blue-200 text-xs">
+              <p className="font-semibold mb-1">읽기 결과</p>
+              <p className="break-all font-mono">{readPayload}</p>
+            </div>
+          )}
 
           {!nfcSupport.supported && (
             <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg px-4 py-3 text-yellow-300 text-sm">
-              Web NFC writing is not available on this device. Android Chrome over HTTPS is required. The system will still issue a short URL for QR/NFC fallback.
+              이 기기에서는 Web NFC 쓰기를 사용할 수 없습니다. HTTPS 환경의 Android Chrome이 필요합니다. 대신 QR/NFC 대체용 짧은 URL은 발급됩니다.
             </div>
           )}
 
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={() => router.back()} className="flex-1 bg-gray-700 hover:bg-gray-600 py-3 rounded-xl font-medium transition-colors">
-              Back
+              뒤로 가기
             </button>
             <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2">
-              {nfcSupport.supported ? <><Nfc className="w-4 h-4" /> Issue NFC URL</> : "Issue short URL"}
+              {nfcSupport.supported ? <><Nfc className="w-4 h-4" /> NFC URL 발급</> : "짧은 URL 발급"}
             </button>
           </div>
           {nfcSupport.supported && (
-            <button
-              type="button"
-              onClick={handleEraseNfc}
-              className="w-full bg-gray-800 hover:bg-gray-700 border border-gray-700 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
-            >
-              <Eraser className="w-4 h-4" />
-              Erase reusable NFC card
-            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={handleReadNfc}
+                className="bg-gray-800 hover:bg-gray-700 border border-gray-700 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                <ScanLine className="w-4 h-4" />
+                NFC 카드 읽기
+              </button>
+              <button
+                type="button"
+                onClick={handleEraseNfc}
+                className="bg-yellow-800 hover:bg-yellow-700 border border-yellow-700 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                <Eraser className="w-4 h-4" />
+                NFC 카드 지우기
+              </button>
+            </div>
           )}
         </form>
       </div>
@@ -424,7 +486,7 @@ function WorkerEnrollInner() {
 export default function WorkerEnrollPage() {
   return (
     <RoleGuard allowedRole="admin">
-      <Suspense fallback={<div className="min-h-screen bg-gray-950 flex items-center justify-center"><p className="text-gray-500">Loading...</p></div>}>
+      <Suspense fallback={<div className="min-h-screen bg-gray-950 flex items-center justify-center"><p className="text-gray-500">불러오는 중...</p></div>}>
         <WorkerEnrollInner />
       </Suspense>
     </RoleGuard>

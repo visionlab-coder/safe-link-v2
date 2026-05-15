@@ -46,6 +46,8 @@ export default function AdminNfcHubPage() {
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [challengeStatus, setChallengeStatus] = useState("");
   const [challengeLoading, setChallengeLoading] = useState(false);
+  const [siteAccessEnabled, setSiteAccessEnabled] = useState(true);
+  const [siteAccessStatus, setSiteAccessStatus] = useState("");
 
   const fetchChallenge = useCallback(async (siteId?: string | null) => {
     const qs = siteId ? `?site_id=${encodeURIComponent(siteId)}` : "";
@@ -53,6 +55,13 @@ export default function AdminNfcHubPage() {
     if (!res.ok) return;
     const data = await res.json();
     setChallenge(data.challenge ?? null);
+  }, []);
+
+  const fetchSiteAccess = useCallback(async () => {
+    const res = await fetch("/api/nfc/site-access-control");
+    if (!res.ok) return;
+    const data = await res.json();
+    setSiteAccessEnabled(data.control?.is_enabled !== false);
   }, []);
 
   useEffect(() => {
@@ -78,6 +87,7 @@ export default function AdminNfcHubPage() {
           setSiteCode((site as { site_code: string }).site_code);
         }
         fetchChallenge(siteId);
+        fetchSiteAccess();
       } else {
         // No site_id in profile — load available sites so admin can pick one
         const { data: sites } = await supabase
@@ -86,9 +96,10 @@ export default function AdminNfcHubPage() {
           .order("name");
         if (sites) setSiteList(sites as { id: string; name: string }[]);
         fetchChallenge(undefined);
+        fetchSiteAccess();
       }
     });
-  }, [fetchChallenge]);
+  }, [fetchChallenge, fetchSiteAccess]);
 
   const saveCurrentSiteLocation = async () => {
     setLocationStatus("");
@@ -129,7 +140,32 @@ export default function AdminNfcHubPage() {
       setMySiteId(id);
       setSiteName(site.name);
       fetchChallenge(id);
+      fetchSiteAccess();
     }
+  };
+
+  const toggleSiteAccess = async () => {
+    const nextEnabled = !siteAccessEnabled;
+    const message = nextEnabled
+      ? "근로자 SAFE-LINK 기능을 다시 켜시겠습니까?"
+      : "현장 근로자 SAFE-LINK 모든 기능을 중지하시겠습니까?";
+    if (!window.confirm(message)) return;
+    setSiteAccessStatus("");
+    const res = await fetch("/api/nfc/site-access-control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        is_enabled: nextEnabled,
+        reason: nextEnabled ? "admin_enabled" : "admin_disabled",
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setSiteAccessStatus(data.error || "현장 기능 상태 변경에 실패했습니다.");
+      return;
+    }
+    setSiteAccessEnabled(data.control?.is_enabled !== false);
+    setSiteAccessStatus(nextEnabled ? "근로자 기능을 켰습니다." : "근로자 기능을 중지했습니다.");
   };
 
   const createChallenge = async (rotate = false) => {
@@ -198,6 +234,31 @@ export default function AdminNfcHubPage() {
               )}
             </div>
             {locationStatus && <p className="text-xs text-gray-400 mt-3">{locationStatus}</p>}
+          </div>
+
+          <div className="mb-5 bg-gray-900 border border-gray-800 rounded-xl p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold">근로자 SAFE-LINK 기능</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  꺼짐 상태에서는 TBM 태그와 근로자 NFC 진입이 차단됩니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={toggleSiteAccess}
+                className={`relative h-8 w-14 rounded-full transition-colors ${siteAccessEnabled ? "bg-green-600" : "bg-gray-700"}`}
+                aria-label="Toggle worker SAFE-LINK access"
+              >
+                <span
+                  className={`absolute top-1 h-6 w-6 rounded-full bg-white transition-transform ${siteAccessEnabled ? "translate-x-7" : "translate-x-1"}`}
+                />
+              </button>
+            </div>
+            <p className={`text-xs mt-3 ${siteAccessEnabled ? "text-green-300" : "text-yellow-300"}`}>
+              현재 상태: {siteAccessEnabled ? "켜짐" : "꺼짐"}
+            </p>
+            {siteAccessStatus && <p className="text-xs text-gray-400 mt-2">{siteAccessStatus}</p>}
           </div>
 
           <div className="mb-5 bg-gray-900 border border-gray-800 rounded-xl p-4">

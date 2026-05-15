@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient, type SupabaseClient } from "@supabase/supabase-js";
-import { createHmac, timingSafeEqual } from "crypto";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 
 export const runtime = "nodejs";
@@ -28,13 +27,6 @@ const COUNTRY_TO_LANG: Record<string, string> = {
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SITE_SELECT = "id, name, code, site_code";
 
-type VerifyBody = {
-  token?: string;
-  mode?: "info" | "enter";
-  nationality?: unknown;
-  preferred_lang?: unknown;
-};
-
 function createService() {
   const url = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
   const key = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim();
@@ -42,15 +34,24 @@ function createService() {
   return createServiceClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-function cleanCountry(value: unknown): string | null {
-  const code = String(value || "").trim().toUpperCase();
-  if (!/^[A-Z]{2}$/.test(code)) return null;
-  return code;
+function cleanCountry(value: unknown): string {
+  const code = String(value || "KR").trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(code) ? code : "KR";
 }
 
 function cleanLang(value: unknown, country: string): string {
-  const lang = String(value || COUNTRY_TO_LANG[country] || "en").trim().toLowerCase();
-  return /^[a-z]{2,5}$/.test(lang) ? lang : "en";
+  const lang = String(value || COUNTRY_TO_LANG[country] || "ko").trim().toLowerCase();
+  return /^[a-z]{2,5}$/.test(lang) ? lang : "ko";
+}
+
+function cleanInitials(value: unknown): string | null {
+  const initials = String(value || "").trim().replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase();
+  return initials.length > 0 ? initials : null;
+}
+
+function cleanPhoneLast4(value: unknown): string | null {
+  const digits = String(value || "").replace(/\D/g, "").slice(-4);
+  return digits.length === 4 ? digits : null;
 }
 
 function nfcEmail(workerId: string): string {
@@ -66,32 +67,6 @@ function todayInSeoul(): string {
   }).format(new Date());
 }
 
-function verifyToken(token: string): { workerId: string; siteRef: string; expiresAt: number } | null {
-  const secret = (process.env.NFC_HMAC_SECRET ?? "").trim();
-  if (!secret) return null;
-
-  try {
-    const raw = Buffer.from(token, "base64url").toString("utf-8");
-    const parts = raw.split("|");
-    if (parts.length !== 4) return null;
-
-    const [workerId, siteRef, expiresAtStr, sig] = parts;
-    const expiresAt = parseInt(expiresAtStr, 10);
-    if (!workerId || !siteRef || !Number.isFinite(expiresAt)) return null;
-    if (Date.now() / 1000 > expiresAt) return null;
-
-    const payload = `${workerId}|${siteRef}|${expiresAt}`;
-    const expectedSig = createHmac("sha256", secret).update(payload).digest("hex");
-    const sigBuf = Buffer.from(sig);
-    const expBuf = Buffer.from(expectedSig);
-    if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) return null;
-
-    return { workerId, siteRef, expiresAt };
-  } catch {
-    return null;
-  }
-}
-
 async function resolveSiteByRef(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   service: SupabaseClient<any, any, any>,
@@ -101,35 +76,18 @@ async function resolveSiteByRef(
   if (!ref) return null;
 
   if (UUID_PATTERN.test(ref)) {
-    const { data } = await service
-      .from("sites")
-      .select(SITE_SELECT)
-      .eq("id", ref)
-      .maybeSingle();
+    const { data } = await service.from("sites").select(SITE_SELECT).eq("id", ref).maybeSingle();
     if (data) return data;
   }
 
   const upperRef = ref.toUpperCase();
-  const { data: byCode } = await service
-    .from("sites")
-    .select(SITE_SELECT)
-    .eq("code", upperRef)
-    .maybeSingle();
+  const { data: byCode } = await service.from("sites").select(SITE_SELECT).eq("code", upperRef).maybeSingle();
   if (byCode) return byCode;
 
-  const { data: bySiteCode } = await service
-    .from("sites")
-    .select(SITE_SELECT)
-    .eq("site_code", upperRef)
-    .maybeSingle();
+  const { data: bySiteCode } = await service.from("sites").select(SITE_SELECT).eq("site_code", upperRef).maybeSingle();
   if (bySiteCode) return bySiteCode;
 
-  const { data: byName } = await service
-    .from("sites")
-    .select(SITE_SELECT)
-    .ilike("name", ref)
-    .limit(1)
-    .maybeSingle();
+  const { data: byName } = await service.from("sites").select(SITE_SELECT).ilike("name", ref).limit(1).maybeSingle();
   return byName ?? null;
 }
 
@@ -153,46 +111,40 @@ async function recordQrTbmAttendance(args: {
   siteId: string;
   preferredLang: string;
 }) {
-  const { service, workerId, siteId, preferredLang } = args;
-  const { data: session } = await service
+  const { data: session } = await args.service
     .from("nfc_tbm_sessions")
     .select("id, title, status, started_at")
-    .eq("site_id", siteId)
+    .eq("site_id", args.siteId)
     .in("status", ["open", "running"])
     .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (!session) {
-    return { action: "no_active_session" as const, session: null };
-  }
+  if (!session) return { action: "no_active_session" as const, session: null };
 
-  const { data: existing } = await service
+  const { data: existing } = await args.service
     .from("nfc_tbm_attendance")
     .select("id, is_certified")
     .eq("session_id", session.id)
-    .eq("worker_id", workerId)
+    .eq("worker_id", args.workerId)
     .maybeSingle();
 
-  if (existing?.is_certified) {
-    return { action: "already_certified" as const, session };
-  }
+  if (existing?.is_certified) return { action: "already_certified" as const, session };
 
   const now = new Date().toISOString();
-
   if (existing) {
-    await service
+    await args.service
       .from("nfc_tbm_attendance")
       .update({ certified_at: now, is_certified: true })
       .eq("id", existing.id);
     return { action: "certified" as const, session };
   }
 
-  await service.from("nfc_tbm_attendance").insert({
+  await args.service.from("nfc_tbm_attendance").insert({
     session_id: session.id,
-    worker_id: workerId,
+    worker_id: args.workerId,
     tapped_at: now,
-    lang_used: preferredLang,
+    lang_used: args.preferredLang,
     is_certified: false,
     entry_method: "qr",
   });
@@ -201,76 +153,57 @@ async function recordQrTbmAttendance(args: {
 }
 
 export async function POST(req: NextRequest) {
-  let body: VerifyBody;
+  let body: {
+    site_id?: unknown;
+    mode?: "info" | "enter";
+    name_initials?: unknown;
+    phone_last4?: unknown;
+    nationality?: unknown;
+    preferred_lang?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
   }
 
-  const token = String(body.token ?? "").trim();
-  if (!token) return NextResponse.json({ error: "token_required" }, { status: 400 });
-
-  const verified = verifyToken(token);
-  if (!verified) {
-    return NextResponse.json({ error: "INVALID_OR_EXPIRED_TOKEN" }, { status: 401 });
-  }
-
   const service = createService();
-  const site = await resolveSiteByRef(service, verified.siteRef);
+  const site = await resolveSiteByRef(service, String(body.site_id || ""));
   if (!site) return NextResponse.json({ error: "site_not_found" }, { status: 404 });
-
-  const { data: worker } = await service
-    .from("nfc_workers")
-    .select("id, worker_code, full_name, preferred_lang, nationality, nationality_confirmed_at, auth_user_id, assigned_site_id, is_active")
-    .eq("id", verified.workerId)
-    .maybeSingle();
-
-  if (!worker || !worker.is_active) return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
-
-  const assignedSite = worker.assigned_site_id
-    ? await resolveSiteByRef(service, String(worker.assigned_site_id))
-    : null;
-
-  if (assignedSite && String(assignedSite.id) !== String(site.id)) {
-    return NextResponse.json({ error: "worker_site_mismatch" }, { status: 403 });
-  }
-
-  if (!assignedSite || String(worker.assigned_site_id) !== String(site.id)) {
-    await service
-      .from("nfc_workers")
-      .update({ assigned_site_id: site.id, updated_at: new Date().toISOString() })
-      .eq("id", worker.id);
-  }
 
   if (body.mode === "info") {
     return NextResponse.json({
       ok: true,
-      mode: "info",
-      worker: {
-        id: worker.id,
-        full_name: worker.full_name,
-        worker_code: worker.worker_code,
-        nationality: worker.nationality,
-        preferred_lang: worker.preferred_lang,
-        nationality_confirmed: Boolean(worker.nationality_confirmed_at),
-      },
-      site: {
-        id: site.id,
-        name: site.name,
-        code: site.site_code ?? site.code ?? null,
-      },
+      site: { id: site.id, name: site.name, code: site.site_code ?? site.code ?? null },
     });
   }
 
+  const initials = cleanInitials(body.name_initials);
+  const phoneLast4 = cleanPhoneLast4(body.phone_last4);
+  if (!initials) return NextResponse.json({ error: "initials_required" }, { status: 400 });
+  if (!phoneLast4) return NextResponse.json({ error: "phone_last4_required" }, { status: 400 });
+
   const nationality = cleanCountry(body.nationality);
-  if (!nationality) return NextResponse.json({ error: "nationality_invalid" }, { status: 400 });
   const preferredLang = cleanLang(body.preferred_lang, nationality);
 
   if (!(await isSiteAccessEnabled(service, String(site.id)))) {
     return NextResponse.json({ error: "site_access_disabled" }, { status: 403 });
   }
 
+  const { data: workers, error: workerErr } = await service
+    .from("nfc_workers")
+    .select("id, worker_code, full_name, nationality, preferred_lang, auth_user_id, assigned_site_id, is_active")
+    .eq("assigned_site_id", site.id)
+    .eq("name_initials", initials)
+    .eq("phone_last4", phoneLast4)
+    .eq("is_active", true)
+    .limit(2);
+
+  if (workerErr) return NextResponse.json({ error: "worker_lookup_failed" }, { status: 500 });
+  if (!workers || workers.length === 0) return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
+  if (workers.length > 1) return NextResponse.json({ error: "worker_match_ambiguous" }, { status: 409 });
+
+  const worker = workers[0];
   const nowIso = new Date().toISOString();
   const { data: updatedWorker, error: updateErr } = await service
     .from("nfc_workers")
@@ -278,7 +211,6 @@ export async function POST(req: NextRequest) {
       nationality,
       preferred_lang: preferredLang,
       nationality_confirmed_at: nowIso,
-      assigned_site_id: site.id,
       updated_at: nowIso,
     })
     .eq("id", worker.id)
@@ -292,7 +224,7 @@ export async function POST(req: NextRequest) {
   const workDate = todayInSeoul();
   const { data: dailyAccess } = await service
     .from("nfc_worker_daily_access")
-    .select("id, status, checked_in_at, checked_out_at")
+    .select("id, status")
     .eq("worker_id", worker.id)
     .eq("work_date", workDate)
     .maybeSingle();
@@ -304,23 +236,18 @@ export async function POST(req: NextRequest) {
     accessAction = "checked_out";
     accessActive = false;
   } else if (dailyAccess?.status === "active") {
-    await service
-      .from("nfc_worker_daily_access")
-      .update({ last_seen_at: nowIso })
-      .eq("id", dailyAccess.id);
+    await service.from("nfc_worker_daily_access").update({ last_seen_at: nowIso }).eq("id", dailyAccess.id);
     accessAction = "already_checked_in";
   } else {
-    const { error: checkinErr } = await service
-      .from("nfc_worker_daily_access")
-      .insert({
-        worker_id: worker.id,
-        site_id: site.id,
-        work_date: workDate,
-        status: "active",
-        checked_in_at: nowIso,
-        last_seen_at: nowIso,
-        checkin_location: { source: "worker_qr" },
-      });
+    const { error: checkinErr } = await service.from("nfc_worker_daily_access").insert({
+      worker_id: worker.id,
+      site_id: site.id,
+      work_date: workDate,
+      status: "active",
+      checked_in_at: nowIso,
+      last_seen_at: nowIso,
+      checkin_location: { source: "site_qr" },
+    });
     if (checkinErr) return NextResponse.json({ error: "checkin_failed" }, { status: 500 });
     accessAction = "checked_in";
   }
@@ -379,35 +306,19 @@ export async function POST(req: NextRequest) {
   const basePayload = {
     ok: true,
     worker: workerPublic,
-    site: {
-      id: site.id,
-      name: site.name,
-      code: site.site_code ?? site.code ?? null,
-    },
-    access: {
-      action: accessAction,
-      active: accessActive,
-      work_date: workDate,
-      site_id: site.id,
-    },
+    site: { id: site.id, name: site.name, code: site.site_code ?? site.code ?? null },
+    access: { action: accessAction, active: accessActive, work_date: workDate, site_id: site.id },
     qr_action: tbm.action,
     session: tbm.session ? { id: tbm.session.id, title: tbm.session.title } : null,
   };
 
-  if (!authUserId || !accessActive) {
-    return NextResponse.json(basePayload);
-  }
+  if (!authUserId || !accessActive) return NextResponse.json(basePayload);
 
   const tokenHash = generatedTokenHash ?? (
-    await service.auth.admin.generateLink({
-      type: "magiclink",
-      email,
-    })
+    await service.auth.admin.generateLink({ type: "magiclink", email })
   ).data?.properties?.hashed_token ?? null;
 
-  if (!tokenHash) {
-    return NextResponse.json(basePayload);
-  }
+  if (!tokenHash) return NextResponse.json(basePayload);
 
   const serverClient = await createServerClient();
   const { error: otpErr } = await serverClient.auth.verifyOtp({
@@ -415,9 +326,7 @@ export async function POST(req: NextRequest) {
     type: "magiclink",
   });
 
-  if (otpErr) {
-    return NextResponse.json(basePayload);
-  }
+  if (otpErr) return NextResponse.json(basePayload);
 
   return NextResponse.json({ ...basePayload, session_established: true });
 }
