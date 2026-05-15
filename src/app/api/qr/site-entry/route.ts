@@ -270,8 +270,16 @@ export async function POST(req: NextRequest) {
       last_seen_at: nowIso,
       checkin_location: { source: "site_qr" },
     });
-    if (checkinErr) return NextResponse.json({ error: "checkin_failed" }, { status: 500 });
-    accessAction = "checked_in";
+    if (checkinErr) {
+      // B2: 동시 더블 탭으로 unique 충돌 → already_checked_in으로 처리
+      if (checkinErr.code === "23505") {
+        accessAction = "already_checked_in";
+      } else {
+        return NextResponse.json({ error: "checkin_failed" }, { status: 500 });
+      }
+    } else {
+      accessAction = "checked_in";
+    }
   }
 
   const tbm = accessActive
@@ -308,11 +316,22 @@ export async function POST(req: NextRequest) {
   }
 
   if (authUserId) {
+    // B1: 기존 프로필 role 확인 — 관리자 권한을 WORKER로 강등하지 않음
+    const { data: existingProfile } = await service
+      .from("profiles")
+      .select("role")
+      .eq("id", authUserId)
+      .maybeSingle();
+    const resolvedRole =
+      existingProfile?.role && existingProfile.role !== "WORKER"
+        ? existingProfile.role
+        : "WORKER";
+
     await Promise.all([
       service.from("profiles").upsert(
         {
           id: authUserId,
-          role: "WORKER",
+          role: resolvedRole,
           display_name: updatedWorker.full_name,
           preferred_lang: preferredLang,
           site_id: site.id,

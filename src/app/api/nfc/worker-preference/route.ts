@@ -404,7 +404,8 @@ export async function POST(req: NextRequest) {
       )
     : 0;
 
-  if (geofenceActive) {
+  // 퇴근 의도일 때는 지오펜스 검사 생략 — 현장 밖에서도 퇴근/안전일지 허용
+  if (geofenceActive && intent !== "checkout") {
     const allowedRadiusM = siteRadius + Math.min(accuracy, 50);
     if (distanceM > allowedRadiusM) {
       return NextResponse.json({
@@ -458,11 +459,22 @@ export async function POST(req: NextRequest) {
   }
 
   if (authUserId) {
+    // B1: 기존 프로필 role 확인 — 관리자 권한을 WORKER로 강등하지 않음
+    const { data: existingProfile } = await service
+      .from("profiles")
+      .select("role")
+      .eq("id", authUserId)
+      .maybeSingle();
+    const resolvedRole =
+      existingProfile?.role && existingProfile.role !== "WORKER"
+        ? existingProfile.role
+        : "WORKER";
+
     await Promise.all([
       service.from("profiles").upsert(
         {
           id: authUserId,
-          role: "WORKER",
+          role: resolvedRole,
           display_name: data.full_name,
           preferred_lang: preferredLang,
           site_id: site.id,
@@ -552,15 +564,23 @@ export async function POST(req: NextRequest) {
       .from("nfc_worker_daily_access")
       .insert({
         worker_id: workerId,
-          site_id: data.assigned_site_id,
+        site_id: data.assigned_site_id,
         work_date: workDate,
         status: "active",
         checked_in_at: nowIso,
         last_seen_at: nowIso,
         checkin_location: { latitude, longitude, accuracy, distance_m: Math.round(distanceM) },
       });
-    if (checkinErr) return NextResponse.json({ error: "checkin_failed" }, { status: 500 });
-    accessAction = "checked_in";
+    if (checkinErr) {
+      // B2: 동시 더블 탭으로 unique 충돌 → already_checked_in으로 처리
+      if (checkinErr.code === "23505") {
+        accessAction = "already_checked_in";
+      } else {
+        return NextResponse.json({ error: "checkin_failed" }, { status: 500 });
+      }
+    } else {
+      accessAction = "checked_in";
+    }
   }
 
   // Patch C-4/C-6: Establish the Supabase session server-side so the

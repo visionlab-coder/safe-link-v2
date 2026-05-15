@@ -359,11 +359,22 @@ export async function POST(req: NextRequest) {
   }
 
   if (authUserId) {
+    // B1: 기존 프로필 role 확인 — 관리자 권한을 WORKER로 강등하지 않음
+    const { data: existingProfile } = await service
+      .from("profiles")
+      .select("role")
+      .eq("id", authUserId)
+      .maybeSingle();
+    const resolvedRole =
+      existingProfile?.role && existingProfile.role !== "WORKER"
+        ? existingProfile.role
+        : "WORKER";
+
     await Promise.all([
       service.from("profiles").upsert(
         {
           id: authUserId,
-          role: "WORKER",
+          role: resolvedRole,
           display_name: updatedWorker.full_name,
           preferred_lang: preferredLang,
           site_id: site.id,

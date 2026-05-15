@@ -17,6 +17,27 @@ type DeviceLocation = {
   accuracy: number;
 };
 
+const NFC_ERROR_MESSAGES: Record<string, string> = {
+  outside_worksite: "현장 반경 밖에서는 출근 처리가 안됩니다. 현장 안에서 다시 태그해 주세요.",
+  site_challenge_expired: "오늘 확인코드가 만료되었습니다. 관리자에게 재발급을 요청하세요.",
+  site_challenge_invalid: "현장 확인코드가 일치하지 않습니다. 6자리를 다시 확인해 주세요.",
+  sticker_revoked_or_missing: "이 NFC 카드는 사용 중지되었습니다. 관리자에게 재발급을 요청하세요.",
+  signature_invalid: "NFC 카드 인증에 실패했습니다. 관리자에게 확인을 요청하세요.",
+  worker_site_required: "근로자 현장 배정이 누락되었습니다. 관리자에게 등록을 요청하세요.",
+  worker_not_found: "등록되지 않은 NFC 카드입니다. 관리자에게 확인을 요청하세요.",
+  site_access_disabled: "현재 이 현장은 NFC 입장이 비활성화되어 있습니다. 관리자에게 문의하세요.",
+  daily_safety_log_upload_failed: "안전일지 업로드에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+  location_required: "위치 권한을 켠 뒤 다시 태그해 주세요.",
+  url_malformed_or_spoofed: "잘못된 NFC 링크입니다. 관리자에게 카드 확인을 요청하세요.",
+  nationality_invalid: "국가 선택이 올바르지 않습니다. 다시 선택해 주세요.",
+  checkin_failed: "출근 처리에 실패했습니다. 다시 태그해 주세요.",
+  checkout_failed: "퇴근 처리에 실패했습니다. 다시 시도해 주세요.",
+};
+
+function nfcErrorMessage(raw: string): string {
+  return NFC_ERROR_MESSAGES[raw] ?? raw;
+}
+
 const COUNTRIES: CountryOption[] = [
   { code: "KR", lang: "ko", label: "Korea" },
   { code: "VN", lang: "vi", label: "Vietnam" },
@@ -71,7 +92,7 @@ function NfcWorkerEntryInner() {
           longitude: pos.coords.longitude,
           accuracy: pos.coords.accuracy,
         }),
-        () => reject(new Error("Allow location access at the worksite, then tap the NFC card again.")),
+        () => reject(new Error("위치 권한을 허용한 뒤 현장에서 다시 태그해 주세요.")),
         { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
       );
     });
@@ -92,7 +113,7 @@ function NfcWorkerEntryInner() {
       }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || data.error || "NFC access failed.");
+    if (!res.ok) throw new Error(nfcErrorMessage(data.error || data.detail || "NFC access failed."));
 
     if (data.access?.action === "checked_out" || data.access?.active === false) {
       await supabase.auth.signOut();
