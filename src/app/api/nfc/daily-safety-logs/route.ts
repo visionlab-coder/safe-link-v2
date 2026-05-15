@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/utils/nfc/require-admin";
+import { isGlobalAdmin, requireAdmin } from "@/utils/nfc/require-admin";
+import { buildLegalReportEnvelope, recordReportExport } from "@/utils/reports/integrity";
 
 export const runtime = "nodejs";
 
@@ -8,22 +9,17 @@ export async function GET(req: NextRequest) {
   if (!guard.ok) return guard.response;
   const { ctx } = guard;
 
-  // 현장 범위 강제: 글로벌 role이 아닌 경우 자신의 현장 데이터만 조회 가능
-  const GLOBAL_ROLES = ["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER"];
-  let enforcedSiteId: string | null = null;
-  if (!GLOBAL_ROLES.includes(ctx.user.role.toUpperCase())) {
-    const { data: profileData } = await ctx.service
-      .from("profiles")
-      .select("site_id")
-      .eq("id", ctx.user.id)
-      .maybeSingle();
-    enforcedSiteId = profileData?.site_id ?? null;
-    if (!enforcedSiteId) {
+  let siteId = req.nextUrl.searchParams.get("site_id")?.trim() || null;
+  if (!isGlobalAdmin(ctx.user.role)) {
+    if (!ctx.user.site_id) {
       return NextResponse.json({ error: "profile_site_required" }, { status: 409 });
     }
+    if (siteId && siteId !== ctx.user.site_id) {
+      return NextResponse.json({ error: "cross_site_access_denied" }, { status: 403 });
+    }
+    siteId = ctx.user.site_id;
   }
 
-  const siteId = enforcedSiteId ?? req.nextUrl.searchParams.get("site_id")?.trim();
   const workDate = req.nextUrl.searchParams.get("work_date")?.trim();
   const limit = Math.min(Number(req.nextUrl.searchParams.get("limit") || 100), 300);
 
@@ -57,7 +53,20 @@ export async function GET(req: NextRequest) {
   if (workDate) query = query.eq("work_date", workDate);
 
   const { data, error } = await query;
-  if (error) return NextResponse.json({ error: "query_failed" }, { status: 500 });
+  if (error) {
+    return NextResponse.json({ error: "query_failed", detail: error.message }, { status: 500 });
+  }
 
-  return NextResponse.json({ logs: data ?? [] });
+  const logs = data ?? [];
+  const report = buildLegalReportEnvelope({
+    reportType: "daily_safety_log_report",
+    generatedBy: ctx.user.id,
+    scope: { siteId: siteId ?? "ALL", workDate },
+    sourceTables: ["nfc_worker_safety_daily_logs", "nfc_workers"],
+    payload: { logs },
+  });
+
+  await recordReportExport({ service: ctx.service, envelope: report });
+
+  return NextResponse.json({ logs, report });
 }

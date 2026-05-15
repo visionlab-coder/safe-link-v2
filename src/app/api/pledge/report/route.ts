@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/utils/nfc/require-admin";
+import { requireAdmin, requireSameSite } from "@/utils/nfc/require-admin";
+import { buildLegalReportEnvelope, recordReportExport } from "@/utils/reports/integrity";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,8 @@ export async function GET(req: NextRequest) {
   ]);
 
   if (sessionResult.error || !sessionResult.data) return NextResponse.json({ error: "session_not_found" }, { status: 404 });
+  const denied = requireSameSite(guard.ctx.user, sessionResult.data.site_id);
+  if (denied) return denied;
   if (attendanceResult.error) return NextResponse.json({ error: "attendance_query_failed", detail: attendanceResult.error.message }, { status: 500 });
   if (pledgeResult.error) return NextResponse.json({ error: "pledge_query_failed", detail: pledgeResult.error.message }, { status: 500 });
 
@@ -30,10 +33,33 @@ export async function GET(req: NextRequest) {
   const expectedWorkerIds = new Set((attendanceResult.data ?? []).map((row) => String(row.worker_id)));
   const unsignedCount = Math.max(expectedWorkerIds.size - signedCount, 0);
 
-  return NextResponse.json({
+  const payload = {
     session: sessionResult.data,
     signedCount,
     unsignedCount,
     pledges,
+    legalTbmChecklist: {
+      requiredFields: [
+        "작업내용",
+        "주요 위험요인",
+        "위험성 감소대책",
+        "근로자 준수사항",
+        "관리감독자 확인",
+      ],
+      note:
+        "TBM 서명 보고서는 참석·서명 증빙이며, 위험성평가/TBM 법적 방어력을 위해 세션 metadata 또는 TBM 본문에 위 항목을 포함해야 합니다.",
+    },
+  };
+
+  const report = buildLegalReportEnvelope({
+    reportType: "tbm_signature_report",
+    generatedBy: guard.ctx.user.id,
+    scope: { siteId: String(sessionResult.data.site_id), tbmSessionId },
+    sourceTables: ["nfc_tbm_sessions", "nfc_tbm_attendance", "claim13_pledges"],
+    payload,
   });
+
+  await recordReportExport({ service, envelope: report });
+
+  return NextResponse.json({ ...payload, report });
 }

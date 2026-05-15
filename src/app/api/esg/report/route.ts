@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/utils/nfc/require-admin";
+import { requireAdmin, requireSameSite } from "@/utils/nfc/require-admin";
+import { buildLegalReportEnvelope, recordReportExport } from "@/utils/reports/integrity";
 
 export const runtime = "nodejs";
 
@@ -20,16 +21,8 @@ export async function GET(req: NextRequest) {
   const siteId = req.nextUrl.searchParams.get("siteId");
   if (!siteId) return NextResponse.json({ error: "siteId_required" }, { status: 400 });
 
-  const { data: callerProfile } = await guard.ctx.service
-    .from("profiles")
-    .select("site_id, role")
-    .eq("id", guard.ctx.user.id)
-    .maybeSingle();
-
-  const isGlobalRole = ["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER"].includes(guard.ctx.user.role);
-  if (!isGlobalRole && callerProfile?.site_id !== siteId) {
-    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
-  }
+  const denied = requireSameSite(guard.ctx.user, siteId);
+  if (denied) return denied;
 
   const from = requireDate(req.nextUrl.searchParams.get("from"), "1970-01-01");
   const to = requireDate(req.nextUrl.searchParams.get("to"), new Date().toISOString().slice(0, 10));
@@ -107,7 +100,7 @@ export async function GET(req: NextRequest) {
     ? null
     : new Set((liveTranslationsResult.data ?? []).map((row) => String(row.session_id))).size;
 
-  return NextResponse.json({
+  const payload = {
     siteId,
     period: { from, to },
     tbm: {
@@ -129,5 +122,25 @@ export async function GET(req: NextRequest) {
     auditChain: { totalEvents: auditResult.count ?? 0 },
     interpretation: { totalSessions: liveSessionCount },
     generatedAt: new Date().toISOString(),
+  };
+
+  const report = buildLegalReportEnvelope({
+    reportType: "esg_safety_report",
+    generatedBy: guard.ctx.user.id,
+    scope: { siteId, from, to },
+    sourceTables: [
+      "nfc_tbm_sessions",
+      "nfc_tbm_attendance",
+      "claim13_pledges",
+      "claim17_stop_work_interventions",
+      "claim13_hash_chain_events",
+      "safety_equipment_grants",
+      "live_translations",
+    ],
+    payload,
   });
+
+  await recordReportExport({ service, envelope: report });
+
+  return NextResponse.json({ ...payload, report });
 }
