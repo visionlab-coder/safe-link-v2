@@ -319,21 +319,24 @@ export async function POST(req: NextRequest) {
     pickSiteNumber(site as Record<string, unknown>, "radius_m") ??
     DEFAULT_GEOFENCE_RADIUS_M;
 
-  if (siteLatitude == null || siteLongitude == null) {
-    return NextResponse.json({ error: "site_geofence_not_configured" }, { status: 409 });
-  }
+  // 현장 지오펜스 미설정 시 위치 검증 생략 (테스트/초기 설정 환경 허용)
+  const geofenceActive = siteLatitude != null && siteLongitude != null;
+  const distanceM = geofenceActive
+    ? haversineMeters(
+        { latitude, longitude },
+        { latitude: siteLatitude!, longitude: siteLongitude! }
+      )
+    : 0;
 
-  const distanceM = haversineMeters(
-    { latitude, longitude },
-    { latitude: siteLatitude, longitude: siteLongitude }
-  );
-  const allowedRadiusM = siteRadius + Math.min(accuracy, 50);
-  if (distanceM > allowedRadiusM) {
-    return NextResponse.json({
-      error: "outside_worksite",
-      distance_m: Math.round(distanceM),
-      allowed_radius_m: Math.round(allowedRadiusM),
-    }, { status: 403 });
+  if (geofenceActive) {
+    const allowedRadiusM = siteRadius + Math.min(accuracy, 50);
+    if (distanceM > allowedRadiusM) {
+      return NextResponse.json({
+        error: "outside_worksite",
+        distance_m: Math.round(distanceM),
+        allowed_radius_m: Math.round(allowedRadiusM),
+      }, { status: 403 });
+    }
   }
 
   const { data: updatedWorker, error: preferenceErr } = await service
