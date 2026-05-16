@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AlertCircle, CheckCircle, Loader2, UserCheck } from "lucide-react";
+import { createClient } from "@/utils/supabase/client";
 import {
   findQrLanguageByCode,
   getQrEntryText,
@@ -88,11 +89,13 @@ function SiteQrEntryInner() {
   const searchParams = useSearchParams();
   const siteId = searchParams.get("site_id") ?? "";
   const initialLang = findQrLanguageByCode(searchParams.get("lang") ?? "ko").lang;
+  const supabase = createClient();
   const [selectedLang, setSelectedLang] = useState<QrLanguageCode>(initialLang);
   const [siteName, setSiteName] = useState("");
+  const [siteCode, setSiteCode] = useState("");
   const [initials, setInitials] = useState("");
   const [phoneLast4, setPhoneLast4] = useState("");
-  const [status, setStatus] = useState<"loading" | "ready" | "submitting" | "blocked" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "submitting" | "blocked" | "error" | "logout_confirm">("loading");
   const [errMsg, setErrMsg] = useState("");
 
   const language = useMemo(() => findQrLanguageByCode(selectedLang), [selectedLang]);
@@ -107,6 +110,12 @@ function SiteQrEntryInner() {
     if (!siteId) {
       setErrMsg("site_not_found");
       setStatus("error");
+      return;
+    }
+
+    // 재스캔 감지: 이미 세션 활성 → 퇴근 화면으로
+    if (sessionStorage.getItem("safe-link-session-active") === "true") {
+      setStatus("logout_confirm");
       return;
     }
 
@@ -125,6 +134,7 @@ function SiteQrEntryInner() {
           return;
         }
         setSiteName(data.site?.name ?? data.site?.code ?? text.siteFallback);
+        setSiteCode(data.site?.code ?? "");
         setStatus("ready");
       })
       .catch(() => {
@@ -137,6 +147,13 @@ function SiteQrEntryInner() {
       cancelled = true;
     };
   }, [siteId, text.siteFallback]);
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    sessionStorage.removeItem("safe-link-session-active");
+    sessionStorage.removeItem("safe-link-worker-active");
+    setStatus("blocked");
+  }
 
   async function submitEntry() {
     setStatus("submitting");
@@ -184,6 +201,25 @@ function SiteQrEntryInner() {
     }
   }
 
+  if (status === "logout_confirm") {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-5 bg-gray-950 px-6">
+        <CheckCircle className="h-16 w-16 text-emerald-400" />
+        <div className="text-center">
+          <h1 className="text-xl font-bold text-white">SAFE-LINK 활성 중 / Active</h1>
+          <p className="mt-2 text-sm leading-6 text-gray-400">이미 입장됨 · Already checked in</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="mt-2 flex h-14 w-full max-w-sm items-center justify-center rounded-lg bg-red-600 text-base font-black text-white"
+        >
+          퇴근하기 / Check Out
+        </button>
+      </main>
+    );
+  }
+
   if (status === "loading") {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-950 px-6">
@@ -220,7 +256,10 @@ function SiteQrEntryInner() {
           </div>
           <div className="mt-4 rounded-lg border border-gray-800 bg-gray-900 px-4 py-3">
             <p className="text-xs font-bold text-gray-500">{text.siteLabel}</p>
-            <p className="mt-1 text-base font-bold">{siteName || text.siteFallback}</p>
+            <p className="mt-1 text-base font-bold">
+              {siteName || text.siteFallback}
+              {siteCode && <span className="ml-2 font-mono text-xs font-normal text-gray-400">· {siteCode}</span>}
+            </p>
           </div>
         </header>
 

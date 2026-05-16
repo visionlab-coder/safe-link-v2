@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { AlertCircle, CheckCircle, Globe2, Loader2 } from "lucide-react";
+import { createClient } from "@/utils/supabase/client";
 import {
   findQrLanguageByCode,
   findQrLanguageByCountry,
@@ -104,7 +105,8 @@ function errorMessage(lang: QrLanguageCode, code: string) {
 
 export default function QrLandingPage() {
   const { token } = useParams<{ token: string }>();
-  const [phase, setPhase] = useState<"loading" | "select" | "entering" | "blocked" | "error">("loading");
+  const supabase = createClient();
+  const [phase, setPhase] = useState<"loading" | "select" | "entering" | "blocked" | "error" | "logout_confirm">("loading");
   const [info, setInfo] = useState<InfoResult | null>(null);
   const [selectedLang, setSelectedLang] = useState<QrLanguageCode>("ko");
   const [errMsg, setErrMsg] = useState("");
@@ -119,6 +121,12 @@ export default function QrLandingPage() {
 
   useEffect(() => {
     if (!token) return;
+
+    // 재스캔 감지: 이미 세션 활성 → 퇴근 화면으로
+    if (sessionStorage.getItem("safe-link-session-active") === "true") {
+      setPhase("logout_confirm");
+      return;
+    }
 
     let cancelled = false;
     fetch("/api/qr/verify", {
@@ -198,6 +206,32 @@ export default function QrLandingPage() {
     }
   }
 
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    sessionStorage.removeItem("safe-link-session-active");
+    sessionStorage.removeItem("safe-link-worker-active");
+    setPhase("blocked");
+  }
+
+  if (phase === "logout_confirm") {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-5 bg-gray-950 px-6">
+        <CheckCircle className="h-16 w-16 text-emerald-400" />
+        <div className="text-center">
+          <h1 className="text-xl font-bold text-white">SAFE-LINK 활성 중 / Active</h1>
+          <p className="mt-2 text-sm leading-6 text-gray-400">이미 입장됨 · Already checked in</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="mt-2 flex h-14 w-full max-w-sm items-center justify-center rounded-lg bg-red-600 text-base font-black text-white"
+        >
+          퇴근하기 / Check Out
+        </button>
+      </main>
+    );
+  }
+
   if (phase === "loading") {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-950 px-6">
@@ -246,7 +280,12 @@ export default function QrLandingPage() {
             <div className="mt-4 rounded-lg border border-gray-800 bg-gray-900/70 px-4 py-3">
               <p className="text-base font-bold">{info.worker.full_name || text.workerFallbackName}</p>
               <p className="mt-1 text-xs text-gray-500">{info.worker.worker_code}</p>
-              {info.site?.name && <p className="mt-2 text-sm text-gray-300">{info.site.name}</p>}
+              {info.site?.name && (
+                <p className="mt-2 text-sm text-gray-300">
+                  {info.site.name}
+                  {info.site.code && <span className="ml-2 font-mono text-xs text-gray-500">· {info.site.code}</span>}
+                </p>
+              )}
             </div>
           )}
         </header>

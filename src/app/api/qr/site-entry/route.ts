@@ -222,10 +222,34 @@ export async function POST(req: NextRequest) {
     .limit(2);
 
   if (workerErr) return NextResponse.json({ error: "worker_lookup_failed" }, { status: 500 });
-  if (!workers || workers.length === 0) return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
-  if (workers.length > 1) return NextResponse.json({ error: "worker_match_ambiguous" }, { status: 409 });
+  if (workers && workers.length > 1) return NextResponse.json({ error: "worker_match_ambiguous" }, { status: 409 });
 
-  const worker = workers[0];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let worker: any;
+  if (!workers || workers.length === 0) {
+    // 신규교육 게스트: DB에 없는 근로자 최소 레코드 생성
+    const guestCode = `QR-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+    const { data: guestWorker, error: guestErr } = await service
+      .from("nfc_workers")
+      .insert({
+        worker_code: guestCode,
+        full_name: initials,
+        name_initials: initials,
+        phone_last4: phoneLast4,
+        assigned_site_id: site.id,
+        nationality,
+        preferred_lang: preferredLang,
+        is_active: true,
+      })
+      .select("id, worker_code, full_name, nationality, preferred_lang, auth_user_id, assigned_site_id, is_active")
+      .single();
+    if (guestErr || !guestWorker) {
+      return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
+    }
+    worker = guestWorker;
+  } else {
+    worker = workers[0];
+  }
   const nowIso = new Date().toISOString();
   const { data: updatedWorker, error: updateErr } = await service
     .from("nfc_workers")
