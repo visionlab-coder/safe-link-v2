@@ -1,10 +1,16 @@
 "use client";
 
+import Image from "next/image";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AlertCircle, CheckCircle, Loader2, UserCheck } from "lucide-react";
-
-type Country = { code: string; label: string; nativeLabel: string; lang: string };
+import {
+  findQrLanguageByCode,
+  getQrEntryText,
+  getQrFlagUrl,
+  QR_LANGUAGE_OPTIONS,
+  type QrLanguageCode,
+} from "@/utils/qr/language-options";
 
 type EntryResult = {
   ok?: boolean;
@@ -14,57 +20,88 @@ type EntryResult = {
   access?: { action: "checked_in" | "already_checked_in" | "checked_out"; active: boolean };
 };
 
-const COUNTRIES: Country[] = [
-  { code: "KR", label: "대한민국", nativeLabel: "한국어", lang: "ko" },
-  { code: "VN", label: "베트남", nativeLabel: "Tiếng Việt", lang: "vi" },
-  { code: "CN", label: "중국", nativeLabel: "中文", lang: "zh" },
-  { code: "TH", label: "태국", nativeLabel: "ไทย", lang: "th" },
-  { code: "ID", label: "인도네시아", nativeLabel: "Bahasa Indonesia", lang: "id" },
-  { code: "PH", label: "필리핀", nativeLabel: "Filipino", lang: "ph" },
-  { code: "UZ", label: "우즈베키스탄", nativeLabel: "O'zbekcha", lang: "uz" },
-  { code: "RU", label: "러시아", nativeLabel: "Русский", lang: "ru" },
-  { code: "JP", label: "일본", nativeLabel: "日本語", lang: "jp" },
-  { code: "MN", label: "몽골", nativeLabel: "Монгол", lang: "mn" },
-  { code: "MM", label: "미얀마", nativeLabel: "မြန်မာ", lang: "my" },
-  { code: "KH", label: "캄보디아", nativeLabel: "ខ្មែរ", lang: "km" },
-  { code: "NP", label: "네팔", nativeLabel: "नेपाली", lang: "ne" },
-  { code: "BD", label: "방글라데시", nativeLabel: "বাংলা", lang: "bn" },
-];
-
-const LANG_TO_COUNTRY: Record<string, string> = Object.fromEntries(COUNTRIES.map((country) => [country.lang, country.code]));
-
-const ERROR_MESSAGES: Record<string, string> = {
-  site_not_found: "현장 정보를 찾지 못했습니다. 관리자 QR의 현장코드를 확인해 주세요.",
-  site_access_disabled: "현재 이 현장의 근로자 SAFE-LINK 기능이 꺼져 있습니다.",
-  initials_required: "이름 이니셜을 입력해 주세요.",
-  phone_last4_required: "휴대전화 뒷자리 4자리를 입력해 주세요.",
-  worker_not_found: "입력한 정보와 일치하는 근로자를 찾지 못했습니다.",
-  worker_match_ambiguous: "같은 정보의 근로자가 2명 이상입니다. 관리자에게 확인을 요청하세요.",
-  checkin_failed: "입장 기록 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.",
-  preference_update_failed: "언어 설정 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.",
-  session_failed: "근로자 세션 생성에 실패했습니다. 관리자에게 확인을 요청하세요.",
-  NETWORK_ERROR: "네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+const ERROR_MESSAGES: Record<QrLanguageCode, Record<string, string>> = {
+  ko: {
+    site_not_found: "현장을 찾을 수 없습니다. 관리자에게 현장 QR을 다시 요청하세요.",
+    site_access_disabled: "이 현장은 현재 SAFE-LINK 근로자 입장이 중지되어 있습니다.",
+    initials_required: "이름 이니셜을 입력하세요.",
+    phone_last4_required: "휴대전화 뒤 4자리를 입력하세요.",
+    worker_not_found: "입력한 정보와 일치하는 근로자를 찾을 수 없습니다.",
+    worker_match_ambiguous: "같은 정보의 근로자가 2명 이상입니다. 관리자에게 확인하세요.",
+    checkin_failed: "입장 처리 중 오류가 발생했습니다. 다시 시도하세요.",
+    preference_update_failed: "언어 저장 중 오류가 발생했습니다. 다시 시도하세요.",
+    session_failed: "근로자 세션을 만들지 못했습니다. 관리자에게 확인하세요.",
+    NETWORK_ERROR: "네트워크 연결을 확인한 뒤 다시 시도하세요.",
+  },
+  vi: {
+    worker_not_found: "Không tìm thấy công nhân khớp với thông tin đã nhập.",
+    NETWORK_ERROR: "Vui lòng kiểm tra mạng và thử lại.",
+  },
+  zh: {
+    worker_not_found: "找不到与输入信息匹配的工人。",
+    NETWORK_ERROR: "请检查网络后重试。",
+  },
+  th: {
+    worker_not_found: "ไม่พบคนงานที่ตรงกับข้อมูลที่กรอก",
+    NETWORK_ERROR: "โปรดตรวจสอบเครือข่ายแล้วลองอีกครั้ง",
+  },
+  uz: {},
+  ph: {},
+  km: {},
+  id: {},
+  mn: {},
+  my: {},
+  ne: {},
+  bn: {},
+  kk: {},
+  ru: {
+    worker_not_found: "Работник с такими данными не найден.",
+    NETWORK_ERROR: "Проверьте сеть и попробуйте снова.",
+  },
+  en: {
+    site_not_found: "Worksite not found. Ask the manager for a new site QR.",
+    site_access_disabled: "Worker entry is currently disabled for this worksite.",
+    initials_required: "Enter your name initials.",
+    phone_last4_required: "Enter the last 4 digits of your phone.",
+    worker_not_found: "No worker matches the entered information.",
+    worker_match_ambiguous: "More than one worker matches this information. Ask the manager to check.",
+    checkin_failed: "Entry processing failed. Please try again.",
+    preference_update_failed: "Language could not be saved. Please try again.",
+    session_failed: "Worker session could not be created. Ask the manager to check.",
+    NETWORK_ERROR: "Check the network connection and try again.",
+  },
+  jp: {
+    worker_not_found: "入力情報に一致する作業員が見つかりません。",
+    NETWORK_ERROR: "ネットワークを確認してからもう一度お試しください。",
+  },
+  fr: {},
+  es: {},
+  ar: {},
+  hi: {},
 };
 
-function message(code: string) {
-  return ERROR_MESSAGES[code] ?? code;
+function errorMessage(lang: QrLanguageCode, code: string) {
+  return ERROR_MESSAGES[lang]?.[code] ?? ERROR_MESSAGES.en[code] ?? ERROR_MESSAGES.ko[code] ?? code;
 }
 
 function SiteQrEntryInner() {
   const searchParams = useSearchParams();
   const siteId = searchParams.get("site_id") ?? "";
-  const initialLang = searchParams.get("lang") ?? "ko";
-  const [selectedCountry, setSelectedCountry] = useState(LANG_TO_COUNTRY[initialLang] ?? "KR");
+  const initialLang = findQrLanguageByCode(searchParams.get("lang") ?? "ko").lang;
+  const [selectedLang, setSelectedLang] = useState<QrLanguageCode>(initialLang);
   const [siteName, setSiteName] = useState("");
   const [initials, setInitials] = useState("");
   const [phoneLast4, setPhoneLast4] = useState("");
   const [status, setStatus] = useState<"loading" | "ready" | "submitting" | "blocked" | "error">("loading");
   const [errMsg, setErrMsg] = useState("");
 
-  const country = useMemo(
-    () => COUNTRIES.find((item) => item.code === selectedCountry) ?? COUNTRIES[0],
-    [selectedCountry]
-  );
+  const language = useMemo(() => findQrLanguageByCode(selectedLang), [selectedLang]);
+  const text = useMemo(() => getQrEntryText(selectedLang), [selectedLang]);
+
+  useEffect(() => {
+    localStorage.setItem("safe-link-lang", language.lang);
+    localStorage.setItem("safe-link-country", language.country);
+  }, [language.country, language.lang]);
 
   useEffect(() => {
     if (!siteId) {
@@ -87,7 +124,7 @@ function SiteQrEntryInner() {
           setStatus("error");
           return;
         }
-        setSiteName(data.site?.name ?? data.site?.code ?? "SAFE-LINK 현장");
+        setSiteName(data.site?.name ?? data.site?.code ?? text.siteFallback);
         setStatus("ready");
       })
       .catch(() => {
@@ -99,7 +136,7 @@ function SiteQrEntryInner() {
     return () => {
       cancelled = true;
     };
-  }, [siteId]);
+  }, [siteId, text.siteFallback]);
 
   async function submitEntry() {
     setStatus("submitting");
@@ -114,8 +151,8 @@ function SiteQrEntryInner() {
           mode: "enter",
           name_initials: initials,
           phone_last4: phoneLast4,
-          nationality: country.code,
-          preferred_lang: country.lang,
+          nationality: language.country,
+          preferred_lang: language.lang,
         }),
       });
       const data: EntryResult = await res.json();
@@ -126,8 +163,6 @@ function SiteQrEntryInner() {
         return;
       }
 
-      localStorage.setItem("safe-link-lang", country.lang);
-      localStorage.setItem("safe-link-country", country.code);
       sessionStorage.setItem("safe-link-worker-active", data.access?.active ? "1" : "0");
 
       if (data.access?.action === "checked_out") {
@@ -141,9 +176,8 @@ function SiteQrEntryInner() {
         return;
       }
 
-      // RoleGuard rememberMe=false 체크 우회 — QR 입장 세션은 항상 활성으로 표시
       sessionStorage.setItem("safe-link-session-active", "true");
-      window.location.replace(`/worker?lang=${encodeURIComponent(country.lang)}&qr=1`);
+      window.location.replace(`/worker?lang=${encodeURIComponent(language.lang)}&qr=1`);
     } catch {
       setErrMsg("NETWORK_ERROR");
       setStatus("error");
@@ -152,22 +186,20 @@ function SiteQrEntryInner() {
 
   if (status === "loading") {
     return (
-      <main className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-4 px-6">
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-950 px-6">
         <Loader2 className="h-10 w-10 animate-spin text-blue-400" />
-        <p className="text-sm text-gray-300">현장 정보를 확인하고 있습니다.</p>
+        <p className="text-sm text-gray-300">{text.siteLoading}</p>
       </main>
     );
   }
 
   if (status === "blocked") {
     return (
-      <main className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-5 px-6">
+      <main className="flex min-h-screen flex-col items-center justify-center gap-5 bg-gray-950 px-6">
         <CheckCircle className="h-16 w-16 text-gray-400" />
         <div className="text-center">
-          <h1 className="text-xl font-bold text-white">오늘 퇴근 처리가 완료되었습니다.</h1>
-          <p className="mt-2 text-sm leading-6 text-gray-400">
-            다음 근무일 TBM 태그 또는 QR 입장 전까지 SAFE-LINK 기능은 사용할 수 없습니다.
-          </p>
+          <h1 className="text-xl font-bold text-white">{text.blockedTitle}</h1>
+          <p className="mt-2 text-sm leading-6 text-gray-400">{text.blockedBody}</p>
         </div>
       </main>
     );
@@ -182,49 +214,65 @@ function SiteQrEntryInner() {
               <UserCheck className="h-6 w-6 text-emerald-300" />
             </div>
             <div>
-              <p className="text-sm text-gray-400">SAFE-LINK 근로자 QR</p>
-              <h1 className="text-2xl font-black">간편 입장</h1>
+              <p className="text-sm text-gray-400">{text.siteQrLabel}</p>
+              <h1 className="text-2xl font-black">{text.quickEntryTitle}</h1>
             </div>
           </div>
           <div className="mt-4 rounded-lg border border-gray-800 bg-gray-900 px-4 py-3">
-            <p className="text-xs font-bold text-gray-500">자동 적용 현장</p>
-            <p className="mt-1 text-base font-bold">{siteName || "SAFE-LINK 현장"}</p>
+            <p className="text-xs font-bold text-gray-500">{text.siteLabel}</p>
+            <p className="mt-1 text-base font-bold">{siteName || text.siteFallback}</p>
           </div>
         </header>
 
-        <section className="mb-5 grid grid-cols-2 gap-2">
-          {COUNTRIES.map((item) => {
-            const active = item.code === selectedCountry;
-            return (
-              <button
-                key={item.code}
-                type="button"
-                onClick={() => setSelectedCountry(item.code)}
-                className={`min-h-12 rounded-lg border px-3 text-left ${
-                  active ? "border-blue-400 bg-blue-500/15" : "border-gray-800 bg-gray-900"
-                }`}
-              >
-                <span className="block text-xs font-bold">{item.label}</span>
-                <span className="block text-[11px] text-gray-400">{item.nativeLabel}</span>
-              </button>
-            );
-          })}
+        <section className="mb-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-xs font-bold text-gray-400">{text.chooseLanguageTitle}</p>
+            <p className="text-xs font-bold text-blue-200">
+              {text.selectedLanguage}: {language.nativeName}
+            </p>
+          </div>
+          <div className="grid grid-cols-5 gap-2">
+            {QR_LANGUAGE_OPTIONS.map((item) => {
+              const active = item.lang === selectedLang;
+              return (
+                <button
+                  key={item.lang}
+                  type="button"
+                  onClick={() => setSelectedLang(item.lang)}
+                  aria-label={item.nativeName}
+                  title={item.nativeName}
+                  className={`flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg border bg-gray-900 p-1 transition ${
+                    active ? "border-blue-400 ring-2 ring-blue-400/40" : "border-gray-800"
+                  }`}
+                >
+                  <Image
+                    src={getQrFlagUrl(item)}
+                    alt={item.nativeName}
+                    width={80}
+                    height={60}
+                    unoptimized
+                    className="h-full w-full rounded-md object-cover"
+                  />
+                </button>
+              );
+            })}
+          </div>
         </section>
 
         <section className="flex flex-col gap-3">
           <label className="flex flex-col gap-2">
-            <span className="text-xs font-bold text-gray-400">본인 이름의 이니셜</span>
+            <span className="text-xs font-bold text-gray-400">{text.initialsLabel}</span>
             <input
               value={initials}
               onChange={(event) => setInitials(event.target.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase())}
-              placeholder="예: HGD"
+              placeholder={text.initialsPlaceholder}
               maxLength={4}
               className="h-14 rounded-lg border border-gray-800 bg-gray-900 px-4 font-mono text-lg font-black outline-none focus:border-blue-400"
             />
           </label>
 
           <label className="flex flex-col gap-2">
-            <span className="text-xs font-bold text-gray-400">휴대전화 뒷자리 4자리</span>
+            <span className="text-xs font-bold text-gray-400">{text.phoneLast4Label}</span>
             <input
               value={phoneLast4}
               onChange={(event) => setPhoneLast4(event.target.value.replace(/\D/g, "").slice(0, 4))}
@@ -239,7 +287,7 @@ function SiteQrEntryInner() {
         {status === "error" && (
           <div className="mt-4 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
             <AlertCircle className="mt-0.5 h-4 w-4 flex-none" />
-            <p>{message(errMsg)}</p>
+            <p>{errorMessage(language.lang, errMsg)}</p>
           </div>
         )}
 
@@ -253,10 +301,10 @@ function SiteQrEntryInner() {
             {status === "submitting" ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                입장 처리 중
+                {text.entering}
               </>
             ) : (
-              "근로자 화면으로 이동"
+              text.enterWorker
             )}
           </button>
         </div>

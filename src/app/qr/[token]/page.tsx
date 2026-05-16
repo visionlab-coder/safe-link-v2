@@ -1,15 +1,17 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { AlertCircle, CheckCircle, Globe2, Loader2 } from "lucide-react";
-
-type Country = {
-  code: string;
-  label: string;
-  nativeLabel: string;
-  lang: string;
-};
+import {
+  findQrLanguageByCode,
+  findQrLanguageByCountry,
+  getQrEntryText,
+  getQrFlagUrl,
+  QR_LANGUAGE_OPTIONS,
+  type QrLanguageCode,
+} from "@/utils/qr/language-options";
 
 type InfoResult = {
   ok?: boolean;
@@ -36,51 +38,84 @@ type EnterResult = InfoResult & {
   };
 };
 
-const COUNTRIES: Country[] = [
-  { code: "KR", label: "대한민국", nativeLabel: "한국어", lang: "ko" },
-  { code: "VN", label: "베트남", nativeLabel: "Tiếng Việt", lang: "vi" },
-  { code: "CN", label: "중국", nativeLabel: "中文", lang: "zh" },
-  { code: "TH", label: "태국", nativeLabel: "ไทย", lang: "th" },
-  { code: "ID", label: "인도네시아", nativeLabel: "Bahasa Indonesia", lang: "id" },
-  { code: "PH", label: "필리핀", nativeLabel: "Filipino", lang: "ph" },
-  { code: "UZ", label: "우즈베키스탄", nativeLabel: "O'zbekcha", lang: "uz" },
-  { code: "RU", label: "러시아", nativeLabel: "Русский", lang: "ru" },
-  { code: "JP", label: "일본", nativeLabel: "日本語", lang: "jp" },
-  { code: "MN", label: "몽골", nativeLabel: "Монгол", lang: "mn" },
-  { code: "MM", label: "미얀마", nativeLabel: "မြန်မာ", lang: "my" },
-  { code: "KH", label: "캄보디아", nativeLabel: "ខ្មែរ", lang: "km" },
-  { code: "NP", label: "네팔", nativeLabel: "नेपाली", lang: "ne" },
-  { code: "BD", label: "방글라데시", nativeLabel: "বাংলা", lang: "bn" },
-];
-
-const ERROR_MESSAGES: Record<string, string> = {
-  INVALID_OR_EXPIRED_TOKEN: "QR 유효 시간이 만료되었습니다. 관리자에게 새 QR 발급을 요청하세요.",
-  site_not_found: "현장 정보를 찾지 못했습니다. 관리자에게 현장코드 연결 상태를 확인해 달라고 요청하세요.",
-  worker_not_found: "등록된 근로자 정보를 찾지 못했습니다.",
-  worker_site_mismatch: "이 QR은 현재 근로자의 등록 현장과 일치하지 않습니다.",
-  site_access_disabled: "현재 이 현장의 근로자 SAFE-LINK 기능이 꺼져 있습니다.",
-  nationality_invalid: "국가를 다시 선택해 주세요.",
-  checkin_failed: "입장 기록 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.",
-  preference_update_failed: "언어 설정 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.",
-  session_failed: "근로자 세션 생성에 실패했습니다. 관리자에게 QR 재발급을 요청하세요.",
-  NETWORK_ERROR: "네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+const ERROR_MESSAGES: Record<QrLanguageCode, Record<string, string>> = {
+  ko: {
+    INVALID_OR_EXPIRED_TOKEN: "QR 코드가 만료되었거나 올바르지 않습니다. 관리자에게 새 QR을 요청하세요.",
+    site_not_found: "현장을 찾을 수 없습니다. 관리자에게 확인하세요.",
+    worker_not_found: "근로자 정보를 찾을 수 없습니다.",
+    worker_site_mismatch: "이 QR의 현장과 근로자의 현재 현장이 일치하지 않습니다.",
+    site_access_disabled: "이 현장은 현재 SAFE-LINK 근로자 입장이 중지되어 있습니다.",
+    nationality_invalid: "국가를 다시 선택하세요.",
+    checkin_failed: "입장 처리 중 오류가 발생했습니다. 다시 시도하세요.",
+    preference_update_failed: "언어 저장 중 오류가 발생했습니다. 다시 시도하세요.",
+    session_failed: "근로자 세션을 만들지 못했습니다. 관리자에게 확인하세요.",
+    NETWORK_ERROR: "네트워크 연결을 확인한 뒤 다시 시도하세요.",
+  },
+  vi: {
+    worker_not_found: "Không tìm thấy thông tin công nhân.",
+    NETWORK_ERROR: "Vui lòng kiểm tra mạng và thử lại.",
+  },
+  zh: {
+    worker_not_found: "找不到工人信息。",
+    NETWORK_ERROR: "请检查网络后重试。",
+  },
+  th: {
+    worker_not_found: "ไม่พบข้อมูลคนงาน",
+    NETWORK_ERROR: "โปรดตรวจสอบเครือข่ายแล้วลองอีกครั้ง",
+  },
+  uz: {},
+  ph: {},
+  km: {},
+  id: {},
+  mn: {},
+  my: {},
+  ne: {},
+  bn: {},
+  kk: {},
+  ru: {
+    worker_not_found: "Информация о работнике не найдена.",
+    NETWORK_ERROR: "Проверьте сеть и попробуйте снова.",
+  },
+  en: {
+    INVALID_OR_EXPIRED_TOKEN: "The QR code is expired or invalid. Ask the manager for a new QR.",
+    site_not_found: "Worksite not found. Ask the manager to check.",
+    worker_not_found: "Worker information was not found.",
+    worker_site_mismatch: "This QR worksite does not match the worker's current worksite.",
+    site_access_disabled: "Worker entry is currently disabled for this worksite.",
+    nationality_invalid: "Choose your country again.",
+    checkin_failed: "Entry processing failed. Please try again.",
+    preference_update_failed: "Language could not be saved. Please try again.",
+    session_failed: "Worker session could not be created. Ask the manager to check.",
+    NETWORK_ERROR: "Check the network connection and try again.",
+  },
+  jp: {
+    worker_not_found: "作業員情報が見つかりません。",
+    NETWORK_ERROR: "ネットワークを確認してからもう一度お試しください。",
+  },
+  fr: {},
+  es: {},
+  ar: {},
+  hi: {},
 };
 
-function errorMessage(code: string) {
-  return ERROR_MESSAGES[code] ?? code;
+function errorMessage(lang: QrLanguageCode, code: string) {
+  return ERROR_MESSAGES[lang]?.[code] ?? ERROR_MESSAGES.en[code] ?? ERROR_MESSAGES.ko[code] ?? code;
 }
 
 export default function QrLandingPage() {
   const { token } = useParams<{ token: string }>();
   const [phase, setPhase] = useState<"loading" | "select" | "entering" | "blocked" | "error">("loading");
   const [info, setInfo] = useState<InfoResult | null>(null);
-  const [selectedCountry, setSelectedCountry] = useState("KR");
+  const [selectedLang, setSelectedLang] = useState<QrLanguageCode>("ko");
   const [errMsg, setErrMsg] = useState("");
 
-  const country = useMemo(
-    () => COUNTRIES.find((item) => item.code === selectedCountry) ?? COUNTRIES[0],
-    [selectedCountry]
-  );
+  const language = useMemo(() => findQrLanguageByCode(selectedLang), [selectedLang]);
+  const text = useMemo(() => getQrEntryText(selectedLang), [selectedLang]);
+
+  useEffect(() => {
+    localStorage.setItem("safe-link-lang", language.lang);
+    localStorage.setItem("safe-link-country", language.country);
+  }, [language.country, language.lang]);
 
   useEffect(() => {
     if (!token) return;
@@ -95,15 +130,14 @@ export default function QrLandingPage() {
       .then((data: InfoResult) => {
         if (cancelled) return;
         if (!data.ok) {
-          setErrMsg(data.error ?? "QR 확인에 실패했습니다.");
+          setErrMsg(data.error ?? "INVALID_OR_EXPIRED_TOKEN");
           setPhase("error");
           return;
         }
 
-        const savedCountry = String(data.worker?.nationality ?? "").toUpperCase();
-        if (COUNTRIES.some((item) => item.code === savedCountry)) {
-          setSelectedCountry(savedCountry);
-        }
+        const savedLang = findQrLanguageByCode(data.worker?.preferred_lang);
+        const savedCountry = findQrLanguageByCountry(data.worker?.nationality);
+        setSelectedLang(savedCountry?.lang ?? savedLang.lang);
         setInfo(data);
         setPhase("select");
       })
@@ -130,20 +164,18 @@ export default function QrLandingPage() {
         body: JSON.stringify({
           token,
           mode: "enter",
-          nationality: country.code,
-          preferred_lang: country.lang,
+          nationality: language.country,
+          preferred_lang: language.lang,
         }),
       });
       const data: EnterResult = await res.json();
 
       if (!data.ok) {
-        setErrMsg(data.error ?? "QR 입장 처리에 실패했습니다.");
+        setErrMsg(data.error ?? "worker_not_found");
         setPhase("error");
         return;
       }
 
-      localStorage.setItem("safe-link-lang", country.lang);
-      localStorage.setItem("safe-link-country", country.code);
       sessionStorage.setItem("safe-link-worker-active", data.access?.active ? "1" : "0");
 
       if (data.access?.action === "checked_out") {
@@ -158,7 +190,8 @@ export default function QrLandingPage() {
         return;
       }
 
-      window.location.replace(`/worker?lang=${encodeURIComponent(country.lang)}&qr=1`);
+      sessionStorage.setItem("safe-link-session-active", "true");
+      window.location.replace(`/worker?lang=${encodeURIComponent(language.lang)}&qr=1`);
     } catch {
       setErrMsg("NETWORK_ERROR");
       setPhase("error");
@@ -167,83 +200,88 @@ export default function QrLandingPage() {
 
   if (phase === "loading") {
     return (
-      <main className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-4 px-6">
-        <Loader2 className="w-10 h-10 text-blue-400 animate-spin" />
-        <p className="text-gray-300 text-sm">QR 정보를 확인하고 있습니다.</p>
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-950 px-6">
+        <Loader2 className="h-10 w-10 animate-spin text-blue-400" />
+        <p className="text-sm text-gray-300">{text.qrLoading}</p>
       </main>
     );
   }
 
   if (phase === "error") {
     return (
-      <main className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-4 px-6">
-        <AlertCircle className="w-16 h-16 text-red-400" />
-        <h1 className="text-white text-xl font-bold text-center">QR 입장 실패</h1>
-        <p className="text-red-300 text-sm text-center leading-6">{errorMessage(errMsg)}</p>
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-950 px-6">
+        <AlertCircle className="h-16 w-16 text-red-400" />
+        <h1 className="text-center text-xl font-bold text-white">{text.errorTitle}</h1>
+        <p className="text-center text-sm leading-6 text-red-300">{errorMessage(language.lang, errMsg)}</p>
       </main>
     );
   }
 
   if (phase === "blocked") {
     return (
-      <main className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-5 px-6">
-        <CheckCircle className="w-16 h-16 text-gray-400" />
+      <main className="flex min-h-screen flex-col items-center justify-center gap-5 bg-gray-950 px-6">
+        <CheckCircle className="h-16 w-16 text-gray-400" />
         <div className="text-center">
-          <h1 className="text-white text-xl font-bold">오늘 퇴근 처리가 완료되었습니다.</h1>
-          <p className="text-gray-400 text-sm mt-2 leading-6">
-            다음 근무일 TBM 태그 또는 QR 입장 전까지 SAFE-LINK 기능은 사용할 수 없습니다.
-          </p>
+          <h1 className="text-xl font-bold text-white">{text.blockedTitle}</h1>
+          <p className="mt-2 text-sm leading-6 text-gray-400">{text.blockedBody}</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white px-5 py-6">
+    <main className="min-h-screen bg-gray-950 px-5 py-6 text-white">
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-md flex-col">
         <header className="mb-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-500/15">
+            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-500/15">
               <Globe2 className="h-6 w-6 text-blue-300" />
             </div>
             <div>
-              <p className="text-sm text-gray-400">SAFE-LINK 근로자 QR</p>
-              <h1 className="text-2xl font-black">국가를 선택하세요</h1>
+              <p className="text-sm text-gray-400">{text.workerQrLabel}</p>
+              <h1 className="text-2xl font-black">{text.chooseLanguageTitle}</h1>
             </div>
           </div>
           {info?.worker && (
             <div className="mt-4 rounded-lg border border-gray-800 bg-gray-900/70 px-4 py-3">
-              <p className="text-base font-bold">{info.worker.full_name}</p>
+              <p className="text-base font-bold">{info.worker.full_name || text.workerFallbackName}</p>
               <p className="mt-1 text-xs text-gray-500">{info.worker.worker_code}</p>
               {info.site?.name && <p className="mt-2 text-sm text-gray-300">{info.site.name}</p>}
             </div>
           )}
         </header>
 
-        <section className="grid grid-cols-1 gap-2">
-          {COUNTRIES.map((item) => {
-            const active = item.code === selectedCountry;
-            return (
-              <button
-                key={item.code}
-                type="button"
-                onClick={() => setSelectedCountry(item.code)}
-                className={`flex min-h-14 items-center justify-between rounded-lg border px-4 text-left transition ${
-                  active
-                    ? "border-blue-400 bg-blue-500/15 text-white"
-                    : "border-gray-800 bg-gray-900 text-gray-200"
-                }`}
-              >
-                <span>
-                  <span className="block text-sm font-bold">{item.label}</span>
-                  <span className="block text-xs text-gray-400">{item.nativeLabel}</span>
-                </span>
-                <span className={`text-xs font-bold ${active ? "text-blue-200" : "text-gray-600"}`}>
-                  {item.lang.toUpperCase()}
-                </span>
-              </button>
-            );
-          })}
+        <section>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-xs font-bold text-gray-400">{text.selectedLanguage}</p>
+            <p className="text-xs font-bold text-blue-200">{language.nativeName}</p>
+          </div>
+          <div className="grid grid-cols-5 gap-2">
+            {QR_LANGUAGE_OPTIONS.map((item) => {
+              const active = item.lang === selectedLang;
+              return (
+                <button
+                  key={item.lang}
+                  type="button"
+                  onClick={() => setSelectedLang(item.lang)}
+                  aria-label={item.nativeName}
+                  title={item.nativeName}
+                  className={`flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg border bg-gray-900 p-1 transition ${
+                    active ? "border-blue-400 ring-2 ring-blue-400/40" : "border-gray-800"
+                  }`}
+                >
+                  <Image
+                    src={getQrFlagUrl(item)}
+                    alt={item.nativeName}
+                    width={80}
+                    height={60}
+                    unoptimized
+                    className="h-full w-full rounded-md object-cover"
+                  />
+                </button>
+              );
+            })}
+          </div>
         </section>
 
         <div className="mt-auto pt-6">
@@ -256,10 +294,10 @@ export default function QrLandingPage() {
             {phase === "entering" ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                입장 처리 중
+                {text.entering}
               </>
             ) : (
-              "근로자 화면으로 이동"
+              text.enterWorker
             )}
           </button>
         </div>
