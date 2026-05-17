@@ -1,6 +1,7 @@
 export type SetupRoleKey =
   | "site_manager"
   | "safety_officer"
+  | "gongmu"
   | "worker"
   | "root"
   | "hq_officer";
@@ -8,6 +9,7 @@ export type SetupRoleKey =
 /** profiles.role 컬럼에 저장되는 실제 역할 값
  *  - WORKER: 외국인 근로자 (현장 작업자)
  *  - SAFETY_OFFICER: 현장 안전관리자
+ *  - SITE_ADMIN: 현장 공무 담당자 (계약·기성·서류 관리)
  *  - HQ_ADMIN: 본사 관리자
  *  - HQ_OFFICER: 본사 현장 안전관리 담당관
  *  - ROOT: 기존 최상위 권한 (레거시)
@@ -16,6 +18,7 @@ export type SetupRoleKey =
 export type ProfileRole =
   | "HQ_ADMIN"
   | "SAFETY_OFFICER"
+  | "SITE_ADMIN"
   | "WORKER"
   | "ROOT"
   | "HQ_OFFICER"
@@ -27,6 +30,7 @@ export type AllowedRole = "admin" | "worker" | "hq" | "system";
 export const ROLE_HIERARCHY: Record<ProfileRole, number> = {
   WORKER: 1,
   SAFETY_OFFICER: 2,
+  SITE_ADMIN: 2,
   HQ_OFFICER: 2,
   HQ_ADMIN: 3,
   ROOT: 90,
@@ -36,6 +40,7 @@ export const ROLE_HIERARCHY: Record<ProfileRole, number> = {
 export const SETUP_ROLE_TO_PROFILE_ROLE: Record<SetupRoleKey, ProfileRole> = {
   site_manager: "HQ_ADMIN",
   safety_officer: "SAFETY_OFFICER",
+  gongmu: "SITE_ADMIN",
   worker: "WORKER",
   root: "ROOT",
   hq_officer: "HQ_OFFICER",
@@ -44,6 +49,7 @@ export const SETUP_ROLE_TO_PROFILE_ROLE: Record<SetupRoleKey, ProfileRole> = {
 export const PROFILE_ROLE_DEFAULT_ROUTE: Record<ProfileRole, string> = {
   HQ_ADMIN: "/control",
   SAFETY_OFFICER: "/admin",
+  SITE_ADMIN: "/admin",
   WORKER: "/worker",
   ROOT: "/system",
   HQ_OFFICER: "/system",
@@ -83,7 +89,7 @@ export function hasAllowedRole(role: ProfileRole, allowedRole: AllowedRole): boo
   }
 
   if (allowedRole === "admin") {
-    return role === "HQ_ADMIN" || role === "SAFETY_OFFICER" || role === "HQ_OFFICER";
+    return role === "HQ_ADMIN" || role === "SAFETY_OFFICER" || role === "SITE_ADMIN" || role === "HQ_OFFICER";
   }
 
   if (allowedRole === "hq") {

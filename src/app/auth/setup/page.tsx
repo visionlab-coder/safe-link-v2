@@ -29,6 +29,7 @@ const T: Record<string, Record<string, string>> = {
     siteTitle: "현장 코드 또는 현장명", roleTitle: "현장 역할",
     site_manager: "현장 소장", site_manager_desc: "TBM 작성 및 전파, 근로자 관리 (1명만)",
     safety_officer: "안전관리자", safety_officer_desc: "현장 안전 점검 및 TBM 모니터링",
+    gongmu: "공무 담당", gongmu_desc: "현장 계약·기성·서류 관리",
     worker: "현장 근로자", worker_desc: "TBM 수신 및 서명, 관리자와 실시간 소통",
     hq_officer: "본사 안전관리실", hq_officer_desc: "본사 전역 통합 관제 및 전 현장 모니터링",
     save: "완료하고 시작하기",
@@ -51,6 +52,7 @@ const T: Record<string, Record<string, string>> = {
     siteTitle: "Site Code or Name", roleTitle: "Site Role",
     site_manager: "Site Manager", site_manager_desc: "Write & broadcast TBM, manage workers (1 only)",
     safety_officer: "Safety Officer", safety_officer_desc: "Safety inspection & TBM monitoring",
+    gongmu: "Construction Admin", gongmu_desc: "Contract, billing & document management",
     worker: "Field Worker", worker_desc: "Receive TBM, sign, and communicate with management",
     hq_officer: "HQ Safety Office", hq_officer_desc: "Global HQ control and monitoring",
     save: "Complete & Start",
@@ -73,6 +75,7 @@ const T: Record<string, Record<string, string>> = {
     siteTitle: "Mã hoặc tên công trường", roleTitle: "Vai trò",
     site_manager: "Quản lý công trường", site_manager_desc: "Viết & phát TBM, quản lý công nhân (chỉ 1 người)",
     safety_officer: "Cán bộ an toàn", safety_officer_desc: "Kiểm tra an toàn & theo dõi TBM",
+    gongmu: "Hành chính công trình", gongmu_desc: "Quản lý hợp đồng, nghiệm thu và tài liệu",
     worker: "Công nhân", worker_desc: "Nhận TBM, ký và giao tiếp với quản lý",
     hq_officer: "Văn phòng HQ", hq_officer_desc: "Kiểm soát HQ toàn cầu",
     save: "Hoàn tất & Bắt đầu",
@@ -95,6 +98,7 @@ const T: Record<string, Record<string, string>> = {
     siteTitle: "工地代码或名称", roleTitle: "现场角色",
     site_manager: "现场主管", site_manager_desc: "编写/发送TBM，管理工人（仅限1人）",
     safety_officer: "安全管理员", safety_officer_desc: "现场安全检查及TBM监控",
+    gongmu: "工务管理", gongmu_desc: "合同、进度款及文件管理",
     worker: "现场工人", worker_desc: "接收TBM，签名并实时沟通",
     hq_officer: "总部安全管理室", hq_officer_desc: "总部全域综合管控",
     save: "完成并开始",
@@ -117,6 +121,7 @@ const T: Record<string, Record<string, string>> = {
     siteTitle: "รหัสหรือชื่อไซต์งาน", roleTitle: "บทบาท",
     site_manager: "ผู้จัดการไซต์", site_manager_desc: "เขียน/กระจาย TBM (1 คนเท่านั้น)",
     safety_officer: "เจ้าหน้าที่ความปลอดภัย", safety_officer_desc: "ตรวจสอบความปลอดภัย",
+    gongmu: "ผู้ดูแลงานก่อสร้าง", gongmu_desc: "จัดการสัญญา งวดงาน และเอกสาร",
     worker: "คนงาน", worker_desc: "รับ TBM ลงนาม สื่อสาร",
     hq_officer: "สำนักงานใหญ่", hq_officer_desc: "ควบคุมและตรวจสอบทั่วโลก",
     save: "เสร็จสิ้นและเริ่ม",
@@ -257,6 +262,8 @@ function SetupContent() {
   const [title, setTitle] = useState("");
   const [siteCode, setSiteCode] = useState("");
   const [initSiteId] = useState(searchParams.get("site_id") || "");
+  const [selectedSiteId, setSelectedSiteId] = useState("");
+  const [siteList, setSiteList] = useState<{ id: string; name: string }[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [adminExists, setAdminExists] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -296,7 +303,7 @@ function SetupContent() {
         setSiteCode(profile.site_code || "");
         const dbToRole: Record<string, RoleKey> = {
           HQ_ADMIN: "site_manager", SAFETY_OFFICER: "safety_officer",
-          WORKER: "worker", ROOT: "root", HQ_OFFICER: "hq_officer",
+          SITE_ADMIN: "gongmu", WORKER: "worker", ROOT: "root", HQ_OFFICER: "hq_officer",
         };
         if (isMaster) setRole("root");
         else if (isHQ) setRole("hq_officer");
@@ -315,6 +322,13 @@ function SetupContent() {
         .from("profiles").select("id", { count: "exact", head: true })
         .eq("role", "HQ_ADMIN").neq("id", user.id);
       setAdminExists((count ?? 0) > 0);
+
+      // 현장 목록 로드 (드롭다운 선택용)
+      const { data: sitesData } = await supabase
+        .from("sites")
+        .select("id, name")
+        .order("name", { ascending: true });
+      if (sitesData) setSiteList(sitesData);
     };
     init();
   }, [router, searchParams, supabase]);
@@ -368,7 +382,8 @@ function SetupContent() {
   const canProceedStep1 = () => !!(name.trim() && role);
   const canProceedStep2 = () => {
     if (role === "worker" && (!trade || !siteCode)) return false;
-    if ((role === "site_manager" || role === "safety_officer" || role === "root" || role === "hq_officer") && !title) return false;
+    if ((role === "site_manager" || role === "safety_officer" || role === "gongmu") && (!title || !selectedSiteId)) return false;
+    if ((role === "root" || role === "hq_officer") && !title) return false;
     return true;
   };
 
@@ -394,9 +409,11 @@ function SetupContent() {
     }
     if (role === "site_manager" && adminExists && !isEditMode) { alert(t.adminLimit); return; }
     if (role === "worker" && (!trade || !phone)) { alert(t.err); return; }
-    if ((role === "site_manager" || role === "safety_officer" || role === "root" || role === "hq_officer") && !title) { alert(t.err); return; }
+    if ((role === "site_manager" || role === "safety_officer" || role === "gongmu" || role === "root" || role === "hq_officer") && !title) { alert(t.err); return; }
 
-    const isAdminRole = role === "site_manager" || role === "safety_officer";
+    const isAdminRole = role === "site_manager" || role === "safety_officer" || role === "gongmu";
+    // 드롭다운에서 선택된 site_id 우선 사용, 없으면 URL 파라미터 사용
+    const resolvedSiteId = selectedSiteId || initSiteId || null;
 
     setLoading(true);
     const { error } = await supabase.from("profiles").upsert({
@@ -409,7 +426,7 @@ function SetupContent() {
       trade: trade.trim(),
       title: title.trim(),
       site_code: siteCode.trim(),
-      site_id: initSiteId || null,
+      site_id: resolvedSiteId,
     });
     if (error) {
       setLoading(false);
@@ -417,7 +434,8 @@ function SetupContent() {
       return;
     }
 
-    if (isAdminRole && siteCode.trim()) {
+    // 드롭다운으로 이미 site_id가 확정된 경우 resolve 호출 불필요
+    if (isAdminRole && !selectedSiteId && siteCode.trim()) { // 드롭다운 미사용 fallback
       try {
         const location = await getCurrentLocation();
         const res = await fetch("/api/sites/resolve", {
@@ -460,6 +478,7 @@ function SetupContent() {
     ...(isHQAuthorized ? [{ key: "hq_officer" as RoleKey, emoji: "🏢", color: "indigo" as ColorKey, glow: "rgba(99,102,241,0.35)" }] : []),
     { key: "site_manager" as RoleKey, emoji: "🏗️", color: "blue" as ColorKey, glow: "rgba(59,130,246,0.35)" },
     { key: "safety_officer" as RoleKey, emoji: "🦺", color: "amber" as ColorKey, glow: "rgba(245,158,11,0.35)" },
+    { key: "gongmu" as RoleKey, emoji: "📋", color: "indigo" as ColorKey, glow: "rgba(99,102,241,0.35)" },
     { key: "worker" as RoleKey, emoji: "👷", color: "green" as ColorKey, glow: "rgba(34,197,94,0.35)" },
   ];
 
@@ -590,27 +609,48 @@ function SetupContent() {
                   {/* Site name */}
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block" style={{ color:"#475569" }}>
-                      {(role === "site_manager" || role === "safety_officer")
-                        ? (language === "ko" ? "현장명 *" : "Site Name *")
+                      {(role === "site_manager" || role === "safety_officer" || role === "gongmu")
+                        ? (language === "ko" ? "현장 선택 *" : "Select Site *")
                         : t.siteTitle}
                     </label>
-                    <div style={fieldBox}>
-                      <input
-                        type="text"
-                        placeholder={
-                          (role === "site_manager" || role === "safety_officer")
-                            ? (language === "ko" ? "예: 강남 테헤란로 오피스 신축" : "e.g. Main Office Building")
-                            : t.siteTitle
-                        }
-                        value={siteCode}
-                        onChange={e => setSiteCode(e.target.value)}
-                        className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5"
-                      />
-                    </div>
-                    {(role === "site_manager" || role === "safety_officer") && siteCode.trim() && (
-                      <p className="text-[10px] mt-1.5 ml-1" style={{ color:"#22C55E" }}>
-                        ✓ {language === "ko" ? "저장 시 현장이 자동 연결됩니다" : "Site will be auto-linked on save"}
-                      </p>
+                    {(role === "site_manager" || role === "safety_officer" || role === "gongmu") ? (
+                      <>
+                        <div style={fieldBox}>
+                          <select
+                            value={selectedSiteId}
+                            onChange={e => {
+                              const id = e.target.value;
+                              setSelectedSiteId(id);
+                              const found = siteList.find(s => s.id === id);
+                              setSiteCode(found?.name ?? "");
+                            }}
+                            className="w-full bg-transparent text-white text-sm outline-none px-4 py-3.5 appearance-none"
+                            style={{ color: selectedSiteId ? "#F1F5F9" : "#475569" }}
+                          >
+                            <option value="" style={{ background:"#0d0e18" }}>
+                              {language === "ko" ? "현장을 선택하세요" : "Select a site"}
+                            </option>
+                            {siteList.map(s => (
+                              <option key={s.id} value={s.id} style={{ background:"#0d0e18" }}>{s.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {selectedSiteId && (
+                          <p className="text-[10px] mt-1.5 ml-1" style={{ color:"#22C55E" }}>
+                            ✓ {language === "ko" ? "현장이 선택되었습니다" : "Site selected"}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <div style={fieldBox}>
+                        <input
+                          type="text"
+                          placeholder={t.siteTitle}
+                          value={siteCode}
+                          onChange={e => setSiteCode(e.target.value)}
+                          className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5"
+                        />
+                      </div>
                     )}
                   </div>
 
