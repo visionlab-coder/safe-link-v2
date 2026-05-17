@@ -128,10 +128,10 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // === 1.5. Gemini 건설현장 번역 (비Papago 언어, non-fast 모드) ===
-        // uz, km, my, ne, bn, kk, ar, hi, mn, tl/ph — Google만 쓰면 문맥 없이 직역됨
-        // fast=false(일반 통역) 시 Gemini로 건설 현장 문맥 보정 번역 우선 시도
-        if (!translatedText && !usePapago && !fast) {
+        // === 1.5. Gemini 건설현장 번역 (비Papago 언어: uz/km/my/ne/bn/kk/ar/hi/mn/tl) ===
+        // Google 단독으로는 건설 안전 문맥 없이 직역 → 오역/오해 위험
+        // fast 여부와 무관하게 항상 Gemini 우선 사용 (라이브 통역에서도 정확도 보장)
+        if (!translatedText && !usePapago) {
             const geminiTranslated = await geminiConstructionTranslate(processedText, sl, tl, apiKey);
             if (geminiTranslated) {
                 translatedText = geminiTranslated;
@@ -496,18 +496,20 @@ async function geminiConstructionTranslate(text: string, sl: string, tl: string,
     const sourceName = langNames[sl] || sl;
     const targetName = langNames[tl] || tl;
 
-    const prompt = `당신은 건설현장 안전교육 전문 번역가입니다.
+    const prompt = `당신은 건설현장에서 일하는 외국인 근로자를 위한 안전 통역 전문가입니다.
 다음 텍스트를 ${sourceName}에서 ${targetName}으로 번역하세요.
 
-번역 규칙:
-1. 건설현장 안전 용어를 정확하게 번역 (헬멧, 안전모, 추락방지, 거푸집, 철근 등)
-2. 현장 근로자가 이해하기 쉬운 자연스러운 표현
-3. 안전 지시는 명확하고 직접적으로
-4. 번역문만 반환 (설명·원문·따옴표 없이)
+핵심 원칙 (반드시 준수):
+1. 직역 금지 — 현지 근로자가 실제 쓰는 자연스러운 표현 사용
+2. 건설 안전 용어는 해당 국가에서 실제 쓰이는 현지 단어로 번역
+   (예: 안전모→헬멧 현지어, 안전벨트→하네스 현지어, 거푸집·철근→현지 건설 용어)
+3. 안전 지시는 단순·명확하게 (문법보다 이해 우선)
+4. 명령/지시는 근로자에게 정중하게, 하지만 오해 없이 직접적으로
+5. 번역문만 반환 (원문·설명·따옴표 절대 불포함)
 
-원문: ${text}
+원문 (${sourceName}): ${text}
 
-번역:`;
+번역 (${targetName}):`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), GEMINI_TRANSLATE_TIMEOUT_MS);

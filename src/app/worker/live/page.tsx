@@ -181,12 +181,12 @@ export default function WorkerLivePage() {
                     return;
                 }
 
-                // 폴백: fast=true로 번역만 즉시 표시 → 발음은 백그라운드
+                // 발음 스킵(속도), 번역은 full quality — 희귀 언어도 Gemini 건설 문맥 보장
                 try {
                     const res = await fetch("/api/translate", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ text: cleanTextKo, sl: "ko", tl: myLang, fast: true, pronunciation: false }),
+                        body: JSON.stringify({ text: cleanTextKo, sl: "ko", tl: myLang, pronunciation: false }),
                     });
                     const data = await res.json();
                     const translatedNow = data.translated || row.text_ko;

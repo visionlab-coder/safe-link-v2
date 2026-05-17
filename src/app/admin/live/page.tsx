@@ -16,6 +16,8 @@ function AdminLiveContent() {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [adminId, setAdminId] = useState("");
     const lastSentRef = useRef<{ text: string; at: number }>({ text: "", at: 0 });
+    // 현장 근로자 언어 목록 — 사전 번역 대상 (ref로 관리해 useCallback 재생성 방지)
+    const siteWorkerLangsRef = useRef<string[]>([]);
 
     useEffect(() => {
         const load = async () => {
@@ -29,6 +31,25 @@ function AdminLiveContent() {
         };
         load();
     }, []);
+
+    // siteId 확정 후 현장 근로자 언어 목록 수집 (사전 번역에 사용)
+    useEffect(() => {
+        if (!siteId) return;
+        const supabase = createClient();
+        supabase
+            .from("profiles")
+            .select("preferred_lang")
+            .eq("site_id", siteId)
+            .not("preferred_lang", "is", null)
+            .then(({ data }) => {
+                const langs = [...new Set(
+                    (data || [])
+                        .map((p: any) => p.preferred_lang as string)
+                        .filter(l => l && l !== "ko")
+                )];
+                siteWorkerLangsRef.current = langs;
+            });
+    }, [siteId]);
 
     // Track listeners via Supabase presence — site-based fixed channel so workers can join
     useEffect(() => {
@@ -65,11 +86,34 @@ function AdminLiveContent() {
         const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setTranscripts(prev => [...prev, { text: cleanText, time }]);
 
+        // 현장 근로자 언어로 병렬 사전 번역 — 언어당 1번만 호출 (중복 근로자 기기 절약)
+        const langs = siteWorkerLangsRef.current;
+        const translations: Record<string, string> = {};
+
+        if (langs.length > 0) {
+            await Promise.all(
+                langs.map(async (lang) => {
+                    try {
+                        const res = await fetch("/api/translate", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ text: cleanText, sl: "ko", tl: lang, pronunciation: false }),
+                        });
+                        const data = await res.json();
+                        if (data.translated) translations[lang] = data.translated;
+                    } catch {
+                        // 번역 실패 시 근로자 기기가 개별 폴백 호출로 처리
+                    }
+                })
+            );
+        }
+
         const supabase = createClient();
         const payload: any = {
             session_id: sessionId,
             text_ko: cleanText,
             created_by: adminId,
+            ...(Object.keys(translations).length > 0 && { translations }),
         };
         if (siteId) payload.site_id = siteId;
         await supabase.from("live_translations").insert(payload);
@@ -82,7 +126,8 @@ function AdminLiveContent() {
     const { isRecording, toggle: toggleRecording } = useCloudSTT({
         lang: "ko",
         onTranscript: handleTranscript,
-        chunkInterval: 4000,
+        chunkInterval: 6000,   // 6s — 교육 발화는 문장이 길므로 완전한 문장 단위 전송
+        silenceDuration: 2500, // 2.5s — 자연 휴지 허용, 문장 경계에서 자동 분할
         live: true,
     });
 

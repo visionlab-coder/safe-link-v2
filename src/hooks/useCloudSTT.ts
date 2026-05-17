@@ -45,7 +45,7 @@ interface UseCloudSTTOptions {
     chunkInterval?: number;
     /** 침묵 감지 ms — 이 시간 이상 조용하면 자동 전송 (기본 2000ms) */
     silenceDuration?: number;
-    /** 실시간 통역 모드: Gemini 교정 스킵하여 지연 최소화 */
+    /** 실시간 통역 모드: latest_long 모델 + Gemini 교정 서버에서 수행 */
     live?: boolean;
 }
 

@@ -165,37 +165,35 @@ const playBrowserNativeAudio = (text: string, langCode: string, gender: VoiceGen
 
 /**
  * 서버 기반 TTS (Google Cloud Neural2)
+ * 모든 청크를 동시에 prefetch → 순차 재생 (다음 청크가 이미 버퍼링된 상태로 대기)
  * 오디오 재생 차단 시 브라우저 TTS로 폴백, 실패해도 큐 멈추지 않음
  */
 export const playProxyAudio = (text: string, lang: string, gender: VoiceGender, onDone?: (success: boolean) => void) => {
     const tl = lang === 'zh' ? 'zh-CN' : lang;
-    const segments = text.match(/[^.!?。！？\n]+[.!?。！？\n]?/g) || [text];
-    let streamIdx = 0;
-    let anySuccess = false;
+    const rawSegments = text.match(/[^.!?。！？\n]+[.!?。！？\n]?/g) || [text];
+    const segments = rawSegments.map(s => s.trim()).filter(Boolean);
 
-    const nextStream = () => {
-        if (streamIdx >= segments.length) {
-            if (onDone) onDone(anySuccess);
-            return;
-        }
-        const chunk = segments[streamIdx++].trim();
-        if (!chunk) { nextStream(); return; }
+    if (segments.length === 0) { onDone?.(false); return; }
 
+    // 모든 청크 동시 prefetch — 1번 재생 중에 2·3번이 이미 버퍼링됨 (순차 다운로드 지연 제거)
+    const audios = segments.map(chunk => {
         const url = `/api/tts?text=${encodeURIComponent(chunk)}&lang=${tl}&gender=${gender}`;
         const audio = new Audio(url);
+        audio.preload = 'auto';
+        return { audio, chunk };
+    });
 
-        audio.onended = () => { anySuccess = true; nextStream(); };
-        audio.onerror = () => {
-            // Cloud TTS 실패 → 브라우저 TTS로 이 청크만 재생, 큐는 계속 진행
-            tryBrowserFallback(chunk, lang, gender, nextStream);
-        };
+    let idx = 0;
+    let anySuccess = false;
 
-        audio.play().catch(() => {
-            // 자동재생 차단 → 브라우저 TTS 시도
-            tryBrowserFallback(chunk, lang, gender, nextStream);
-        });
+    const playNext = () => {
+        if (idx >= audios.length) { onDone?.(anySuccess); return; }
+        const { audio, chunk } = audios[idx++];
+        audio.onended = () => { anySuccess = true; playNext(); };
+        audio.onerror = () => tryBrowserFallback(chunk, lang, gender, playNext);
+        audio.play().catch(() => tryBrowserFallback(chunk, lang, gender, playNext));
     };
-    nextStream();
+    playNext();
 };
 
 /** 단일 청크에 대한 브라우저 TTS 폴백 (실패해도 콜백 호출하여 큐 진행) */

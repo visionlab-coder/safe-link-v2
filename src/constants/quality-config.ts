@@ -35,13 +35,14 @@ export const WHISPER_TIMEOUT_MS = 8_000;
 
 /**
  * Google STT 타임아웃 (ms)
- * Google STT는 200~800ms로 빠름. 3초면 충분.
+ * default 모델: 200~800ms, latest_long 모델: 1~3s
+ * ⚠️ latest_long enhanced 모델을 항상 사용하므로 5초로 확보
  */
-export const GOOGLE_STT_TIMEOUT_MS = 3_000;
+export const GOOGLE_STT_TIMEOUT_MS = 5_000;
 
 /**
  * Gemini STT 교정 타임아웃 (ms) — 한국어 건설현장 용어 보정
- * live 모드에서는 사용 안 함(속도 우선).
+ * live/non-live 모두 적용. gemini-2.5-flash 기준 실제 응답 500ms~1.5s.
  */
 export const GEMINI_STT_CORRECTION_TIMEOUT_MS = 3_000;
 
@@ -58,6 +59,13 @@ export const STT_MIN_CONFIDENCE = 0.6;
  * ⚠️ 0.6 미만: 다른 국적 발화 오수락 위험 / 0.75 초과: 유효 발화 절반 이상 폐기
  */
 export const STT_MIN_CONFIDENCE_LIVE = 0.65;
+
+/**
+ * Gemini STT 교정 생략 신뢰도 — Google STT 평균 신뢰도가 이 이상이면 Gemini 교정 건너뜀
+ * 명확한 발화(≥0.92)는 오인식 가능성이 낮아 Gemini 교정 불필요 → 1~3s 절약
+ * ⚠️ 0.95 초과: 소음 환경에서 교정 너무 자주 생략 / 0.90 미만: 교정 효과 감소 미미
+ */
+export const STT_HIGH_CONFIDENCE_SKIP_GEMINI = 0.92;
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -94,3 +102,8 @@ export const GEMINI_PRONUNCIATION_TIMEOUT_MS = 7_000;
 // 2026-05-13  PAPAGO_TIMEOUT_MS 신설: 5000 (무한 hang 방지)
 // 2026-05-13  GOOGLE_TRANSLATE_TIMEOUT_MS 신설: 5000 (일관된 타임아웃 정책)
 // 2026-05-13  STT_MIN_CONFIDENCE_LIVE 완화: 0.75 → 0.65 (유효 발화 폐기 과다 문제)
+// 2026-05-16  GOOGLE_STT_TIMEOUT_MS: 3000 → 5000 (latest_long 모델 응답시간 1~3s 대응)
+// 2026-05-16  live 모드 STT: default→latest_long enhanced (건설현장 발화 인식률 개선)
+// 2026-05-16  live 모드 STT: Gemini 교정 활성화 (non-live와 동일 품질 보정 적용)
+// 2026-05-16  STT_HIGH_CONFIDENCE_SKIP_GEMINI 신설: 0.92 (명확 발화 Gemini 생략 → 1~3s 절약)
+// 2026-05-16  TTS playProxyAudio: 순차 다운로드 → 전체 동시 prefetch (다음 청크 버퍼링 선행)

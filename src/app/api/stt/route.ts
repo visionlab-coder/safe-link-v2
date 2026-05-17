@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 import { getErrorMessage } from '@/utils/errors';
-import { CONSTRUCTION_SPEECH_HINTS } from '@/constants/construction-terms';
+import { CONSTRUCTION_SPEECH_HINTS, WHISPER_CONTEXT_PROMPT } from '@/constants/construction-terms';
 import { CONSTRUCTION_GLOSSARY } from '@/constants/glossary';
 import {
     WHISPER_TIMEOUT_MS,
@@ -9,6 +9,7 @@ import {
     GEMINI_STT_CORRECTION_TIMEOUT_MS,
     STT_MIN_CONFIDENCE,
     STT_MIN_CONFIDENCE_LIVE,
+    STT_HIGH_CONFIDENCE_SKIP_GEMINI,
 } from '@/constants/quality-config';
 
 /** 동기 정규화: 은어→표준어 (서버사이드, DB 미사용) */
@@ -39,19 +40,20 @@ function normalizeServerSide(text: string): { normalized: string; changes: { fro
 /** Gemini 기반 건설 현장 문맥 보정 (한국어 전용) */
 async function correctWithLLM(transcript: string, apiKey: string): Promise<string> {
     try {
-        const systemPrompt = `당신은 건설 현장 음성 인식 교정 전문가입니다.
-아래 텍스트는 건설 현장에서 STT(음성인식)로 변환된 결과입니다.
-건설 현장 문맥에 맞게 오인식된 단어를 교정해주세요.
+        const systemPrompt = `당신은 건설현장 안전 교육 음성인식(STT) 교정 전문가입니다.
+아래는 건설 현장 관리자 발화를 STT로 변환한 텍스트입니다.
+발화 맥락: 건설 현장 안전 교육 또는 TBM(Tool Box Meeting) 진행 중.
 
-교정 규칙:
-1. 건설 장비/자재 오인식: CPD/CPVR→CPB, 아이폰→알폼(Al-Form), 씨피비→CPB
-2. 현장 은어의 문맥 보존: "국물"은 건설 현장에서 "시멘트 페이스트"를 의미
-3. 외국인 이름/팀명은 그대로 유지 (슈그아르, 압둘 등)
-4. 안전 용어 우선: 위험/경고 관련 단어가 애매하면 안전 관련으로 해석
-5. 숫자/층수 관련 오인식 교정: "식스"→"6", "일층"→"1층"
-6. 교정이 불필요하면 원문 그대로 반환
+교정 규칙 (우선순위 순):
+1. 안전 지시·경고 오인식 최우선 교정 (위험/경고 단어는 안전 관련으로 해석)
+2. 건설 자재/장비 오인식: 아이폰→알폼(Al-Form), 씨피비→CPB, CPD/CPVR→CPB
+3. 층수·수치 교정: "식스층"→"6층", "일층"→"1층", "쓰리"→"3"
+4. 현장 은어 보존: "국물"=시멘트페이스트, "빠루"=빠루(철제도구)
+5. 외국인 이름·팀명 원형 유지 (슈그아르, 압둘라, 베트남팀 등)
+6. 불완전한 문장도 원형 유지 (교정 대신 원문 반환)
+7. 교정 불필요 시 원문 그대로 반환
 
-반드시 교정된 텍스트만 반환하세요. 설명이나 따옴표 없이 텍스트만 출력하세요.`;
+교정된 텍스트만 출력하세요. 설명·따옴표·원문 반복 없이.`;
 
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), GEMINI_STT_CORRECTION_TIMEOUT_MS);
@@ -107,8 +109,8 @@ async function transcribeWithWhisper(
     formData.append('file', audioBlob, 'audio.webm');
     formData.append('model', 'whisper-1');
     formData.append('language', iso);
-    // 현장 용어 프롬프트 — Whisper는 최대 224 토큰 prompt 힌트 허용
-    formData.append('prompt', CONSTRUCTION_SPEECH_HINTS.join(', ').slice(0, 800));
+    // 자연문 형태 컨텍스트 프롬프트 — 키워드 나열보다 문장 맥락이 Whisper 인식률 더 높음
+    formData.append('prompt', WHISPER_CONTEXT_PROMPT);
     // 소음 환경: 온도 0 = 가장 확률 높은 토큰만 선택 → 환각 억제
     formData.append('temperature', '0');
     formData.append('response_format', 'json');
@@ -262,8 +264,9 @@ export async function POST(req: Request) {
                 : { model: "default" }),
         });
 
-        // live 모드: 속도 우선 → default 모델 직접 사용 (latest_long 이중호출 없애 ~1s 단축)
-        const tryEnhanced = !live;
+        // 항상 enhanced 모델 사용 — live 모드도 latest_long + speechContexts 적용
+        // (default 모델 대비 한국어 건설 현장 발화 인식률 대폭 향상)
+        const tryEnhanced = true;
         const callSTT = async (enhanced: boolean): Promise<Response> => {
             const ctrl = new AbortController();
             const t = setTimeout(() => ctrl.abort(), GOOGLE_STT_TIMEOUT_MS);
@@ -294,15 +297,21 @@ export async function POST(req: Request) {
 
         // live 모드(TBM 방송)는 다국어 혼재 환경 → 더 엄격한 신뢰도 적용
         const confidenceThreshold = live ? MIN_CONFIDENCE_LIVE : MIN_CONFIDENCE;
+        let totalConf = 0, confCount = 0;
         const transcript = data.results
             ?.map((res) => {
                 const alt = res.alternatives?.[0];
                 if (!alt?.transcript) return "";
                 if (alt.confidence !== undefined && alt.confidence < confidenceThreshold) return "";
+                if (alt.confidence !== undefined) { totalConf += alt.confidence; confCount++; }
                 return alt.transcript;
             })
             .filter(Boolean)
             .join(" ") || "";
+
+        // 평균 신뢰도가 높으면 Gemini 교정 생략 (명확한 발화 → 1~3s 절약)
+        const avgConf = confCount > 0 ? totalConf / confCount : 0;
+        const skipGemini = avgConf >= STT_HIGH_CONFIDENCE_SKIP_GEMINI;
 
         if (!transcript.trim()) {
             return NextResponse.json({ transcript: "" });
@@ -321,16 +330,22 @@ export async function POST(req: Request) {
 
         if (shortLang === "ko") {
             if (live) {
-                // 실시간 통역: 은어 정규화만, Gemini 스킵
-                const { normalized, changes } = normalizeServerSide(transcript.trim());
+                // 실시간 통역: 은어 정규화 + Gemini 교정 (신뢰도 높으면 Gemini 생략 → 지연 절감)
+                const corrected = (GOOGLE_API_KEY && !skipGemini)
+                    ? await correctWithLLM(transcript.trim(), GOOGLE_API_KEY)
+                    : transcript.trim();
+                const { normalized, changes } = normalizeServerSide(corrected);
                 return NextResponse.json({
                     transcript: normalized,
+                    ...(corrected !== transcript.trim() && { llm_corrected: true }),
                     ...(changes.length > 0 && { normalized: true, changes }),
                     engine: "google",
                     live: true,
                 });
             }
-            const corrected = await correctWithLLM(transcript.trim(), GOOGLE_API_KEY);
+            const corrected = skipGemini
+                ? transcript.trim()
+                : await correctWithLLM(transcript.trim(), GOOGLE_API_KEY);
             const llmCorrected = corrected !== transcript.trim();
             const { normalized, changes } = normalizeServerSide(corrected);
 
