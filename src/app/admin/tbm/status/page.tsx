@@ -397,8 +397,9 @@ function TBMStatusPageContent() {
             setLoading(false);
             return;
         }
-        const { data: ackData } = await supabase.from("tbm_ack").select("worker_id, ack_at, signature_data").eq("tbm_id", tbm.id);
-        const ackMap = new Map((ackData || []).map(a => [a.worker_id, { at: a.ack_at, sig: a.signature_data }]));
+        const ackRes = await fetch(`/api/tbm/ack?tbmId=${encodeURIComponent(tbm.id)}`);
+        const ackJson = ackRes.ok ? await ackRes.json() : { acks: [] };
+        const ackMap = new Map((ackJson.acks as any[]).map((a: any) => [a.worker_id, { at: a.ack_at, sig: a.signature_data }]));
         const statusList: WorkerStatus[] = workerProfiles.map(w => ({
             id: w.id,
             display_name: w.display_name || "Anonymous",
@@ -427,8 +428,9 @@ function TBMStatusPageContent() {
         if (adminSiteId) workerQuery = workerQuery.eq("site_id", adminSiteId);
         const { data: workerProfiles } = await workerQuery;
         if (!workerProfiles) { setLoading(false); return; }
-        const { data: ackData } = await supabase.from("tbm_ack").select("worker_id, ack_at, signature_data").eq("tbm_id", tbm.id);
-        const ackMap = new Map((ackData || []).map(a => [a.worker_id, { at: a.ack_at, sig: a.signature_data }]));
+        const ackRes = await fetch(`/api/tbm/ack?tbmId=${encodeURIComponent(tbm.id)}`);
+        const ackJson = ackRes.ok ? await ackRes.json() : { acks: [] };
+        const ackMap = new Map((ackJson.acks as any[]).map((a: any) => [a.worker_id, { at: a.ack_at, sig: a.signature_data }]));
         const statusList: WorkerStatus[] = workerProfiles.map(w => ({
             id: w.id,
             display_name: w.display_name || "Anonymous",
