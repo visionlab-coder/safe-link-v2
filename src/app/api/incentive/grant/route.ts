@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/utils/nfc/require-admin";
+import { requireAdmin, requireSameSite } from "@/utils/nfc/require-admin";
 
 export const runtime = "nodejs";
 
@@ -31,6 +31,10 @@ export async function POST(req: NextRequest) {
   if (!workerId || !equipmentType) {
     return NextResponse.json({ error: "workerId_equipmentType_required" }, { status: 400 });
   }
+
+  // 비전역 관리자는 자신의 현장에만 지급 가능
+  const siteBlock = requireSameSite(guard.ctx.user, body.siteId ?? null);
+  if (siteBlock) return siteBlock;
 
   const quizSessionId = body.quizSessionId ?? null;
   let dupQuery = guard.ctx.service

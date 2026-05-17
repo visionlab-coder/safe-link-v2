@@ -38,7 +38,7 @@ async function routeToAdmins(
 ) {
   const targetRoles = isPriority
     ? ["SAFETY_OFFICER", "HQ_OFFICER"]
-    : ["SAFETY_OFFICER", "HQ_OFFICER", "HQ_ADMIN", "SITE_MANAGER"];
+    : ["SAFETY_OFFICER", "HQ_OFFICER", "HQ_ADMIN", "SITE_ADMIN"];
 
   const { data: admins } = await service
     .from("profiles")

@@ -18,6 +18,9 @@ export async function POST(request: NextRequest) {
   if (!text || !from || !to) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
+  if (typeof text !== 'string' || text.length > 2000) {
+    return NextResponse.json({ error: 'text_too_long' }, { status: 400 });
+  }
 
   const naverIdKey  = process.env.NAVER_CLIENT_ID?.trim();
   const naverSecret = process.env.NAVER_CLIENT_SECRET?.trim();

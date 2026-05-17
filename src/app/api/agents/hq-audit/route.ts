@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
             .select('role')
             .eq('id', user.id)
             .single();
-        const allowedRoles = ['HQ_OFFICER', 'SITE_MANAGER', 'ROOT'];
+        const allowedRoles = ['HQ_OFFICER', 'SITE_ADMIN', 'ROOT', 'SUPER_ADMIN', 'HQ_ADMIN'];
         if (!profile || !allowedRoles.includes(profile.role)) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
