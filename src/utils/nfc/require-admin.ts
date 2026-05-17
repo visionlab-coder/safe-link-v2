@@ -8,7 +8,7 @@ import { createClient as createServiceClient, type SupabaseClient } from "@supab
  * 통과 시 service-role supabase 클라이언트와 admin user 정보를 반환한다.
  */
 
-const ADMIN_ROLES = new Set(["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER", "SAFETY_OFFICER"]);
+const ADMIN_ROLES = new Set(["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER", "SAFETY_OFFICER", "SITE_ADMIN"]);
 
 export interface AdminContext {
   user: { id: string; email?: string | null; role: string; site_id?: string | null };
