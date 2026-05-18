@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { HardHat, ShieldCheck } from 'lucide-react';
 import { languages } from '@/constants';
+import BrandLogo from '@/components/BrandLogo';
 
 const startBtnText: Record<string, string> = {
   ko: "시작하기",
@@ -97,6 +98,7 @@ function LandingPageInner() {
 
         {/* Brand Header */}
         <div className="relative mb-16 flex flex-col items-center select-none animate-float">
+          <BrandLogo compact={false} imageClassName="max-w-[260px] md:max-w-[330px] mb-7" />
           <div className="relative">
             <div className="absolute -inset-8 blur-[100px] bg-blue-600/30 rounded-full pointer-events-none" />
             <h1 className="relative text-8xl md:text-9xl font-bold tracking-tighter leading-none italic">

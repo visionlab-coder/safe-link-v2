@@ -7,6 +7,7 @@ import Image from "next/image";
 import { languages } from "@/constants";
 import { HardHat, ShieldCheck, Info, CheckCircle2, XCircle, ArrowLeft } from "lucide-react";
 import { getT } from "./translations";
+import BrandLogo from "@/components/BrandLogo";
 
 /** 원시 API 에러를 사용자 친화적 한국어로 변환. 절대 내부 에러 메시지를 그대로 노출하지 않음. */
 function sanitizeAuthError(msg: string): string {
@@ -316,6 +317,7 @@ function AuthContent() {
           <div className="p-7">
             {/* Header */}
             <div className="text-center mb-7">
+              <BrandLogo compact={false} className="mb-4 justify-center" imageClassName="max-w-[250px]" />
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-4"
                 style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.18)" }}>
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
@@ -373,6 +375,7 @@ function AuthContent() {
 
         {/* Brand + lang chip */}
         <div className="text-center mb-5">
+          <BrandLogo compact className="mb-3 justify-center" imageClassName="max-w-[180px]" />
           <h1 className="text-4xl font-black text-white tracking-tighter leading-none">
             SAFE<span className="text-blue-400">-LINK</span>
           </h1>

@@ -68,8 +68,22 @@ const notoSansDevanagari = Noto_Sans_Devanagari({
 });
 
 export const metadata: Metadata = {
-  title: "SAFE-LINK | Field Communication OS",
-  description: "Real-time multilingual communication platform for construction sites",
+  title: "SAFE-LINK by SEOWON | Field Safety OS",
+  description: "SEOWON construction field safety communication platform",
+  applicationName: "SAFE-LINK",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "SAFE-LINK",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export default function RootLayout({

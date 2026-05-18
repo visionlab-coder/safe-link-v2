@@ -7,6 +7,7 @@ import Image from "next/image";
 import { createClient } from "@/utils/supabase/client";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import { playNotificationSound } from "@/utils/notifications";
+import BrandLogo from "@/components/BrandLogo";
 
 const workerUI: Record<string, any> = {
     ko: {
@@ -684,7 +685,7 @@ function WorkerHomeContent() {
                 <header className="flex justify-between items-start animate-float">
                     <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2 mb-1">
-                            <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase text-gradient">Safe-Link</h1>
+                            <BrandLogo compact showProduct imageClassName="max-w-[150px]" />
                             <div className="flex items-center gap-1 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-full">
                                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                                 <span className="text-[10px] text-green-400 font-black tracking-widest leading-none">LIVE</span>
@@ -1003,7 +1004,7 @@ function WorkerHomeContent() {
                 {/* 🛡️ Footer Brand */}
                 <footer className="mt-auto flex flex-col items-center gap-4 py-6">
                     <div className="flex items-center gap-2 opacity-20">
-                        <div className="w-8 h-8 rounded-lg bg-white/20" />
+                        <BrandLogo compact imageClassName="max-w-[120px]" />
                         <span className="font-black text-xl italic text-white uppercase tracking-tighter">Safe-Link OS</span>
                     </div>
                     <p className="text-[10px] font-black text-slate-700 tracking-[0.4em] uppercase">{t.safeWork}</p>

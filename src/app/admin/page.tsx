@@ -9,6 +9,7 @@ import { MapPin } from "lucide-react";
 import SiteAgentBriefing from "@/components/agents/SiteAgentBriefing";
 import { playNotificationSound } from "@/utils/notifications";
 import SystemHealthCheck from "@/components/SystemHealthCheck";
+import BrandLogo from "@/components/BrandLogo";
 
 // 관리자 모드: 한국어 / 영어 / 중국어 3개 (그 외 언어는 영어 fallback)
 const adminUI: Record<string, any> = {
@@ -212,7 +213,7 @@ function AdminDashboardContent() {
                 <header className="flex justify-between items-start animate-float">
                     <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2 mb-1">
-                            <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase text-gradient">Safe-Link</h1>
+                            <BrandLogo compact showProduct imageClassName="max-w-[160px]" />
                             <div className="flex items-center gap-1 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
                                 <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                                 <span className="text-[10px] text-blue-400 font-black tracking-widest leading-none">FIELD UNIT</span>
@@ -627,7 +628,7 @@ function AdminDashboardContent() {
                 {/* 🛡️ Footer Brand */}
                 <footer className="mt-auto flex flex-col items-center gap-4 py-8">
                     <div className="flex items-center gap-2 opacity-10">
-                        <div className="w-10 h-10 rounded-xl bg-white/20" />
+                        <BrandLogo compact imageClassName="max-w-[140px]" />
                         <span className="font-black text-2xl italic text-white uppercase tracking-tighter">Safe-Link Console</span>
                     </div>
                 </footer>
