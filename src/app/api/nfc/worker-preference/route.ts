@@ -424,6 +424,35 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ADV-002: Run check-in challenge gate BEFORE any mutations (preference update, auth creation).
+  // Previously the challenge fired inside the else-branch (new check-in) after all mutations had
+  // already committed — a failed challenge still mutated nationality/lang and created auth accounts.
+  const workDate = todayInSeoul();
+  const now = new Date();
+  const nowIso = now.toISOString();
+
+  const { data: access } = await service
+    .from("nfc_worker_daily_access")
+    .select("id, status, checked_in_at, checked_out_at")
+    .eq("worker_id", workerId)
+    .eq("work_date", workDate)
+    .maybeSingle();
+
+  // Only new check-ins require the challenge gate up-front.
+  // Checkout challenge is enforced later, immediately before the checkout mutation.
+  const isNewCheckin = !access || access.status === "checked_out";
+  if (isNewCheckin) {
+    const challenge = await verifySiteChallenge({
+      service,
+      siteId: data.assigned_site_id,
+      workDate,
+      challengeCode: body.site_challenge_code,
+      required: true,
+    });
+    if (!challenge.ok) return NextResponse.json({ error: challenge.error }, { status: challenge.status });
+  }
+
+  // Mutations proceed only after challenge gate passed (or challenge not applicable)
   const { data: updatedWorker, error: preferenceErr } = await service
     .from("nfc_workers")
     .update({
@@ -494,17 +523,6 @@ export async function POST(req: NextRequest) {
     ]);
   }
 
-  const workDate = todayInSeoul();
-  const now = new Date();
-  const nowIso = now.toISOString();
-
-  const { data: access } = await service
-    .from("nfc_worker_daily_access")
-    .select("id, status, checked_in_at, checked_out_at")
-    .eq("worker_id", workerId)
-    .eq("work_date", workDate)
-    .maybeSingle();
-
   let accessAction: "checked_in" | "already_checked_in" | "checkout_required" | "checked_out";
   let accessActive = true;
 
@@ -560,15 +578,7 @@ export async function POST(req: NextRequest) {
     accessAction = "checked_out";
     accessActive = false;
   } else {
-    const challenge = await verifySiteChallenge({
-      service,
-      siteId: data.assigned_site_id,
-      workDate,
-      challengeCode: body.site_challenge_code,
-      required: true,
-    });
-    if (!challenge.ok) return NextResponse.json({ error: challenge.error }, { status: challenge.status });
-
+    // Challenge already verified above (isNewCheckin path) — proceed directly to insert
     const { error: checkinErr } = await service
       .from("nfc_worker_daily_access")
       .insert({

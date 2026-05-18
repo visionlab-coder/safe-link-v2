@@ -112,12 +112,15 @@ export async function verifyStickerSignature(input: VerifyStickerInput): Promise
     const isCompact = Boolean(workerCode);
     if (!isCompact && (!workerId || !Number.isFinite(issuedEpoch))) return false;
 
-    // Patch 4: TTL expiry check — reject stickers older than NFC_STICKER_TTL_DAYS
+    // TTL check: reject stickers older than NFC_STICKER_TTL_DAYS,
+    // and reject future-dated stickers (beyond 5-minute clock-skew allowance)
+    // to prevent indefinitely-valid stickers created with a far-future issuedEpoch.
     if (Number.isFinite(issuedEpoch)) {
       const ttlDays = Number(process.env.NFC_STICKER_TTL_DAYS ?? 365);
       const ttlSeconds = ttlDays * 24 * 60 * 60;
       const nowEpoch = Math.floor(Date.now() / 1000);
-      if (nowEpoch - issuedEpoch > ttlSeconds) return false;
+      if (issuedEpoch > nowEpoch + 300) return false;       // future-dated: reject
+      if (nowEpoch - issuedEpoch > ttlSeconds) return false; // expired: reject
     }
 
     const key = await getSigningKey();

@@ -48,7 +48,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "PASSWORD_TOO_SHORT" }, { status: 400 });
   }
 
-  const domain = email.split("@")[1] ?? "";
+  const emailParts = email.split("@");
+  if (emailParts.length !== 2 || !emailParts[0] || !emailParts[1]) {
+    return NextResponse.json({ error: "INVALID_EMAIL" }, { status: 400 });
+  }
+  const domain = emailParts[1];
   if (!ALLOWED_DOMAINS.has(domain)) {
     return NextResponse.json({ error: "DOMAIN_NOT_ALLOWED" }, { status: 403 });
   }

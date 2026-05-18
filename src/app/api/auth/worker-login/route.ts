@@ -75,9 +75,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const email = `${phoneDigits}@safe-link.local`;
 
   // C-06: 전화번호만으로 신규 계정 생성 차단 — 사전 등록된 근로자만 허용.
-  // nfc_workers(phone_last4) 또는 profiles(phone_number) 중 하나라도 존재해야 함.
+  // nfc_workers.phone(전체 번호) 또는 profiles.phone_number(전체 번호) 중 하나라도 존재해야 함.
+  // phone_last4(뒤 4자리)는 충돌 공간이 너무 작아 인증 게이트로 사용 불가.
   const [nfcWorkerResult, profileResult] = await Promise.all([
-    service.from("nfc_workers").select("id").eq("phone_last4", phoneDigits.slice(-4)).eq("is_active", true).limit(1).maybeSingle(),
+    service.from("nfc_workers").select("id").eq("phone", phoneDigits).eq("is_active", true).limit(1).maybeSingle(),
     service.from("profiles").select("id").eq("phone_number", phoneDigits).limit(1).maybeSingle(),
   ]);
   if (!nfcWorkerResult.data && !profileResult.data) {

@@ -55,22 +55,14 @@ export async function PATCH(
     return NextResponse.json({ error: "invalid_action. use: start | close" }, { status: 400 });
   }
 
-  // M-05: 상태 전이 유효성 검사 — 닫힌 세션 재오픈 차단
-  const { data: current } = await guard.ctx.service
-    .from("nfc_tbm_sessions")
-    .select("status")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (!current) return NextResponse.json({ error: "session_not_found" }, { status: 404 });
-
+  // M-05 / ADV-006: Atomic state-transition guard — single UPDATE with WHERE status IN (allowed).
+  // Eliminates the SELECT→UPDATE TOCTOU race where two concurrent close requests both read
+  // the same "running" status, both pass the guard, and both execute the UPDATE (last one wins,
+  // corrupting ended_by and ended_at in the audit log).
   const ALLOWED_TRANSITIONS: Record<SessionAction, string[]> = {
     start: ["open"],
     close: ["open", "running"],
   };
-  if (!ALLOWED_TRANSITIONS[action].includes(current.status)) {
-    return NextResponse.json({ error: "invalid_state_transition", current: current.status }, { status: 409 });
-  }
 
   const patch: Record<string, unknown> = { status: STATUS_MAP[action] };
   if (action === "close") {
@@ -82,9 +74,20 @@ export async function PATCH(
     .from("nfc_tbm_sessions")
     .update(patch)
     .eq("id", id)
+    .in("status", ALLOWED_TRANSITIONS[action]) // atomic guard — only succeeds if status allows transition
     .select("id, status, started_at, ended_at")
-    .single();
+    .maybeSingle();
 
-  if (error || !data) return NextResponse.json({ error: "update_failed" }, { status: 500 });
+  if (error) return NextResponse.json({ error: "update_failed" }, { status: 500 });
+  if (!data) {
+    // Row not found OR status was already transitioned (concurrent request won)
+    const { data: current } = await guard.ctx.service
+      .from("nfc_tbm_sessions")
+      .select("status")
+      .eq("id", id)
+      .maybeSingle();
+    if (!current) return NextResponse.json({ error: "session_not_found" }, { status: 404 });
+    return NextResponse.json({ error: "invalid_state_transition", current: current.status }, { status: 409 });
+  }
   return NextResponse.json({ session: data });
 }
