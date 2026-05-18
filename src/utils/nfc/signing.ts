@@ -138,20 +138,9 @@ export async function verifyStickerSignature(input: VerifyStickerInput): Promise
       // Use a timing-safe comparison on the truncated base64url strings
       const sigBytes = new TextEncoder().encode(sig.padEnd(22, "\0"));
       const expBytes = new TextEncoder().encode(encodedCurrent.padEnd(22, "\0"));
-      if (timingSafeEqual(sigBytes, expBytes) && sig === encodedCurrent) return true;
-
-      // Legacy fallback for already-issued compact stickers (no issuedEpoch in payload)
-      if (sigVersion === 1) {
-        const payloadLegacy = `${workerCode}|${sigVersion}|${input.identityHint ?? ""}`;
-        const expectedLegacy = new Uint8Array(
-          await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payloadLegacy))
-        );
-        const encodedLegacy = base64urlEncode(expectedLegacy).slice(0, 22);
-        const legacyExpBytes = new TextEncoder().encode(encodedLegacy.padEnd(22, "\0"));
-        if (timingSafeEqual(sigBytes, legacyExpBytes) && sig === encodedLegacy) return true;
-      }
-
-      return false;
+      // v1 레거시 fallback 제거 (H-07): t= 파라미터 없는 구형 스티커는 더 이상 허용 안 함.
+      // 기존 인쇄 스티커는 재발급 필요 (/admin/workers → 스티커 재발급).
+      return timingSafeEqual(sigBytes, expBytes) && sig === encodedCurrent;
     }
 
     // Full (non-compact) path — always uses issuedEpoch

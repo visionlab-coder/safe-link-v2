@@ -128,19 +128,21 @@ export async function POST(request: NextRequest) {
         accept: "text/html,text/plain,application/xhtml+xml;q=0.9,*/*;q=0.5",
       },
       // redirect: "manual" — block SSRF via open redirects to internal hosts.
-      // Any 3xx response is treated as an error rather than followed silently.
       redirect: "manual",
     });
+
+    // DNS rebinding TOCTOU 방어: fetch 완료 후 재검증
+    // TTL=0 공격에서 DNS가 fetch 도중 내부 IP로 변경됐을 가능성 차단
+    if (await resolveAndCheckHost(target.hostname)) {
+      return NextResponse.json({ error: "blocked_host" }, { status: 400 });
+    }
 
     if (response.status >= 300 && response.status < 400) {
       return NextResponse.json({ error: "redirect_blocked" }, { status: 400 });
     }
 
     if (!response.ok) {
-      return NextResponse.json(
-        { error: "fetch_failed", status: response.status },
-        { status: 502 },
-      );
+      return NextResponse.json({ error: "fetch_failed" }, { status: 502 });
     }
 
     const contentType = response.headers.get("content-type") || "";
@@ -155,9 +157,8 @@ export async function POST(request: NextRequest) {
     const title = rawText.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || target.hostname;
 
     return NextResponse.json({ title, text });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "unknown_error";
-    return NextResponse.json({ error: "fetch_error", message }, { status: 502 });
+  } catch {
+    return NextResponse.json({ error: "fetch_error" }, { status: 502 });
   } finally {
     clearTimeout(timeout);
   }
