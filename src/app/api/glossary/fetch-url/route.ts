@@ -87,7 +87,8 @@ export async function POST(request: NextRequest) {
     .select("role")
     .eq("id", user.id)
     .single();
-  if (profile?.role !== "ADMIN" && profile?.role !== "SUPER_ADMIN") {
+  const ADMIN_ROLES = new Set(["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER", "SAFETY_OFFICER", "SITE_ADMIN"]);
+  if (!profile || !ADMIN_ROLES.has(String(profile.role ?? "").toUpperCase())) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 

@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   else if (statusFilter) query = query.eq("status", statusFilter);
 
   const { data, error } = await query;
-  if (error) return NextResponse.json({ error: "query_failed", detail: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "query_failed" }, { status: 500 });
   return NextResponse.json({ sessions: data ?? [] });
 }
 

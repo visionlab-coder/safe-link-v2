@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
   if (!siteId) return NextResponse.json({ error: "siteId_required" }, { status: 400 });
 
   const { data, error } = await guard.ctx.service.rpc("verify_claim13_hash_chain", { p_site_id: siteId });
-  if (error) return NextResponse.json({ error: "verification_failed", detail: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "verification_failed" }, { status: 500 });
 
   return NextResponse.json({
     siteId,

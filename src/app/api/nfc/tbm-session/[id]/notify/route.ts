@@ -53,9 +53,9 @@ export async function POST(
       .eq("tbm_session_id", id),
   ]);
 
-  if (workersResult.error) return NextResponse.json({ error: "workers_query_failed", detail: workersResult.error.message }, { status: 500 });
-  if (attendanceResult.error) return NextResponse.json({ error: "attendance_query_failed", detail: attendanceResult.error.message }, { status: 500 });
-  if (logsResult.error) return NextResponse.json({ error: "notification_log_query_failed", detail: logsResult.error.message }, { status: 500 });
+  if (workersResult.error) return NextResponse.json({ error: "workers_query_failed" }, { status: 500 });
+  if (attendanceResult.error) return NextResponse.json({ error: "attendance_query_failed" }, { status: 500 });
+  if (logsResult.error) return NextResponse.json({ error: "notification_log_query_failed" }, { status: 500 });
 
   const certified = new Set(
     (attendanceResult.data ?? [])
@@ -89,7 +89,7 @@ export async function POST(
     .insert(rows)
     .select("worker_id, attempt_number, next_retry_at");
 
-  if (insertError) return NextResponse.json({ error: "notification_insert_failed", detail: insertError.message }, { status: 500 });
+  if (insertError) return NextResponse.json({ error: "notification_insert_failed" }, { status: 500 });
 
   return NextResponse.json({ notified: inserted?.length ?? 0, workers: inserted ?? [] });
 }
@@ -108,6 +108,6 @@ export async function GET(
     .eq("tbm_session_id", id)
     .order("sent_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: "notification_log_query_failed", detail: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "notification_log_query_failed" }, { status: 500 });
   return NextResponse.json({ logs: data ?? [] });
 }

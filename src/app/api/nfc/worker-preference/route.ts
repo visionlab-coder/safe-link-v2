@@ -90,6 +90,7 @@ async function verifySiteChallenge(args: {
   siteId: string;
   workDate: string;
   challengeCode?: unknown;
+  required?: boolean;
 }): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
   const { data } = await args.service
     .from("nfc_site_daily_challenges")
@@ -99,7 +100,7 @@ async function verifySiteChallenge(args: {
     .eq("is_active", true)
     .maybeSingle();
 
-  // 오늘 챌린지 미설정 → 지오펜스만으로 충분, 통과
+  // 오늘 챌린지 미설정 → 통과
   if (!data) return { ok: true };
 
   if (new Date(data.expires_at).getTime() < Date.now()) {
@@ -107,13 +108,18 @@ async function verifySiteChallenge(args: {
   }
 
   const code = String(args.challengeCode || "").trim();
-  // 코드가 자동 주입됐거나 직접 입력된 경우 검증
-  if (code && /^[0-9]{6}$/.test(code)) {
-    if (String(data.challenge_code) !== code) {
-      return { ok: false, status: 403, error: "site_challenge_invalid" };
+
+  // 코드 미제공 시 — required=true(체크인)이면 반드시 코드 필요
+  if (!code || !/^[0-9]{6}$/.test(code)) {
+    if (args.required) {
+      return { ok: false, status: 403, error: "site_challenge_required" };
     }
+    return { ok: true };
   }
-  // 코드 미입력 상태지만 챌린지는 존재 → 자동 통과 (지오펜스 검증 완료)
+
+  if (String(data.challenge_code) !== code) {
+    return { ok: false, status: 403, error: "site_challenge_invalid" };
+  }
   return { ok: true };
 }
 
@@ -268,10 +274,11 @@ async function resolveSiteByRef(
     .maybeSingle();
   if (bySiteCode) return bySiteCode;
 
+  const safeRef = ref.replace(/%/g, "\\%").replace(/_/g, "\\_");
   const { data: byName } = await service
     .from("sites")
     .select(SITE_SELECT)
-    .ilike("name", ref)
+    .ilike("name", safeRef)
     .limit(1)
     .maybeSingle();
   return byName ?? null;
@@ -404,9 +411,10 @@ export async function POST(req: NextRequest) {
       )
     : 0;
 
-  // 퇴근 의도일 때는 지오펜스 검사 생략 — 현장 밖에서도 퇴근/안전일지 허용
-  if (geofenceActive && intent !== "checkout") {
-    const allowedRadiusM = siteRadius + Math.min(accuracy, 50);
+  // 체크인: 정상 반경 적용 / 퇴근: 2배 반경 허용 (주차장·이동 중 퇴근 대비)
+  if (geofenceActive) {
+    const baseRadius = intent === "checkout" ? siteRadius * 2 : siteRadius;
+    const allowedRadiusM = baseRadius + Math.min(accuracy, 50);
     if (distanceM > allowedRadiusM) {
       return NextResponse.json({
         error: "outside_worksite",
@@ -557,6 +565,7 @@ export async function POST(req: NextRequest) {
       siteId: data.assigned_site_id,
       workDate,
       challengeCode: body.site_challenge_code,
+      required: true,
     });
     if (!challenge.ok) return NextResponse.json({ error: challenge.error }, { status: challenge.status });
 

@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { data, error } = await query;
-  if (error) return NextResponse.json({ error: "query_failed", detail: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "query_failed" }, { status: 500 });
   return NextResponse.json({ workers: data ?? [] });
 }
 

@@ -77,13 +77,14 @@ export async function POST(req: NextRequest) {
         .maybeSingle()
     : { data: null };
 
-  // 현장명으로 기존 현장 조회 (대소문자 무시)
+  // 현장명으로 기존 현장 조회 (대소문자 무시) — LIKE 와일드카드 이스케이프 필수
+  const safeName = name.replace(/%/g, "\\%").replace(/_/g, "\\_");
   const existingByName = existingByCode.data
     ? { data: null }
     : await service
         .from("sites")
         .select("id, name, site_code, metadata")
-        .ilike("name", name)
+        .ilike("name", safeName)
         .limit(1)
         .maybeSingle();
 
@@ -144,10 +145,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (insertErr || !created) {
-    return NextResponse.json(
-      { error: "site_create_failed", detail: insertErr?.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "site_create_failed" }, { status: 500 });
   }
 
   return NextResponse.json({

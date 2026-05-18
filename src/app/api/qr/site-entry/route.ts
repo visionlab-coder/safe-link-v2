@@ -100,7 +100,8 @@ async function resolveSiteByRef(
   const { data: bySiteCode } = await service.from("sites").select(SITE_SELECT).eq("site_code", upperRef).maybeSingle();
   if (bySiteCode) return bySiteCode;
 
-  const { data: byName } = await service.from("sites").select(SITE_SELECT).ilike("name", ref).limit(1).maybeSingle();
+  const safeRef = ref.replace(/%/g, "\\%").replace(/_/g, "\\_");
+  const { data: byName } = await service.from("sites").select(SITE_SELECT).ilike("name", safeRef).limit(1).maybeSingle();
   return byName ?? null;
 }
 
@@ -315,11 +316,13 @@ export async function POST(req: NextRequest) {
       })
     : { action: "checked_out" as const, session: null };
 
-  let authUserId: string | null = updatedWorker.auth_user_id ?? null;
+  // 게스트 워커(QR-)는 auth.users 계정 생성 금지 — 사전 등록된 근로자만 세션 발급
+  const isGuestWorker = String(updatedWorker.worker_code ?? "").startsWith("QR-");
+  let authUserId: string | null = isGuestWorker ? null : (updatedWorker.auth_user_id ?? null);
   const email = nfcEmail(worker.id);
   let generatedTokenHash: string | null = null;
 
-  if (!authUserId) {
+  if (!authUserId && !isGuestWorker) {
     const { data: authData, error: authErr } = await service.auth.admin.createUser({
       email,
       email_confirm: true,

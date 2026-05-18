@@ -104,6 +104,6 @@ export async function DELETE(
     .update({ is_active: false, updated_at: new Date().toISOString() })
     .eq("id", id);
 
-  if (error) return NextResponse.json({ error: "deactivate_failed", detail: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "deactivate_failed" }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     .select("id, equipment_type, score_pct")
     .single();
 
-  if (error) return NextResponse.json({ error: "grant_insert_failed", detail: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "grant_insert_failed" }, { status: 500 });
 
   return NextResponse.json({ granted: true, grant: data });
 }
@@ -68,6 +68,6 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  if (error) return NextResponse.json({ error: "grant_query_failed", detail: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "grant_query_failed" }, { status: 500 });
   return NextResponse.json({ grants: data ?? [] });
 }

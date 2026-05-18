@@ -104,7 +104,7 @@ export async function POST(
     } catch {
       // 삭제 실패는 무시 — 감사 로그 정합성 우선
     }
-    return NextResponse.json({ error: "pledge_sign_failed", detail: updateError.message }, { status: 500 });
+    return NextResponse.json({ error: "pledge_sign_failed" }, { status: 500 });
   }
   if (!updatedPledge) {
     // Another concurrent request already signed it

@@ -25,7 +25,7 @@ export async function GET() {
     .eq("site_id", siteId)
     .maybeSingle();
 
-  if (error) return NextResponse.json({ error: "site_access_query_failed", detail: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "site_access_query_failed" }, { status: 500 });
   return NextResponse.json({
     control: data ?? { site_id: siteId, is_enabled: true, reason: null, updated_at: null },
   });

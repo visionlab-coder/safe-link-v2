@@ -124,10 +124,11 @@ async function resolveSiteByRef(
     .maybeSingle();
   if (bySiteCode) return bySiteCode;
 
+  const safeRef = ref.replace(/%/g, "\\%").replace(/_/g, "\\_");
   const { data: byName } = await service
     .from("sites")
     .select(SITE_SELECT)
-    .ilike("name", ref)
+    .ilike("name", safeRef)
     .limit(1)
     .maybeSingle();
   return byName ?? null;
@@ -236,7 +237,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "worker_site_mismatch" }, { status: 403 });
   }
 
-  if (!assignedSite || String(worker.assigned_site_id) !== String(site.id)) {
+  // assigned_site_id는 최초 1회만 설정 — 이미 다른 현장에 배정된 경우 덮어쓰기 금지
+  if (!worker.assigned_site_id) {
     await service
       .from("nfc_workers")
       .update({ assigned_site_id: site.id, updated_at: new Date().toISOString() })

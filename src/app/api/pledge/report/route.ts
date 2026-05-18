@@ -25,8 +25,8 @@ export async function GET(req: NextRequest) {
   if (sessionResult.error || !sessionResult.data) return NextResponse.json({ error: "session_not_found" }, { status: 404 });
   const denied = requireSameSite(guard.ctx.user, sessionResult.data.site_id);
   if (denied) return denied;
-  if (attendanceResult.error) return NextResponse.json({ error: "attendance_query_failed", detail: attendanceResult.error.message }, { status: 500 });
-  if (pledgeResult.error) return NextResponse.json({ error: "pledge_query_failed", detail: pledgeResult.error.message }, { status: 500 });
+  if (attendanceResult.error) return NextResponse.json({ error: "attendance_query_failed" }, { status: 500 });
+  if (pledgeResult.error) return NextResponse.json({ error: "pledge_query_failed" }, { status: 500 });
 
   const pledges = pledgeResult.data ?? [];
   const signedCount = pledges.filter((pledge) => Boolean(pledge.approved_at)).length;

@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 
   const userRole = String(userProfile?.role ?? "").toUpperCase();
   const isAdminRole = ["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER", "SAFETY_OFFICER"].includes(userRole);
-  if (!isAdminRole && userProfile?.site_id && userProfile.site_id !== siteId) {
+  if (!isAdminRole && userProfile?.site_id !== siteId) {
     return NextResponse.json({ error: "cross_site_pledge_denied" }, { status: 403 });
   }
 
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
     .select("id, pledge_content_hash")
     .single();
 
-  if (error) return NextResponse.json({ error: "pledge_insert_failed", detail: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "pledge_insert_failed" }, { status: 500 });
 
   if (signatureData && approvedAt) {
     const audit = await appendClaim13HashChainEvent(service, {
@@ -126,6 +126,6 @@ export async function GET(req: NextRequest) {
     .eq("tbm_session_id", tbmSessionId)
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: "pledge_query_failed", detail: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "pledge_query_failed" }, { status: 500 });
   return NextResponse.json({ pledges: data ?? [] });
 }

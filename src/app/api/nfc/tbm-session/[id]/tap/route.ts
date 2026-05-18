@@ -181,7 +181,7 @@ export async function POST(
         last_seen_at: now,
         checkin_location: { source: "tbm_nfc_tag", tbm_session_id: sessionId },
       });
-    if (accessErr) return NextResponse.json({ error: "daily_access_activate_failed", detail: accessErr.message }, { status: 500 });
+    if (accessErr) return NextResponse.json({ error: "daily_access_activate_failed" }, { status: 500 });
   }
 
   const { data: existing } = await ctx.service
@@ -215,7 +215,7 @@ export async function POST(
       .update({ certified_at: now, is_certified: true })
       .eq("id", existing.id);
 
-    if (updErr) return NextResponse.json({ error: "certification_failed", detail: updErr.message }, { status: 500 });
+    if (updErr) return NextResponse.json({ error: "certification_failed" }, { status: 500 });
 
     return NextResponse.json({
       action: "certified",
@@ -238,7 +238,7 @@ export async function POST(
       is_certified: false,
     });
 
-  if (insErr) return NextResponse.json({ error: "attendance_insert_failed", detail: insErr.message }, { status: 500 });
+  if (insErr) return NextResponse.json({ error: "attendance_insert_failed" }, { status: 500 });
 
   if (session.status === "open") {
     await ctx.service.from("nfc_tbm_sessions").update({ status: "running" }).eq("id", sessionId);

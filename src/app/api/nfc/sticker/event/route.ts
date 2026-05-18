@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       .eq("id", body.sticker_id);
 
     if (revokeErr) {
-      return NextResponse.json({ error: "sticker_revoke_failed", detail: revokeErr.message }, { status: 500 });
+      return NextResponse.json({ error: "sticker_revoke_failed" }, { status: 500 });
     }
   }
 
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
   });
 
   if (error) {
-    return NextResponse.json({ error: "event_log_failed", detail: error.message }, { status: 500 });
+    return NextResponse.json({ error: "event_log_failed" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

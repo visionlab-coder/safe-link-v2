@@ -27,13 +27,11 @@ const nextConfig: NextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(self), geolocation=(self)",
           },
-          // Content-Security-Policy: enforce 모드
-          // unsafe-inline/unsafe-eval은 Next.js 런타임 및 인라인 스크립트 요구사항
           {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://generativelanguage.googleapis.com https://sheets.googleapis.com https://www.googleapis.com",
