@@ -1,7 +1,10 @@
 /**
- * Hangulize: Converts Romanized text (Pinyin, etc.) into Korean phonetic scripts (Hangul).
- * Specialized for Chinese Pinyin with exhaustive syllable mapping and smart syllable assembly.
+ * Hangulize: Converts foreign text into Korean phonetic scripts (Hangul).
+ * Supports: Chinese (Pinyin), Vietnamese, Indonesian, Uzbek, Tagalog, French, Spanish,
+ * Russian/Kazakh/Mongolian (Cyrillic), Japanese (Kana), Thai, Hindi/Nepali, Bengali.
  */
+
+import { hangulizeThai, hangulizeDevanagari, hangulizeBengali } from './hangulize-nonlatin';
 
 const INITIAL_MAP: Record<string, number> = {
     "ㄱ": 0, "ㄲ": 1, "ㄴ": 2, "ㄷ": 3, "ㄸ": 4, "ㄹ": 5, "ㅁ": 6, "ㅂ": 7, "ㅃ": 8, "ㅅ": 9, "ㅆ": 10, "ㅇ": 11, "ㅈ": 12, "ㅉ": 13, "ㅊ": 14, "ㅋ": 15, "ㅌ": 16, "ㅍ": 17, "ㅎ": 18
@@ -213,21 +216,39 @@ function hangulizeJapanese(text: string): string {
     return parts.join("").replace(/ン/g, "운");
 }
 
+// 비로마자 언어: 원문 그대로 반환
+const NON_LATIN_LANGS = new Set(['km', 'my', 'ar', 'ko']);
+// 키릴 문자 언어
+const CYRILLIC_LANGS = new Set(['ru', 'kk', 'mn']);
+
 export function hangulize(text: string, lang: string): string {
     if (!text) return "";
-    // 일본어: 히라가나/가타카나 직접 매핑 (ASCII 정규화 전 처리)
-    if (lang === 'ja' || lang === 'jp') return hangulizeJapanese(text);
 
-    let normalized = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (lang === 'ja' || lang === 'jp') return hangulizeJapanese(text);
+    if (lang === 'th') return hangulizeThai(text);
+    if (lang === 'hi' || lang === 'ne') return hangulizeDevanagari(text);
+    if (lang === 'bn') return hangulizeBengali(text);
+    if (NON_LATIN_LANGS.has(lang)) return text;
+    if (CYRILLIC_LANGS.has(lang)) return hangulizeCyrillic(text);
+
+    let pre = text.toLowerCase();
+    pre = pre.replace(/ñ/g, 'NY');
+    pre = pre.replace(/đ/g, 'D');
+    pre = pre.replace(/ʻ/g, "'");
+
+    let normalized = pre.normalize("NFD").replace(/[̀-ͯ]/g, "");
+    normalized = normalized.replace(/[‘’′]/g, "'").replace(/[“”]/g, '"');
     normalized = normalized.replace(/u:/g, "v").replace(/ü/g, "v");
+    normalized = normalized.replace(/NY/g, "ny");
+    normalized = normalized.replace(/D/g, "d");
 
     if (lang === 'zh') return hangulizePinyin(normalized);
-    if (lang === 'vi') {
-        normalized = normalized.replace(/đ/g, "d");
-        return hangulizeVietnamese(normalized);
-    }
-    if (lang === 'th') return hangulizeWithDict(normalized, thSyllables);
-    if (lang === 'id') return hangulizeWithDict(normalized, idSyllables);
+    if (lang === 'vi') return hangulizeVietnamese(normalized);
+    if (lang === 'id') return hangulizeIndonesian(normalized);
+    if (lang === 'uz') return hangulizeUzbek(normalized);
+    if (lang === 'ph') return hangulizeTagalog(normalized);
+    if (lang === 'fr') return hangulizeFrench(normalized);
+    if (lang === 'es') return hangulizeSpanish(normalized);
     return genericHangulize(normalized);
 }
 
@@ -1070,4 +1091,197 @@ function genericHangulize(text: string): string {
     });
 
     return result.join(' ');
+}
+
+
+// ========== 공통 유틸리티 ==========
+function splitPunct(word: string): [string, string] {
+    const m = word.match(/^([a-z0-9'-]+)([^a-z0-9'-]*)$/);
+    return m ? [m[1], m[2]] : [word, ""];
+}
+function applyPatterns(word: string, patterns: Array<[RegExp, string]>): string {
+    let converted = word;
+    for (const [pattern, replacement] of patterns) converted = converted.replace(pattern, replacement);
+    return converted;
+}
+function dictPatternHangulize(text: string, dict: Record<string, string>, patterns: Array<[RegExp, string]>): string {
+    return text.split(/\s+/).map(word => {
+        const [clean, trail] = splitPunct(word);
+        if (/^\d+$/.test(clean)) return clean + trail;
+        if (dict[clean]) return dict[clean] + trail;
+        return applyPatterns(clean, patterns) + trail;
+    }).join(' ');
+}
+
+// ========== 인도네시아어 (개선) ==========
+const idPatterns: Array<[RegExp, string]> = [
+    [/ngg/g, "응그"], [/ng/g, "응"], [/ny/g, "니"], [/sy/g, "시"],
+    [/kh/g, "흐"], [/th/g, "트"], [/ph/g, "프"], [/ck/g, "크"],
+    [/ai/g, "아이"], [/au/g, "아우"], [/oi/g, "오이"],
+    [/a/g, "아"], [/e/g, "에"], [/i/g, "이"], [/o/g, "오"], [/u/g, "우"],
+    [/b/g, "브"], [/c/g, "첌"], [/d/g, "드"], [/f/g, "프"],
+    [/g/g, "그"], [/h/g, "흐"], [/j/g, "즈"], [/k/g, "크"],
+    [/l/g, "ㄹ"], [/m/g, "무"], [/n/g, "느"], [/p/g, "프"],
+    [/r/g, "르"], [/s/g, "스"], [/t/g, "트"], [/v/g, "브"],
+    [/w/g, "우"], [/x/g, "크스"], [/y/g, "이"], [/z/g, "즈"],
+];
+const idWords: Record<string, string> = {
+    "selamat": "슬라맛", "pagi": "파기", "siang": "시앙", "sore": "소레", "malam": "말람",
+    "terima": "트리마", "kasih": "카시", "ya": "야", "tidak": "티닥", "bisa": "비사",
+    "apa": "아파", "ini": "이니", "itu": "이투", "dan": "단", "atau": "아타우",
+    "yang": "양", "ada": "아다", "harus": "하루스", "jangan": "장안", "tolong": "톨롭",
+    "helm": "헬무", "keselamatan": "크슬라마탄", "bahaya": "바하야", "hati-hati": "하티하티",
+    "berhenti": "브르헬티", "masuk": "마숙", "keluar": "클루아르",
+    "atas": "아타스", "bawah": "바와", "kiri": "키리", "kanan": "카난",
+    "darurat": "다루랏", "pertama": "프르타마",
+    "beton": "베톤", "besi": "브시", "tangga": "탱가",
+    "pipa": "피파", "semen": "세멘", "kayu": "카유",
+    "atap": "아탭", "dinding": "딘딩", "pondasi": "폰다시",
+};
+function hangulizeIndonesian(text: string): string {
+    return dictPatternHangulize(text, idWords, idPatterns);
+}
+
+// ========== 우즈베크어 ==========
+const uzPatterns: Array<[RegExp, string]> = [
+    [/sh/g, "쉼"], [/ch/g, "치"], [/ng/g, "응"],
+    [/o'/g, "오"], [/g'/g, "그"],
+    [/ai/g, "아이"], [/oy/g, "오이"], [/ey/g, "에이"],
+    [/a/g, "아"], [/e/g, "에"], [/i/g, "이"], [/o/g, "오"], [/u/g, "우"],
+    [/b/g, "브"], [/d/g, "드"], [/f/g, "프"], [/g/g, "그"],
+    [/h/g, "흐"], [/j/g, "즈"], [/k/g, "크"], [/l/g, "ㄹ"],
+    [/m/g, "무"], [/n/g, "느"], [/p/g, "프"], [/q/g, "크"],
+    [/r/g, "르"], [/s/g, "스"], [/t/g, "트"], [/v/g, "브"],
+    [/w/g, "우"], [/x/g, "흐"], [/y/g, "이"], [/z/g, "즈"],
+];
+const uzWords: Record<string, string> = {
+    "salom": "살롬", "rahmat": "라흐맛", "ha": "하", "bor": "보르", "kerak": "케락",
+    "va": "바", "yoki": "요키", "lekin": "레킨", "uchun": "우춘", "bilan": "빌란",
+    "kask": "카스크", "xavfli": "하블리", "ehtiyot": "에흐티욕",
+    "ishchi": "이쉼치", "qurilish": "쿠릴리쉼", "maydon": "마이돈",
+    "favqulodda": "파브쿨로다", "yordam": "요르담",
+    "temir": "테미르", "beton": "베톤", "kran": "크란", "lift": "리프트",
+};
+function hangulizeUzbek(text: string): string {
+    return dictPatternHangulize(text, uzWords, uzPatterns);
+}
+
+// ========== 타갈로그어 (필리핀) ==========
+const phPatterns: Array<[RegExp, string]> = [
+    [/ng/g, "응"], [/ny/g, "니"], [/ts/g, "츠"],
+    [/ai/g, "아이"], [/ao/g, "아오"], [/aw/g, "아우"],
+    [/a/g, "아"], [/e/g, "에"], [/i/g, "이"], [/o/g, "오"], [/u/g, "우"],
+    [/b/g, "브"], [/c/g, "크"], [/d/g, "드"], [/f/g, "프"],
+    [/g/g, "그"], [/h/g, "흐"], [/j/g, "즈"], [/k/g, "크"],
+    [/l/g, "ㄹ"], [/m/g, "무"], [/n/g, "느"], [/p/g, "프"],
+    [/r/g, "르"], [/s/g, "스"], [/t/g, "트"], [/v/g, "브"],
+    [/w/g, "우"], [/x/g, "크스"], [/y/g, "이"], [/z/g, "즈"],
+];
+const phWords: Record<string, string> = {
+    "magandang": "마간당", "umaga": "우마가", "salamat": "살라맛",
+    "oo": "오오", "hindi": "힌디", "po": "포",
+    "kailangan": "카일랑안", "pwede": "프웨데", "huwag": "후왕",
+    "kaligtasan": "칼릭타산", "panganib": "팡아닙", "ingat": "잏",
+    "tigil": "티길", "trabaho": "트라바호", "manggagawa": "망가가와",
+    "bawal": "바왕", "bakal": "바칼", "semento": "세멘토",
+    "hagdan": "하그단", "andamyo": "안다미오",
+    "martilyo": "마르틸요", "pako": "파코",
+};
+function hangulizeTagalog(text: string): string {
+    return dictPatternHangulize(text, phWords, phPatterns);
+}
+
+// ========== 프랑스어 ==========
+const frPatterns: Array<[RegExp, string]> = [
+    [/tion/g, "시옹"], [/sion/g, "지옹"],
+    [/ille/g, "이"], [/eau/g, "오"], [/aux/g, "오"], [/eux/g, "외"],
+    [/ou/g, "우"], [/oi/g, "와"],
+    [/ain/g, "앵"], [/ein/g, "앵"], [/an(?=[^aeiou]|$)/g, "앙"],
+    [/en(?=[^aeiou]|$)/g, "앙"], [/on(?=[^aeiou]|$)/g, "옴"],
+    [/ai/g, "에"], [/au/g, "오"], [/eu/g, "외"],
+    [/ch/g, "쉼"], [/ph/g, "프"], [/gn/g, "니"], [/qu/g, "크"],
+    [/a/g, "아"], [/e/g, "으"], [/i/g, "이"], [/o/g, "오"], [/u/g, "위"],
+    [/b/g, "브"], [/c/g, "크"], [/d/g, "드"], [/f/g, "프"],
+    [/g/g, "그"], [/h/g, ""], [/j/g, "주"], [/k/g, "크"],
+    [/l/g, "ㄹ"], [/m/g, "무"], [/n/g, "느"], [/p/g, "프"],
+    [/r/g, "르"], [/s/g, "스"], [/t/g, "트"], [/v/g, "브"],
+    [/w/g, "우"], [/x/g, "크스"], [/y/g, "이"], [/z/g, "즈"],
+];
+const frWords: Record<string, string> = {
+    "bonjour": "봉주르", "bonsoir": "봉수아르", "merci": "메르시",
+    "oui": "위", "non": "농", "securite": "세퀴리테", "casque": "카스크",
+    "danger": "당제", "attention": "아혷시옹", "sortie": "소르티",
+    "travail": "트라바이", "chantier": "샹티에",
+    "urgence": "위르정스", "eau": "오", "feu": "퐀",
+    "batiment": "바티망", "beton": "베통", "grue": "그뚔",
+    "protection": "프로텍시옹", "ciment": "시망",
+    "fondation": "폵다시옹", "mur": "늮르",
+};
+function hangulizeFrench(text: string): string {
+    return dictPatternHangulize(text, frWords, frPatterns);
+}
+
+// ========== 스페인어 ==========
+const esPatterns: Array<[RegExp, string]> = [
+    [/cion/g, "시온"], [/ny/g, "니"],
+    [/rr/g, "르"], [/ll/g, "이"], [/ch/g, "치"],
+    [/gu(?=[ei])/g, "그"], [/qu(?=[ei])/g, "크"], [/qu/g, "크"],
+    [/ue/g, "웨"], [/ua/g, "와"], [/ie/g, "이에"],
+    [/a/g, "아"], [/e/g, "에"], [/i/g, "이"], [/o/g, "오"], [/u/g, "우"],
+    [/c(?=[ei])/g, "스"], [/c/g, "크"],
+    [/b/g, "브"], [/d/g, "드"], [/f/g, "프"], [/g/g, "그"],
+    [/h/g, ""], [/j/g, "호"], [/k/g, "크"], [/l/g, "ㄹ"],
+    [/m/g, "무"], [/n/g, "느"], [/p/g, "프"], [/r/g, "르"],
+    [/s/g, "스"], [/t/g, "트"], [/v/g, "브"], [/w/g, "우"],
+    [/x/g, "크스"], [/y/g, "이"], [/z/g, "스"],
+];
+const esWords: Record<string, string> = {
+    "buenos": "부에노스", "dias": "디아스", "gracias": "그라시아스",
+    "si": "시", "no": "노", "seguridad": "세구리다드", "casco": "카스코",
+    "peligro": "펌리그로", "cuidado": "쿠이다도", "alto": "알토",
+    "salida": "살리다", "trabajo": "트라바호", "obra": "오브라",
+    "emergencia": "에메르헨시아", "agua": "아구아", "fuego": "푸에고",
+    "construccion": "콘스트룹시온", "andamio": "안다미오",
+    "cemento": "세멘토", "acero": "아세로",
+    "proteccion": "프로텍시온", "incendio": "인센디오",
+};
+function hangulizeSpanish(text: string): string {
+    return dictPatternHangulize(text, esWords, esPatterns);
+}
+
+// ========== 키릴 문자 (러시아어·카자흐어·몫골어) ==========
+const cyrillicMap: Record<string, string> = {
+    'а': '아', 'б': '브', 'в': '브', 'г': '그', 'д': '드',
+    'е': '예', 'ё': '요', 'ж': '주', 'з': '즈', 'и': '이',
+    'й': '이', 'к': '크', 'л': '르', 'м': '무', 'н': '느',
+    'о': '오', 'п': '프', 'р': '르', 'с': '스', 'т': '트',
+    'у': '우', 'ф': '프', 'х': '흐', 'ц': '츠', 'ч': '치',
+    'ш': '쉼', 'щ': '쉼', 'ъ': '', 'ы': '이', 'ь': '',
+    'э': '에', 'ю': '유', 'я': '야',
+    'ә': '애', 'ғ': '그', 'қ': '크', 'ң': '응', 'ө': '외',
+    'ұ': '우', 'ү': '위', 'һ': '흐', 'і': '이',
+};
+const cyrillicWords: Record<string, string> = {
+    "здравствуйте": "즈드라브스뜨부이짜",
+    "привет": "프리벳", "спасибо": "스파시바",
+    "да": "다", "нет": "아니요", "хорошо": "하라쇼",
+    "безопасность": "베자파스나스참",
+    "каска": "카스카", "опасно": "아파스나",
+    "осторожно": "아스따로주나", "стоп": "스톱",
+    "бетон": "베톤", "кран": "크란",
+};
+function hangulizeCyrillic(text: string): string {
+    const lower = text.toLowerCase();
+    return lower.split(/\s+/).map(word => {
+        const m = word.match(/^([Ѐ-ӿ'-]+)([^Ѐ-ӿ'-]*)$/);
+        const clean = m ? m[1] : word;
+        const trail = m ? m[2] : "";
+        if (cyrillicWords[clean]) return cyrillicWords[clean] + trail;
+        let result = "";
+        for (const ch of Array.from(clean)) {
+            if (ch === 'ъ' || ch === 'ь') continue;
+            result += cyrillicMap[ch] || ch;
+        }
+        return result + trail;
+    }).join(' ');
 }
