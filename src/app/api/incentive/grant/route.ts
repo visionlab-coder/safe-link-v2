@@ -32,6 +32,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "workerId_equipmentType_required" }, { status: 400 });
   }
 
+  // M-08: scorePct DB 미검증 수정 — 0-100 정수 범위 강제
+  const rawScore = body.scorePct;
+  const scorePct = rawScore == null ? null : Number(rawScore);
+  if (scorePct !== null && (!Number.isInteger(scorePct) || scorePct < 0 || scorePct > 100)) {
+    return NextResponse.json({ error: "scorePct_invalid" }, { status: 400 });
+  }
+
   // 비전역 관리자는 자신의 현장에만 지급 가능
   const siteBlock = requireSameSite(guard.ctx.user, body.siteId ?? null);
   if (siteBlock) return siteBlock;
@@ -58,7 +65,7 @@ export async function POST(req: NextRequest) {
       worker_id: workerId,
       site_id: body.siteId ?? null,
       quiz_session_id: quizSessionId,
-      score_pct: body.scorePct ?? null,
+      score_pct: scorePct,
       equipment_type: equipmentType,
       granted_by: guard.ctx.user.id,
       note: body.note ?? null,

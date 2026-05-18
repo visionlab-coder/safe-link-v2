@@ -45,6 +45,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const phoneDigits = String(body.phoneNumber ?? "").replace(/[^0-9]/g, "");
+
+  // C-10 부분 개선: 전화번호 단위 추가 rate limit (IP 우회 시에도 계정 열거 차단)
+  if (!checkRateLimit(`phone:${phoneDigits}`)) {
+    return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
+  }
   const displayName = String(body.displayName ?? "").trim().slice(0, 100);
   const lang = /^[a-z]{2,5}$/.test(String(body.lang ?? ""))
     ? String(body.lang)
@@ -68,6 +73,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   });
 
   const email = `${phoneDigits}@safe-link.local`;
+
+  // C-06: 전화번호만으로 신규 계정 생성 차단 — 사전 등록된 근로자만 허용.
+  // nfc_workers(phone_last4) 또는 profiles(phone_number) 중 하나라도 존재해야 함.
+  const [nfcWorkerResult, profileResult] = await Promise.all([
+    service.from("nfc_workers").select("id").eq("phone_last4", phoneDigits.slice(-4)).eq("is_active", true).limit(1).maybeSingle(),
+    service.from("profiles").select("id").eq("phone_number", phoneDigits).limit(1).maybeSingle(),
+  ]);
+  if (!nfcWorkerResult.data && !profileResult.data) {
+    return NextResponse.json({ error: "WORKER_NOT_REGISTERED" }, { status: 403 });
+  }
 
   // generateLink creates the user if they don't exist yet, or issues a token
   // for an existing user — no password ever required.

@@ -21,8 +21,9 @@ export default function RoleGuard({
     const [isAuthorized, setIsAuthorized] = useState(false);
 
     useEffect(() => {
+        const supabase = createClient();
+
         const checkAuth = async () => {
-            const supabase = createClient();
 
             // 자동로그인 비활성화 체크:
             // rememberMe=false이고 브라우저를 닫았다 다시 열면 (sessionStorage 없음) → 로그아웃
@@ -96,7 +97,20 @@ export default function RoleGuard({
         };
 
         checkAuth();
-    }, [router, allowedRole]); // (allowedRole도 깐깐하게 추가했어요)
+
+        // M-09: auth 상태 변경 감지 — SIGNED_OUT 시 즉시 리디렉션, 토큰 갱신 시 역할 재검증
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+            if (event === "SIGNED_OUT") {
+                setIsAuthorized(false);
+                router.replace("/auth");
+            } else if (event === "TOKEN_REFRESHED") {
+                checkAuth();
+            }
+        });
+
+        return () => { subscription.unsubscribe(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [router, allowedRole]);
 
     if (!isAuthorized) {
         return (
