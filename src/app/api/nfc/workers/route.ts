@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin, requireSameSite } from "@/utils/nfc/require-admin";
+import { isValidUUID, requireAdmin, requireSameSite } from "@/utils/nfc/require-admin";
 import { TRADES } from "@/utils/nfc/constants";
 
 export const runtime = "nodejs";
@@ -16,7 +16,8 @@ export async function GET(req: NextRequest) {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
 
-  const requestedSiteId = req.nextUrl.searchParams.get("site_id");
+  const rawReqSiteId = req.nextUrl.searchParams.get("site_id");
+  const requestedSiteId = rawReqSiteId && isValidUUID(rawReqSiteId) ? rawReqSiteId : null;
   const q = req.nextUrl.searchParams.get("q")?.trim();
   const activeOnly = req.nextUrl.searchParams.get("active") !== "0";
   const limit = Math.min(Number(req.nextUrl.searchParams.get("limit") || 50), 200);

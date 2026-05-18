@@ -75,6 +75,12 @@ export function canAccessSite(user: AdminContext["user"], siteId?: string | null
   return Boolean(user.site_id && siteId && String(user.site_id) === String(siteId));
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isValidUUID(v: unknown): v is string {
+  return typeof v === "string" && UUID_RE.test(v);
+}
+
 export function requireSameSite(user: AdminContext["user"], siteId?: string | null): NextResponse | null {
   if (canAccessSite(user, siteId)) return null;
   if (!user.site_id) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isGlobalAdmin, requireAdmin, requireSameSite } from "@/utils/nfc/require-admin";
+import { isGlobalAdmin, isValidUUID, requireAdmin, requireSameSite } from "@/utils/nfc/require-admin";
 
 export const runtime = "nodejs";
 
@@ -7,7 +7,8 @@ export async function GET(req: NextRequest) {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
 
-  let siteId = req.nextUrl.searchParams.get("site_id");
+  const rawSiteId = req.nextUrl.searchParams.get("site_id");
+  let siteId = rawSiteId && isValidUUID(rawSiteId) ? rawSiteId : null;
   const statusFilter = req.nextUrl.searchParams.get("status");
   if (!isGlobalAdmin(guard.ctx.user.role)) {
     const denied = requireSameSite(guard.ctx.user, siteId || guard.ctx.user.site_id);
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
 
   const siteId = String(body.site_id || "").trim();
   if (!siteId) return NextResponse.json({ error: "site_id_required" }, { status: 400 });
+  if (!isValidUUID(siteId)) return NextResponse.json({ error: "site_id_invalid" }, { status: 400 });
   const denied = requireSameSite(ctx.user, siteId);
   if (denied) return denied;
 
@@ -59,6 +61,6 @@ export async function POST(req: NextRequest) {
     .select("id, site_id, tbm_notice_id, title, status, started_at")
     .single();
 
-  if (error || !data) return NextResponse.json({ error: "session_create_failed", detail: error?.message }, { status: 500 });
+  if (error || !data) return NextResponse.json({ error: "session_create_failed" }, { status: 500 });
   return NextResponse.json({ session: data });
 }

@@ -162,7 +162,9 @@ function AuthContent() {
 
   const redirectByRoleString = useCallback((role: string | null, activeLang: string) => {
     const targetRole = searchParams.get("role");
-    const siteId = searchParams.get("site_id");
+    const rawSiteId = searchParams.get("site_id");
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const siteId = rawSiteId && UUID_RE.test(rawSiteId) ? rawSiteId : null;
     if (!role) {
       router.push(`/auth/setup?lang=${activeLang}${targetRole ? `&role=${targetRole}` : ""}${siteId ? `&site_id=${siteId}` : ""}`);
       return;
@@ -259,16 +261,39 @@ function AuthContent() {
     if (password !== passConfirm) { alert(t.noMatch); return; }
     setLoading(true);
     const activeLang = lang || "ko";
-    const { error: signUpErr } = await supabase.auth.signUp({
-      email: adminEmail, password,
-      options: { data: { backup_email: backupEmail || null } },
-    });
-    if (signUpErr) { alert(sanitizeAuthError(signUpErr.message)); setLoading(false); return; }
+
+    try {
+      const res = await fetch("/api/auth/admin-signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: adminEmail, password }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        if (data.error === "DOMAIN_NOT_ALLOWED") {
+          alert("회사 이메일(@seowonenc.co.kr)만 회원가입이 가능합니다.");
+        } else if (data.error === "ALREADY_REGISTERED") {
+          alert("이미 등록된 이메일입니다. 로그인을 시도해주세요.");
+        } else if (data.error === "RATE_LIMITED") {
+          alert(sanitizeAuthError("rate limit"));
+        } else {
+          alert(sanitizeAuthError(data.error ?? "unknown"));
+        }
+        setLoading(false);
+        return;
+      }
+    } catch {
+      alert(sanitizeAuthError("network"));
+      setLoading(false);
+      return;
+    }
+
     const { error: loginErr } = await supabase.auth.signInWithPassword({ email: adminEmail, password });
     if (loginErr) { alert(sanitizeAuthError(loginErr.message)); setLoading(false); return; }
     sessionStorage.setItem("safe-link-session-active", "true");
     const targetRole = searchParams.get("role");
-    const siteId = searchParams.get("site_id");
+    const rawSiteId = searchParams.get("site_id");
+    const siteId = rawSiteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawSiteId) ? rawSiteId : null;
     router.push(`/auth/setup?lang=${activeLang}${targetRole ? `&role=${targetRole}` : ""}${siteId ? `&site_id=${siteId}` : ""}`);
     setLoading(false);
   };

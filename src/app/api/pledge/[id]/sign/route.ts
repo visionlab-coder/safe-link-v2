@@ -41,6 +41,14 @@ export async function POST(
   if (!signatureData) return NextResponse.json({ error: "signatureData_required" }, { status: 400 });
 
   const service = createService();
+
+  // M-06: Atomic UPDATE-first pattern — eliminates orphan audit events from concurrent signing.
+  // The .is("approved_at", null) guard ensures exactly one concurrent request wins.
+  // Audit event is inserted ONLY after the pledge is durably signed.
+  const approvedAt = new Date().toISOString();
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? req.headers.get("x-real-ip") ?? null;
+
+  // Step 1: Fetch pledge to verify ownership (read-only, before atomic write)
   const { data: pledge, error: pledgeError } = await service
     .from("claim13_pledges")
     .select("id, worker_id, site_id, tbm_session_id, pledge_content_hash, nfc_uid, approved_at")
@@ -50,18 +58,30 @@ export async function POST(
   if (pledgeError || !pledge) return NextResponse.json({ error: "pledge_not_found" }, { status: 404 });
   if (pledge.worker_id !== user.id) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
 
-  // Patch H-4: 재서명 방지
-  if (pledge.approved_at !== null) {
+  // Step 2: Atomic write — only one concurrent request wins; losers get 409
+  const { data: updatedPledge, error: updateError } = await service
+    .from("claim13_pledges")
+    .update({
+      signature_data: signatureData,
+      approved_at: approvedAt,
+      client_ip: clientIp,
+    })
+    .eq("id", id)
+    .is("approved_at", null) // concurrent-safe: only succeeds if not yet signed
+    .select("id")
+    .maybeSingle();
+
+  if (updateError) return NextResponse.json({ error: "pledge_sign_failed" }, { status: 500 });
+  if (!updatedPledge) {
+    // Another concurrent request already signed this pledge
     return NextResponse.json({ error: "pledge_already_signed" }, { status: 409 });
   }
 
-  const approvedAt = new Date().toISOString();
-  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? req.headers.get("x-real-ip") ?? null;
-
-  // Patch C-11: 해시체인 삽입 후 pledge UPDATE 실패 시 해시체인 이벤트 삭제 시도
-  let audit;
+  // Step 3: Append audit event (pledge is already durably signed above)
+  // Audit failure is non-fatal — pledge integrity is preserved; alert separately if needed
+  let hashChainEventId: number | null = null;
   try {
-    audit = await appendClaim13HashChainEvent(service, {
+    const audit = await appendClaim13HashChainEvent(service, {
       siteId: pledge.site_id,
       entityType: "claim13_pledge",
       entityId: pledge.id,
@@ -77,39 +97,14 @@ export async function POST(
       },
       createdBy: user.id,
     });
-  } catch (auditErr) {
-    return NextResponse.json(
-      { error: "audit_chain_failed", detail: auditErr instanceof Error ? auditErr.message : String(auditErr) },
-      { status: 500 }
-    );
+    hashChainEventId = audit.id;
+    await service
+      .from("claim13_pledges")
+      .update({ hash_chain_event_id: audit.id })
+      .eq("id", id);
+  } catch {
+    // Audit chain failure — pledge signed but hash_chain_event_id remains null
   }
 
-  const { data: updatedPledge, error: updateError } = await service
-    .from("claim13_pledges")
-    .update({
-      signature_data: signatureData,
-      approved_at: approvedAt,
-      client_ip: clientIp,
-      hash_chain_event_id: audit.id,
-    })
-    .eq("id", id)
-    .is("approved_at", null) // atomic guard — only one concurrent request wins
-    .select("id")
-    .maybeSingle();
-
-  if (updateError) {
-    // 롤백: 해시체인 이벤트 삭제 시도 (best-effort)
-    try {
-      await service.from("claim13_audit_events").delete().eq("id", audit.id);
-    } catch {
-      // 삭제 실패는 무시 — 감사 로그 정합성 우선
-    }
-    return NextResponse.json({ error: "pledge_sign_failed" }, { status: 500 });
-  }
-  if (!updatedPledge) {
-    // Another concurrent request already signed it
-    return NextResponse.json({ error: "pledge_already_signed" }, { status: 409 });
-  }
-
-  return NextResponse.json({ ok: true, approvedAt, hashChainEventId: audit.id });
+  return NextResponse.json({ ok: true, approvedAt, hashChainEventId });
 }
