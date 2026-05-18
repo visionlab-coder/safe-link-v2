@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/utils/supabase/server";
+import { checkQrEntryLimit } from "@/utils/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -26,19 +27,6 @@ const COUNTRY_TO_LANG: Record<string, string> = {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SITE_SELECT = "id, name, code, site_code";
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
-function checkRateLimit(key: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(key);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(key, { count: 1, resetAt: now + 60_000 });
-    return true;
-  }
-  if (entry.count >= 10) return false;
-  entry.count++;
-  return true;
-}
 
 function createService() {
   const url = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
@@ -185,9 +173,7 @@ export async function POST(req: NextRequest) {
     req.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
     req.headers.get("x-real-ip") ??
     "unknown";
-  // Rate limit by IP only — including site_id/mode in the key allowed bucket multiplication
-  // by rotating arbitrary site_id values, effectively removing the per-IP limit.
-  if (!checkRateLimit(ip)) {
+  if (!(await checkQrEntryLimit(ip))) {
     return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
   }
 

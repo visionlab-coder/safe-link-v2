@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { checkAdminSignupLimit } from "@/utils/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -7,27 +8,13 @@ export const runtime = "nodejs";
 // Anyone outside these domains is rejected server-side before a Supabase account is created.
 const ALLOWED_DOMAINS = new Set(["seowonenc.co.kr"]);
 
-// 3 signup attempts per IP per 10 minutes — prevents bulk account creation
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + 10 * 60_000 });
-    return true;
-  }
-  if (entry.count >= 3) return false;
-  entry.count++;
-  return true;
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
     req.headers.get("x-real-ip") ??
     "unknown";
 
-  if (!checkRateLimit(ip)) {
+  if (!(await checkAdminSignupLimit(ip))) {
     return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
   }
 

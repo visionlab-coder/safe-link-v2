@@ -1,23 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/utils/supabase/server";
+import { checkWorkerLoginLimit, checkWorkerLoginPhoneLimit } from "@/utils/rate-limit";
 
 export const runtime = "nodejs";
-
-// 5 requests per minute per IP
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000 });
-    return true;
-  }
-  if (entry.count >= 5) return false;
-  entry.count++;
-  return true;
-}
 
 // POST /api/auth/worker-login
 // body: { phoneNumber, displayName, lang? }
@@ -33,7 +19,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     req.headers.get("x-real-ip") ??
     "unknown";
 
-  if (!checkRateLimit(ip)) {
+  if (!(await checkWorkerLoginLimit(ip))) {
     return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
   }
 
@@ -46,8 +32,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const phoneDigits = String(body.phoneNumber ?? "").replace(/[^0-9]/g, "");
 
-  // C-10 부분 개선: 전화번호 단위 추가 rate limit (IP 우회 시에도 계정 열거 차단)
-  if (!checkRateLimit(`phone:${phoneDigits}`)) {
+  // C-10: 전화번호 단위 분산 rate limit — 멀티 인스턴스에서도 IP 우회 방지
+  if (!(await checkWorkerLoginPhoneLimit(phoneDigits))) {
     return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
   }
   const displayName = String(body.displayName ?? "").trim().slice(0, 100);
