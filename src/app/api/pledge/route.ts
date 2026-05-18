@@ -51,7 +51,14 @@ export async function POST(req: NextRequest) {
 
   const userRole = String(userProfile?.role ?? "").toUpperCase();
   const isAdminRole = ["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER", "SAFETY_OFFICER"].includes(userRole);
-  if (!isAdminRole && userProfile?.site_id !== siteId) {
+
+  // ADV-009: 관리자 계정의 서약 생성 차단 — 서약 레코드는 worker_id가 실제 근로자여야 함.
+  // 관리자가 서약을 생성하면 감사 로그에서 근로자 서약과 구분 불가 (데이터 정합성 오염).
+  if (isAdminRole) {
+    return NextResponse.json({ error: "admin_cannot_create_pledge" }, { status: 403 });
+  }
+
+  if (userProfile?.site_id !== siteId) {
     return NextResponse.json({ error: "cross_site_pledge_denied" }, { status: 403 });
   }
 

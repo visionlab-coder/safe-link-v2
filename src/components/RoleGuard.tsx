@@ -98,12 +98,15 @@ export default function RoleGuard({
 
         checkAuth();
 
-        // M-09: auth 상태 변경 감지 — SIGNED_OUT 시 즉시 리디렉션, 토큰 갱신 시 역할 재검증
+        // M-09 / ADV-008: auth 상태 변경 감지
+        // SIGNED_OUT: 즉시 리디렉션
+        // TOKEN_REFRESHED: 토큰 갱신 시 역할 재검증
+        // USER_UPDATED: 서버에서 역할 변경 시 즉시 재검증 (변경 후 최대 1시간 지연 방지)
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
             if (event === "SIGNED_OUT") {
                 setIsAuthorized(false);
                 router.replace("/auth");
-            } else if (event === "TOKEN_REFRESHED") {
+            } else if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
                 checkAuth();
             }
         });

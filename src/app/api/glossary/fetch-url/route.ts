@@ -30,6 +30,10 @@ function isBlockedHost(hostname: string) {
   // IPv4 decimal / hex encoding bypasses (e.g. 2130706433 = 127.0.0.1, 0x7f000001)
   if (/^(0x[0-9a-f]+|\d{8,10})$/i.test(host)) return true;
 
+  // IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1, ::ffff:169.254.169.254)
+  // Recursive check: extract the embedded IPv4 address and re-run all rules.
+  if (host.startsWith("::ffff:")) return isBlockedHost(host.slice(7));
+
   // IPv6 loopback / link-local / unique-local
   if (
     host.startsWith("fe80:") ||

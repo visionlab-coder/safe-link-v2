@@ -185,8 +185,9 @@ export async function POST(req: NextRequest) {
     req.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
     req.headers.get("x-real-ip") ??
     "unknown";
-  const rateKey = `${ip}:${String(body.site_id || "").trim()}:${body.mode || "enter"}`;
-  if (!checkRateLimit(rateKey)) {
+  // Rate limit by IP only — including site_id/mode in the key allowed bucket multiplication
+  // by rotating arbitrary site_id values, effectively removing the per-IP limit.
+  if (!checkRateLimit(ip)) {
     return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
   }
 
@@ -244,10 +245,30 @@ export async function POST(req: NextRequest) {
       })
       .select("id, worker_code, full_name, nationality, preferred_lang, auth_user_id, assigned_site_id, is_active")
       .single();
-    if (guestErr || !guestWorker) {
+
+    if (guestErr) {
+      // ADV-010: 동시 요청이 동일 initials+phone_last4+site_id 게스트를 먼저 생성한 경우 (23505 unique 충돌).
+      // 유니크 제약이 있다면 충돌 → 기존 레코드로 폴백. 없다면 단순 실패 처리.
+      if (guestErr.code === "23505") {
+        const { data: racedWorker } = await service
+          .from("nfc_workers")
+          .select("id, worker_code, full_name, nationality, preferred_lang, auth_user_id, assigned_site_id, is_active")
+          .eq("assigned_site_id", site.id)
+          .eq("name_initials", initials)
+          .eq("phone_last4", phoneLast4)
+          .eq("is_active", true)
+          .limit(1)
+          .maybeSingle();
+        if (!racedWorker) return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
+        worker = racedWorker;
+      } else {
+        return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
+      }
+    } else if (!guestWorker) {
       return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
+    } else {
+      worker = guestWorker;
     }
-    worker = guestWorker;
   } else {
     worker = workers[0];
   }
