@@ -13,6 +13,8 @@ import { Trash2, QrCode } from "lucide-react";
 import { hangulize } from "@/utils/hangulize";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
 import { usePresence } from "@/hooks/usePresence";
+import ExportMenu from "@/components/ExportMenu";
+import { exportData, type ExportFormat } from "@/utils/export-files";
 
 type ParsedMessage = { norm: string; text: string; pron: string; rev: string };
 const ui: Record<string, Record<string, string>> = {
@@ -446,6 +448,45 @@ function AdminChatContent() {
         .filter(w => !hiddenWorkers.has(w.id))
         .filter(w => (w.display_name || "").toLowerCase().includes(searchQuery.toLowerCase()));
 
+    const handleExport = async (format: ExportFormat) => {
+        if (!activeWorker || messages.length === 0) return;
+        const rows = messages.map((message) => {
+            const parsed = parseMsg(message.translated_text);
+            return {
+                time: new Date(message.created_at).toLocaleString("ko-KR"),
+                sender: message.from_user === myId ? "관리자" : activeWorker.display_name,
+                source_lang: message.source_lang,
+                target_lang: message.target_lang,
+                source_text: message.source_text,
+                translated_text: parsed.text || message.translated_text,
+                pronunciation: parsed.pron,
+                read: message.is_read ? "읽음" : "미확인",
+            };
+        });
+        await exportData(format, {
+            title: "1:1 AI 번역 채팅 로그",
+            subtitle: `${activeWorker.display_name} / ${new Date().toLocaleString("ko-KR")}`,
+            filename: `chat_log_${activeWorker.display_name}_${new Date().toISOString().slice(0, 10)}`,
+            summary: [
+                { label: "메시지", value: rows.length },
+                { label: "관리자 발신", value: messages.filter(message => message.from_user === myId).length },
+                { label: "근로자 발신", value: messages.filter(message => message.from_user !== myId).length },
+            ],
+            columns: [
+                { key: "time", label: "시각" },
+                { key: "sender", label: "발신자" },
+                { key: "source_lang", label: "원문 언어" },
+                { key: "target_lang", label: "번역 언어" },
+                { key: "source_text", label: "원문" },
+                { key: "translated_text", label: "번역" },
+                { key: "pronunciation", label: "발음" },
+                { key: "read", label: "읽음" },
+            ],
+            rows,
+            raw: { worker: activeWorker, messages },
+        });
+    };
+
     return (
         <RoleGuard allowedRole="admin">
             {/* White/Bright Theme applied to root */}
@@ -488,6 +529,7 @@ function AdminChatContent() {
 
                         {activeWorker && (
                             <div className="flex items-center gap-1">
+                                <ExportMenu disabled={messages.length === 0} onExport={handleExport} />
                                 <button
                                     onClick={async () => {
                                         setShowQR(true);

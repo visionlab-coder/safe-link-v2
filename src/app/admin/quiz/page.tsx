@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
 import { createClient } from "@/utils/supabase/client";
+import ExportMenu from "@/components/ExportMenu";
+import { exportData, type ExportFormat } from "@/utils/export-files";
 
 type Phase = "select" | "generating" | "preview" | "sending" | "live";
 
@@ -156,6 +158,48 @@ function AdminQuizContent() {
   const answeredCount = liveResponses.filter(r => r.status === "answered").length;
   const totalSent = liveResponses.length;
 
+  const handleExport = async (format: ExportFormat) => {
+    const rows = phase === "live"
+      ? liveResponses.map((response) => ({
+          type: "response",
+          id: response.id,
+          worker: response.worker_id,
+          lang: response.lang,
+          status: response.status,
+          submitted_at: response.submitted_at ?? "",
+        }))
+      : questions.map((question, index) => ({
+          type: "question",
+          id: question.id,
+          worker: `${index + 1}`,
+          lang: question.keyword,
+          status: question.included ? "included" : "excluded",
+          submitted_at: question.question_ko,
+        }));
+
+    await exportData(format, {
+      title: "안전 퀴즈 리포트",
+      subtitle: `${selectedSession?.title ?? selectedSession?.id ?? "선택 세션"} / ${new Date().toLocaleString("ko-KR")}`,
+      filename: `safety_quiz_${quizSessionId || selectedSession?.id || "draft"}_${new Date().toISOString().slice(0, 10)}`,
+      summary: [
+        { label: "문항", value: questions.length },
+        { label: "발송", value: totalSent },
+        { label: "응답", value: answeredCount },
+        { label: "응답률", value: totalSent > 0 ? `${Math.round((answeredCount / totalSent) * 100)}%` : "0%" },
+      ],
+      columns: [
+        { key: "type", label: "구분" },
+        { key: "id", label: "ID" },
+        { key: "worker", label: "근로자/번호" },
+        { key: "lang", label: "언어/키워드" },
+        { key: "status", label: "상태" },
+        { key: "submitted_at", label: "내용/제출시각" },
+      ],
+      rows,
+      raw: { selectedSession, quizSessionId, questions, liveResponses },
+    });
+  };
+
   return (
     <RoleGuard allowedRole="admin">
       <div className="min-h-screen bg-mesh text-white font-sans flex flex-col selection:bg-blue-500/30">
@@ -177,6 +221,11 @@ function AdminQuizContent() {
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
               <span className="text-xs font-black text-green-400 uppercase tracking-widest">Live</span>
             </span>
+          )}
+          {(questions.length > 0 || liveResponses.length > 0) && (
+            <div className={phase === "live" ? "ml-3" : "ml-auto"}>
+              <ExportMenu onExport={handleExport} />
+            </div>
           )}
         </header>
 

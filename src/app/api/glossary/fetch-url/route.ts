@@ -178,6 +178,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "blocked_host" }, { status: 400 });
   }
 
+  if (await resolveAndCheckHost(target.hostname)) {
+    return NextResponse.json({ error: "blocked_host" }, { status: 400 });
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
 

@@ -3,7 +3,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
 import { createClient } from "@/utils/supabase/client";
-import { BarChart3, ArrowLeft, RefreshCw, Download, Shield, Users, AlertTriangle, PenLine, Link, Mic } from "lucide-react";
+import ExportMenu from "@/components/ExportMenu";
+import { exportData, type ExportFormat } from "@/utils/export-files";
+import { BarChart3, ArrowLeft, RefreshCw, Shield, Users, AlertTriangle, PenLine, Link, Mic } from "lucide-react";
 
 type Site = { id: string; name: string; code?: string | null };
 type EsgReport = {
@@ -17,6 +19,14 @@ type EsgReport = {
   auditChain: { totalEvents: number };
   interpretation: { totalSessions: number | null };
   generatedAt: string;
+  report?: unknown;
+};
+
+type EsgMetricRow = {
+  category: string;
+  metric: string;
+  value: string | number;
+  detail: string;
 };
 
 function StatCard({
@@ -59,6 +69,43 @@ function StatCard({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+function VennDiagram({ report }: { report: EsgReport }) {
+  const tbm = Math.round(report.tbm.certificationRate * 100);
+  const pledge = Math.round(report.pledges.signatureRate * 100);
+  const stopWork =
+    report.stopWork.totalIncidents > 0
+      ? Math.round((report.stopWork.resolvedCount / report.stopWork.totalIncidents) * 100)
+      : 100;
+  const overlap = Math.round((tbm + pledge + stopWork) / 3);
+
+  return (
+    <div className="mt-4 bg-gray-900 rounded-2xl p-5 border border-gray-800">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Safety Venn</p>
+          <h2 className="text-lg font-black text-white">TBM · 서약 · 작업중지 교차 집계</h2>
+        </div>
+        <p className="text-3xl font-black text-emerald-400">{overlap}%</p>
+      </div>
+      <div className="relative h-56">
+        <div className="absolute left-[20%] top-4 w-40 h-40 rounded-full bg-blue-500/35 border border-blue-400/60 flex items-start justify-center pt-8 text-center">
+          <span className="font-black text-blue-100">TBM<br />{tbm}%</span>
+        </div>
+        <div className="absolute left-[41%] top-4 w-40 h-40 rounded-full bg-emerald-500/35 border border-emerald-400/60 flex items-start justify-center pt-8 text-center">
+          <span className="font-black text-emerald-100">서약<br />{pledge}%</span>
+        </div>
+        <div className="absolute left-[31%] top-20 w-40 h-40 rounded-full bg-amber-500/35 border border-amber-400/60 flex items-end justify-center pb-8 text-center">
+          <span className="font-black text-amber-100">조치<br />{stopWork}%</span>
+        </div>
+        <div className="absolute left-1/2 top-[46%] -translate-x-1/2 -translate-y-1/2 bg-gray-950/90 border border-white/20 rounded-2xl px-4 py-3 text-center shadow-xl">
+          <p className="text-xs text-gray-400 font-bold">종합</p>
+          <p className="text-2xl font-black text-white">{overlap}%</p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -116,15 +163,87 @@ export default function AdminEsgPage() {
     }
   }, [selectedSiteId, from, to]);
 
-  const handleExportJson = () => {
+  useEffect(() => {
+    if (selectedSiteId && !loadingSites) {
+      fetchReport();
+    }
+  }, [fetchReport, loadingSites, selectedSiteId]);
+
+  const buildExportRows = (current: EsgReport): EsgMetricRow[] => [
+    {
+      category: "TBM",
+      metric: "TBM 세션",
+      value: current.tbm.totalSessions,
+      detail: `참석 ${current.tbm.totalAttendance}명`,
+    },
+    {
+      category: "TBM",
+      metric: "TBM 인증률",
+      value: `${Math.round(current.tbm.certificationRate * 100)}%`,
+      detail: `${Math.round(current.tbm.certificationRate * current.tbm.totalAttendance)} / ${current.tbm.totalAttendance}명`,
+    },
+    {
+      category: "서약",
+      metric: "안전서약",
+      value: current.pledges.totalPledges,
+      detail: `서명 완료 ${current.pledges.signedCount}건, 서명률 ${Math.round(current.pledges.signatureRate * 100)}%`,
+    },
+    {
+      category: "작업중지",
+      metric: "작업중지 개입",
+      value: current.stopWork.totalIncidents,
+      detail: `해결 ${current.stopWork.resolvedCount} / 총 ${current.stopWork.totalIncidents}`,
+    },
+    {
+      category: "감사",
+      metric: "감사체인 이벤트",
+      value: current.auditChain.totalEvents,
+      detail: "SHA-256 리포트 무결성 기록",
+    },
+    {
+      category: "통역",
+      metric: "라이브 통역 세션",
+      value: current.interpretation.totalSessions ?? "-",
+      detail: "기간 내 라이브 통역 집계",
+    },
+    {
+      category: "장비",
+      metric: "안전장비 지급",
+      value: current.safetyEquipment.totalGrants,
+      detail: "퀴즈/인센티브 기반 지급 건수",
+    },
+  ];
+
+  const esgScore = report
+    ? Math.round(
+        (report.tbm.certificationRate * 40) +
+        (report.pledges.signatureRate * 30) +
+        (report.stopWork.totalIncidents > 0 ? (report.stopWork.resolvedCount / report.stopWork.totalIncidents) * 20 : 20) +
+        (report.tbm.totalSessions > 0 ? 10 : 0),
+      )
+    : 0;
+
+  const handleExport = async (format: ExportFormat) => {
     if (!report) return;
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `esg_report_${report.siteId}_${report.period.from}_${report.period.to}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    await exportData(format, {
+      title: "ESG 안전 리포트",
+      subtitle: `${report.period.from} ~ ${report.period.to} / 자동 집계`,
+      filename: `esg_safety_report_${report.siteId}_${report.period.from}_${report.period.to}`,
+      summary: [
+        { label: "ESG 종합 점수", value: `${esgScore}/100` },
+        { label: "TBM 인증률", value: `${Math.round(report.tbm.certificationRate * 100)}%` },
+        { label: "서약 서명률", value: `${Math.round(report.pledges.signatureRate * 100)}%` },
+        { label: "작업중지 해결", value: `${report.stopWork.resolvedCount}/${report.stopWork.totalIncidents}` },
+      ],
+      columns: [
+        { key: "category", label: "구분" },
+        { key: "metric", label: "지표" },
+        { key: "value", label: "값" },
+        { key: "detail", label: "상세" },
+      ],
+      rows: buildExportRows(report),
+      raw: report,
+    });
   };
 
   return (
@@ -183,15 +302,7 @@ export default function AdminEsgPage() {
                 {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                 리포트 생성
               </button>
-              {report && (
-                <button
-                  onClick={handleExportJson}
-                  className="flex items-center gap-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 font-bold py-2.5 px-4 rounded-xl text-sm transition-colors"
-                >
-                  <Download className="w-4 h-4" />
-                  JSON
-                </button>
-              )}
+              <ExportMenu disabled={!report} includeJson onExport={handleExport} />
             </div>
           </div>
 
@@ -268,6 +379,8 @@ export default function AdminEsgPage() {
                   </div>
                 </div>
               )}
+
+              <VennDiagram report={report} />
 
               <div className="mt-4 bg-gray-900 rounded-xl p-4 border border-gray-800">
                 <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-2">ESG 종합 점수</p>

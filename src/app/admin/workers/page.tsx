@@ -5,6 +5,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Plus, QrCode, RefreshCw, Search, UserX, Users, X } from "lucide-react";
 import RoleGuard from "@/components/RoleGuard";
+import ExportMenu from "@/components/ExportMenu";
+import { exportData, type ExportFormat } from "@/utils/export-files";
 import { createClient } from "@/utils/supabase/client";
 
 interface Worker {
@@ -79,6 +81,31 @@ export default function AdminWorkersPage() {
     setQuery(search.trim());
   };
 
+  const handleExport = async (format: ExportFormat) => {
+    await exportData(format, {
+      title: "NFC 근로자 관리대장",
+      subtitle: `현장 ${adminSiteId || "-"} / ${new Date().toLocaleString("ko-KR")}`,
+      filename: `nfc_workers_${adminSiteId || "site"}_${new Date().toISOString().slice(0, 10)}`,
+      summary: [
+        { label: "전체 근로자", value: workers.length },
+        { label: "활성", value: workers.filter((worker) => worker.is_active).length },
+        { label: "동의 서명", value: workers.filter((worker) => worker.consent_signed_at).length },
+      ],
+      columns: [
+        { key: "worker_code", label: "근로자 코드" },
+        { key: "full_name", label: "이름" },
+        { key: "nationality", label: "국적" },
+        { key: "trade", label: "공종" },
+        { key: "preferred_lang", label: "언어" },
+        { key: "is_active", label: "상태", value: (row) => row.is_active ? "활성" : "비활성" },
+        { key: "consent_signed_at", label: "동의 서명일" },
+        { key: "created_at", label: "등록일" },
+      ],
+      rows: workers,
+      raw: { siteId: adminSiteId, workers },
+    });
+  };
+
   const handleDeactivate = async (id: string, name: string) => {
     if (!confirm(`${name} 근로자를 비활성화하시겠습니까? 활성 NFC/QR 링크가 모두 폐기됩니다.`)) return;
     await fetch(`/api/nfc/workers/${id}`, { method: "DELETE" });
@@ -128,6 +155,8 @@ export default function AdminWorkersPage() {
                 {adminSiteId && <p className="text-xs text-gray-500 font-mono">{adminSiteId}</p>}
               </div>
             </div>
+            <div className="flex items-center gap-2">
+              <ExportMenu disabled={workers.length === 0} onExport={handleExport} />
             <button
               onClick={() => router.push("/admin/workers/enroll")}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -135,6 +164,7 @@ export default function AdminWorkersPage() {
               <Plus className="w-4 h-4" />
               카드 발급
             </button>
+            </div>
           </div>
 
           <form onSubmit={handleSearch} className="flex gap-2 mb-4">

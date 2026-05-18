@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { CalendarDays, CheckCircle2, ClipboardList, RefreshCw, XCircle } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import ExportMenu from "@/components/ExportMenu";
+import { exportData, type ExportFormat } from "@/utils/export-files";
 
 type DailyLog = {
   id: string;
@@ -86,6 +88,31 @@ export default function AdminNfcDailyLogsPage() {
 
   const signedCount = logs.filter((log) => log.attendance_summary?.has_tbm_signature).length;
 
+  const handleExport = async (format: ExportFormat) => {
+    await exportData(format, {
+      title: "NFC 일일 안전 로그",
+      subtitle: `${workDate} / 현장 ${adminSiteId || "-"}`,
+      filename: `nfc_daily_logs_${adminSiteId || "site"}_${workDate}`,
+      summary: [
+        { label: "전체 로그", value: logs.length },
+        { label: "TBM 서명", value: signedCount },
+        { label: "미서명", value: Math.max(logs.length - signedCount, 0) },
+      ],
+      columns: [
+        { key: "worker", label: "근로자", value: (row) => row.worker?.full_name ?? row.worker_id },
+        { key: "worker_code", label: "근로자 코드", value: (row) => row.worker?.worker_code ?? "" },
+        { key: "nationality", label: "국적", value: (row) => row.worker?.nationality ?? "" },
+        { key: "trade", label: "공종", value: (row) => row.worker?.trade ?? "" },
+        { key: "check_in_at", label: "출근", value: (row) => timeLabel(row.check_in_at) },
+        { key: "check_out_at", label: "퇴근", value: (row) => timeLabel(row.check_out_at) },
+        { key: "tbm", label: "TBM", value: (row) => `${row.attendance_summary?.tbm_signed_count ?? 0}/${row.attendance_summary?.tbm_count ?? 0}` },
+        { key: "tbm_signed_at", label: "서명", value: (row) => row.attendance_summary?.has_tbm_signature ? timeLabel(row.tbm_signed_at) : "미서명" },
+      ],
+      rows: logs,
+      raw: { siteId: adminSiteId, workDate, logs },
+    });
+  };
+
   return (
     <RoleGuard allowedRole="admin">
       <main className="min-h-screen bg-gray-950 text-white p-4">
@@ -101,6 +128,7 @@ export default function AdminNfcDailyLogsPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <ExportMenu disabled={logs.length === 0} onExport={handleExport} />
               <div className="relative">
                 <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                 <input

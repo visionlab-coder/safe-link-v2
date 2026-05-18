@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
 import { createClient } from "@/utils/supabase/client";
 import { Award, CheckCircle, ChevronRight, ArrowLeft, RefreshCw } from "lucide-react";
+import ExportMenu from "@/components/ExportMenu";
+import { exportData, type ExportFormat } from "@/utils/export-files";
 
 const EQUIPMENT_TYPES = [
   "안전모", "안전화", "안전조끼", "안전장갑", "안전안경",
@@ -132,6 +134,40 @@ export default function AdminIncentivePage() {
 
   const alreadyGranted = (workerId: string) => grants.some((g) => g.worker_id === workerId);
 
+  const handleExport = async (format: ExportFormat) => {
+    const rows = responses.map((response) => ({
+      worker_code: response.nfc_workers?.worker_code ?? response.worker_id,
+      full_name: response.nfc_workers?.full_name ?? "",
+      lang: response.lang,
+      score_pct: response.score_pct ?? "",
+      status: response.status,
+      answered_at: response.answered_at ?? "",
+      granted: alreadyGranted(response.worker_id) ? "지급" : "미지급",
+    }));
+
+    await exportData(format, {
+      title: "안전장비 인센티브 지급 리포트",
+      subtitle: `${selectedSession?.id ?? "전체"} / 현장 ${adminSiteId || "-"}`,
+      filename: `safety_incentive_${selectedSession?.id ?? "all"}_${new Date().toISOString().slice(0, 10)}`,
+      summary: [
+        { label: "응답", value: responses.length },
+        { label: "80점 이상", value: responses.filter((response) => (response.score_pct ?? 0) >= 80).length },
+        { label: "지급", value: grants.length },
+      ],
+      columns: [
+        { key: "worker_code", label: "근로자 코드" },
+        { key: "full_name", label: "이름" },
+        { key: "lang", label: "언어" },
+        { key: "score_pct", label: "점수" },
+        { key: "status", label: "상태" },
+        { key: "answered_at", label: "응답시각" },
+        { key: "granted", label: "장비 지급" },
+      ],
+      rows,
+      raw: { selectedSession, responses, grants },
+    });
+  };
+
   return (
     <RoleGuard allowedRole="admin">
       <div className="min-h-screen bg-gray-950 text-white p-4">
@@ -143,6 +179,10 @@ export default function AdminIncentivePage() {
             <Award className="w-6 h-6 text-yellow-400" />
             <h1 className="text-xl font-bold">안전장비 인센티브 지급</h1>
             <span className="text-xs bg-yellow-900/50 text-yellow-400 px-2 py-0.5 rounded font-bold">청구항 12</span>
+          </div>
+
+          <div className="mb-4 flex justify-end">
+            <ExportMenu disabled={responses.length === 0} onExport={handleExport} />
           </div>
 
           {!selectedSession ? (

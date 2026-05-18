@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
+import ExportMenu from "@/components/ExportMenu";
+import { exportData, type ExportFormat } from "@/utils/export-files";
 
 const isoMap: Record<string, string> = {
     ko: "kr", en: "us", vi: "vn", zh: "cn", th: "th", uz: "uz", ph: "ph",
@@ -189,6 +191,31 @@ function TBMStatusPageContent() {
 
     const escapeHtml = (str: string) =>
         str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
+    const handleFileExport = async (format: ExportFormat) => {
+        if (!latestTBM) return;
+        const signedWorkers = workers.filter(w => w.signed);
+        const unsignedWorkers = workers.filter(w => !w.signed);
+        await exportData(format, {
+            title: "TBM 서명 현황 리포트",
+            subtitle: `${latestTBM.site_name || "현장"} / ${new Date(latestTBM.created_at).toLocaleString("ko-KR")}`,
+            filename: `tbm_signature_report_${latestTBM.site_name || "site"}_${new Date().toISOString().slice(0, 10)}`,
+            summary: [
+                { label: "전체", value: workers.length },
+                { label: "서명 완료", value: signedWorkers.length },
+                { label: "미서명", value: unsignedWorkers.length },
+                { label: "서명률", value: workers.length ? `${Math.round((signedWorkers.length / workers.length) * 100)}%` : "0%" },
+            ],
+            columns: [
+                { key: "display_name", label: "근로자" },
+                { key: "preferred_lang", label: "언어" },
+                { key: "signed", label: "서명 여부", value: row => row.signed ? "완료" : "미서명" },
+                { key: "signed_at", label: "서명 시각", value: row => row.signed_at || "" },
+            ],
+            rows: workers,
+            raw: { tbm: latestTBM, workers },
+        });
+    };
 
     const handleExport = async (mode: 'print' | 'sheets' | 'drive' = 'print') => {
         if (!latestTBM) return;
@@ -485,6 +512,7 @@ function TBMStatusPageContent() {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
+                        <ExportMenu disabled={!latestTBM || workers.length === 0} onExport={handleFileExport} />
                         {/* 내보내기 드롭다운 스타일 버튼 */}
                         <div className="relative group/export">
                             <button className="glass px-5 py-2 rounded-full text-xs font-black text-blue-400 hover:bg-blue-500/10 transition-all tap-effect uppercase tracking-widest flex items-center gap-2">

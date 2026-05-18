@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { normalizeKoAsync, clearGlossaryCache } from "@/utils/normalize";
 import { motion, AnimatePresence } from "framer-motion";
+import ExportMenu from "@/components/ExportMenu";
+import { exportData, type ExportFormat } from "@/utils/export-files";
 
 type GlossaryTerm = {
     id: number;
@@ -463,6 +465,27 @@ export default function GlossaryPage() {
     const escapeHtml = (str: string) =>
         str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 
+    const handleFileExport = async (format: ExportFormat) => {
+        await exportData(format, {
+            title: "현장 용어집 리포트",
+            subtitle: `총 ${terms.length}개 / ${new Date().toLocaleString("ko-KR")}`,
+            filename: `safelink_glossary_${new Date().toISOString().slice(0, 10)}`,
+            summary: [
+                { label: "전체 용어", value: terms.length },
+                { label: "활성", value: terms.filter(term => term.is_active).length },
+                { label: "비활성", value: terms.filter(term => !term.is_active).length },
+            ],
+            columns: [
+                { key: "category", label: "카테고리" },
+                { key: "slang", label: "현장 표현" },
+                { key: "standard", label: "표준 표현" },
+                { key: "is_active", label: "상태", value: row => row.is_active ? "활성" : "비활성" },
+            ],
+            rows: terms,
+            raw: { terms },
+        });
+    };
+
     const handleExport = async (mode: 'print' | 'sheets' | 'drive' = 'print') => {
         if (terms.length === 0) return;
 
@@ -559,6 +582,8 @@ export default function GlossaryPage() {
                             <p className="text-slate-400 font-bold tracking-tight uppercase text-sm">현장 용어 및 표준어 관리</p>
                         </div>
                     </div>
+                    <div className="flex items-center gap-2">
+                        <ExportMenu disabled={terms.length === 0} onExport={handleFileExport} />
                     <div className="relative group/export">
                         <button className="glass px-6 py-3 rounded-full text-xs font-black text-blue-400 hover:bg-blue-500/10 transition-all tap-effect uppercase tracking-widest flex items-center gap-2 shadow-xl">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2-2H7a2 2 0 00-2 2v4h12z" /></svg>
@@ -569,6 +594,7 @@ export default function GlossaryPage() {
                             <button onClick={() => handleExport('sheets')} className="w-full px-4 py-4 text-left text-[11px] font-black hover:bg-white/5 text-slate-300 transition-colors border-b border-white/5 uppercase tracking-widest flex items-center gap-2">📊 구글 스프레드시트 (CSV)</button>
                             <button onClick={() => handleExport('drive')} className="w-full px-4 py-4 text-left text-[11px] font-black hover:bg-white/5 text-slate-300 transition-colors uppercase tracking-widest flex items-center gap-2">☁️ 구글 드라이브 보관</button>
                         </div>
+                    </div>
                     </div>
                 </header>
 

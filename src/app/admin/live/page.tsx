@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
 import { createClient } from "@/utils/supabase/client";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
+import ExportMenu from "@/components/ExportMenu";
+import { exportData, type ExportFormat } from "@/utils/export-files";
 
 function AdminLiveContent() {
     const router = useRouter();
@@ -145,6 +147,25 @@ function AdminLiveContent() {
         setIsLive(false);
     };
 
+    const handleExport = async (format: ExportFormat) => {
+        await exportData(format, {
+            title: "라이브 통역 방송 로그",
+            subtitle: `${sessionId || "미시작"} / 현장 ${siteId || "-"} / ${new Date().toLocaleString("ko-KR")}`,
+            filename: `live_interpreter_${sessionId || "draft"}_${new Date().toISOString().slice(0, 10)}`,
+            summary: [
+                { label: "발화", value: transcripts.length },
+                { label: "청취자", value: listenerCount },
+                { label: "상태", value: isLive ? "ON AIR" : "종료" },
+            ],
+            columns: [
+                { key: "time", label: "시각" },
+                { key: "text", label: "한국어 원문" },
+            ],
+            rows: transcripts,
+            raw: { sessionId, siteId, transcripts },
+        });
+    };
+
     return (
         <RoleGuard allowedRole="admin">
             <div className="min-h-screen bg-mesh text-white font-sans flex flex-col selection:bg-blue-500/30">
@@ -165,15 +186,18 @@ function AdminLiveContent() {
                             )}
                         </div>
                     </div>
-                    {isLive && (
-                        <div className="flex items-center gap-2 glass px-4 py-2 rounded-full border-white/5">
-                            <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                            </svg>
-                            <span className="text-sm font-black text-green-400">{listenerCount}</span>
-                            <span className="text-[10px] text-slate-500 font-black uppercase">listeners</span>
-                        </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                        <ExportMenu disabled={transcripts.length === 0} onExport={handleExport} />
+                        {isLive && (
+                            <div className="flex items-center gap-2 glass px-4 py-2 rounded-full border-white/5">
+                                <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                                </svg>
+                                <span className="text-sm font-black text-green-400">{listenerCount}</span>
+                                <span className="text-[10px] text-slate-500 font-black uppercase">listeners</span>
+                            </div>
+                        )}
+                    </div>
                 </header>
 
                 <main className="flex-1 flex flex-col p-4 md:p-8 gap-6 max-w-3xl mx-auto w-full pb-20">
