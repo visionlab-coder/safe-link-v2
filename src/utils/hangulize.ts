@@ -87,7 +87,7 @@ const viSyllables: Record<string, string> = {
 };
 
 // 태국어 로마자 → 한글 매핑 (영어 bridge 경유 시 사용)
-const thSyllables: Record<string, string> = {
+const _thSyllables: Record<string, string> = {
     "sawatdi": "사왓디", "khrap": "크랍", "kha": "카", "chai": "차이", "mai": "마이",
     "khob": "콥", "khun": "쿤", "sabai": "사바이", "di": "디", "arai": "아라이",
     "nan": "난", "ni": "니", "thi": "티", "nai": "나이", "pen": "뻰", "khao": "카오",
@@ -103,7 +103,7 @@ const thSyllables: Record<string, string> = {
 };
 
 // 인도네시아어/말레이어 음절 매핑
-const idSyllables: Record<string, string> = {
+const _idSyllables: Record<string, string> = {
     "selamat": "슬라맛", "pagi": "빠기", "siang": "시앙", "sore": "소레", "malam": "말람",
     "terima": "뜨리마", "kasih": "까시", "sama": "사마", "tidak": "띠닥", "bisa": "비사",
     "apa": "아빠", "ini": "이니", "itu": "이뚜", "dan": "단", "yang": "양",
@@ -253,7 +253,7 @@ export function hangulize(text: string, lang: string): string {
 }
 
 /** 사전 기반 hangulize: 사전 매칭 → fallback generic */
-function hangulizeWithDict(text: string, dict: Record<string, string>): string {
+function _hangulizeWithDict(text: string, dict: Record<string, string>): string {
     return text.split(/\s+/).map(word => {
         if (dict[word]) return dict[word];
         // 복합어: 긴 접두사/접미사 검색
