@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
 import { createClient } from "@/utils/supabase/client";
@@ -199,6 +200,16 @@ function AdminLiveContent() {
                         )}
                     </div>
                 </header>
+
+                <div className="relative overflow-hidden h-40 w-full">
+                  <Image
+                    src="/images/safelink-pages/live-field-monitoring.png"
+                    alt="Live Field Monitoring"
+                    fill
+                    className="object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                </div>
 
                 <main className="flex-1 flex flex-col p-4 md:p-8 gap-6 max-w-3xl mx-auto w-full pb-20">
                     {!isLive ? (

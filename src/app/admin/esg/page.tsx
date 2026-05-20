@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
 import { createClient } from "@/utils/supabase/client";
@@ -257,6 +258,16 @@ export default function AdminEsgPage() {
             <BarChart3 className="w-6 h-6 text-emerald-400" />
             <h1 className="text-xl font-bold">ESG 안전 리포트</h1>
             <span className="text-xs bg-emerald-900/50 text-emerald-400 px-2 py-0.5 rounded font-bold">청구항 24</span>
+          </div>
+
+          <div className="relative rounded-2xl overflow-hidden h-40 w-full mb-4">
+            <Image
+              src="/images/safelink-pages/esg-safety-report.png"
+              alt="ESG Safety Report"
+              fill
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
           </div>
 
           <div className="bg-gray-800 rounded-2xl p-4 mb-4 border border-gray-700 flex flex-col gap-3">

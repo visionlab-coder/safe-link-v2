@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useRef, useCallback } from "react";
+import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
@@ -597,6 +598,16 @@ export default function GlossaryPage() {
                     </div>
                     </div>
                 </header>
+
+                <div className="relative rounded-2xl overflow-hidden h-40 w-full">
+                  <Image
+                    src="/images/safelink-pages/ai-glossary-communication.png"
+                    alt="AI Glossary"
+                    fill
+                    className="object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Left Column: Form & Testing */}

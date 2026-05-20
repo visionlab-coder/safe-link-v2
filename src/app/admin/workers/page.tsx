@@ -167,6 +167,16 @@ export default function AdminWorkersPage() {
             </div>
           </div>
 
+          <div className="relative rounded-2xl overflow-hidden h-40 w-full mb-4">
+            <Image
+              src="/images/safelink-pages/workers-roster-check.png"
+              alt="Workers Roster"
+              fill
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          </div>
+
           <form onSubmit={handleSearch} className="flex gap-2 mb-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />

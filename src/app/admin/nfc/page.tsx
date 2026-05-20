@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter } from "next/navigation";
 import { ChevronRight, ClipboardList, KeyRound, LocateFixed, Nfc, RefreshCw, Users } from "lucide-react";
@@ -200,6 +201,16 @@ export default function AdminNfcHubPage() {
             <p className="text-gray-400 text-sm">
               NFC 카드 발급, TBM 참석 확인, 일일 안전일지, 현장 확인코드를 관리합니다.
             </p>
+            <div className="relative rounded-2xl overflow-hidden h-40 w-full mt-4">
+              <Image
+                src="/images/safelink-pages/nfc-qr-field-scan.png"
+                alt="NFC Field Scan"
+                fill
+                className="object-cover"
+                priority
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+            </div>
           </div>
 
           <div className="mb-5 bg-gray-900 border border-gray-800 rounded-xl p-4">

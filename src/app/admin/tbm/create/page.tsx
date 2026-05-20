@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
@@ -314,6 +315,16 @@ function AdminTBMCreateContent() {
                         </div>
                     </div>
                 </header>
+
+                <div className="relative overflow-hidden h-40 w-full">
+                  <Image
+                    src="/images/safelink-pages/tbm-briefing-field.png"
+                    alt="TBM Field Briefing"
+                    fill
+                    className="object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                </div>
 
                 <main className="flex-1 flex flex-col p-4 md:p-8 gap-8 max-w-3xl mx-auto w-full pb-20">
                     <div className="flex flex-col gap-2">

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, Suspense } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
 import { createClient } from "@/utils/supabase/client";
@@ -228,6 +229,16 @@ function AdminQuizContent() {
             </div>
           )}
         </header>
+
+        <div className="relative overflow-hidden h-40 w-full">
+          <Image
+            src="/images/safelink-pages/quiz-worker-training.png"
+            alt="Safety Quiz"
+            fill
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+        </div>
 
         <main className="flex-1 flex flex-col p-4 md:p-8 gap-6 max-w-3xl mx-auto w-full pb-20">
 

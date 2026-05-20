@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, Suspense } from "react";
+import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
@@ -283,6 +284,17 @@ function AdminDashboardContent() {
                     <h2 className="text-5xl font-black text-white text-gradient tracking-tighter uppercase">{t.board}</h2>
                     <p className="text-slate-500 font-bold tracking-tight uppercase text-sm">{t.boardDesc}</p>
                 </motion.div>
+
+                <div className="relative rounded-2xl overflow-hidden h-44 w-full">
+                  <Image
+                    src="/images/safelink-pages/admin-dashboard-control.png"
+                    alt="Admin Dashboard"
+                    fill
+                    className="object-cover"
+                    priority
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                </div>
 
                 {/* 🚨 Pre-flight Health Check (Critical for Monday Demo) */}
                 <SystemHealthCheck />
