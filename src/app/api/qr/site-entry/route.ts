@@ -323,11 +323,11 @@ export async function POST(req: NextRequest) {
       })
     : { action: "checked_out" as const, session: null };
 
-  // 게스트 워커(QR-)는 auth.users 계정 생성 금지 — 사전 등록된 근로자만 세션 발급
   const isGuestWorker = String(updatedWorker.worker_code ?? "").startsWith("QR-");
   let authUserId: string | null = updatedWorker.auth_user_id ?? null;
   const email = nfcEmail(worker.id);
   let generatedTokenHash: string | null = null;
+  let generatedVerificationType: string = "magiclink";
 
   if (!authUserId) {
     const { data: linkData } = await service.auth.admin.generateLink({
@@ -337,6 +337,8 @@ export async function POST(req: NextRequest) {
     });
     authUserId = linkData?.user?.id ?? null;
     generatedTokenHash = linkData?.properties?.hashed_token ?? null;
+    // 신규 유저는 "signup", 기존 유저는 "magiclink" — verifyOtp 타입 불일치 방지
+    generatedVerificationType = linkData?.properties?.verification_type ?? "magiclink";
   }
 
   if (authUserId) {
@@ -379,16 +381,20 @@ export async function POST(req: NextRequest) {
 
   if (!authUserId || !accessActive) return NextResponse.json(basePayload);
 
-  const tokenHash = generatedTokenHash ?? (
-    await service.auth.admin.generateLink({ type: "magiclink", email })
-  ).data?.properties?.hashed_token ?? null;
+  let tokenHash: string | null = generatedTokenHash;
+  let verifyType: string = generatedVerificationType;
+  if (!tokenHash) {
+    const { data: fallbackLink } = await service.auth.admin.generateLink({ type: "magiclink", email });
+    tokenHash = fallbackLink?.properties?.hashed_token ?? null;
+    verifyType = fallbackLink?.properties?.verification_type ?? "magiclink";
+  }
 
   if (!tokenHash) return NextResponse.json(basePayload);
 
   const serverClient = await createServerClient();
   const { error: otpErr } = await serverClient.auth.verifyOtp({
     token_hash: tokenHash,
-    type: "magiclink",
+    type: verifyType as "signup" | "magiclink" | "email",
   });
 
   if (otpErr) return NextResponse.json(basePayload);
