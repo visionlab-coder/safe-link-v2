@@ -99,7 +99,12 @@ function NfcWorkerEntryInner() {
   };
 
   const applyPreference = async (nationality: string, preferred_lang: string, intent: "open" | "checkout" = "open") => {
-    const location = await getDeviceLocation();
+    let location: DeviceLocation | null = null;
+    try {
+      location = await getDeviceLocation();
+    } catch {
+      // 위치 권한 없거나 GPS 실패 — 지오펜스 미설정 현장은 서버가 허용
+    }
     const res = await fetch("/api/nfc/worker-preference", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -107,7 +112,7 @@ function NfcWorkerEntryInner() {
         url: buildSignedUrl(),
         nationality,
         preferred_lang,
-        location,
+        ...(location && { location }),
         intent,
         site_challenge_code: siteChallengeCode,
       }),
@@ -301,7 +306,7 @@ function NfcWorkerEntryInner() {
           <div className="flex items-start gap-3">
             <Globe2 className="w-5 h-5 text-blue-400 mt-0.5 shrink-0" />
             <p className="text-sm text-gray-300">
-              Select your country. Location access is required so SAFE-LINK only works at the assigned worksite.
+              Select your country to check in to SAFE-LINK.
             </p>
           </div>
         </div>

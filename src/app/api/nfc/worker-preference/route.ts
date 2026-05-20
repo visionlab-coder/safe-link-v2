@@ -391,9 +391,7 @@ export async function POST(req: NextRequest) {
   const latitude = asFiniteNumber(body.location?.latitude);
   const longitude = asFiniteNumber(body.location?.longitude);
   const accuracy = Math.max(0, asFiniteNumber(body.location?.accuracy) ?? 0);
-  if (latitude == null || longitude == null) {
-    return NextResponse.json({ error: "location_required" }, { status: 428 });
-  }
+  const hasLocation = latitude != null && longitude != null;
 
   const siteLatitude = pickSiteNumber(site as Record<string, unknown>, "latitude");
   const siteLongitude = pickSiteNumber(site as Record<string, unknown>, "longitude");
@@ -402,11 +400,17 @@ export async function POST(req: NextRequest) {
     pickSiteNumber(site as Record<string, unknown>, "radius_m") ??
     DEFAULT_GEOFENCE_RADIUS_M;
 
-  // 현장 지오펜스 미설정 시 위치 검증 생략 (테스트/초기 설정 환경 허용)
+  // 현장 지오펜스 미설정 시 위치 검증 생략 (QR 대안 접근 허용)
   const geofenceActive = siteLatitude != null && siteLongitude != null;
-  const distanceM = geofenceActive
+
+  // 지오펜스가 활성화된 경우에만 위치 정보 필수
+  if (geofenceActive && !hasLocation) {
+    return NextResponse.json({ error: "location_required" }, { status: 428 });
+  }
+
+  const distanceM = geofenceActive && hasLocation
     ? haversineMeters(
-        { latitude, longitude },
+        { latitude: latitude!, longitude: longitude! },
         { latitude: siteLatitude!, longitude: siteLongitude! }
       )
     : 0;
