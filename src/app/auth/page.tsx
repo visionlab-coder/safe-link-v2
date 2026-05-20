@@ -172,7 +172,7 @@ function AuthContent() {
     }
     if (role === "ROOT" || role === "HQ_OFFICER") router.push(`/system?lang=${activeLang}`);
     else if (role === "HQ_ADMIN") router.push(`/control?lang=${activeLang}`);
-    else if (role === "SAFETY_OFFICER") router.push(`/admin?lang=${activeLang}`);
+    else if (role === "SAFETY_OFFICER" || role === "SITE_ADMIN") router.push(`/admin?lang=${activeLang}`);
     else router.push(`/worker?lang=${activeLang}`);
   }, [router, searchParams]);
 
