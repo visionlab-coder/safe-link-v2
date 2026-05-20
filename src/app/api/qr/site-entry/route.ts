@@ -325,28 +325,18 @@ export async function POST(req: NextRequest) {
 
   // 게스트 워커(QR-)는 auth.users 계정 생성 금지 — 사전 등록된 근로자만 세션 발급
   const isGuestWorker = String(updatedWorker.worker_code ?? "").startsWith("QR-");
-  let authUserId: string | null = isGuestWorker ? null : (updatedWorker.auth_user_id ?? null);
+  let authUserId: string | null = updatedWorker.auth_user_id ?? null;
   const email = nfcEmail(worker.id);
   let generatedTokenHash: string | null = null;
 
-  if (!authUserId && !isGuestWorker) {
-    const { data: authData, error: authErr } = await service.auth.admin.createUser({
+  if (!authUserId) {
+    const { data: linkData } = await service.auth.admin.generateLink({
+      type: "magiclink",
       email,
-      email_confirm: true,
-      user_metadata: { nfc_worker_id: worker.id },
+      options: { data: { nfc_worker_id: worker.id, qr_guest: isGuestWorker } },
     });
-
-    if (!authErr && authData?.user) {
-      authUserId = authData.user.id;
-    } else {
-      const { data: linkData } = await service.auth.admin.generateLink({
-        type: "magiclink",
-        email,
-        options: { data: { nfc_worker_id: worker.id } },
-      });
-      authUserId = linkData?.user?.id ?? null;
-      generatedTokenHash = linkData?.properties?.hashed_token ?? null;
-    }
+    authUserId = linkData?.user?.id ?? null;
+    generatedTokenHash = linkData?.properties?.hashed_token ?? null;
   }
 
   if (authUserId) {
