@@ -482,6 +482,11 @@ function WorkerTBMDetailContent() {
                     ) : (
                         <>
                             {/* 🚨 NEW TBM ARRIVED ALERT */}
+                            <div className="relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
+                                <Image src="/images/safelink-pages/tbm-briefing-field.png" alt="TBM worker briefing" fill className="object-cover" priority />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                            </div>
+
                             {hasNewTBM && (
                                 <div className="animate-in slide-in-from-top-4 fade-in duration-500 w-full mb-6 relative overflow-hidden p-6 glass-red rounded-3xl border-red-500 border-2 shadow-[0_0_60px_-15px_rgba(239,68,68,0.6)] flex items-center justify-center gap-4 text-white z-50">
                                     <svg className="w-8 h-8 animate-pulse text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>

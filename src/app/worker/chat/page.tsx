@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, Suspense, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@/utils/supabase/client";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import RoleGuard from "@/components/RoleGuard";
@@ -553,6 +554,10 @@ function WorkerChatContent() {
                         <div className="flex items-center justify-between mb-4 px-2">
                             <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">{t.title}</h2>
                             <QrCode className="w-5 h-5 text-slate-400" />
+                        </div>
+                        <div className="relative mb-4 h-28 w-full overflow-hidden rounded-2xl border border-slate-200">
+                            <Image src="/images/safelink-pages/ai-glossary-communication.png" alt="Worker translation chat" fill className="object-cover" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />
                         </div>
                         <div className="flex flex-col gap-2">
                             {filteredAdmins.length === 0 ? (

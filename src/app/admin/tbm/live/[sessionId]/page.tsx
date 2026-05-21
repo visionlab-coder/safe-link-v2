@@ -9,6 +9,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import { Nfc, Square, RefreshCw, CheckCircle, Users, AlertTriangle, Brain } from "lucide-react";
 import { NfcScanner, detectNfcSupport, NfcError } from "@/utils/nfc/web-nfc";
 import { NFC_BASE_URL } from "@/utils/nfc/constants";
@@ -217,6 +218,11 @@ export default function TbmLiveSessionPage() {
 
         <div className="max-w-2xl mx-auto p-4 space-y-4">
           {/* 스캔 영역 */}
+          <div className="relative h-40 w-full overflow-hidden rounded-2xl border border-gray-800">
+            <Image src="/images/safelink-pages/tbm-briefing-field.png" alt="Live TBM attendance scan" fill className="object-cover" priority />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          </div>
+
           {isActive && (
             <div className={`rounded-2xl p-6 text-center transition-all ${
               scanState === "scanning"         ? "bg-green-950 border-2 border-green-600" :

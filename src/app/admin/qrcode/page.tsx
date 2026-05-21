@@ -224,6 +224,11 @@ export default function QRDistributionPage() {
                         </div>
                     </header>
 
+                    <div className="relative h-44 w-full overflow-hidden rounded-[36px] border border-white/10 shadow-2xl">
+                        <Image src="/images/safelink-pages/nfc-qr-field-scan.png" alt="QR and NFC access center" fill className="object-cover" priority />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                    </div>
+
                     {/* Site Binding */}
                     <section className="glass rounded-[40px] p-8 border-white/10 flex flex-col gap-4">
                         <div>

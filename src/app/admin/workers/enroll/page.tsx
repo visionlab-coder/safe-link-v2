@@ -376,6 +376,11 @@ function WorkerEnrollInner() {
           <h1 className="text-xl font-bold">{existingWorkerId ? "근로자 NFC 카드 재발급" : "근로자 NFC 카드 발급"}</h1>
         </div>
 
+        <div className="relative mb-6 h-40 w-full overflow-hidden rounded-2xl border border-gray-800">
+          <Image src="/images/safelink-pages/workers-roster-check.png" alt="Worker NFC enrollment" fill className="object-cover" priority />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {!existingWorkerId && (
             <>

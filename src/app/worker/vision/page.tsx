@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { createClient } from "@/utils/supabase/client";
 
@@ -120,6 +121,11 @@ export default function WorkerVisionPage() {
                         <p className="text-slate-500 text-xs font-bold">{t.subtitle}</p>
                     </div>
                 </header>
+
+                <div className="relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
+                    <Image src="/images/safelink-pages/live-field-monitoring.png" alt="AI safety vision check" fill className="object-cover" priority />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                </div>
 
                 {/* Camera Capture */}
                 <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleCapture} className="hidden" />

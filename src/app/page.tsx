@@ -117,6 +117,17 @@ function LandingPageInner() {
         </div>
 
         {/* ?? Language Picker ?? */}
+        <div className="relative mb-10 h-44 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
+          <Image
+            src="/images/safelink-pages/landing-poc-hero.png"
+            alt="SAFE-LINK field safety platform"
+            fill
+            className="object-cover"
+            priority
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+        </div>
+
         <div className="w-full mb-12 glass-card rounded-[48px] p-8 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
 

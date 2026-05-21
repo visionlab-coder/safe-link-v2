@@ -719,6 +719,17 @@ function WorkerHomeContent() {
                 </header>
 
                 {/* 🛑 작업중지권 (Stop Work Authority) — 긴급 버튼 */}
+                <div className="relative overflow-hidden h-40 w-full rounded-[32px] border border-white/10 shadow-2xl">
+                    <Image
+                        src="/images/safelink-pages/tbm-briefing-field.png"
+                        alt="Field worker safety briefing"
+                        fill
+                        className="object-cover"
+                        priority
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                </div>
+
                 <section className="relative">
                     <button
                         onClick={() => setShowStopWorkModal(true)}

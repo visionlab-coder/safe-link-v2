@@ -579,6 +579,15 @@ function AdminChatContent() {
                     <div className={`${activeWorker ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col border-r border-slate-100 bg-slate-50/50 p-4 h-full overflow-y-auto`}>
                         <div className="mb-6 z-10 sticky top-0 bg-slate-50/90 backdrop-blur-md pb-4 pt-2 border-b border-slate-100">
                             <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-4">{t.title}</h2>
+                            <div className="relative mb-4 h-28 w-full overflow-hidden rounded-2xl border border-slate-200">
+                                <Image
+                                    src="/images/safelink-pages/ai-glossary-communication.png"
+                                    alt="AI translation communication"
+                                    fill
+                                    className="object-cover"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />
+                            </div>
                             <div className="relative">
                                 <input
                                     type="text"

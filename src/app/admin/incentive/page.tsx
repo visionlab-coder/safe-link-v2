@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
 import { createClient } from "@/utils/supabase/client";
@@ -183,6 +184,16 @@ export default function AdminIncentivePage() {
 
           <div className="mb-4 flex justify-end">
             <ExportMenu disabled={responses.length === 0} onExport={handleExport} />
+          </div>
+
+          <div className="relative rounded-2xl overflow-hidden h-40 w-full mb-4 border border-gray-800">
+            <Image
+              src="/images/safelink-pages/quiz-worker-training.png"
+              alt="Safety incentive training"
+              fill
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
           </div>
 
           {!selectedSession ? (

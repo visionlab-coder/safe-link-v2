@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Nfc, Plus, ChevronRight, Clock, CheckCircle } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
@@ -87,6 +88,11 @@ export default function TbmLiveIndexPage() {
           </div>
 
           {/* 새 세션 생성 폼 */}
+          <div className="relative mb-6 h-40 w-full overflow-hidden rounded-2xl border border-gray-800">
+            <Image src="/images/safelink-pages/tbm-briefing-field.png" alt="TBM NFC session management" fill className="object-cover" priority />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          </div>
+
           {creating && (
             <div className="bg-gray-800 rounded-xl p-4 mb-4 border border-green-800">
               <p className="text-sm text-gray-400 mb-3">새 TBM NFC 참석 세션을 개설합니다.</p>

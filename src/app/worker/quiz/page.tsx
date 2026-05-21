@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { createClient } from "@/utils/supabase/client";
 import { CheckCircle, XCircle, Brain, ChevronRight } from "lucide-react";
@@ -175,6 +176,16 @@ export default function WorkerQuizPage() {
           </button>
           <h1 className="text-2xl font-black tracking-tight uppercase italic text-gradient">{t.title}</h1>
         </header>
+
+        <div className="relative overflow-hidden h-40 w-full rounded-[32px] border border-white/10 shadow-2xl">
+          <Image
+            src="/images/safelink-pages/quiz-worker-training.png"
+            alt="Worker safety quiz"
+            fill
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+        </div>
 
         {!quizResponse && (
           <div className="flex-1 flex items-center justify-center">

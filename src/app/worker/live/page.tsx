@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { createClient } from "@/utils/supabase/client";
 import { playPremiumAudio, VoiceGender } from "@/utils/tts";
@@ -242,6 +243,11 @@ export default function WorkerLivePage() {
                 </header>
 
                 <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 md:p-8 flex flex-col gap-4">
+                    <div className="relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl shrink-0">
+                        <Image src="/images/safelink-pages/live-field-monitoring.png" alt="Live field monitoring" fill className="object-cover" priority />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                    </div>
+
                     {subtitles.length === 0 && (
                         <div className="flex-1 flex items-center justify-center min-h-[60vh]">
                             <div className="flex flex-col items-center gap-6 text-center">

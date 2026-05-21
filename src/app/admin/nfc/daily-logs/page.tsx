@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { CalendarDays, CheckCircle2, ClipboardList, RefreshCw, XCircle } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
@@ -147,6 +148,16 @@ export default function AdminNfcDailyLogsPage() {
                 <RefreshCw className="w-4 h-4" />
               </button>
             </div>
+          </div>
+
+          <div className="relative mb-5 h-40 w-full overflow-hidden rounded-2xl border border-gray-800">
+            <Image
+              src="/images/safelink-pages/nfc-qr-field-scan.png"
+              alt="NFC daily safety logs"
+              fill
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
           </div>
 
           <div className="grid grid-cols-3 gap-3 mb-4">

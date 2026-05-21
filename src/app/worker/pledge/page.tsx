@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { createClient } from "@/utils/supabase/client";
 import SignatureCanvas from "react-signature-canvas";
@@ -139,6 +140,11 @@ export default function WorkerPledgePage() {
         </header>
 
         <main className="flex-1 flex flex-col gap-6 p-4 pb-24 max-w-lg mx-auto w-full">
+          <div className="relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
+            <Image src="/images/safelink-pages/tbm-briefing-field.png" alt="TBM safety pledge" fill className="object-cover" priority />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+          </div>
+
           <section className="glass rounded-[32px] p-6 border-white/10 flex flex-col gap-3">
             <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">서약 내용</p>
             <p className="text-base font-bold text-white leading-relaxed">{t.pledge}</p>

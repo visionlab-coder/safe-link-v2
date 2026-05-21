@@ -540,6 +540,16 @@ function TBMStatusPageContent() {
                         </div>
                     </div>
 
+                    <div className="relative overflow-hidden h-40 w-full rounded-2xl border border-white/10">
+                        <Image
+                            src="/images/safelink-pages/tbm-briefing-field.png"
+                            alt="TBM status monitoring"
+                            fill
+                            className="object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                    </div>
+
                     {!loading && totalCount > 0 && (
                         <section className="glass rounded-[48px] p-8 md:p-10 border-white/10 shadow-3xl relative overflow-hidden group">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/10 blur-[100px] rounded-full -mr-32 -mt-32 pointer-events-none" />

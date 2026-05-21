@@ -392,6 +392,17 @@ function AuthContent() {
           )}
         </div>
 
+        <div className="relative mb-5 h-32 w-full overflow-hidden rounded-3xl border border-white/10 shadow-2xl">
+          <Image
+            src="/images/safelink-pages/auth-login-secure.png"
+            alt="Secure SAFE-LINK login"
+            fill
+            className="object-cover"
+            priority
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/5 to-transparent" />
+        </div>
+
         {/* Card */}
         <div style={glassCard} className="overflow-hidden">
           <div style={accentLine} />
