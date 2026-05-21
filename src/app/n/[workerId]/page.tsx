@@ -28,6 +28,7 @@ const NFC_ERROR_MESSAGES: Record<string, string> = {
   site_access_disabled: "현재 이 현장은 NFC 입장이 비활성화되어 있습니다. 관리자에게 문의하세요.",
   daily_safety_log_upload_failed: "안전일지 업로드에 실패했습니다. 잠시 후 다시 시도해 주세요.",
   location_required: "위치 권한을 켠 뒤 다시 태그해 주세요.",
+  site_geofence_required: "이 현장은 위치 설정이 완료되지 않았습니다. 관리자에게 현장 좌표 등록을 요청하세요.",
   url_malformed_or_spoofed: "잘못된 NFC 링크입니다. 관리자에게 카드 확인을 요청하세요.",
   nationality_invalid: "국가 선택이 올바르지 않습니다. 다시 선택해 주세요.",
   checkin_failed: "출근 처리에 실패했습니다. 다시 태그해 주세요.",

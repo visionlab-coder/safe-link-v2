@@ -400,11 +400,14 @@ export async function POST(req: NextRequest) {
     pickSiteNumber(site as Record<string, unknown>, "radius_m") ??
     DEFAULT_GEOFENCE_RADIUS_M;
 
-  // 현장 지오펜스 미설정 시 위치 검증 생략 (QR 대안 접근 허용)
   const geofenceActive = siteLatitude != null && siteLongitude != null;
 
-  // 지오펜스가 활성화된 경우에만 위치 정보 필수
-  if (geofenceActive && !hasLocation) {
+  // 지오펜스 미설정 현장은 위치 검증 없이 출근 불가 — 관리자가 좌표를 먼저 등록해야 함
+  if (!geofenceActive) {
+    return NextResponse.json({ error: "site_geofence_required" }, { status: 403 });
+  }
+
+  if (!hasLocation) {
     return NextResponse.json({ error: "location_required" }, { status: 428 });
   }
 
