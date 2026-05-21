@@ -391,10 +391,16 @@ export async function POST(req: NextRequest) {
 
   if (!tokenHash) return NextResponse.json(basePayload);
 
+  const ALLOWED_VERIFY_TYPES = ["signup", "magiclink", "email"] as const;
+  type AllowedVerifyType = typeof ALLOWED_VERIFY_TYPES[number];
+  const safeVerifyType: AllowedVerifyType = (ALLOWED_VERIFY_TYPES as readonly string[]).includes(verifyType)
+    ? verifyType as AllowedVerifyType
+    : "magiclink";
+
   const serverClient = await createServerClient();
   const { error: otpErr } = await serverClient.auth.verifyOtp({
     token_hash: tokenHash,
-    type: verifyType as "signup" | "magiclink" | "email",
+    type: safeVerifyType,
   });
 
   if (otpErr) return NextResponse.json(basePayload);
