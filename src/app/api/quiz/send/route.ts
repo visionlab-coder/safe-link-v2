@@ -71,11 +71,15 @@ Korean options: ${JSON.stringify(question.options_ko)}`;
   const match = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
   if (!match) return { question: question.question_ko, options: question.options_ko };
 
-  const parsed = JSON.parse(match[1]);
-  return {
-    question: parsed.question ?? question.question_ko,
-    options: parsed.options ?? question.options_ko,
-  };
+  try {
+    const parsed = JSON.parse(match[1]);
+    return {
+      question: parsed.question ?? question.question_ko,
+      options: parsed.options ?? question.options_ko,
+    };
+  } catch {
+    return { question: question.question_ko, options: question.options_ko };
+  }
 }
 
 export async function POST(req: NextRequest) {

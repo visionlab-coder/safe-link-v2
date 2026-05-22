@@ -58,6 +58,9 @@ export async function POST(req: NextRequest) {
   }
 
   const correctAnswers = response.answer_index_correct as number[];
+  if (answers.length !== correctAnswers.length) {
+    return NextResponse.json({ error: "invalid_answers_length" }, { status: 400 });
+  }
   const correct = answers.filter((ans, i) => ans === correctAnswers[i]).length;
   const total = correctAnswers.length;
   const scorePct = total > 0 ? Math.round((correct / total) * 100) : 0;

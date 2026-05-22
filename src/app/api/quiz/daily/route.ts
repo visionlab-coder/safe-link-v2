@@ -35,7 +35,8 @@ export async function POST(req: NextRequest) {
   const tbmSessionId = latestTbm?.id ?? null;
 
   // quiz/generate 내부 호출 (서버 to 서버)
-  const origin = req.nextUrl.origin;
+  // NEXT_PUBLIC_SITE_URL 우선 — req.nextUrl.origin은 Host 헤더 조작에 취약
+  const origin = (process.env.NEXT_PUBLIC_SITE_URL ?? req.nextUrl.origin).replace(/\/$/, "");
   const generateRes = await fetch(`${origin}/api/quiz/generate`, {
     method: "POST",
     headers: {

@@ -71,7 +71,8 @@ export async function POST(request: NextRequest) {
         if (sl === 'ko') {
             const glossary = await fetchGlossaryServer();
             for (const [slang, std] of Object.entries(glossary)) {
-                processedText = processedText.replace(new RegExp(slang, 'g'), std as string);
+                const escapedSlang = slang.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                processedText = processedText.replace(new RegExp(escapedSlang, 'g'), std as string);
             }
         } else if (tl === 'ko') {
             // 외국어→한국어: 건설 전문 용어를 한국어로 치환 후 번역 (품질 향상)

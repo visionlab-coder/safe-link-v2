@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 export const runtime = "nodejs";
 import { getErrorMessage } from '@/utils/errors';
+import { requireAdmin } from '@/utils/nfc/require-admin';
 
 interface GeminiTipsResponse {
     candidates?: Array<{
@@ -21,6 +22,9 @@ interface TipsPayload {
  * Gemini AI 기반 건설 현장 TBM 안전 수칙 3개 생성
  */
 export async function POST(request: NextRequest) {
+    const guard = await requireAdmin();
+    if (!guard.ok) return guard.response;
+
     const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();
 
 

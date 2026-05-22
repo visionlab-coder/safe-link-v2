@@ -140,9 +140,15 @@ export default function WorkerQuizPage() {
       if (res.ok && data.ok) {
         setResult({ scorePct: data.scorePct ?? 0, correct: data.correct ?? 0, total: data.total ?? 0 });
         setSubmitted(true);
+        // 제출 후 재조회 — answer_index_correct 포함된 완전한 응답 확보 (결과 화면용)
+        const refreshRes = await fetch("/api/quiz/worker-quiz");
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json() as { response: QuizResponse | null };
+          if (refreshData.response) setQuizResponse(refreshData.response);
+        }
       } else if (res.status === 409) {
         setSubmitted(true);
-        const total = quizResponse.answer_index_correct.length;
+        const total = (quizResponse.answer_index_correct ?? []).length || quizResponse.questions_translated.length;
         setResult({ scorePct: data.score_pct ?? 0, correct: Math.round(((data.score_pct ?? 0) / 100) * total), total });
       }
     } finally {
@@ -272,9 +278,9 @@ export default function WorkerQuizPage() {
             </div>
 
             {quizResponse.questions_translated.map((q, qIdx) => {
-              const correctIdx = quizResponse.answer_index_correct[qIdx];
+              const correctIdx = (quizResponse.answer_index_correct ?? [])[qIdx] ?? null;
               const myAnswer = selectedAnswers[qIdx] ?? null;
-              const isCorrect = myAnswer === correctIdx;
+              const isCorrect = correctIdx !== null && myAnswer === correctIdx;
               return (
                 <div key={qIdx} className={`glass rounded-[28px] p-5 border
                   ${isCorrect ? "border-green-500/20" : "border-red-500/20"}`}>
@@ -284,9 +290,11 @@ export default function WorkerQuizPage() {
                       : <XCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />}
                     <p className="text-sm font-bold text-white">{q.question}</p>
                   </div>
-                  <p className="text-xs text-slate-500 font-bold pl-8">
-                    {t.correctAnswer}: <span className="text-green-400">{q.options[correctIdx]}</span>
-                  </p>
+                  {correctIdx !== null && (
+                    <p className="text-xs text-slate-500 font-bold pl-8">
+                      {t.correctAnswer}: <span className="text-green-400">{q.options[correctIdx]}</span>
+                    </p>
+                  )}
                 </div>
               );
             })}
