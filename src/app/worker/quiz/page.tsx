@@ -95,25 +95,21 @@ export default function WorkerQuizPage() {
       const workerLang = (prof as { preferred_lang?: string } | null)?.preferred_lang ?? "ko";
       setLang(workerLang);
 
-      // Patch C-5: answer_index_correct는 answered 상태에서만 유효 사용 (채점 전 노출 금지는 API 레이어에서 강제)
-      const { data: responses } = await supabase
-        .from("tbm_quiz_responses")
-        .select("id, lang, questions_translated, answer_index_correct, answers_submitted, score_pct, status, answered_at")
-        .eq("worker_id", session.user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (responses) {
-        const qr = responses as QuizResponse;
-        setQuizResponse(qr);
-        if (qr.status === "answered") {
-          setSubmitted(true);
-          const total = qr.answer_index_correct.length;
-          setResult({ scorePct: qr.score_pct ?? 0, correct: Math.round(((qr.score_pct ?? 0) / 100) * total), total });
-          setSelectedAnswers(qr.answers_submitted ?? new Array(total).fill(null));
-        } else {
-          setSelectedAnswers(new Array(qr.questions_translated.length).fill(null));
+      // auth_user_id → nfc_workers.id → tbm_quiz_responses 조회 (ID 불일치 방지)
+      const res = await fetch("/api/quiz/worker-quiz");
+      if (res.ok) {
+        const data = await res.json() as { response: QuizResponse | null };
+        const qr = data.response;
+        if (qr) {
+          setQuizResponse(qr);
+          if (qr.status === "answered") {
+            setSubmitted(true);
+            const total = (qr.answer_index_correct ?? []).length;
+            setResult({ scorePct: qr.score_pct ?? 0, correct: Math.round(((qr.score_pct ?? 0) / 100) * total), total });
+            setSelectedAnswers(qr.answers_submitted ?? new Array(total).fill(null));
+          } else {
+            setSelectedAnswers(new Array(qr.questions_translated.length).fill(null));
+          }
         }
       }
       setLoading(false);

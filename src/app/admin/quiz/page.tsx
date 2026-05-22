@@ -153,6 +153,23 @@ function AdminQuizContent() {
       .eq("quiz_session_id", quizSessionId)
       .then(({ data }) => setLiveResponses((data as LiveResponse[]) ?? []));
 
+    // 일괄 자동출제(daily) 후 questions 상태가 비어있으면 세션에서 로드
+    if (questions.length === 0) {
+      supabase
+        .from("tbm_quiz_sessions")
+        .select("questions")
+        .eq("id", quizSessionId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.questions) {
+            const qs: GeneratedQuestion[] = (data.questions as Omit<GeneratedQuestion, "included">[]).map(
+              (q) => ({ ...q, included: true })
+            );
+            setQuestions(qs);
+          }
+        });
+    }
+
     const channel = supabase
       .channel("tbm_quiz_live")
       .on("postgres_changes", {
@@ -536,6 +553,37 @@ function AdminQuizContent() {
                   </div>
                 ))}
               </div>
+
+              {/* 출제된 문제 및 정답 */}
+              {questions.length > 0 && (
+                <div className="mt-2 flex flex-col gap-3">
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">출제 문제 &amp; 정답</p>
+                  {questions.map((q, qi) => (
+                    <div key={q.id} className="rounded-2xl p-4 bg-white/5 border border-white/10">
+                      <div className="flex items-start gap-2 mb-2">
+                        <span className="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                          {qi + 1}
+                        </span>
+                        <p className="text-sm font-bold text-white">{q.question_ko}</p>
+                      </div>
+                      <div className="flex flex-col gap-1 pl-7">
+                        {q.options_ko.map((opt, oi) => (
+                          <div
+                            key={oi}
+                            className={`text-xs px-3 py-1.5 rounded-lg ${
+                              oi === q.answer_index
+                                ? "bg-green-500/20 text-green-300 font-bold"
+                                : "text-slate-500"
+                            }`}
+                          >
+                            {oi === q.answer_index && "✓ "}{opt}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
           )}
         </main>

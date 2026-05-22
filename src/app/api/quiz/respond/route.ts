@@ -33,11 +33,20 @@ export async function POST(req: NextRequest) {
 
   const service = createService();
 
+  // auth_user_id → nfc_workers.id 해석 (send 시 nfc_workers.id로 저장됨)
+  const { data: nfcWorker } = await service
+    .from("nfc_workers")
+    .select("id")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+  const workerId = (nfcWorker as { id: string } | null)?.id ?? null;
+  if (!workerId) return NextResponse.json({ error: "WORKER_NOT_FOUND" }, { status: 404 });
+
   const { data: response, error: fetchErr } = await service
     .from("tbm_quiz_responses")
     .select("*")
     .eq("id", quizResponseId)
-    .eq("worker_id", user.id)
+    .eq("worker_id", workerId)
     .maybeSingle();
 
   if (fetchErr || !response) {
@@ -86,12 +95,20 @@ export async function GET(req: NextRequest) {
   if (!quizSessionId) return NextResponse.json({ error: "quizSessionId_required" }, { status: 400 });
 
   const service = createService();
+  const { data: nfcWorkerGet } = await service
+    .from("nfc_workers")
+    .select("id")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+  const workerIdGet = (nfcWorkerGet as { id: string } | null)?.id ?? null;
+  if (!workerIdGet) return NextResponse.json({ response: null });
+
   // answer_index_correct는 제출 완료(answered) 후 결과 화면에만 반환 — 미제출 시 노출 금지 (C-5)
   const { data, error } = await service
     .from("tbm_quiz_responses")
     .select("id, lang, questions_translated, answer_index_correct, score_pct, status, answered_at")
     .eq("quiz_session_id", quizSessionId)
-    .eq("worker_id", user.id)
+    .eq("worker_id", workerIdGet)
     .maybeSingle();
 
   if (error) return NextResponse.json({ error: "query_failed" }, { status: 500 });
