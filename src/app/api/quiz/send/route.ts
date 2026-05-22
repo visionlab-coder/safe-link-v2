@@ -107,16 +107,31 @@ export async function POST(req: NextRequest) {
   const questions = quizSession.questions as QuizQuestion[];
   const tbmSessionId = body.tbmSessionId ?? quizSession.tbm_session_id;
 
-  // TBM 세션 참석자 조회
-  const { data: attendees } = await guard.ctx.service
-    .from("nfc_tbm_attendance")
-    .select("worker_id")
-    .eq("session_id", tbmSessionId);
-
-  const workerIds = (attendees ?? []).map((a: { worker_id: string }) => a.worker_id);
+  // TBM 세션 참석자 조회 (TBM 없으면 현장 전체 근로자로 fallback)
+  let workerIds: string[] = [];
+  if (tbmSessionId) {
+    const { data: attendees } = await guard.ctx.service
+      .from("nfc_tbm_attendance")
+      .select("worker_id")
+      .eq("session_id", tbmSessionId);
+    workerIds = (attendees ?? []).map((a: { worker_id: string }) => a.worker_id);
+  }
 
   if (!workerIds.length) {
-    return NextResponse.json({ error: "no_attendees_found" }, { status: 400 });
+    const siteId = (quizSession as { site_id?: string | null }).site_id ??
+      guard.ctx.user.site_id ?? null;
+    if (siteId) {
+      const { data: siteWorkers } = await guard.ctx.service
+        .from("nfc_workers")
+        .select("id")
+        .eq("assigned_site_id", siteId)
+        .eq("is_active", true);
+      workerIds = (siteWorkers ?? []).map((w: { id: string }) => w.id);
+    }
+  }
+
+  if (!workerIds.length) {
+    return NextResponse.json({ error: "no_workers_found" }, { status: 400 });
   }
 
   // 근로자 언어 조회 (nfc_workers: attendance의 worker_id는 nfc_workers.id)

@@ -178,12 +178,13 @@ export async function POST(req: NextRequest) {
   }
 
   let quizSessionId: string | null = null;
-  if (tbmSessionId && questions.length > 0) {
+  if (questions.length > 0) {
+    const siteId = guard.ctx.user.site_id ?? null;
     const { data: inserted } = await guard.ctx.service
       .from("tbm_quiz_sessions")
       .insert({
-        tbm_session_id: tbmSessionId,
-        site_id: null,
+        tbm_session_id: tbmSessionId || null,
+        site_id: siteId,
         questions,
         created_by: guard.ctx.user.id,
         status: "draft",
@@ -194,7 +195,7 @@ export async function POST(req: NextRequest) {
     quizSessionId = inserted?.id ?? null;
   }
 
-  return NextResponse.json({ questions, tbmSessionId, quizSessionId, source });
+  return NextResponse.json({ questions, tbmSessionId: tbmSessionId || null, quizSessionId, source });
 }
 
 // GET /api/quiz/generate?tbmSessionId=xxx → 저장된 퀴즈 조회
