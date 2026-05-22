@@ -6,6 +6,7 @@ import { verifyTravelToken } from '@/lib/travel-auth';
 import { CONSTRUCTION_GLOSSARY } from '@/constants/glossary';
 import { getErrorMessage } from '@/utils/errors';
 import { hangulize } from '@/utils/hangulize';
+import { stripEmoji } from '@/utils/strip-emoji';
 import pinyin from 'tiny-pinyin';
 import { preProcessWithGlossary } from '@/utils/construction-glossary';
 import { formalizeKo } from '@/utils/politeness';
@@ -239,9 +240,9 @@ export async function POST(request: NextRequest) {
         }
 
         // 한국어 결과는 존대말(경어)로 변환
-        const finalTranslated = tl === 'ko' ? formalizeKo(translatedText) : translatedText;
+        const finalTranslated = stripEmoji(tl === 'ko' ? formalizeKo(translatedText) : translatedText);
         // 역번역은 원래 언어로 돌아가므로, 한국어로 돌아오는 경우 존대말 적용
-        const finalReverse = sl === 'ko' ? formalizeKo(reverseTranslated) : reverseTranslated;
+        const finalReverse = stripEmoji(sl === 'ko' ? formalizeKo(reverseTranslated) : reverseTranslated);
 
         return NextResponse.json({
             translated: finalTranslated,

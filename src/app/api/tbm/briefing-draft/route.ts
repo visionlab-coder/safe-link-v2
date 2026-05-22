@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/utils/nfc/require-admin";
+import { stripEmoji } from "@/utils/strip-emoji";
 
 export const runtime = "nodejs";
 
@@ -46,6 +47,7 @@ ${hazardSummary}
 - 존댓말(공손체) 사용
 - 실용적이고 현장 중심의 내용
 - 제목 포함
+- 이모지·이모티콘 절대 사용 금지 (TTS 음성 읽기 오류 방지)
 
 반드시 브리핑 텍스트만 반환하세요.`;
 
@@ -73,7 +75,7 @@ ${hazardSummary}
   const data = (await res.json()) as GeminiResponse;
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
   if (!text) throw new Error("empty_gemini_response");
-  return text.trim();
+  return stripEmoji(text);
 }
 
 export async function POST(req: NextRequest) {
