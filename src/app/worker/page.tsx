@@ -670,6 +670,23 @@ function WorkerHomeContent() {
     const lang = profile?.preferred_lang || urlLang || "ko";
     const t = getUI(lang);
     const iso = isoMap[lang] || "un";
+    const simpleHome = lang === "ko"
+        ? {
+            todayTitle: "오늘 할 일",
+            todayDesc: "교육을 확인하고 서명하면 완료됩니다.",
+            step1: "교육 확인",
+            step2: "서명",
+            step3: "완료",
+            helperTitle: "필요한 기능",
+        }
+        : {
+            todayTitle: "Today",
+            todayDesc: "Review the safety training and sign to finish.",
+            step1: "Review",
+            step2: "Sign",
+            step3: "Done",
+            helperTitle: "Tools",
+        };
 
     const handleSignOut = async () => {
         const supabase = createClient();
@@ -869,54 +886,52 @@ function WorkerHomeContent() {
                 )}
 
                 {/* 🎯 Daily TBM (The Main Mission) */}
-                <section className="glass rounded-[48px] p-10 border-white/10 shadow-3xl relative overflow-hidden flex flex-col gap-10">
-                    <div className="absolute top-0 right-0 w-48 h-48 bg-red-600/10 blur-[80px] rounded-full -mr-24 -mt-24 pointer-events-none" />
+                <section className="glass rounded-[36px] p-6 md:p-8 border-white/10 shadow-3xl relative overflow-hidden flex flex-col gap-6">
+                    <div className="absolute top-0 right-0 w-40 h-40 bg-green-500/10 blur-[70px] rounded-full -mr-20 -mt-20 pointer-events-none" />
 
-                    <div className="flex flex-col gap-4 relative">
-                        <div className="flex items-center gap-3">
-                            <div className="w-2.5 h-8 bg-red-500 rounded-full" />
-                            <h2 className="text-2xl font-black text-white text-gradient uppercase tracking-tighter">{t.tbmBadge}</h2>
-                        </div>
-                        <p className="text-xl font-bold text-slate-400 leading-snug">
-                            {t.tbmDesc}
-                        </p>
+                    <div className="relative flex flex-col gap-2">
+                        <span className="text-[11px] font-black text-green-300 uppercase tracking-[0.28em]">{simpleHome.todayTitle}</span>
+                        <h2 className="text-3xl md:text-4xl font-black text-white tracking-tight leading-tight">{t.tbmBadge}</h2>
+                        <p className="text-base md:text-lg font-bold text-slate-300 leading-snug">{simpleHome.todayDesc}</p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white/5 rounded-[32px] p-6 border border-white/5 flex flex-col gap-2">
-                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.status}</span>
-                            <span className="text-xl font-black text-red-400 italic">WAITING</span>
-                        </div>
-                        <div className="bg-white/5 rounded-[32px] p-6 border border-white/5 flex flex-col gap-2 text-right">
-                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Team Sign Rate</span>
-                            <span className="text-xl font-black text-blue-400 italic">82%</span>
-                        </div>
+                    <div className="relative grid grid-cols-3 gap-2">
+                        {[simpleHome.step1, simpleHome.step2, simpleHome.step3].map((step, index) => (
+                            <div key={step} className="rounded-2xl bg-white/5 border border-white/5 px-3 py-4 text-center">
+                                <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-green-400/15 text-sm font-black text-green-300">
+                                    {index + 1}
+                                </div>
+                                <p className="text-xs font-black text-white leading-tight">{step}</p>
+                            </div>
+                        ))}
                     </div>
 
                     <button
                         onClick={() => router.push("/worker/tbm/today")}
-                        className="w-full py-8 bg-gradient-to-br from-green-400 to-green-600 text-slate-950 text-2xl font-black rounded-[32px] shadow-[0_20px_50px_-15px_rgba(34,197,94,0.4)] transition-all tap-effect hover:scale-[1.02]"
+                        className="relative w-full py-6 bg-green-400 text-slate-950 text-2xl font-black rounded-[28px] shadow-[0_20px_50px_-15px_rgba(34,197,94,0.45)] transition-all tap-effect hover:bg-green-300 active:scale-95"
                     >
                         {t.tbmBtn.toUpperCase()}
                     </button>
                 </section>
 
+                <p className="px-2 text-[11px] font-black uppercase tracking-[0.26em] text-slate-600">{simpleHome.helperTitle}</p>
+
                 {/* 📸 AI Vision Section */}
                 <section
                     onClick={() => router.push('/worker/vision')}
-                    className="glass rounded-[40px] p-8 border-white/10 hover:border-purple-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
+                    className="glass rounded-[28px] p-5 border-white/10 hover:border-purple-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
                 >
                     <div className="absolute inset-0 bg-purple-500/5 group-hover:bg-purple-500/10 transition-colors" />
-                    <div className="flex items-center gap-6 relative">
-                        <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-purple-400 shadow-lg">
-                            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex items-center gap-4 relative">
+                        <div className="w-12 h-12 glass rounded-2xl flex items-center justify-center text-purple-400 shadow-lg">
+                            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
                             </svg>
                         </div>
                         <div className="flex flex-col">
-                            <h2 className="text-2xl font-black text-white">{t.visionTitle}</h2>
-                            <p className="text-slate-400 font-bold text-sm tracking-tight">{t.visionDesc}</p>
+                            <h2 className="text-lg font-black text-white">{t.visionTitle}</h2>
+                            <p className="text-slate-400 font-bold text-xs tracking-tight">{t.visionDesc}</p>
                         </div>
                     </div>
                 </section>
@@ -924,18 +939,18 @@ function WorkerHomeContent() {
                 {/* 🧠 Safety Quiz Section */}
                 <section
                     onClick={() => router.push('/worker/quiz')}
-                    className="glass rounded-[40px] p-8 border-white/10 hover:border-amber-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
+                    className="glass rounded-[28px] p-5 border-white/10 hover:border-amber-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
                 >
                     <div className="absolute inset-0 bg-amber-500/5 group-hover:bg-amber-500/10 transition-colors" />
-                    <div className="flex items-center gap-6 relative">
-                        <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-amber-400 shadow-lg">
-                            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex items-center gap-4 relative">
+                        <div className="w-12 h-12 glass rounded-2xl flex items-center justify-center text-amber-400 shadow-lg">
+                            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
                             </svg>
                         </div>
                         <div className="flex flex-col">
-                            <h2 className="text-2xl font-black text-white">{t.quizTitle}</h2>
-                            <p className="text-slate-400 font-bold text-sm tracking-tight">{t.quizDesc}</p>
+                            <h2 className="text-lg font-black text-white">{t.quizTitle}</h2>
+                            <p className="text-slate-400 font-bold text-xs tracking-tight">{t.quizDesc}</p>
                         </div>
                     </div>
                 </section>
@@ -943,20 +958,20 @@ function WorkerHomeContent() {
                 {/* ✍️ Safety Pledge Section */}
                 <section
                     onClick={() => router.push('/worker/pledge')}
-                    className="glass rounded-[40px] p-8 border-white/10 hover:border-blue-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
+                    className="glass rounded-[28px] p-5 border-white/10 hover:border-blue-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
                 >
                     <div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors" />
-                    <div className="flex items-center gap-6 relative">
-                        <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-blue-400 shadow-lg">
-                            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex items-center gap-4 relative">
+                        <div className="w-12 h-12 glass rounded-2xl flex items-center justify-center text-blue-400 shadow-lg">
+                            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
                             </svg>
                         </div>
                         <div className="flex flex-col">
-                            <h2 className="text-2xl font-black text-white">
+                            <h2 className="text-lg font-black text-white">
                                 {lang === "ko" ? "TBM 안전 서약" : lang === "zh" ? "TBM 安全承诺" : lang === "vi" ? "Cam kết an toàn" : lang === "th" ? "คำมั่นสัญญา" : lang === "id" ? "Janji Keselamatan" : "TBM Safety Pledge"}
                             </h2>
-                            <p className="text-slate-400 font-bold text-sm tracking-tight">
+                            <p className="text-slate-400 font-bold text-xs tracking-tight">
                                 {lang === "ko" ? "서명으로 안전 서약 확인" : lang === "zh" ? "签名确认安全承诺" : lang === "vi" ? "Ký tên xác nhận cam kết" : lang === "th" ? "เซ็นชื่อยืนยันคำมั่น" : lang === "id" ? "Tanda tangan untuk konfirmasi" : "Sign to confirm safety pledge"}
                             </p>
                         </div>
@@ -966,18 +981,18 @@ function WorkerHomeContent() {
                 {/* 🎙️ Live Interpretation Section */}
                 <section
                     onClick={() => router.push('/worker/live')}
-                    className="glass rounded-[40px] p-8 border-white/10 hover:border-green-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
+                    className="glass rounded-[28px] p-5 border-white/10 hover:border-green-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
                 >
                     <div className="absolute inset-0 bg-green-500/5 group-hover:bg-green-500/10 transition-colors" />
-                    <div className="flex items-center gap-6 relative">
-                        <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-green-400 shadow-lg">
-                            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex items-center gap-4 relative">
+                        <div className="w-12 h-12 glass rounded-2xl flex items-center justify-center text-green-400 shadow-lg">
+                            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
                             </svg>
                         </div>
                         <div className="flex flex-col">
-                            <h2 className="text-2xl font-black text-white">{t.liveTitle}</h2>
-                            <p className="text-slate-400 font-bold text-sm tracking-tight">{t.liveDesc}</p>
+                            <h2 className="text-lg font-black text-white">{t.liveTitle}</h2>
+                            <p className="text-slate-400 font-bold text-xs tracking-tight">{t.liveDesc}</p>
                         </div>
                     </div>
                 </section>
@@ -985,12 +1000,12 @@ function WorkerHomeContent() {
                 {/* 💬 Communication Section */}
                 <section
                     onClick={() => router.push('/worker/chat')}
-                    className="glass rounded-[40px] p-8 border-white/10 hover:border-blue-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
+                    className="glass rounded-[28px] p-5 border-white/10 hover:border-blue-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
                 >
                     <div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors" />
-                    <div className="flex items-center gap-6 mb-8 relative">
-                        <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-blue-400 shadow-lg relative">
-                            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex items-center gap-4 mb-5 relative">
+                        <div className="w-12 h-12 glass rounded-2xl flex items-center justify-center text-blue-400 shadow-lg relative">
+                            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                             </svg>
                             {newChatCount > 0 && (
@@ -1000,11 +1015,11 @@ function WorkerHomeContent() {
                             )}
                         </div>
                         <div className="flex flex-col">
-                            <h2 className="text-2xl font-black text-white">{t.chatTitle}</h2>
-                            <p className="text-slate-400 font-bold text-sm tracking-tight">{t.chatDesc}</p>
+                            <h2 className="text-lg font-black text-white">{t.chatTitle}</h2>
+                            <p className="text-slate-400 font-bold text-xs tracking-tight">{t.chatDesc}</p>
                         </div>
                     </div>
-                    <button className="w-full py-5 bg-blue-600/20 text-blue-300 font-black flex items-center justify-center gap-3 group-hover:bg-blue-600/30 transition-colors rounded-2xl relative z-10">
+                    <button className="w-full py-4 bg-blue-600/20 text-blue-300 font-black flex items-center justify-center gap-3 group-hover:bg-blue-600/30 transition-colors rounded-2xl relative z-10">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
