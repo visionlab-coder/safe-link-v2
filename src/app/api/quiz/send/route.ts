@@ -134,18 +134,38 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "no_workers_found" }, { status: 400 });
   }
 
-  // 근로자 언어 조회 (nfc_workers: attendance의 worker_id는 nfc_workers.id)
+  // 근로자 언어 조회: nfc_workers.preferred_lang 우선, profiles.preferred_lang fallback
   const { data: workers } = await guard.ctx.service
     .from("nfc_workers")
-    .select("id, preferred_lang")
+    .select("id, preferred_lang, auth_user_id")
     .in("id", workerIds);
+
+  // auth_user_id → profiles.preferred_lang 조회 (nfc_workers에 언어가 없는 경우 보정)
+  const authUserIds = (workers ?? [])
+    .map((w) => (w as { auth_user_id?: string | null }).auth_user_id)
+    .filter(Boolean) as string[];
+
+  const profileLangMap: Record<string, string> = {};
+  if (authUserIds.length > 0) {
+    const { data: profileRows } = await guard.ctx.service
+      .from("profiles")
+      .select("id, preferred_lang")
+      .in("id", authUserIds);
+    for (const p of profileRows ?? []) {
+      const pr = p as { id: string; preferred_lang?: string | null };
+      if (pr.preferred_lang) profileLangMap[pr.id] = pr.preferred_lang;
+    }
+  }
 
   // 언어별로 그룹화 후 번역 (중복 번역 방지)
   const langGroups = new Map<string, string[]>();
   for (const w of workers ?? []) {
-    const lang = (w as { id: string; preferred_lang: string }).preferred_lang ?? "en";
+    const worker = w as { id: string; preferred_lang?: string | null; auth_user_id?: string | null };
+    const lang = worker.preferred_lang
+      ?? (worker.auth_user_id ? profileLangMap[worker.auth_user_id] : null)
+      ?? "ko";
     if (!langGroups.has(lang)) langGroups.set(lang, []);
-    langGroups.get(lang)!.push((w as { id: string }).id);
+    langGroups.get(lang)!.push(worker.id);
   }
 
   // 언어별 번역 + 퀴즈 발송 기록
@@ -163,7 +183,10 @@ export async function POST(req: NextRequest) {
 
   // tbm_quiz_responses 에 worker별 퀴즈 발송 기록 INSERT
   const insertRows = (workers ?? []).map((w) => {
-    const lang = (w as { preferred_lang: string }).preferred_lang ?? "en";
+    const worker = w as { id: string; preferred_lang?: string | null; auth_user_id?: string | null };
+    const lang = worker.preferred_lang
+      ?? (worker.auth_user_id ? profileLangMap[worker.auth_user_id] : null)
+      ?? "ko";
     return {
       quiz_session_id: quizSessionId,
       worker_id: (w as { id: string }).id,
