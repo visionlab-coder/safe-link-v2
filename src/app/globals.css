@@ -66,6 +66,13 @@ body {
   background-attachment: fixed;
 }
 
+img[src*="safelink-pages"],
+img[src*="%2Fimages%2Fsafelink-pages"],
+img[srcset*="safelink-pages"],
+img[srcset*="%2Fimages%2Fsafelink-pages"] {
+  filter: saturate(0.72) contrast(0.9) brightness(0.74);
+}
+
 /* 💎 Specialized Glass Variants */
 .glass-card {
   background: rgba(255, 255, 255, 0.03);

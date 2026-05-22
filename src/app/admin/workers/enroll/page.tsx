@@ -377,7 +377,7 @@ function WorkerEnrollInner() {
         </div>
 
         <div className="relative mb-6 h-40 w-full overflow-hidden rounded-2xl border border-gray-800">
-          <Image src="/images/safelink-pages/workers-roster-check.png" alt="Worker NFC enrollment" fill className="object-cover" priority />
+          <Image src="/images/safelink-pages/nfc-card-naming.png" alt="Worker NFC card naming" fill className="object-cover" priority />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
         </div>
 

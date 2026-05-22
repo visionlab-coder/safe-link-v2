@@ -507,6 +507,21 @@ export default function TravelTalk() {
   if (phase === 'home') return (
     <div style={PAGE}>
       <div style={{ width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '56px 28px', minHeight: '100vh' }}>
+        <div
+          aria-hidden="true"
+          style={{
+            height: 150,
+            width: '100%',
+            borderRadius: 28,
+            overflow: 'hidden',
+            marginBottom: 28,
+            border: '1px solid rgba(255,255,255,0.10)',
+            backgroundImage: 'linear-gradient(to top, rgba(0,0,0,0.68), rgba(0,0,0,0.05)), url("/images/safelink-pages/travel-translation-support.png")',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.35)',
+          }}
+        />
         <div style={{ textAlign: 'center', marginBottom: 52 }}>
           <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 16 }}>SAFE-LINK</p>
           <h1 style={{ fontSize: 40, fontWeight: 200, letterSpacing: -2, margin: 0, lineHeight: 1.1 }}>Travel Talk</h1>

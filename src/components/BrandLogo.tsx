@@ -18,14 +18,16 @@ export default function BrandLogo({
 
   return (
     <div className={`inline-flex items-center gap-3 ${className}`}>
+      <div className="rounded-2xl bg-white/95 px-3 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.35)] ring-1 ring-white/70">
       <Image
         src={compact ? "/brand/seowon-logo-compact-transparent.png" : "/brand/seowon-logo-transparent.png"}
         alt="SEOWON"
         width={width}
         height={height}
         priority={!compact}
-        className={`h-auto w-auto object-contain ${imageClassName}`}
+        className={`h-auto w-auto object-contain drop-shadow-sm ${imageClassName}`}
       />
+      </div>
       {showProduct && (
         <div className="hidden sm:flex flex-col border-l border-white/10 pl-3 leading-none">
           <span className="text-[10px] font-black uppercase tracking-[0.34em] text-blue-300/80">

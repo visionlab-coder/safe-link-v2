@@ -263,6 +263,11 @@ function SiteQrEntryInner() {
           </div>
         </header>
 
+        <div className="relative mb-5 h-36 w-full overflow-hidden rounded-2xl border border-gray-800 shadow-2xl">
+          <Image src="/images/safelink-pages/qr-guest-entry.png" alt="QR guest worker entry" fill className="object-cover" priority />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/65 to-transparent" />
+        </div>
+
         <section className="mb-5">
           <div className="mb-3 flex items-center justify-between gap-3">
             <p className="text-xs font-bold text-gray-400">{text.chooseLanguageTitle}</p>

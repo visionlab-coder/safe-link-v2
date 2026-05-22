@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import SystemHealthCheck from "@/components/SystemHealthCheck";
 import { createClient } from "@/utils/supabase/client";
@@ -625,6 +626,11 @@ export default function SystemAdminPage() {
                     </header>
 
                     {/* 시뮬레이션 배너 */}
+                    <div className="relative mb-8 h-44 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
+                        <Image src="/images/safelink-pages/system-security-center.png" alt="SAFE-LINK system security center" fill className="object-cover" priority />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                    </div>
+
                     <AnimatePresence>
                         {isSimulation && (
                             <motion.div
