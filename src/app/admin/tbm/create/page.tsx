@@ -32,7 +32,10 @@ const adminUI: Record<string, any> = {
         previewNorm: "은어 자동 교정 미리보기",
         recTime: "녹음 중",
         library: "기초교육 라이브러리",
-        libraryDesc: "위험성평가 항목 불러오기"
+        libraryDesc: "위험성평가 항목 불러오기",
+        briefingGuide: "AI 브리핑 가이드",
+        guideGenerate: "가이드 생성",
+        deleteHistory: "이력 숨기기",
     },
     en: {
         title: "SAFETY BROADCAST",
@@ -54,7 +57,10 @@ const adminUI: Record<string, any> = {
         previewNorm: "Auto-correction Preview",
         recTime: "Recording",
         library: "Safety Library",
-        libraryDesc: "Load risk assessment items"
+        libraryDesc: "Load risk assessment items",
+        briefingGuide: "AI BRIEFING GUIDE",
+        guideGenerate: "Generate Guide",
+        deleteHistory: "Hide",
     },
     zh: {
         title: "安全简报发布",
@@ -76,7 +82,10 @@ const adminUI: Record<string, any> = {
         previewNorm: "自动校正预览",
         recTime: "录音中",
         library: "基础教育资料库",
-        libraryDesc: "加载危险评估项目"
+        libraryDesc: "加载危险评估项目",
+        briefingGuide: "AI简报指南",
+        guideGenerate: "生成指南",
+        deleteHistory: "隐藏记录",
     }
 };
 
@@ -88,8 +97,10 @@ function AdminTBMCreateContent() {
     const [tbmText, setTbmText] = useState("");
     const [isSending, setIsSending] = useState(false);
     const [history, setHistory] = useState<any[]>([]);
-    const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+    const [isGuideLoading, setIsGuideLoading] = useState(false);
     const [aiTips, setAiTips] = useState<string[]>([]);
+    const [userId, setUserId] = useState<string | null>(null);
+    const [hiddenNoticeIds, setHiddenNoticeIds] = useState<string[]>([]);
     const [normalizeResult, setNormalizeResult] = useState<{ normalized: string; changes: { from: string; to: string }[] } | null>(null);
     const [adminLang, setAdminLang] = useState("ko");
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
@@ -106,7 +117,6 @@ function AdminTBMCreateContent() {
     const [adminSiteId, setAdminSiteId] = useState<string | null>(null);
     const [briefingCategory, setBriefingCategory] = useState("");
     const [briefingDraft, setBriefingDraft] = useState("");
-    const [isBriefingLoading, setIsBriefingLoading] = useState(false);
 
     const loadProfile = useCallback(async () => {
         const supabase = createClient();
@@ -121,6 +131,7 @@ function AdminTBMCreateContent() {
             }
             setAdminLang(finalLang);
             setAdminSiteId(profile?.site_id || null);
+            setUserId(session.user.id);
         }
     }, [urlLang]);
 
@@ -142,24 +153,14 @@ function AdminTBMCreateContent() {
         fetchHistory();
     }, [loadProfile, fetchHistory]);
 
-    const handleGenerateBriefing = async () => {
-        setIsBriefingLoading(true);
-        setBriefingDraft("");
-        try {
-            const res = await fetch("/api/tbm/briefing-draft", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ category: briefingCategory.trim() }),
-            });
-            const data = await res.json();
-            if (data.draft) setBriefingDraft(data.draft);
-            else alert(`초안 생성 실패: ${data.error ?? "unknown"}`);
-        } catch {
-            alert("연결 오류가 발생했습니다.");
-        } finally {
-            setIsBriefingLoading(false);
-        }
-    };
+    const hideNotice = useCallback((id: string) => {
+        if (!userId) return;
+        setHiddenNoticeIds(prev => {
+            const next = [...prev, id];
+            localStorage.setItem(`safelink_hidden_notices_${userId}`, JSON.stringify(next));
+            return next;
+        });
+    }, [userId]);
 
     const handleLibrarySelect = useCallback((text: string) => {
         setTbmText((prev) => {
@@ -168,29 +169,37 @@ function AdminTBMCreateContent() {
         });
     }, []);
 
-    const handleGenerateAI = async () => {
-        setIsGeneratingAI(true);
+    useEffect(() => {
+        if (!userId) return;
+        const stored = localStorage.getItem(`safelink_hidden_notices_${userId}`);
+        if (stored) setHiddenNoticeIds(JSON.parse(stored) as string[]);
+    }, [userId]);
+
+    const handleGenerateGuide = async () => {
+        setIsGuideLoading(true);
         setAiTips([]);
+        setBriefingDraft("");
         try {
-            const contextText = tbmText.trim();
-            const res = await fetch("/api/tbm/ai-tips", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ context: contextText }),
-            });
-            const data = await res.json();
-            if (data.error) {
-                console.error("[AI-Tips] API Error:", data.error);
-                alert(`AI 서비스 오류: ${data.error}`);
-                setAiTips([]);
-            } else {
-                setAiTips(data.tips || []);
-            }
-        } catch (e: any) {
-            console.error("[AI-Tips] Fetch failed:", e);
+            const [tipsRes, draftRes] = await Promise.all([
+                fetch("/api/tbm/ai-tips", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ context: tbmText.trim() }),
+                }),
+                fetch("/api/tbm/briefing-draft", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ category: briefingCategory.trim() }),
+                }),
+            ]);
+            const [tipsData, draftData] = await Promise.all([tipsRes.json(), draftRes.json()]);
+            if (draftData.draft) setBriefingDraft(draftData.draft);
+            if (tipsData.tips) setAiTips(tipsData.tips);
+            if (!draftData.draft && !tipsData.tips) alert("가이드 생성에 실패했습니다.");
+        } catch {
             alert("AI 연결에 실패했습니다. 인터넷 연결을 확인해주세요.");
         } finally {
-            setIsGeneratingAI(false);
+            setIsGuideLoading(false);
         }
     };
 
@@ -222,7 +231,7 @@ function AdminTBMCreateContent() {
         });
     }, []);
 
-    const handleSTTError = useCallback((type: string, message: string) => {
+    const handleSTTError = useCallback((_type: string, message: string) => {
         setSttError(message);
         setTimeout(() => setSttError(null), 5000);
     }, []);
@@ -334,54 +343,42 @@ function AdminTBMCreateContent() {
 
                     <section className="glass rounded-[40px] p-8 border-white/10 shadow-2xl relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 blur-[60px] rounded-full -mr-16 -mt-16 group-hover:bg-purple-500/20 transition-all duration-1000" />
-                        <div className="flex justify-between items-center mb-8">
+                        <div className="flex justify-between items-center mb-6">
                             <h3 className="text-lg font-black text-white flex items-center gap-3 italic font-mono">
                                 <span className="w-2 h-6 bg-purple-500 rounded-full" />
-                                {t.smartAssist}
+                                {t.briefingGuide}
                             </h3>
-                            <button onClick={handleGenerateAI} disabled={isGeneratingAI} className="flex items-center gap-2 px-6 py-3 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl text-xs font-black shadow-lg tap-effect disabled:opacity-50 tracking-widest uppercase">
-                                {isGeneratingAI ? t.processing : t.generateTips}
+                            <button onClick={handleGenerateGuide} disabled={isGuideLoading} className="flex items-center gap-2 px-6 py-3 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl text-xs font-black shadow-lg tap-effect disabled:opacity-50 tracking-widest uppercase">
+                                {isGuideLoading ? t.processing : t.guideGenerate}
                             </button>
                         </div>
+                        <div className="flex gap-2 mb-4">
+                            <input
+                                value={briefingCategory}
+                                onChange={(e) => setBriefingCategory(e.target.value)}
+                                placeholder="카테고리 (예: 거푸집, 배근, 타설) — 비워두면 전체"
+                                className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white placeholder-slate-700 focus:outline-none focus:border-purple-500/40"
+                            />
+                        </div>
+                        {briefingDraft && (
+                            <button
+                                onClick={() => { setTbmText(briefingDraft); setBriefingDraft(""); setAiTips([]); }}
+                                className="w-full text-left p-5 glass rounded-2xl text-slate-300 hover:text-white hover:bg-purple-500/5 border border-purple-500/20 transition-all text-sm tap-effect leading-relaxed whitespace-pre-wrap mb-3"
+                            >
+                                {briefingDraft}
+                                <span className="block mt-3 text-[10px] font-black text-purple-400 uppercase tracking-widest">클릭하여 초안에 적용</span>
+                            </button>
+                        )}
                         {aiTips.length > 0 && (
-                            <div className="flex flex-col gap-3 animate-float">
+                            <div className="flex flex-col gap-2 mt-2">
+                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">추가 안전 포인트</span>
                                 {aiTips.map((tip, idx) => (
-                                    <button key={idx} onClick={() => { setTbmText(tip); setAiTips([]); }} className="text-left p-5 glass rounded-2xl text-slate-300 hover:text-white hover:bg-white/5 border-white/5 transition-all text-sm md:text-base tap-effect leading-relaxed">
+                                    <button key={idx} onClick={() => { setTbmText(tip); setAiTips([]); setBriefingDraft(""); }} className="text-left p-4 glass rounded-2xl text-slate-300 hover:text-white hover:bg-white/5 border-white/5 transition-all text-sm tap-effect leading-relaxed">
                                         {tip}
                                     </button>
                                 ))}
                             </div>
                         )}
-
-                        <div className="border-t border-white/5 mt-4 pt-6 flex flex-col gap-4">
-                            <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">
-                                AI 브리핑 초안 — 위험성평가 DB 기반
-                            </span>
-                            <div className="flex gap-2">
-                                <input
-                                    value={briefingCategory}
-                                    onChange={(e) => setBriefingCategory(e.target.value)}
-                                    placeholder="카테고리 (예: 거푸집, 배근, 타설) — 비워두면 전체"
-                                    className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white placeholder-slate-700 focus:outline-none focus:border-amber-500/40"
-                                />
-                                <button
-                                    onClick={handleGenerateBriefing}
-                                    disabled={isBriefingLoading}
-                                    className="px-5 py-3 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl text-xs font-black shadow-lg tap-effect disabled:opacity-50 whitespace-nowrap"
-                                >
-                                    {isBriefingLoading ? "생성 중…" : "초안 생성"}
-                                </button>
-                            </div>
-                            {briefingDraft && (
-                                <button
-                                    onClick={() => { setTbmText(briefingDraft); setBriefingDraft(""); }}
-                                    className="text-left p-5 glass rounded-2xl text-slate-300 hover:text-white hover:bg-amber-500/5 border border-amber-500/20 transition-all text-sm tap-effect leading-relaxed whitespace-pre-wrap"
-                                >
-                                    {briefingDraft}
-                                    <span className="block mt-3 text-[10px] font-black text-amber-400 uppercase tracking-widest">클릭하여 초안에 적용</span>
-                                </button>
-                            )}
-                        </div>
                     </section>
 
                     {/* 기초교육 라이브러리 섹션 */}
@@ -497,16 +494,21 @@ function AdminTBMCreateContent() {
                     <section className="mt-8 flex flex-col gap-6">
                         <h3 className="text-xs font-black text-slate-600 uppercase tracking-[0.4em] px-4">{t.historyTitle}</h3>
                         <div className="flex flex-col gap-4">
-                            {history.length === 0 ? (
+                            {history.filter(tbm => !hiddenNoticeIds.includes(tbm.id)).length === 0 ? (
                                 <div className="p-12 glass rounded-[40px] border-dashed border-white/5 text-center text-slate-600 font-bold italic uppercase tracking-widest">{t.noHistory}</div>
                             ) : (
-                                history.map((tbm) => (
+                                history.filter(tbm => !hiddenNoticeIds.includes(tbm.id)).map((tbm) => (
                                     <div key={tbm.id} className="glass p-6 rounded-[32px] border-white/5 hover:border-white/10 transition-all group flex flex-col gap-4">
                                         <div className="flex justify-between items-start gap-4">
                                             <p className="text-lg text-slate-300 font-bold leading-relaxed">{tbm.content_ko}</p>
-                                            <button onClick={() => { setTbmText(tbm.content_ko); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="w-12 h-12 glass rounded-2xl flex items-center justify-center text-blue-500 hover:bg-blue-500/10 transition-colors flex-shrink-0 tap-effect">
-                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                            </button>
+                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                <button onClick={() => hideNotice(tbm.id)} title={t.deleteHistory} className="w-10 h-10 glass rounded-2xl flex items-center justify-center text-slate-700 hover:text-red-400 hover:bg-red-500/10 transition-colors tap-effect">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                </button>
+                                                <button onClick={() => { setTbmText(tbm.content_ko); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="w-12 h-12 glass rounded-2xl flex items-center justify-center text-blue-500 hover:bg-blue-500/10 transition-colors tap-effect">
+                                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                                </button>
+                                            </div>
                                         </div>
                                         <div className="flex items-center gap-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">
                                             <span>{new Date(tbm.created_at).toLocaleString()}</span>
