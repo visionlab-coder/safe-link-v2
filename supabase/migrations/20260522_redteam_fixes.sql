@@ -5,12 +5,12 @@
 -- Fix: UNIQUE 제약 추가 — DB 레벨에서 마지막 방어선 확보
 -- ============================================================================
 
--- 기존 중복 행 제거 (가장 오래된 행만 남김)
+-- 기존 중복 행 제거 (created_at 기준 가장 오래된 행만 남김)
 DELETE FROM public.tbm_quiz_responses
 WHERE id NOT IN (
-  SELECT MIN(id)
+  SELECT DISTINCT ON (quiz_session_id, worker_id) id
   FROM public.tbm_quiz_responses
-  GROUP BY quiz_session_id, worker_id
+  ORDER BY quiz_session_id, worker_id, created_at ASC
 );
 
 -- UNIQUE 제약 추가 (이미 존재하면 무시)
