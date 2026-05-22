@@ -161,10 +161,19 @@ export async function POST(req: NextRequest) {
 
   if (!tbmText) {
     source = "fallback";
-    const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
-    const offset = (dayOfYear * maxQuestions) % FALLBACK_QUIZ_POOL.length;
-    const pool = [...FALLBACK_QUIZ_POOL.slice(offset), ...FALLBACK_QUIZ_POOL.slice(0, offset)];
-    questions = pool.slice(0, maxQuestions).map((q, i) => ({ ...q, id: `fallback_${Date.now()}_${i}` }));
+    // 매 호출마다 다른 문제 셋: 풀 전체를 무작위로 섞어 앞에서 N개 선택
+    const shuffledPool = [...FALLBACK_QUIZ_POOL].sort(() => Math.random() - 0.5);
+    questions = shuffledPool.slice(0, maxQuestions).map((q, i) => {
+      // 선지 순서도 무작위 (정답이 항상 A번으로 고정되지 않도록)
+      const correctAnswer = q.options_ko[q.answer_index];
+      const shuffledOptions = [...q.options_ko].sort(() => Math.random() - 0.5);
+      return {
+        ...q,
+        id: `fallback_${Date.now()}_${i}`,
+        options_ko: shuffledOptions,
+        answer_index: shuffledOptions.indexOf(correctAnswer),
+      };
+    });
   } else {
     try {
       const all = await generateQuizFromText(tbmText, apiKey);
