@@ -3,6 +3,7 @@ import { createClient as createServiceClient, type SupabaseClient } from "@supab
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { NFC_BASE_URL } from "@/utils/nfc/constants";
 import { parseStickerUrl, verifyStickerSignature } from "@/utils/nfc/signing";
+import { checkNfcEntryLimit } from "@/utils/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -239,7 +240,8 @@ async function isSiteAccessEnabled(
     .select("is_enabled")
     .eq("site_id", siteId)
     .maybeSingle();
-  return data?.is_enabled !== false;
+  // Default-deny: 레코드 없는 현장은 비활성화로 간주 (ADV-007 대응)
+  return data?.is_enabled === true;
 }
 
 async function resolveSiteByRef(
@@ -285,6 +287,14 @@ async function resolveSiteByRef(
 }
 
 export async function POST(req: NextRequest) {
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+    req.headers.get("x-real-ip") ??
+    "unknown";
+  if (!(await checkNfcEntryLimit(ip))) {
+    return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
+  }
+
   let body: {
     url?: string;
     nationality?: string;
@@ -445,9 +455,16 @@ export async function POST(req: NextRequest) {
     .eq("work_date", workDate)
     .maybeSingle();
 
-  // Only new check-ins require the challenge gate up-front.
-  // Checkout challenge is enforced later, immediately before the checkout mutation.
-  const isNewCheckin = !access || access.status === "checked_out";
+  // BUG-001: checkout intent with no prior access record would fall through to
+  // the insert branch and create a phantom check-in. Reject early.
+  if (intent === "checkout" && !access) {
+    return NextResponse.json({ error: "not_checked_in" }, { status: 409 });
+  }
+
+  // BUG-004: only genuinely new check-ins need the challenge gate up-front.
+  // checked_out status means the day's access record already exists — no challenge needed here.
+  // Checkout challenge is enforced separately, immediately before the checkout mutation.
+  const isNewCheckin = !access;
   if (isNewCheckin) {
     const challenge = await verifySiteChallenge({
       service,

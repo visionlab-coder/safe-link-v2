@@ -62,14 +62,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   if (error) {
     const msg = error.message.toLowerCase();
-    if (
+    // Return the same status code regardless of whether the email already exists.
+    // A 409 would let an attacker confirm whether a given email is registered
+    // (email enumeration oracle). The error body still distinguishes the cases
+    // for legitimate frontend use, but scanners checking status codes get no signal.
+    const errorCode =
       msg.includes("already registered") ||
       msg.includes("already exists") ||
       (error as { code?: string }).code === "email_exists"
-    ) {
-      return NextResponse.json({ error: "ALREADY_REGISTERED" }, { status: 409 });
-    }
-    return NextResponse.json({ error: "SIGNUP_FAILED" }, { status: 400 });
+        ? "ALREADY_REGISTERED"
+        : "SIGNUP_FAILED";
+    return NextResponse.json({ error: errorCode }, { status: 400 });
   }
 
   return NextResponse.json({ ok: true });

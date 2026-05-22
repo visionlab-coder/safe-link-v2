@@ -32,6 +32,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const phoneDigits = String(body.phoneNumber ?? "").replace(/[^0-9]/g, "");
 
+  // Validate length before consuming phone-keyed rate limit tokens
+  // (prevents Redis key pollution with malformed/empty phone strings)
+  if (phoneDigits.length < 8 || phoneDigits.length > 15) {
+    return NextResponse.json({ error: "INVALID_PHONE" }, { status: 400 });
+  }
+
   // C-10: 전화번호 단위 분산 rate limit — 멀티 인스턴스에서도 IP 우회 방지
   if (!(await checkWorkerLoginPhoneLimit(phoneDigits))) {
     return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
@@ -40,10 +46,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const lang = /^[a-z]{2,5}$/.test(String(body.lang ?? ""))
     ? String(body.lang)
     : "ko";
-
-  if (phoneDigits.length < 8 || phoneDigits.length > 15) {
-    return NextResponse.json({ error: "INVALID_PHONE" }, { status: 400 });
-  }
   if (!displayName) {
     return NextResponse.json({ error: "DISPLAY_NAME_REQUIRED" }, { status: 400 });
   }

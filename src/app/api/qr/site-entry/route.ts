@@ -103,7 +103,8 @@ async function isSiteAccessEnabled(
     .select("is_enabled")
     .eq("site_id", siteId)
     .maybeSingle();
-  return data?.is_enabled !== false;
+  // Default-deny: 레코드 없는 현장은 비활성화로 간주 (ADV-007 대응)
+  return data?.is_enabled === true;
 }
 
 async function recordQrTbmAttendance(args: {
