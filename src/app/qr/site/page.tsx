@@ -97,6 +97,7 @@ function SiteQrEntryInner() {
   const [phoneLast4, setPhoneLast4] = useState("");
   const [status, setStatus] = useState<"loading" | "ready" | "submitting" | "blocked" | "error" | "logout_confirm">("loading");
   const [errMsg, setErrMsg] = useState("");
+  const [checkingOut, setCheckingOut] = useState(false);
 
   const language = useMemo(() => findQrLanguageByCode(selectedLang), [selectedLang]);
   const text = useMemo(() => getQrEntryText(selectedLang), [selectedLang]);
@@ -148,10 +149,34 @@ function SiteQrEntryInner() {
     };
   }, [siteId, text.siteFallback]);
 
-  async function handleLogout() {
+  async function handleCheckout() {
+    setCheckingOut(true);
+    // 저장된 근로자 정보로 서버에 퇴근 기록
+    const savedInitials = sessionStorage.getItem("safe-link-initials") ?? "";
+    const savedPhone = sessionStorage.getItem("safe-link-phone4") ?? "";
+    const savedNationality = sessionStorage.getItem("safe-link-country") ?? "KR";
+    const savedLang = sessionStorage.getItem("safe-link-lang") ?? "ko";
+    if (savedInitials && savedPhone) {
+      try {
+        await fetch("/api/qr/site-entry", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            site_id: siteId,
+            mode: "enter",
+            name_initials: savedInitials,
+            phone_last4: savedPhone,
+            nationality: savedNationality,
+            preferred_lang: savedLang,
+          }),
+        });
+      } catch { /* DB 업데이트 실패해도 로그아웃 진행 */ }
+    }
     await supabase.auth.signOut();
-    sessionStorage.removeItem("safe-link-session-active");
-    sessionStorage.removeItem("safe-link-worker-active");
+    ["safe-link-session-active", "safe-link-worker-active", "safe-link-initials", "safe-link-phone4"].forEach(
+      (k) => sessionStorage.removeItem(k)
+    );
+    setCheckingOut(false);
     setStatus("blocked");
   }
 
@@ -183,6 +208,11 @@ function SiteQrEntryInner() {
       sessionStorage.setItem("safe-link-worker-active", data.access?.active ? "1" : "0");
 
       if (data.access?.action === "checked_out") {
+        // 재스캔으로 퇴근 처리됨 — 세션 종료 및 저장 데이터 클리어
+        await supabase.auth.signOut();
+        ["safe-link-session-active", "safe-link-worker-active", "safe-link-initials", "safe-link-phone4"].forEach(
+          (k) => sessionStorage.removeItem(k)
+        );
         setStatus("blocked");
         return;
       }
@@ -193,7 +223,10 @@ function SiteQrEntryInner() {
         return;
       }
 
+      // 체크인 성공 — 다음 재스캔(퇴근)을 위해 근로자 정보 저장
       sessionStorage.setItem("safe-link-session-active", "true");
+      sessionStorage.setItem("safe-link-initials", initials);
+      sessionStorage.setItem("safe-link-phone4", phoneLast4);
       window.location.replace(`/worker?lang=${encodeURIComponent(language.lang)}&qr=1`);
     } catch {
       setErrMsg("NETWORK_ERROR");
@@ -211,10 +244,18 @@ function SiteQrEntryInner() {
         </div>
         <button
           type="button"
-          onClick={handleLogout}
-          className="mt-2 flex h-14 w-full max-w-sm items-center justify-center rounded-lg bg-red-600 text-base font-black text-white"
+          onClick={handleCheckout}
+          disabled={checkingOut}
+          className="mt-2 flex h-14 w-full max-w-sm items-center justify-center rounded-lg bg-red-600 text-base font-black text-white disabled:opacity-60"
         >
-          퇴근하기 / Check Out
+          {checkingOut ? (
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              퇴근 처리 중... / Checking out...
+            </>
+          ) : (
+            "퇴근하기 / Check Out"
+          )}
         </button>
       </main>
     );

@@ -103,8 +103,9 @@ async function isSiteAccessEnabled(
     .select("is_enabled")
     .eq("site_id", siteId)
     .maybeSingle();
-  // Default-deny: 레코드 없는 현장은 비활성화로 간주 (ADV-007 대응)
-  return data?.is_enabled === true;
+  // QR 경로는 default-allow — 레코드 없어도 입장 가능 (NFC는 별도 strict)
+  // 명시적으로 is_enabled=false 설정한 현장만 차단
+  return data?.is_enabled !== false;
 }
 
 async function recordQrTbmAttendance(args: {
@@ -291,8 +292,15 @@ export async function POST(req: NextRequest) {
     accessAction = "checked_out";
     accessActive = false;
   } else if (dailyAccess?.status === "active") {
-    await service.from("nfc_worker_daily_access").update({ last_seen_at: nowIso }).eq("id", dailyAccess.id);
-    accessAction = "already_checked_in";
+    // 재스캔 = 퇴근 처리. DB에 checked_out 기록 후 세션 종료.
+    await service.from("nfc_worker_daily_access").update({
+      status: "checked_out",
+      checked_out_at: nowIso,
+      last_seen_at: nowIso,
+      checkout_location: { source: "site_qr_rescan" },
+    }).eq("id", dailyAccess.id);
+    accessAction = "checked_out";
+    accessActive = false;
   } else {
     const { error: checkinErr } = await service.from("nfc_worker_daily_access").insert({
       worker_id: worker.id,
