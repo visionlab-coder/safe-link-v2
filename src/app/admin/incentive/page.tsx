@@ -61,19 +61,13 @@ export default function AdminIncentivePage() {
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/quiz/generate?tbmSessionId=__all__");
-    if (!res.ok) {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("tbm_quiz_sessions")
-        .select("id, tbm_session_id, status, sent_at, created_at")
-        .order("created_at", { ascending: false })
-        .limit(20);
-      setSessions((data ?? []) as QuizSession[]);
-    } else {
-      const data = await res.json() as { quizSessions?: QuizSession[] };
-      setSessions(data.quizSessions ?? []);
-    }
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("tbm_quiz_sessions")
+      .select("id, tbm_session_id, status, sent_at, created_at")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    setSessions((data ?? []) as QuizSession[]);
     setLoading(false);
   }, []);
 

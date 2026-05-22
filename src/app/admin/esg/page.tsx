@@ -92,19 +92,22 @@ function VennDiagram({ report }: { report: EsgReport }) {
         </div>
         <p className="text-3xl font-black text-emerald-400">{overlap}%</p>
       </div>
-      <div className="relative h-56">
-        <div className="absolute left-[20%] top-4 w-40 h-40 rounded-full bg-blue-500/35 border border-blue-400/60 flex items-start justify-center pt-8 text-center">
-          <span className="font-black text-blue-100">TBM<br />{tbm}%</span>
+      <div className="max-w-[280px] mx-auto relative h-60">
+        <div className="absolute left-0 top-0 w-[150px] h-[150px] rounded-full bg-blue-500/30 border border-blue-400/50 flex flex-col items-center justify-center gap-0.5">
+          <span className="text-[10px] text-blue-300 font-bold uppercase tracking-wide">TBM</span>
+          <span className="text-3xl font-black text-blue-100">{tbm}%</span>
         </div>
-        <div className="absolute left-[41%] top-4 w-40 h-40 rounded-full bg-emerald-500/35 border border-emerald-400/60 flex items-start justify-center pt-8 text-center">
-          <span className="font-black text-emerald-100">서약<br />{pledge}%</span>
+        <div className="absolute right-0 top-0 w-[150px] h-[150px] rounded-full bg-emerald-500/30 border border-emerald-400/50 flex flex-col items-center justify-center gap-0.5">
+          <span className="text-[10px] text-emerald-300 font-bold">서약</span>
+          <span className="text-3xl font-black text-emerald-100">{pledge}%</span>
         </div>
-        <div className="absolute left-[31%] top-20 w-40 h-40 rounded-full bg-amber-500/35 border border-amber-400/60 flex items-end justify-center pb-8 text-center">
-          <span className="font-black text-amber-100">조치<br />{stopWork}%</span>
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-[150px] h-[150px] rounded-full bg-amber-500/30 border border-amber-400/50 flex flex-col items-center justify-center gap-0.5">
+          <span className="text-[10px] text-amber-300 font-bold">작업중지</span>
+          <span className="text-3xl font-black text-amber-100">{stopWork}%</span>
         </div>
-        <div className="absolute left-1/2 top-[46%] -translate-x-1/2 -translate-y-1/2 bg-gray-950/90 border border-white/20 rounded-2xl px-4 py-3 text-center shadow-xl">
-          <p className="text-xs text-gray-400 font-bold">종합</p>
-          <p className="text-2xl font-black text-white">{overlap}%</p>
+        <div className="absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 bg-gray-950/95 border border-white/20 rounded-xl px-3 py-2 text-center z-10 shadow-xl">
+          <p className="text-[10px] text-gray-400 font-bold">교차 평균</p>
+          <p className="text-xl font-black text-white">{overlap}%</p>
         </div>
       </div>
     </div>
