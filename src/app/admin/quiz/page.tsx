@@ -7,7 +7,7 @@ import { createClient } from "@/utils/supabase/client";
 import ExportMenu from "@/components/ExportMenu";
 import { exportData, type ExportFormat } from "@/utils/export-files";
 
-type Phase = "select" | "generating" | "preview" | "sending" | "live";
+type Phase = "select" | "generating" | "preview" | "sending" | "live" | "daily_sending";
 
 interface TbmSession {
   id: string;
@@ -43,6 +43,7 @@ function AdminQuizContent() {
   const [quizSessionId, setQuizSessionId] = useState<string | null>(null);
   const [liveResponses, setLiveResponses] = useState<LiveResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [quizSource, setQuizSource] = useState<"tbm" | "fallback" | null>(null);
 
   const loadSessions = useCallback(async () => {
     const supabase = createClient();
@@ -86,6 +87,7 @@ function AdminQuizContent() {
       );
       setQuestions(qs);
       setQuizSessionId(data.quizSessionId ?? null);
+      setQuizSource(data.source ?? null);
       setPhase("preview");
     } catch (e) {
       setError(e instanceof Error ? e.message : "생성 실패. 다시 시도하세요.");
@@ -119,6 +121,25 @@ function AdminQuizContent() {
     setQuizSessionId(null);
     setLiveResponses([]);
     setError(null);
+    setQuizSource(null);
+  };
+
+  const handleDailyQuiz = async () => {
+    setPhase("daily_sending");
+    setError(null);
+    try {
+      const res = await fetch("/api/quiz/daily", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "daily_quiz_failed");
+      if (data.quizSessionId) {
+        setQuizSessionId(data.quizSessionId);
+        setQuizSource(data.source ?? null);
+      }
+      setPhase("live");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "자동 출제 실패. 다시 시도하세요.");
+      setPhase("select");
+    }
   };
 
   // Realtime live responses
@@ -309,6 +330,23 @@ function AdminQuizContent() {
                 </svg>
                 AI 문제 자동 생성
               </button>
+
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-px bg-white/10" />
+                <span className="text-xs text-slate-600 font-bold">또는</span>
+                <div className="flex-1 h-px bg-white/10" />
+              </div>
+
+              <button
+                onClick={handleDailyQuiz}
+                className="w-full py-5 bg-gradient-to-br from-amber-500 to-orange-600 rounded-[32px] text-base font-black text-white shadow-[0_20px_50px_-15px_rgba(245,158,11,0.35)] tap-effect transition-all flex items-center justify-center gap-3"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                오늘의 퀴즈 3문제 자동 출제
+                <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full">TBM 없으면 예시 출제</span>
+              </button>
             </section>
           )}
 
@@ -341,6 +379,11 @@ function AdminQuizContent() {
                   다시 선택
                 </button>
               </div>
+              {quizSource === "fallback" && (
+                <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-2.5 text-xs text-amber-300 font-bold">
+                  📋 TBM 내용이 없어 예시 안전 문제로 출제됐습니다. TBM 작성 후 재생성하면 맞춤 문제가 출제됩니다.
+                </div>
+              )}
 
               <div className="flex flex-col gap-4">
                 {questions.map((q, qi) => (
@@ -401,6 +444,17 @@ function AdminQuizContent() {
                 </svg>
                 근로자 전원에게 발송
               </button>
+            </section>
+          )}
+
+          {/* PHASE: daily_sending */}
+          {phase === "daily_sending" && (
+            <section className="glass rounded-[48px] p-16 border-white/10 shadow-3xl flex flex-col items-center gap-6">
+              <div className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+              <div className="text-center">
+                <p className="text-xl font-black text-white">오늘의 퀴즈 생성 + 발송 중...</p>
+                <p className="text-slate-500 text-sm mt-2">오늘의 TBM 내용으로 3문제를 생성하고 근로자 전원에게 발송합니다</p>
+              </div>
             </section>
           )}
 
