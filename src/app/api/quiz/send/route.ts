@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/utils/nfc/require-admin";
+import { requireAdmin, requireSameSite } from "@/utils/nfc/require-admin";
 
 export const runtime = "nodejs";
 
@@ -107,6 +107,10 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (qsErr || !quizSession) return NextResponse.json({ error: "quiz_session_not_found" }, { status: 404 });
+
+  // 타현장 퀴즈 발송 차단 — SITE_ADMIN은 자신의 현장만, global admin은 허용
+  const siteBlock = requireSameSite(guard.ctx.user, (quizSession as { site_id?: string | null }).site_id);
+  if (siteBlock) return siteBlock;
 
   const questions = quizSession.questions as QuizQuestion[];
   const tbmSessionId = body.tbmSessionId ?? quizSession.tbm_session_id;

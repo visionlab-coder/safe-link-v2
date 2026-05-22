@@ -26,6 +26,7 @@ const workerLoginPhoneLimiter = makeRedisRatelimit(5, 60);   // 5/min per phone
 const adminSignupLimiter = makeRedisRatelimit(3, 600);       // 3/10min
 const qrEntryLimiter = makeRedisRatelimit(10, 60);           // 10/min
 const nfcEntryLimiter = makeRedisRatelimit(20, 60);          // 20/min per IP
+const translateLimiter = makeRedisRatelimit(60, 60);         // 60/min per user/IP (4x paid API calls)
 
 // In-memory fallback (single-instance only — acceptable for dev/staging)
 const inMemoryMap = new Map<string, { count: number; resetAt: number }>();
@@ -67,4 +68,8 @@ export async function checkQrEntryLimit(ip: string): Promise<boolean> {
 
 export async function checkNfcEntryLimit(ip: string): Promise<boolean> {
   return check(nfcEntryLimiter, `nfc:ip:${ip}`, 20, 60_000);
+}
+
+export async function checkTranslateLimit(key: string): Promise<boolean> {
+  return check(translateLimiter, `tl:${key}`, 60, 60_000);
 }

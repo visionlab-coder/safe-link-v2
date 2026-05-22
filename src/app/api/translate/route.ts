@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { createServiceClient } from '@/utils/supabase/service';
 import { createClient } from '@/utils/supabase/server';
 import { verifyTravelToken } from '@/lib/travel-auth';
+import { checkTranslateLimit } from '@/utils/rate-limit';
 import { CONSTRUCTION_GLOSSARY } from '@/constants/glossary';
 import { getErrorMessage } from '@/utils/errors';
 import { hangulize } from '@/utils/hangulize';
@@ -36,17 +37,25 @@ interface GeminiResponse {
 export async function POST(request: NextRequest) {
     // 인증: travel_token (Travel Talk 흐름) 또는 Supabase 세션
     const authHeader = request.headers.get('authorization');
+    let rateLimitKey: string;
     if (authHeader?.startsWith('Bearer ')) {
         const token = authHeader.slice(7);
         if (!verifyTravelToken(token)) {
             return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
         }
+        // travel token은 IP 기반 제한
+        rateLimitKey = `ip:${request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown"}`;
     } else {
         const supa = await createClient();
         const { data: { user }, error: userErr } = await supa.auth.getUser();
         if (userErr || !user) {
             return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
         }
+        rateLimitKey = `uid:${user.id}`;
+    }
+
+    if (!(await checkTranslateLimit(rateLimitKey))) {
+        return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
     }
 
     const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();

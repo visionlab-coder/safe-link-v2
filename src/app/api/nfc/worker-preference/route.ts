@@ -476,24 +476,27 @@ export async function POST(req: NextRequest) {
     if (!challenge.ok) return NextResponse.json({ error: challenge.error }, { status: challenge.status });
   }
 
-  // Mutations proceed only after challenge gate passed (or challenge not applicable)
-  const { data: updatedWorker, error: preferenceErr } = await service
-    .from("nfc_workers")
-    .update({
-      nationality,
-      preferred_lang: preferredLang,
-      nationality_confirmed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", workerId)
-    .eq("is_active", true)
-    .select("id, worker_code, full_name, nationality, preferred_lang, auth_user_id, assigned_site_id, created_by")
-    .single();
+  // 신규 체크인만 nationality/preferred_lang 갱신 — 재탭(이미 체크인)은 기존 값 유지
+  // (타인이 스티커 재탭으로 언어 설정 덮어쓰기 방지)
+  if (isNewCheckin) {
+    const { data: updatedWorker, error: preferenceErr } = await service
+      .from("nfc_workers")
+      .update({
+        nationality,
+        preferred_lang: preferredLang,
+        nationality_confirmed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", workerId)
+      .eq("is_active", true)
+      .select("id, worker_code, full_name, nationality, preferred_lang, auth_user_id, assigned_site_id, created_by")
+      .single();
 
-  if (preferenceErr || !updatedWorker) {
-    return NextResponse.json({ error: "preference_update_failed" }, { status: 500 });
+    if (preferenceErr || !updatedWorker) {
+      return NextResponse.json({ error: "preference_update_failed" }, { status: 500 });
+    }
+    data = updatedWorker;
   }
-  data = updatedWorker;
 
   let authUserId: string | null = data.auth_user_id ?? null;
   const email = nfcEmail(workerId);
@@ -531,13 +534,15 @@ export async function POST(req: NextRequest) {
         ? existingProfile.role
         : "WORKER";
 
+    // 재탭 시 기존 언어 설정 보존 — 신규 체크인만 request body의 preferred_lang 반영
+    const profileLang = isNewCheckin ? preferredLang : (data.preferred_lang ?? preferredLang);
     await Promise.all([
       service.from("profiles").upsert(
         {
           id: authUserId,
           role: resolvedRole,
           display_name: data.full_name,
-          preferred_lang: preferredLang,
+          preferred_lang: profileLang,
           site_id: site.id,
           site_code: (site as { name?: string | null }).name ?? null,
         },
