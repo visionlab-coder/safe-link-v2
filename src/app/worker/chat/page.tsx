@@ -487,6 +487,8 @@ function WorkerChatContent() {
     const { isRecording, toggle: toggleRecording } = useCloudSTT({
         lang,
         onTranscript: handleTranscript,
+        chunkInterval: 4000,   // 4s max — 채팅은 짧은 발화, 10s 대기 불필요
+        silenceDuration: 1200, // 1.2s 침묵 = 대화형 자연 휴지
     });
 
     const t = getUI(lang);
