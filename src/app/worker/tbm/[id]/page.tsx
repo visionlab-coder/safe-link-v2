@@ -38,7 +38,7 @@ const translateKo = async (text: string, targetLang: string): Promise<TransResul
         const res = await fetch('/api/translate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, sl: 'ko', tl: targetLang }),
+            body: JSON.stringify({ text, sl: 'ko', tl: targetLang, useGlossary: true }),
         });
         if (!res.ok) return { text, pron: "", rev: "" };
         const data = await res.json() as { translated?: string; pronunciation?: string; reverse_translated?: string };

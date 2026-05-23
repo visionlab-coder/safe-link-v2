@@ -187,7 +187,7 @@ export default function WorkerLivePage() {
                     const res = await fetch("/api/translate", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ text: cleanTextKo, sl: "ko", tl: myLang, pronunciation: false }),
+                        body: JSON.stringify({ text: cleanTextKo, sl: "ko", tl: myLang, pronunciation: false, useGlossary: true }),
                     });
                     const data = await res.json();
                     const translatedNow = data.translated || row.text_ko;

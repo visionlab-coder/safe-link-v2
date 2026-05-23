@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const { text, sl, tl, fast, pronunciation: includePronunciation = true } = await request.json();
+        const { text, sl, tl, fast, pronunciation: includePronunciation = true, useGlossary = false } = await request.json();
 
         if (!text || !sl || !tl) {
             return NextResponse.json({ error: "Missing required texts" }, { status: 400 });
@@ -75,9 +75,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Text too long (max 5000 characters)" }, { status: 400 });
         }
 
-        // 건설 현장 용어집 전처리 (서버사이드: 서비스 롤로 RLS 우회하여 DB glossary 직접 로드)
+        // 건설 현장 용어집 전처리 — useGlossary=true 로 명시한 호출(TBM/안전지시)에만 적용
+        // 일반 채팅(밥 먹으러 가자 등)에는 건설 용어집 불필요 — 오역 방지
         let processedText = text;
-        if (sl === 'ko') {
+        if (useGlossary && sl === 'ko') {
             const glossary = await fetchGlossaryServer();
             for (const [slang, std] of Object.entries(glossary)) {
                 const escapedSlang = slang.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
