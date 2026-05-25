@@ -416,21 +416,25 @@ function SetupContent() {
     const resolvedSiteId = selectedSiteId || initSiteId || null;
 
     setLoading(true);
-    const { error } = await supabase.from("profiles").upsert({
-      id: userId,
-      display_name: finalName,
-      role: getProfileRoleFromSetupRole(role as SetupRoleKey),
-      system_role: (role === "root" || role === "hq_officer") ? "ROOT" : null,
-      preferred_lang: language,
-      phone_number: phone.trim(),
-      trade: trade.trim(),
-      title: title.trim(),
-      site_code: siteCode.trim(),
-      site_id: resolvedSiteId,
+    // C-3 fix: role/system_role은 서버 API 경유 (REVOKE UPDATE로 클라이언트 직접 쓰기 차단됨)
+    const setupRes = await fetch("/api/auth/setup-profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        setupRole: role,
+        display_name: finalName,
+        preferred_lang: language,
+        phone_number: phone.trim(),
+        trade: trade.trim(),
+        title: title.trim(),
+        site_code: siteCode.trim(),
+        site_id: resolvedSiteId,
+      }),
     });
-    if (error) {
+    if (!setupRes.ok) {
+      const errData = await setupRes.json().catch(() => null) as { error?: string } | null;
       setLoading(false);
-      alert(error.message);
+      alert(errData?.error || "프로필 저장에 실패했습니다.");
       return;
     }
 

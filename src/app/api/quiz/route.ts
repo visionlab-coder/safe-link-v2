@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from "@/utils/supabase/server";
+import { checkQuizTranslateLimit } from "@/utils/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -12,16 +14,32 @@ interface GeminiResponse {
  * POST: Translate quiz question + options to target language using Gemini
  */
 export async function POST(request: NextRequest) {
+    const supabase = await createClient();
+    const { data: { user }, error: userErr } = await supabase.auth.getUser();
+    if (userErr || !user) {
+        return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+    }
+    if (!(await checkQuizTranslateLimit(user.id))) {
+        return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
+    }
+
     const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();
     if (!apiKey) {
         return NextResponse.json({ error: "Missing API Key" }, { status: 500 });
     }
 
     try {
-        const { question, options, targetLang } = await request.json();
+        const body = await request.json();
+        const { question, options, targetLang } = body;
 
         if (!question || !options || !targetLang) {
             return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+        }
+        if (typeof question !== 'string' || question.length > 500) {
+            return NextResponse.json({ error: "question too long" }, { status: 400 });
+        }
+        if (!Array.isArray(options) || options.length > 6 || options.some(o => typeof o !== 'string' || o.length > 200)) {
+            return NextResponse.json({ error: "invalid options" }, { status: 400 });
         }
 
         if (targetLang === 'ko') {
@@ -42,17 +60,22 @@ Return ONLY JSON: {"question":"translated question","options":["option1","option
 Korean question: ${question}
 Korean options: ${JSON.stringify(options)}`;
 
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8_000);
+
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
                 body: JSON.stringify({
                     contents: [{ parts: [{ text: prompt }] }],
                     generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
                 }),
             }
         );
+        clearTimeout(timeout);
 
         if (!response.ok) {
             return NextResponse.json({ question, options });

@@ -80,7 +80,12 @@ export async function POST(request: NextRequest) {
         let processedText = text;
         if (useGlossary && sl === 'ko') {
             const glossary = await fetchGlossaryServer();
-            for (const [slang, std] of Object.entries(glossary)) {
+            // BUG-1 fix: 괄호 설명형 치환어는 번역 텍스트를 오염시킴 → skip
+            // BUG-2 fix: 긴 슬랭 먼저 매칭해야 짧은 슬랭이 긴 슬랭 일부를 먼저 치환하는 문제 방지
+            const sortedEntries = Object.entries(glossary)
+                .filter(([, std]) => !(std as string).includes('('))
+                .sort((a, b) => b[0].length - a[0].length);
+            for (const [slang, std] of sortedEntries) {
                 const escapedSlang = slang.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 processedText = processedText.replace(new RegExp(escapedSlang, 'g'), std as string);
             }
@@ -140,10 +145,10 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // === 1.5. Gemini 건설현장 번역 (비Papago 언어: uz/km/my/ne/bn/kk/ar/hi/mn/tl) ===
+        // === 1.5. Gemini 건설현장 번역 (비Papago 언어 + Papago 실패 시) ===
         // Google 단독으로는 건설 안전 문맥 없이 직역 → 오역/오해 위험
-        // fast 여부와 무관하게 항상 Gemini 우선 사용 (라이브 통역에서도 정확도 보장)
-        if (!translatedText && !usePapago) {
+        // LOW-2 fix: Papago 장애 시에도 Gemini 건설 컨텍스트 번역 시도
+        if (!translatedText) {
             const geminiTranslated = await geminiConstructionTranslate(processedText, sl, tl, apiKey);
             if (geminiTranslated) {
                 translatedText = geminiTranslated;
@@ -555,17 +560,23 @@ async function geminiFullFallback(apiKey: string, text: string, sl: string, tl: 
 Return ONLY JSON: {"translated":"...","pronunciation":"Korean Hangul pronunciation","reverse_translated":"..."}
 Text: ${JSON.stringify(text)}`;
 
+        // BUG-3 fix: 타임아웃 없이 무한 hang 가능 → AbortController 추가
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10_000);
+
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
                 body: JSON.stringify({
                     contents: [{ parts: [{ text: prompt }] }],
                     generationConfig: { temperature: 0.2 },
                 }),
             }
         );
+        clearTimeout(timeout);
 
         if (!response.ok) {
             return NextResponse.json({ translated: text, pronunciation: "", reverse_translated: text, is_fallback: true });

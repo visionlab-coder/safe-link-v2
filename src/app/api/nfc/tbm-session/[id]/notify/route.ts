@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/utils/nfc/require-admin";
+import { requireAdmin, requireSameSite } from "@/utils/nfc/require-admin";
 
 export const runtime = "nodejs";
 
@@ -36,6 +36,9 @@ export async function POST(
     .maybeSingle();
 
   if (sessionError || !session) return NextResponse.json({ error: "session_not_found" }, { status: 404 });
+
+  const siteDenied = requireSameSite(guard.ctx.user, session.site_id);
+  if (siteDenied) return siteDenied;
 
   const [workersResult, attendanceResult, logsResult] = await Promise.all([
     service
@@ -101,6 +104,14 @@ export async function GET(
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
   const { id } = await params;
+
+  const { data: getSession } = await guard.ctx.service
+    .from("nfc_tbm_sessions")
+    .select("site_id")
+    .eq("id", id)
+    .maybeSingle();
+  const getSessionDenied = requireSameSite(guard.ctx.user, getSession?.site_id);
+  if (getSessionDenied) return getSessionDenied;
 
   const { data, error } = await guard.ctx.service
     .from("tbm_notification_log")

@@ -66,27 +66,35 @@ function todayInSeoul(): string {
   }).format(new Date());
 }
 
-function verifyToken(token: string): { workerId: string; siteRef: string; expiresAt: number } | null {
+// C-7: 토큰 형식 v2 = workerId|siteRef|expiresAt|nonce|hmac (5-part)
+//      레거시 형식 v1 = workerId|siteRef|expiresAt|hmac (4-part) — 이전 발급 토큰 호환
+function verifyToken(token: string): { workerId: string; siteRef: string; expiresAt: number; nonce: string | null } | null {
   const secret = (process.env.NFC_HMAC_SECRET ?? "").trim();
   if (!secret) return null;
 
   try {
     const raw = Buffer.from(token, "base64url").toString("utf-8");
     const parts = raw.split("|");
-    if (parts.length !== 4) return null;
+    if (parts.length !== 5 && parts.length !== 4) return null;
 
-    const [workerId, siteRef, expiresAtStr, sig] = parts;
+    const isV2 = parts.length === 5;
+    const [workerId, siteRef, expiresAtStr] = parts;
+    const nonce = isV2 ? parts[3] : null;
+    const sig = isV2 ? parts[4] : parts[3];
+
     const expiresAt = parseInt(expiresAtStr, 10);
     if (!workerId || !siteRef || !Number.isFinite(expiresAt)) return null;
     if (Date.now() / 1000 > expiresAt) return null;
 
-    const payload = `${workerId}|${siteRef}|${expiresAt}`;
+    const payload = isV2
+      ? `${workerId}|${siteRef}|${expiresAt}|${nonce}`
+      : `${workerId}|${siteRef}|${expiresAt}`;
     const expectedSig = createHmac("sha256", secret).update(payload).digest("hex");
     const sigBuf = Buffer.from(sig);
     const expBuf = Buffer.from(expectedSig);
     if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) return null;
 
-    return { workerId, siteRef, expiresAt };
+    return { workerId, siteRef, expiresAt, nonce };
   } catch {
     return null;
   }
@@ -263,6 +271,26 @@ export async function POST(req: NextRequest) {
         code: site.site_code ?? site.code ?? null,
       },
     });
+  }
+
+  // C-7: enter 모드 — nonce 소각 (one-time use). 이미 소각된 nonce는 replay로 차단
+  // v1 토큰(nonce=null)은 enter 모드 거부 — replay 여부를 검증할 방법 없음
+  if (!verified.nonce) {
+    return NextResponse.json({ error: "TOKEN_REPLAY_NOT_VERIFIABLE" }, { status: 401 });
+  }
+
+  // atomic guard: used_at IS NULL인 row만 update하고 실제로 변경된 row 수 확인
+  // Supabase UPDATE는 매칭 row=0이어도 error=null을 반환하므로 .select()로 row 수 검증 필수
+  const { data: consumed, error: nonceUpdateErr } = await service
+    .from("qr_token_nonces")
+    .update({ used_at: new Date().toISOString() })
+    .eq("nonce", verified.nonce)
+    .is("used_at", null)
+    .select("nonce");
+
+  if (nonceUpdateErr || !consumed || consumed.length === 0) {
+    // 0 rows = nonce 없음(발급 안 됨) 또는 이미 소각됨 — replay 차단
+    return NextResponse.json({ error: "TOKEN_ALREADY_USED" }, { status: 401 });
   }
 
   const nationality = cleanCountry(body.nationality);

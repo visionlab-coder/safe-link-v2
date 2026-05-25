@@ -1,23 +1,70 @@
 import { NextRequest } from 'next/server';
 export const runtime = "nodejs";
+import { createClient } from "@/utils/supabase/server";
 import { getErrorMessage } from '@/utils/errors';
+import { checkTtsLimit } from "@/utils/rate-limit";
 
 interface GoogleTtsResponse {
     audioContent?: string;
 }
 
+// Google Standard 전용 언어 — OpenAI tts-1-hd로 업그레이드 (Neural2 동급 품질)
+const OPENAI_TTS_LANGS = new Set(['uz', 'ne', 'km', 'my', 'mn', 'kk']);
+
+/** OpenAI tts-1-hd — Standard-only 언어 대체 엔진 */
+async function fetchOpenAiTTS(text: string, gender: string, apiKey: string): Promise<Response | null> {
+    const voice = gender === 'male' ? 'onyx' : 'nova';
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    try {
+        const res = await fetch('https://api.openai.com/v1/audio/speech', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({ model: 'tts-1-hd', input: text, voice, response_format: 'mp3' }),
+        });
+        clearTimeout(timeout);
+        if (!res.ok) return null;
+        const buffer = await res.arrayBuffer();
+        return new Response(buffer, {
+            headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=3600' },
+        });
+    } catch {
+        clearTimeout(timeout);
+        return null;
+    }
+}
+
 /**
- * [V3.0] Official Google Cloud Text-to-Speech Engine
- * Uses high-fidelity Neural2 & WaveNet voices.
+ * [V3.1] Google Cloud TTS (Neural2/WaveNet) + OpenAI tts-1-hd 하이브리드
+ * Standard-only 언어(uz/ne/km/my/mn/kk)는 OpenAI tts-1-hd 우선 사용
  */
 export async function GET(request: NextRequest) {
+    const supabase = await createClient();
+    const { data: { user }, error: userErr } = await supabase.auth.getUser();
+    if (userErr || !user) return new Response("UNAUTHORIZED", { status: 401 });
+    if (!(await checkTtsLimit(user.id))) {
+        return new Response("RATE_LIMITED", { status: 429 });
+    }
+
     const text = request.nextUrl.searchParams.get('text') ?? '';
     const lang = request.nextUrl.searchParams.get('lang') ?? 'ko';
     const gender = request.nextUrl.searchParams.get('gender') ?? 'female';
     const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();
+    const openaiKey = process.env.OPENAI_API_KEY?.trim();
 
     if (!text) return new Response('Missing text', { status: 400 });
     if (text.length > 1000) return new Response('Text too long (max 1000 characters)', { status: 400 });
+
+    const baseLang = lang.split('-')[0].toLowerCase();
+
+    // Standard-only 언어: OpenAI tts-1-hd 우선 (Google Standard보다 자연스러운 억양)
+    if (OPENAI_TTS_LANGS.has(baseLang) && openaiKey) {
+        const openaiResult = await fetchOpenAiTTS(text, gender, openaiKey);
+        if (openaiResult) return openaiResult;
+        // OpenAI 실패 시 Google TTS로 폴백
+        console.warn(`[TTS-OpenAI] ${lang} 실패, Google TTS 폴백`);
+    }
 
     if (!apiKey) {
         return fetchLegacyTTS(text, lang);

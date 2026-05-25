@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from "@/utils/supabase/server";
 export const runtime = "nodejs";
 
 interface GeminiVisionResponse {
@@ -8,6 +9,10 @@ interface GeminiVisionResponse {
 }
 
 export async function POST(request: NextRequest) {
+    const supabase = await createClient();
+    const { data: { user }, error: userErr } = await supabase.auth.getUser();
+    if (userErr || !user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+
     const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();
     if (!apiKey) {
         return NextResponse.json({ error: "Missing API Key" }, { status: 500 });

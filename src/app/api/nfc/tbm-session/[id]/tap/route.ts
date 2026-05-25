@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/utils/nfc/require-admin";
+import { requireAdmin, requireSameSite } from "@/utils/nfc/require-admin";
 import { NFC_BASE_URL } from "@/utils/nfc/constants";
 import { parseStickerUrl, verifyStickerSignature } from "@/utils/nfc/signing";
 
@@ -74,6 +74,9 @@ export async function POST(
 
   if (sessErr || !session) return NextResponse.json({ error: "session_not_found" }, { status: 404 });
   if (session.status === "closed") return NextResponse.json({ error: "session_closed" }, { status: 409 });
+
+  const tapSiteDenied = requireSameSite(ctx.user, session.site_id);
+  if (tapSiteDenied) return tapSiteDenied;
 
   let body: { url?: string };
   try {

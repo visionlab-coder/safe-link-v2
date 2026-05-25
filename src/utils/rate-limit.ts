@@ -27,6 +27,11 @@ const adminSignupLimiter = makeRedisRatelimit(3, 600);       // 3/10min
 const qrEntryLimiter = makeRedisRatelimit(10, 60);           // 10/min
 const nfcEntryLimiter = makeRedisRatelimit(20, 60);          // 20/min per IP
 const translateLimiter = makeRedisRatelimit(60, 60);         // 60/min per user/IP (4x paid API calls)
+// C-8: hiinfo lookup — pre-session endpoint, IP-only guard (10/min — token enumeration 방지)
+const hiinfoLimiter = makeRedisRatelimit(10, 60);
+const sttLimiter = makeRedisRatelimit(30, 60);          // 30/min per uid — 비용 보호
+const ttsLimiter = makeRedisRatelimit(60, 60);          // 60/min per uid — 캐시 고려
+const quizTranslateLimiter = makeRedisRatelimit(30, 60); // 30/min per uid
 
 // In-memory fallback (single-instance only — acceptable for dev/staging)
 const inMemoryMap = new Map<string, { count: number; resetAt: number }>();
@@ -72,4 +77,20 @@ export async function checkNfcEntryLimit(ip: string): Promise<boolean> {
 
 export async function checkTranslateLimit(key: string): Promise<boolean> {
   return check(translateLimiter, `tl:${key}`, 60, 60_000);
+}
+
+export async function checkHiinfoLimit(ip: string): Promise<boolean> {
+  return check(hiinfoLimiter, `hi:ip:${ip}`, 10, 60_000);
+}
+
+export async function checkSttLimit(uid: string): Promise<boolean> {
+  return check(sttLimiter, `stt:uid:${uid}`, 30, 60_000);
+}
+
+export async function checkTtsLimit(uid: string): Promise<boolean> {
+  return check(ttsLimiter, `tts:uid:${uid}`, 60, 60_000);
+}
+
+export async function checkQuizTranslateLimit(uid: string): Promise<boolean> {
+  return check(quizTranslateLimiter, `quiz:uid:${uid}`, 30, 60_000);
 }

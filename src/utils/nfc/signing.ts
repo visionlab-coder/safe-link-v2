@@ -115,8 +115,9 @@ export async function verifyStickerSignature(input: VerifyStickerInput): Promise
     // TTL check: reject stickers older than NFC_STICKER_TTL_DAYS,
     // and reject future-dated stickers (beyond 5-minute clock-skew allowance)
     // to prevent indefinitely-valid stickers created with a far-future issuedEpoch.
+    // C-11: default reduced from 365 to 90 days — stolen sticker window limited
     if (Number.isFinite(issuedEpoch)) {
-      const ttlDays = Number(process.env.NFC_STICKER_TTL_DAYS ?? 365);
+      const ttlDays = Number(process.env.NFC_STICKER_TTL_DAYS ?? 90);
       const ttlSeconds = ttlDays * 24 * 60 * 60;
       const nowEpoch = Math.floor(Date.now() / 1000);
       if (issuedEpoch > nowEpoch + 300) return false;       // future-dated: reject

@@ -214,52 +214,13 @@ export async function POST(req: NextRequest) {
   if (workerErr) return NextResponse.json({ error: "worker_lookup_failed" }, { status: 500 });
   if (workers && workers.length > 1) return NextResponse.json({ error: "worker_match_ambiguous" }, { status: 409 });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let worker: any;
+  // C-9: 미등록 근로자 게스트 자동 생성 차단 — nfc_workers에 없으면 관리자 사전 등록 필요
   if (!workers || workers.length === 0) {
-    // 신규교육 게스트: DB에 없는 근로자 최소 레코드 생성
-    const guestCode = `QR-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-    const { data: guestWorker, error: guestErr } = await service
-      .from("nfc_workers")
-      .insert({
-        worker_code: guestCode,
-        full_name: initials,
-        name_initials: initials,
-        phone_last4: phoneLast4,
-        assigned_site_id: site.id,
-        nationality,
-        preferred_lang: preferredLang,
-        is_active: true,
-      })
-      .select("id, worker_code, full_name, nationality, preferred_lang, auth_user_id, assigned_site_id, is_active")
-      .single();
-
-    if (guestErr) {
-      // ADV-010: 동시 요청이 동일 initials+phone_last4+site_id 게스트를 먼저 생성한 경우 (23505 unique 충돌).
-      // 유니크 제약이 있다면 충돌 → 기존 레코드로 폴백. 없다면 단순 실패 처리.
-      if (guestErr.code === "23505") {
-        const { data: racedWorker } = await service
-          .from("nfc_workers")
-          .select("id, worker_code, full_name, nationality, preferred_lang, auth_user_id, assigned_site_id, is_active")
-          .eq("assigned_site_id", site.id)
-          .eq("name_initials", initials)
-          .eq("phone_last4", phoneLast4)
-          .eq("is_active", true)
-          .limit(1)
-          .maybeSingle();
-        if (!racedWorker) return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
-        worker = racedWorker;
-      } else {
-        return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
-      }
-    } else if (!guestWorker) {
-      return NextResponse.json({ error: "worker_not_found" }, { status: 404 });
-    } else {
-      worker = guestWorker;
-    }
-  } else {
-    worker = workers[0];
+    return NextResponse.json({ error: "worker_not_registered" }, { status: 404 });
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const worker: any = workers[0];
   const nowIso = new Date().toISOString();
   const { data: updatedWorker, error: updateErr } = await service
     .from("nfc_workers")
@@ -332,7 +293,6 @@ export async function POST(req: NextRequest) {
       })
     : { action: "checked_out" as const, session: null };
 
-  const isGuestWorker = String(updatedWorker.worker_code ?? "").startsWith("QR-");
   let authUserId: string | null = updatedWorker.auth_user_id ?? null;
   const email = nfcEmail(worker.id);
   let generatedTokenHash: string | null = null;
@@ -342,7 +302,7 @@ export async function POST(req: NextRequest) {
     const { data: linkData } = await service.auth.admin.generateLink({
       type: "magiclink",
       email,
-      options: { data: { nfc_worker_id: worker.id, qr_guest: isGuestWorker } },
+      options: { data: { nfc_worker_id: worker.id } },
     });
     authUserId = linkData?.user?.id ?? null;
     generatedTokenHash = linkData?.properties?.hashed_token ?? null;

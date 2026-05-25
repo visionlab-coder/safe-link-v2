@@ -109,13 +109,20 @@ async function verifySiteChallenge(args: {
   }
 
   const code = String(args.challengeCode || "").trim();
+  const codeProvided = code.length > 0;
 
   // 코드 미제공 시 — required=true(체크인)이면 반드시 코드 필요
-  if (!code || !/^[0-9]{6}$/.test(code)) {
+  // C-12: 코드가 있는데 형식 불량이면 required 여부 관계없이 거부 (악성 페이로드 차단)
+  if (!codeProvided) {
     if (args.required) {
       return { ok: false, status: 403, error: "site_challenge_required" };
     }
     return { ok: true };
+  }
+
+  // 코드 제공됐지만 형식 불량
+  if (!/^[0-9]{6}$/.test(code)) {
+    return { ok: false, status: 403, error: "site_challenge_invalid" };
   }
 
   if (String(data.challenge_code) !== code) {
@@ -400,8 +407,16 @@ export async function POST(req: NextRequest) {
 
   const latitude = asFiniteNumber(body.location?.latitude);
   const longitude = asFiniteNumber(body.location?.longitude);
-  const accuracy = Math.max(0, asFiniteNumber(body.location?.accuracy) ?? 0);
+  const rawAccuracyValue = asFiniteNumber(body.location?.accuracy);
+  const accuracy = Math.max(0, rawAccuracyValue ?? 0);
   const hasLocation = latitude != null && longitude != null;
+
+  // C-10: GPS Mock 앱 탐지 — 정밀도가 명시적으로 제공됐고 1m 미만이면 차단
+  // (GPS Mock 앱은 accuracy=0 또는 0.5m 보고; 실제 GPS는 보통 3~30m)
+  // 정밀도 미제공(null) 기기는 구형 디바이스 배려로 통과 허용
+  if (hasLocation && rawAccuracyValue != null && rawAccuracyValue < 1.0) {
+    return NextResponse.json({ error: "gps_accuracy_suspicious" }, { status: 422 });
+  }
 
   const siteLatitude = pickSiteNumber(site as Record<string, unknown>, "latitude");
   const siteLongitude = pickSiteNumber(site as Record<string, unknown>, "longitude");
@@ -617,7 +632,7 @@ export async function POST(req: NextRequest) {
         status: "active",
         checked_in_at: nowIso,
         last_seen_at: nowIso,
-        checkin_location: { latitude, longitude, accuracy, distance_m: Math.round(distanceM) },
+        checkin_location: { latitude, longitude, accuracy, distance_m: Math.round(distanceM), client_ip: ip },
       });
     if (checkinErr) {
       // B2: 동시 더블 탭으로 unique 충돌 → already_checked_in으로 처리

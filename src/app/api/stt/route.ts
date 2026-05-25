@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 export const runtime = "nodejs";
+import { createClient } from "@/utils/supabase/server";
 import { getErrorMessage } from '@/utils/errors';
+import { checkSttLimit } from "@/utils/rate-limit";
 import { CONSTRUCTION_SPEECH_HINTS, WHISPER_CONTEXT_PROMPT } from '@/constants/construction-terms';
 import { CONSTRUCTION_GLOSSARY } from '@/constants/glossary';
 import {
@@ -191,6 +193,13 @@ interface SpeechRecognitionResponse {
 }
 
 export async function POST(req: Request) {
+    const supabase = await createClient();
+    const { data: { user }, error: userErr } = await supabase.auth.getUser();
+    if (userErr || !user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+    if (!(await checkSttLimit(user.id))) {
+        return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
+    }
+
     const GOOGLE_API_KEY = process.env.GOOGLE_CLOUD_API_KEY?.trim();
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim();
     const t0 = Date.now();
@@ -215,7 +224,7 @@ export async function POST(req: Request) {
         const languageCode = lang || "ko-KR";
         const shortLang = languageCode.split('-')[0];
 
-        // === 1. live 모드: Google Cloud STT 우선 (Whisper보다 3~6배 빠름 — 200~500ms vs 1~3s) ===
+        // === 1. non-live 모드: Whisper 우선 (Google보다 정확, 4~6s) / live 모드는 아래 Google STT 참조 ===
         if (!live && OPENAI_API_KEY && WHISPER_LANG_MAP[shortLang]) {
             const transcript = await transcribeWithWhisper(audio, mimeType, languageCode, OPENAI_API_KEY);
 

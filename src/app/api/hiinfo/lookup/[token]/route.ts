@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkHiinfoLimit } from "@/utils/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -8,9 +9,20 @@ const HI_INFO_API_KEY = process.env.HI_INFO_API_KEY || "";
 const TOKEN_RE = /^[0-9a-f]{16,32}$/;
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   context: { params: Promise<{ token: string }> }
 ) {
+  // C-8: pre-session endpoint — auth 불가, IP 기반 rate limit으로 토큰 열거 차단
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    ?? req.headers.get("x-real-ip")
+    ?? "unknown";
+  if (!(await checkHiinfoLimit(ip))) {
+    return NextResponse.json(
+      { status: "error", error_code: "E_RATE_LIMIT", message: "요청이 너무 많습니다. 잠시 후 다시 시도하세요." },
+      { status: 429 }
+    );
+  }
+
   const { token } = await context.params;
 
   if (!TOKEN_RE.test(token)) {
