@@ -12,15 +12,18 @@ const AI_API_PREFIXES = [
     '/api/tbm/ai-tips',
 ]
 
+// Workers 가 process.env 를 손상시키는 케이스가 있어 NEXT_PUBLIC 값은 하드코딩.
+// 이 키는 클라이언트 번들에도 그대로 노출된 공개 anon key 라 보안 영향 없음.
+const SUPABASE_URL = "https://wzmzpuxpcpuvuacwmslj.supabase.co"
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXpwdXhwY3B1dnVhY3dtc2xqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2ODk3MTEsImV4cCI6MjA4NjI2NTcxMX0.hkql2QVn_IIRIrb3pbialLHpDiNDzAE2NQNjgxUTUv0"
+
 // @supabase/ssr / @supabase/supabase-js 는 Cloudflare Workers 런타임에서
 // apikey 헤더를 손상시켜 intermittent 401이 발생함.
 // 미들웨어는 raw cookie 파싱 + raw fetch만 사용 — Vercel / Workers 모두 완전 검증.
 
 function parseAuthCookie(request: NextRequest): { accessToken: string; userId: string } | null {
     try {
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-        if (!supabaseUrl) return null
-        const projectRef = new URL(supabaseUrl).hostname.split('.')[0]
+        const projectRef = new URL(SUPABASE_URL).hostname.split('.')[0]
         const raw = request.cookies.get(`sb-${projectRef}-auth-token`)?.value
         if (!raw) return null
 
@@ -49,14 +52,10 @@ function parseAuthCookie(request: NextRequest): { accessToken: string; userId: s
 
 async function getProfileRole(userId: string, accessToken: string): Promise<string | null> {
     try {
-        const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-        if (!url || !key) return null
-
         // 🚨 apikey 는 URL 쿼리로 전달 — Workers 가 임의 헤더(apikey)를 변형/제거하는 이슈 우회.
         // Authorization 헤더만 사용해 사용자 JWT 검증 → RLS 정상 적용.
         const res = await fetch(
-            `${url}/rest/v1/profiles?select=role&id=eq.${userId}&limit=1&apikey=${encodeURIComponent(key)}`,
+            `${SUPABASE_URL}/rest/v1/profiles?select=role&id=eq.${userId}&limit=1&apikey=${encodeURIComponent(SUPABASE_ANON_KEY)}`,
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,

@@ -22,11 +22,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "email_password_required" }, { status: 400 });
     }
 
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
-    if (!url || !key) {
-        return NextResponse.json({ error: "SERVER_CONFIG_ERROR" }, { status: 500 });
-    }
+    // anon key 는 클라이언트 번들에 이미 노출된 공개 값 → 서버 코드 하드코딩 OK.
+    // Workers 가 env var 를 손상시키거나 process.env 접근이 불안정한 케이스 원천 차단.
+    // 이 값들은 wrangler.toml [vars] 와 동일 — 양쪽 다 박제.
+    const url = "https://wzmzpuxpcpuvuacwmslj.supabase.co";
+    const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXpwdXhwY3B1dnVhY3dtc2xqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2ODk3MTEsImV4cCI6MjA4NjI2NTcxMX0.hkql2QVn_IIRIrb3pbialLHpDiNDzAE2NQNjgxUTUv0";
 
     // apikey 를 URL 파라미터로 전달 (Workers 헤더 손상 우회)
     const authUrl = `${url}/auth/v1/token?grant_type=password&apikey=${encodeURIComponent(key)}`;

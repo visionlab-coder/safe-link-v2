@@ -66,20 +66,21 @@ export async function GET() {
       throw new Error("Missing GOOGLE_CLOUD_API_KEY");
     }
 
+    // Cloudflare Workers 가 홍콩(HKG) 등 Gemini 미지원 지역으로 라우팅되면
+    // generativelanguage.googleapis.com 는 "User location is not supported" 반환.
+    // /api/translate 의 1순위 엔진인 Cloud Translation API 는 전세계 작동 →
+    // health check 는 이쪽을 검증해 실 사용 기준과 일치시킴.
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${googleApiKey}`,
+      `https://translation.googleapis.com/language/translate/v2?key=${googleApiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: "hi" }] }],
-          generationConfig: { maxOutputTokens: 5 },
-        }),
+        body: JSON.stringify({ q: "hi", target: "ko", source: "en" }),
       }
     );
 
     if (response.ok) {
-      results.google_translate = ok("Gemini translate path active");
+      results.google_translate = ok("Cloud Translate active");
     } else {
       const err = (await response.json()) as ApiErrorResponse;
       results.google_translate = fail(err.error?.message || "API Error");
