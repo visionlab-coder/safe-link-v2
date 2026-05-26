@@ -235,31 +235,21 @@ function AuthContent() {
   const handleAdminLogin = async () => {
     if (!adminEmail || !password) return;
     setLoading(true);
-    const ctrl = new AbortController();
-    const timeoutId = setTimeout(() => ctrl.abort(), 20000);
     try {
-      const res = await fetch("/api/auth/admin-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        signal: ctrl.signal,
-        body: JSON.stringify({ email: adminEmail, password }),
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: adminEmail,
+        password,
       });
-      clearTimeout(timeoutId);
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({})) as { error?: string };
-        alert(sanitizeAuthError(data.error ?? "unknown"));
+      if (error) {
+        alert(sanitizeAuthError(error.message));
         setLoading(false);
         return;
       }
-      // getSession() 제거: 서버 쿠키 설정 후 클라이언트 getSession() 행 현상 우회
-      // router.push 사용: window.location.replace는 sessionStorage를 초기화해 RoleGuard 강제 로그아웃 버그
       sessionStorage.setItem("safe-link-session-active", "true");
       router.push(`/admin?lang=${lang || "ko"}`);
-    } catch (e) {
-      clearTimeout(timeoutId);
-      const isTimeout = e instanceof Error && e.name === "AbortError";
-      alert(isTimeout ? "로그인 시간이 초과되었습니다. 잠시 후 다시 시도해주세요." : "로그인 중 오류가 발생했습니다. 다시 시도해주세요.");
+    } catch {
+      alert("로그인 중 오류가 발생했습니다. 다시 시도해주세요.");
       setLoading(false);
     }
   };
