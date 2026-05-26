@@ -4,12 +4,16 @@ main = ".open-next/worker.js"
 compatibility_date = "2024-12-30"
 compatibility_flags = ["nodejs_compat"]
 
-# NEXT_PUBLIC_ 변수는 클라이언트 번들에도 이미 노출되어 있으므로 여기에 박아도 보안 문제 없음.
-# Workers 런타임에서 process.env 로 읽히므로 반드시 명시해야 함.
-# SECRET 계열(SUPABASE_SERVICE_ROLE_KEY 등)은 Cloudflare Dashboard에서 별도 설정.
+# NEXT_PUBLIC_ 및 외부 공개 가능한 식별자(client_id, public key, cluster 등)는
+# 여기 박아둬야 Workers 런타임의 process.env 접근이 100% 안정적임.
+# (Cloudflare Dashboard 의 SECRET 으로만 등록하면 런타임에서 간헐적으로 누락되는 케이스 관찰됨)
+# 실제 비밀 키(SERVICE_ROLE_KEY, NAVER_CLIENT_SECRET, PUSHER_SECRET 등)는 Dashboard 에서 secret 으로 유지.
 [vars]
 NEXT_PUBLIC_SUPABASE_URL = "https://wzmzpuxpcpuvuacwmslj.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXpwdXhwY3B1dnVhY3dtc2xqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2ODk3MTEsImV4cCI6MjA4NjI2NTcxMX0.hkql2QVn_IIRIrb3pbialLHpDiNDzAE2NQNjgxUTUv0"
+NAVER_CLIENT_ID = "pff1l7x9oe"
+PUSHER_KEY = "4966c6c20c77ffa87d75"
+PUSHER_CLUSTER = "ap3"
 
 [assets]
 directory = ".open-next/assets"
