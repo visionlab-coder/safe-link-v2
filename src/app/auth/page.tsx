@@ -236,13 +236,15 @@ function AuthContent() {
     if (!adminEmail || !password) return;
     setLoading(true);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
-        email: adminEmail,
-        password,
+      const res = await fetch("/api/auth/admin-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email: adminEmail, password }),
       });
-      if (error) {
-        alert(sanitizeAuthError(error.message));
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        alert(sanitizeAuthError(body.error ?? "unknown"));
         setLoading(false);
         return;
       }
