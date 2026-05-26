@@ -252,9 +252,10 @@ function AuthContent() {
         setLoading(false);
         return;
       }
-      // 서버가 Set-Cookie로 세션 쿠키를 설정했으므로 하드 내비게이션으로 미들웨어가 쿠키를 인식하게 함
+      // getSession() 제거: 서버 쿠키 설정 후 클라이언트 getSession() 행 현상 우회
+      // router.push 사용: window.location.replace는 sessionStorage를 초기화해 RoleGuard 강제 로그아웃 버그
       sessionStorage.setItem("safe-link-session-active", "true");
-      window.location.replace(`/admin?lang=${lang || "ko"}`);
+      router.push(`/admin?lang=${lang || "ko"}`);
     } catch (e) {
       clearTimeout(timeoutId);
       const isTimeout = e instanceof Error && e.name === "AbortError";
