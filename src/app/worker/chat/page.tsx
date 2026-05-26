@@ -273,14 +273,25 @@ function WorkerChatContent() {
         if (!session) return;
         setMyId(session.user.id);
 
-        // 프로필 + 관리자 목록 병렬 조회 (워터폴 제거)
-        const [profileRes, adminListRes] = await Promise.all([
-            supabase.from("profiles").select("preferred_lang, site_id").eq("id", session.user.id).single(),
-            supabase.from("profiles").select("id, display_name, role, site_id").not("role", "ilike", "worker").not("role", "eq", "ROOT"),
-        ]);
+        // 1) 내 프로필 먼저 — site_id 확인 후 관리자 쿼리 스코프 결정
+        const profileRes = await supabase
+            .from("profiles")
+            .select("preferred_lang, site_id")
+            .eq("id", session.user.id)
+            .single();
 
         const profile = profileRes.data;
-        if (profile?.site_id) setSiteId(profile.site_id);
+        const mySiteId = profile?.site_id ?? null;
+        if (mySiteId) setSiteId(mySiteId);
+
+        // 2) 관리자 목록: 반드시 자기 현장(site_id)만 — 다른 현장 관리자와 채팅 절대 불가
+        let adminQuery = supabase
+            .from("profiles")
+            .select("id, display_name, role, site_id")
+            .not("role", "ilike", "worker")
+            .not("role", "eq", "ROOT");
+        if (mySiteId) adminQuery = adminQuery.eq("site_id", mySiteId);
+        const adminListRes = await adminQuery;
 
         let finalLang = profile?.preferred_lang || "ko";
         if (urlLang && urlLang !== profile?.preferred_lang) {
