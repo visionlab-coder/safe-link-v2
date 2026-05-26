@@ -185,18 +185,6 @@ function AuthContent() {
 
   // No auto-login — worker enters fresh every time
 
-  const redirectByRole = async (userId: string) => {
-    const activeLang = lang || "ko";
-    const { data: profile } = await supabase
-      .from("profiles").select("role, phone_number").eq("id", userId).single() as {
-        data: { role: string | null; phone_number: string | null } | null
-      };
-    if (profile && !profile.phone_number) {
-      await supabase.from("profiles").update({ phone_number: phone.replace(/[^0-9]/g, "") }).eq("id", userId);
-    }
-    redirectByRoleString(profile?.role ?? null, activeLang);
-  };
-
   const handleWorkerEnter = async () => {
     if (!phone || !workerName.trim()) return;
     setLoading(true);
@@ -248,8 +236,20 @@ function AuthContent() {
     if (!adminEmail || !password) return;
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: adminEmail, password });
-      if (error) { alert(sanitizeAuthError(error.message)); setLoading(false); return; }
+      const res = await fetch("/api/auth/admin-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email: adminEmail, password }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        alert(sanitizeAuthError(data.error ?? "unknown"));
+        setLoading(false);
+        return;
+      }
+      // 서버가 세션 쿠키를 설정했으므로 클라이언트 세션 동기화
+      await supabase.auth.getSession();
       sessionStorage.setItem("safe-link-session-active", "true");
       router.push(`/admin?lang=${lang || "ko"}`);
     } catch {
