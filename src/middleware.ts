@@ -53,11 +53,12 @@ async function getProfileRole(userId: string, accessToken: string): Promise<stri
         const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
         if (!url || !key) return null
 
+        // 🚨 apikey 는 URL 쿼리로 전달 — Workers 가 임의 헤더(apikey)를 변형/제거하는 이슈 우회.
+        // Authorization 헤더만 사용해 사용자 JWT 검증 → RLS 정상 적용.
         const res = await fetch(
-            `${url}/rest/v1/profiles?select=role&id=eq.${userId}&limit=1`,
+            `${url}/rest/v1/profiles?select=role&id=eq.${userId}&limit=1&apikey=${encodeURIComponent(key)}`,
             {
                 headers: {
-                    'apikey': key,
                     'Authorization': `Bearer ${accessToken}`,
                 },
             }
