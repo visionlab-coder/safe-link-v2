@@ -27,14 +27,6 @@ export async function POST(req: NextRequest) {
     const pendingCookies: Array<{ name: string; value: string; options: Partial<ResponseCookie> }> = [];
 
     const supabase = createServerClient(url, key, {
-        global: {
-            fetch: (input, init) => {
-                const ctrl = new AbortController();
-                const id = setTimeout(() => ctrl.abort(), 15000);
-                return fetch(input as RequestInfo, { ...(init ?? {}), signal: ctrl.signal })
-                    .finally(() => clearTimeout(id));
-            },
-        },
         cookies: {
             getAll: () => cookieStore.getAll(),
             setAll: (cookiesToSet) => {
