@@ -235,27 +235,32 @@ function AuthContent() {
   const handleAdminLogin = async () => {
     if (!adminEmail || !password) return;
     setLoading(true);
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 20000);
     try {
       const res = await fetch("/api/auth/admin-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        signal: ctrl.signal,
         body: JSON.stringify({ email: adminEmail, password }),
       });
+      clearTimeout(timeoutId);
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { error?: string };
         alert(sanitizeAuthError(data.error ?? "unknown"));
         setLoading(false);
         return;
       }
-      // 서버가 세션 쿠키를 설정했으므로 클라이언트 세션 동기화
-      await supabase.auth.getSession();
+      // 서버가 Set-Cookie로 세션 쿠키를 설정했으므로 하드 내비게이션으로 미들웨어가 쿠키를 인식하게 함
       sessionStorage.setItem("safe-link-session-active", "true");
-      router.push(`/admin?lang=${lang || "ko"}`);
-    } catch {
-      alert("로그인 중 오류가 발생했습니다. 다시 시도해주세요.");
+      window.location.replace(`/admin?lang=${lang || "ko"}`);
+    } catch (e) {
+      clearTimeout(timeoutId);
+      const isTimeout = e instanceof Error && e.name === "AbortError";
+      alert(isTimeout ? "로그인 시간이 초과되었습니다. 잠시 후 다시 시도해주세요." : "로그인 중 오류가 발생했습니다. 다시 시도해주세요.");
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleAdminSignup = async () => {
