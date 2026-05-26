@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
-import type { ResponseCookie } from "next/dist/compiled/@edge-runtime/cookies";
 
 export const runtime = "nodejs";
+
+// @supabase/supabase-js와 @supabase/ssr 모두 Cloudflare Workers 런타임에서
+// apikey 헤더 손상 문제가 있어 완전 제거.
+// Supabase REST Auth API에 raw fetch로 직접 호출 — Workers에서 완전 검증됨.
 
 export async function POST(req: NextRequest) {
     let body: { email?: string; password?: string };
@@ -22,49 +22,47 @@ export async function POST(req: NextRequest) {
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
     if (!url || !key) return NextResponse.json({ error: "SERVER_CONFIG_ERROR" }, { status: 500 });
 
-    // @supabase/ssr의 createServerClient는 Cloudflare Workers 런타임에서
-    // apikey 헤더가 손상되어 "Invalid API key" 오류 발생.
-    // @supabase/supabase-js의 createClient는 정상 작동 (worker-login 경로에서 검증됨).
-    const authClient = createClient(url, key, {
-        auth: { persistSession: false, autoRefreshToken: false },
-    });
-
-    const { data: authData, error } = await authClient.auth.signInWithPassword({ email, password });
-    if (error) {
-        const status = error.message.includes("abort") ? 504 : 401;
-        return NextResponse.json({ error: error.message }, { status });
-    }
-
-    const session = authData.session;
-    if (!session) {
-        return NextResponse.json({ error: "NO_SESSION" }, { status: 500 });
-    }
-
-    // setSession = 로컬 쿠키 기록만 수행 (네트워크 왕복 없음 — 토큰이 방금 발급됨)
-    // @supabase/ssr이 미들웨어에서 읽을 수 있는 형식으로 쿠키를 설정한다.
-    const cookieStore = await cookies();
-    const pendingCookies: Array<{ name: string; value: string; options: Partial<ResponseCookie> }> = [];
-
-    const ssrClient = createServerClient(url, key, {
-        cookies: {
-            getAll: () => cookieStore.getAll(),
-            setAll: (cookiesToSet) => {
-                cookiesToSet.forEach(({ name, value, options }) => {
-                    pendingCookies.push({ name, value, options: options ?? {} });
-                    try { cookieStore.set(name, value, options); } catch { /* read-only context */ }
-                });
-            },
+    // Supabase Auth REST API 직접 호출
+    const authRes = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "apikey": key,
+            "Authorization": `Bearer ${key}`,
         },
+        body: JSON.stringify({ email, password }),
     });
 
-    await ssrClient.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-    });
+    if (!authRes.ok) {
+        const errBody = await authRes.json().catch(() => ({})) as { error_description?: string; msg?: string };
+        const errMsg = errBody.error_description ?? errBody.msg ?? "authentication_failed";
+        const status = authRes.status === 429 ? 429 : 401;
+        return NextResponse.json({ error: errMsg }, { status });
+    }
+
+    const session = await authRes.json() as {
+        access_token: string;
+        refresh_token: string;
+        expires_in: number;
+        expires_at?: number;
+        token_type: string;
+        user: Record<string, unknown>;
+    };
+
+    // @supabase/ssr 미들웨어가 읽는 쿠키 형식으로 직접 구성
+    // 형식: sb-{project-ref}-auth-token = base64-{btoa(JSON.stringify(session))}
+    const projectRef = new URL(url).hostname.split(".")[0];
+    const cookieName = `sb-${projectRef}-auth-token`;
+    const cookieValue = `base64-${Buffer.from(JSON.stringify(session)).toString("base64")}`;
+    const maxAge = session.expires_in ?? 3600;
 
     const response = NextResponse.json({ ok: true });
-    pendingCookies.forEach(({ name, value, options }) => {
-        response.cookies.set(name, value, options);
+    response.cookies.set(cookieName, cookieValue, {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        maxAge,
+        secure: process.env.NODE_ENV === "production",
     });
     return response;
 }
