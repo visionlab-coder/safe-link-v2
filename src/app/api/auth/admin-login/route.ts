@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { ResponseCookie } from "next/dist/compiled/@edge-runtime/cookies";
@@ -21,12 +22,30 @@ export async function POST(req: NextRequest) {
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
     if (!url || !key) return NextResponse.json({ error: "SERVER_CONFIG_ERROR" }, { status: 500 });
 
-    const cookieStore = await cookies();
+    // @supabase/ssr의 createServerClient는 Cloudflare Workers 런타임에서
+    // apikey 헤더가 손상되어 "Invalid API key" 오류 발생.
+    // @supabase/supabase-js의 createClient는 정상 작동 (worker-login 경로에서 검증됨).
+    const authClient = createClient(url, key, {
+        auth: { persistSession: false, autoRefreshToken: false },
+    });
 
-    // signInWithPassword가 설정하는 쿠키를 Response에 직접 복사하기 위해 캡처
+    const { data: authData, error } = await authClient.auth.signInWithPassword({ email, password });
+    if (error) {
+        const status = error.message.includes("abort") ? 504 : 401;
+        return NextResponse.json({ error: error.message }, { status });
+    }
+
+    const session = authData.session;
+    if (!session) {
+        return NextResponse.json({ error: "NO_SESSION" }, { status: 500 });
+    }
+
+    // setSession = 로컬 쿠키 기록만 수행 (네트워크 왕복 없음 — 토큰이 방금 발급됨)
+    // @supabase/ssr이 미들웨어에서 읽을 수 있는 형식으로 쿠키를 설정한다.
+    const cookieStore = await cookies();
     const pendingCookies: Array<{ name: string; value: string; options: Partial<ResponseCookie> }> = [];
 
-    const supabase = createServerClient(url, key, {
+    const ssrClient = createServerClient(url, key, {
         cookies: {
             getAll: () => cookieStore.getAll(),
             setAll: (cookiesToSet) => {
@@ -38,14 +57,11 @@ export async function POST(req: NextRequest) {
         },
     });
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-        const status = error.message.includes("abort") ? 504 : 401;
-        return NextResponse.json({ error: error.message }, { status });
-    }
+    await ssrClient.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+    });
 
-    // NextResponse.json()은 독립 Response 객체 — pendingCookies를 명시적으로 복사해야
-    // Set-Cookie 헤더가 브라우저에 전달됨 (이것이 없으면 미들웨어가 세션을 못 읽어 /auth로 튕김)
     const response = NextResponse.json({ ok: true });
     pendingCookies.forEach(({ name, value, options }) => {
         response.cookies.set(name, value, options);
