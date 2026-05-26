@@ -247,12 +247,13 @@ function AuthContent() {
   const handleAdminLogin = async () => {
     if (!adminEmail || !password) return;
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: adminEmail, password });
-    if (error) { alert(sanitizeAuthError(error.message)); setLoading(false); return; }
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email: adminEmail, password });
+      if (error) { alert(sanitizeAuthError(error.message)); setLoading(false); return; }
       sessionStorage.setItem("safe-link-session-active", "true");
-      await redirectByRole(session.user.id);
+      router.push(`/admin?lang=${lang || "ko"}`);
+    } catch {
+      alert("로그인 중 오류가 발생했습니다. 다시 시도해주세요.");
     }
     setLoading(false);
   };
