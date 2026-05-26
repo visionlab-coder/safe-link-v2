@@ -120,23 +120,35 @@ function AdminChatContent() {
         if (!session) return;
         setMyId(session.user.id);
 
-        // 프로필 조회 + 근로자 목록을 병렬 실행 (워터폴 제거)
-        const [profileRes, workersRes] = await Promise.all([
-            supabase.from("profiles").select("preferred_lang, site_id").eq("id", session.user.id).single(),
-            supabase.from("profiles").select("id, display_name, preferred_lang, role").eq("role", "WORKER").not("role", "eq", "ROOT"),
-        ]);
+        // 1) 프로필 먼저 — site_id + role로 근로자 쿼리 스코프 결정
+        const profileRes = await supabase
+            .from("profiles")
+            .select("preferred_lang, site_id, role")
+            .eq("id", session.user.id)
+            .single();
 
-        if (profileRes.data?.site_id) setSiteId(profileRes.data.site_id);
+        const mySiteId = profileRes.data?.site_id ?? null;
+        if (mySiteId) setSiteId(mySiteId);
         let finalLang = profileRes.data?.preferred_lang || "ko";
         if (urlLang && urlLang !== profileRes.data?.preferred_lang) {
             supabase.from("profiles").update({ preferred_lang: urlLang }).eq("id", session.user.id);
             finalLang = urlLang;
         }
         setAdminLang(finalLang);
+
+        // 2) ROOT/SUPER_ADMIN/HQ_ADMIN/HQ_OFFICER는 전체 현장 근로자 조회
+        //    그 외(SAFETY_OFFICER, SITE_ADMIN 등)는 자기 현장만 — SaaS 현장 격리 필수
+        const GLOBAL_ROLES = ["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER"];
+        const isGlobal = GLOBAL_ROLES.includes((profileRes.data?.role ?? "").toUpperCase());
+        let workersQuery = supabase
+            .from("profiles")
+            .select("id, display_name, preferred_lang, role")
+            .eq("role", "WORKER");
+        if (!isGlobal && mySiteId) workersQuery = workersQuery.eq("site_id", mySiteId);
+        const workersRes = await workersQuery;
         if (workersRes.data) setWorkers(workersRes.data);
 
         // 🆕 새로운 근로자 가입 시 사이드바 실시간 업데이트 (site_id 스코프)
-        const mySiteId = profileRes.data?.site_id ?? null;
         const profileSubscription = supabase
             .channel(`sidebar_updates_${mySiteId ?? session.user.id}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload: { eventType: string; new: Partial<WorkerProfile> & { role?: string; site_id?: string | null } }) => {
