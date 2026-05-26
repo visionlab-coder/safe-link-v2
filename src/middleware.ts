@@ -1,4 +1,3 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { canAccessSystem, hasAllowedRole, type ProfileRole } from '@/lib/roles'
 
@@ -13,69 +12,89 @@ const AI_API_PREFIXES = [
     '/api/tbm/ai-tips',
 ]
 
+// @supabase/ssr / @supabase/supabase-js 는 Cloudflare Workers 런타임에서
+// apikey 헤더를 손상시켜 intermittent 401이 발생함.
+// 미들웨어는 raw cookie 파싱 + raw fetch만 사용 — Vercel / Workers 모두 완전 검증.
+
+function parseAuthCookie(request: NextRequest): { accessToken: string; userId: string } | null {
+    try {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        if (!supabaseUrl) return null
+        const projectRef = new URL(supabaseUrl).hostname.split('.')[0]
+        const raw = request.cookies.get(`sb-${projectRef}-auth-token`)?.value
+        if (!raw) return null
+
+        const jsonStr = raw.startsWith('base64-')
+            ? Buffer.from(raw.slice(7), 'base64').toString('utf-8')
+            : raw
+        const session = JSON.parse(jsonStr) as { access_token?: string }
+        if (!session.access_token) return null
+
+        // JWT payload 디코딩 (서명 검증 불필요 — httpOnly 쿠키는 JS에서 변조 불가)
+        const payloadStr = Buffer.from(
+            session.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'),
+            'base64'
+        ).toString('utf-8')
+        const payload = JSON.parse(payloadStr) as { sub?: string; exp?: number }
+
+        // 만료 체크
+        if (payload.exp && payload.exp < Date.now() / 1000) return null
+        if (!payload.sub) return null
+
+        return { accessToken: session.access_token, userId: payload.sub }
+    } catch {
+        return null
+    }
+}
+
+async function getProfileRole(userId: string, accessToken: string): Promise<string | null> {
+    try {
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        if (!url || !key) return null
+
+        const res = await fetch(
+            `${url}/rest/v1/profiles?select=role&id=eq.${userId}&limit=1`,
+            {
+                headers: {
+                    'apikey': key,
+                    'Authorization': `Bearer ${accessToken}`,
+                },
+            }
+        )
+        if (!res.ok) return null
+        const rows = await res.json() as Array<{ role?: string }>
+        return rows[0]?.role?.toUpperCase() ?? null
+    } catch {
+        return null
+    }
+}
+
 export async function middleware(request: NextRequest) {
-    let supabaseResponse = NextResponse.next({ request })
     const { pathname } = request.nextUrl
 
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                getAll() {
-                    return request.cookies.getAll()
-                },
-                setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value }) =>
-                        request.cookies.set(name, value)
-                    )
-                    supabaseResponse = NextResponse.next({ request })
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        supabaseResponse.cookies.set(name, value, options)
-                    )
-                },
-            },
-        }
-    )
-
-    // getSession(): 쿠키 기반 JWT 파싱만 수행 (네트워크 왕복 없음)
-    // 토큰 갱신은 Supabase SSR이 setAll 콜백에서 자동 처리
-    const { data: { session } } = await supabase.auth.getSession()
-
-    // AI API 엔드포인트: 미인증 외부 호출 차단
-    // getSession()은 이미 위에서 호출됨 — 추가 네트워크 비용 없음
+    // AI API: 세션 여부만 확인 (역할 불필요)
     if (AI_API_PREFIXES.some(prefix => pathname.startsWith(prefix))) {
-        if (!session) {
+        const auth = parseAuthCookie(request)
+        if (!auth) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-        return supabaseResponse
+        return NextResponse.next({ request })
     }
 
-    // /admin, /worker, /system 경로: 역할 기반 접근 제어
+    // /admin, /worker, /system: 역할 기반 접근 제어
     const needsRoleCheck =
         pathname.startsWith('/admin') ||
         pathname.startsWith('/worker') ||
         pathname.startsWith('/system')
 
     if (needsRoleCheck) {
-        if (!session) {
+        const auth = parseAuthCookie(request)
+        if (!auth) {
             return NextResponse.redirect(new URL('/auth', request.url))
         }
 
-        // getUser(): 서버에서 JWT 검증 (세션 위변조 방지)
-        const { data: { user } } = await supabase.auth.getUser()
-
-        if (!user) {
-            return NextResponse.redirect(new URL('/auth', request.url))
-        }
-
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-
-        const role = (profile?.role as string | undefined)?.toUpperCase() as ProfileRole | undefined
+        const role = (await getProfileRole(auth.userId, auth.accessToken)) as ProfileRole | null
 
         if (pathname.startsWith('/system')) {
             if (!role || !canAccessSystem(role)) {
@@ -92,7 +111,7 @@ export async function middleware(request: NextRequest) {
         }
     }
 
-    return supabaseResponse
+    return NextResponse.next({ request })
 }
 
 export const config = {

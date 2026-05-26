@@ -56,9 +56,14 @@ export async function POST(req: NextRequest) {
     const cookieValue = `base64-${Buffer.from(JSON.stringify(session)).toString("base64")}`;
     const maxAge = session.expires_in ?? 3600;
 
+    // 🚨 httpOnly: false 필수 — @supabase/ssr 의 createBrowserClient 는
+    // document.cookie 로 세션을 읽어 RoleGuard / getUser() 등을 수행함.
+    // httpOnly:true 면 브라우저 JS 가 쿠키를 못 봐서 클라이언트 측이 “세션 없음” 으로 판단,
+    // 로그인 직후 즉시 /auth 로 강제 리다이렉트되는 무한 튕김 발생.
+    // 이 형식 / 속성은 @supabase/ssr 표준과 동일하며 절대 변경 금지.
     const response = NextResponse.json({ ok: true });
     response.cookies.set(cookieName, cookieValue, {
-        httpOnly: true,
+        httpOnly: false,
         sameSite: "lax",
         path: "/",
         maxAge,
