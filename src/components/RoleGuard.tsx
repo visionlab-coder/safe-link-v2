@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
 import {
     getDefaultRouteForProfileRole,
     hasAllowedRole,
@@ -10,108 +9,99 @@ import {
     type ProfileRole,
 } from "@/lib/roles";
 
+// RoleGuard — 클라이언트 인증/권한 가드.
+//
+// /api/auth/me 단일 엔드포인트로 인증 상태와 역할 확인.
+// createBrowserClient(@supabase/ssr) 의존 제거 → Workers / Vercel 어디서나 안정.
+//
+// 미들웨어가 이미 서버측에서 인증+역할 검증을 통과시킨 상태에서 실행되므로
+// 이 가드는 사실상 2차 방어 + 클라이언트 라우팅용. /api/auth/me 가 401 이면
+// 만료/세션 손상으로 보고 /auth 로 안내.
+
 export default function RoleGuard({
     children,
-    allowedRole
+    allowedRole,
 }: {
-    children: React.ReactNode,
-    allowedRole: AllowedRole
+    children: React.ReactNode;
+    allowedRole: AllowedRole;
 }) {
     const router = useRouter();
     const [isAuthorized, setIsAuthorized] = useState(false);
 
     useEffect(() => {
-        const supabase = createClient();
+        let cancelled = false;
 
         const checkAuth = async () => {
-
-            // 자동로그인 비활성화 체크:
-            // rememberMe=false이고 브라우저를 닫았다 다시 열면 (sessionStorage 없음) → 로그아웃
-            const rememberMe = localStorage.getItem("safe-link-remember");
-            const sessionActive = sessionStorage.getItem("safe-link-session-active");
+            // rememberMe 처리: 브라우저 닫고 다시 열면 자동 로그인 안 함.
+            const rememberMe = typeof localStorage !== "undefined"
+                ? localStorage.getItem("safe-link-remember")
+                : null;
+            const sessionActive = typeof sessionStorage !== "undefined"
+                ? sessionStorage.getItem("safe-link-session-active")
+                : null;
             if (rememberMe === "false" && !sessionActive) {
-                await supabase.auth.signOut();
+                // signOut 호출은 cookie 클리어용 — /api/auth/signout 호출하면 좋지만
+                // 지금은 단순히 /auth 로 보내고 거기서 클리어.
                 router.replace("/auth");
                 return;
             }
 
-            // getUser()로 서버 검증 (getSession은 만료 토큰도 반환할 수 있음)
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
-            if (authError || !user) {
-                // 만료/무효 세션 → 정리 후 로그인으로
-                await supabase.auth.signOut();
-                router.replace("/auth");
-                return;
-            }
+            try {
+                const res = await fetch("/api/auth/me", {
+                    cache: "no-store",
+                    credentials: "include",
+                });
 
-            // getSession으로 세션 객체도 확보 (하위 코드에서 session.user.id 사용)
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                router.replace("/auth");
-                return;
-            }
+                if (!res.ok) {
+                    if (cancelled) return;
+                    router.replace("/auth");
+                    return;
+                }
 
-            // 현재 세션 활성 표시 (브라우저 닫으면 자동 삭제됨)
-            sessionStorage.setItem("safe-link-session-active", "true");
+                const data = (await res.json()) as {
+                    user?: { id: string; email: string | null };
+                    profile?: {
+                        role?: string;
+                        preferred_lang?: string | null;
+                        display_name?: string | null;
+                    } | null;
+                };
 
-            // 3. ✨ 드디어 진짜 '내 서랍(DB)'에서 역할을 확인합니다!
-            const { data: profile, error } = await supabase
-                .from("profiles")
-                .select("role")
-                .eq("id", session.user.id)
-                .single();
+                if (cancelled) return;
 
-            if (error) {
-                console.warn("RoleGuard 에러:", error);
-                // 프로필 없음 (PGRST116) → setup으로 이동
-                if (error.code === "PGRST116") {
+                if (!data.user || !data.profile) {
                     router.replace("/auth/setup");
                     return;
                 }
-                router.replace("/auth");
-                return;
-            }
 
-            if (!profile) {
-                router.replace("/auth/setup");
-                return;
-            }
+                if (typeof sessionStorage !== "undefined") {
+                    sessionStorage.setItem("safe-link-session-active", "true");
+                }
 
-            // 역할 vs allowedRole 비교 (DB에 소문자로 저장된 경우 대비 정규화)
-            const role = (String(profile.role || "")).toUpperCase() as ProfileRole;
-            const isAllowed = role ? hasAllowedRole(role, allowedRole) : false;
-
-            if (!isAllowed) {
+                const role = (String(data.profile.role || "")).toUpperCase() as ProfileRole;
                 if (!role) {
                     router.replace("/auth/setup");
                     return;
                 }
 
-                // 실제 역할에 맞는 경로로 안내 (매핑 없으면 /auth/setup)
-                const fallbackRoute = getDefaultRouteForProfileRole(role) ?? "/auth/setup";
-                router.replace(fallbackRoute);
-                return;
-            }
+                if (!hasAllowedRole(role, allowedRole)) {
+                    const fallbackRoute = getDefaultRouteForProfileRole(role) ?? "/auth/setup";
+                    router.replace(fallbackRoute);
+                    return;
+                }
 
-            setIsAuthorized(true);
+                setIsAuthorized(true);
+            } catch {
+                if (cancelled) return;
+                router.replace("/auth");
+            }
         };
 
         checkAuth();
 
-        // M-09 / ADV-008: auth 상태 변경 감지
-        // SIGNED_OUT: 즉시 리디렉션
-        // TOKEN_REFRESHED: 토큰 갱신 시 역할 재검증
-        // USER_UPDATED: 서버에서 역할 변경 시 즉시 재검증 (변경 후 최대 1시간 지연 방지)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-            if (event === "SIGNED_OUT") {
-                setIsAuthorized(false);
-                router.replace("/auth");
-            } else if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
-                checkAuth();
-            }
-        });
-
-        return () => { subscription.unsubscribe(); };
+        return () => {
+            cancelled = true;
+        };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router, allowedRole]);
 

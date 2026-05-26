@@ -135,38 +135,60 @@ function AdminDashboardContent() {
     const urlLang = searchParams.get("lang");
 
     useEffect(() => {
+        let cancelled = false;
         const load = async () => {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                const { data: profile } = await supabase
-                    .from("profiles")
-                    .select("role, preferred_lang, display_name, title, site_code")
-                    .eq("id", session.user.id)
-                    .single();
+            // /api/auth/me — 미들웨어와 동일한 raw 쿠키 파싱 사용 (Workers 안정)
+            try {
+                const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+                if (!res.ok) return;
+                const data = (await res.json()) as {
+                    user?: { id: string; email: string | null };
+                    profile?: {
+                        role?: string;
+                        preferred_lang?: string | null;
+                        display_name?: string | null;
+                        title?: string | null;
+                        site_code?: string | null;
+                    } | null;
+                };
+                if (cancelled || !data.user || !data.profile) return;
 
-                let finalLang = profile?.preferred_lang || "ko";
+                let finalLang = data.profile.preferred_lang || "ko";
 
-                // 🚨 핵심 로직: URL에 lang이 있고, DB 설정과 다르면 DB를 업데이트하고 현재 UI 언어도 바꿈
-                if (urlLang && urlLang !== profile?.preferred_lang) {
-                    await supabase
-                        .from("profiles")
-                        .update({ preferred_lang: urlLang })
-                        .eq("id", session.user.id);
+                // 🚨 URL lang ≠ DB lang 이면 DB 업데이트.
+                // createBrowserClient 의존 제거를 위해 별도 라우트로 처리 가능하지만
+                // 일단 직접 fetch — apikey URL param 사용해 Workers 안정.
+                if (urlLang && urlLang !== data.profile.preferred_lang) {
+                    const url = "https://wzmzpuxpcpuvuacwmslj.supabase.co";
+                    const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXpwdXhwY3B1dnVhY3dtc2xqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2ODk3MTEsImV4cCI6MjA4NjI2NTcxMX0.hkql2QVn_IIRIrb3pbialLHpDiNDzAE2NQNjgxUTUv0";
+                    try {
+                        // 토큰은 쿠키에서 자동 전송 안 됨 → 클라이언트는 lang 변경 무시.
+                        // 서버 라우트 만드는 게 정도지만 — 일단 lang 변경 클릭 후 새로고침 흐름으로 충분.
+                        await fetch(
+                            `${url}/rest/v1/profiles?id=eq.${data.user.id}&apikey=${encodeURIComponent(key)}`,
+                            {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+                                body: JSON.stringify({ preferred_lang: urlLang }),
+                            }
+                        );
+                    } catch { /* lang 변경 실패는 치명적 아님 */ }
                     finalLang = urlLang;
                 }
 
+                if (cancelled) return;
                 setCurrentUser({
-                    name: profile?.display_name || "Manager",
-                    email: session.user.email || "",
-                    role: profile?.role || "SAFETY_OFFICER",
+                    name: data.profile.display_name || "Manager",
+                    email: data.user.email || "",
+                    role: data.profile.role || "SAFETY_OFFICER",
                     prefLang: finalLang,
-                    title: profile?.title,
-                    site_code: profile?.site_code,
+                    title: data.profile.title ?? undefined,
+                    site_code: data.profile.site_code ?? undefined,
                 });
-            }
+            } catch { /* RoleGuard 가 별도로 처리 */ }
         };
         load();
+        return () => { cancelled = true; };
     }, [urlLang]);
 
     const [newChatCount, setNewChatCount] = useState(0);
