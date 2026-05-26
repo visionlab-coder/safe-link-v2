@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import type { ResponseCookie } from "next/dist/compiled/@edge-runtime/cookies";
 
 export const runtime = "nodejs";
 
@@ -22,7 +23,9 @@ export async function POST(req: NextRequest) {
 
     const cookieStore = await cookies();
 
-    // signInWithPassword: 15초 타임아웃으로 Cloudflare Workers 무한 행 방지
+    // signInWithPassword가 설정하는 쿠키를 Response에 직접 복사하기 위해 캡처
+    const pendingCookies: Array<{ name: string; value: string; options: Partial<ResponseCookie> }> = [];
+
     const supabase = createServerClient(url, key, {
         global: {
             fetch: (input, init) => {
@@ -35,11 +38,10 @@ export async function POST(req: NextRequest) {
         cookies: {
             getAll: () => cookieStore.getAll(),
             setAll: (cookiesToSet) => {
-                try {
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        cookieStore.set(name, value, options)
-                    );
-                } catch { /* read-only context */ }
+                cookiesToSet.forEach(({ name, value, options }) => {
+                    pendingCookies.push({ name, value, options: options ?? {} });
+                    try { cookieStore.set(name, value, options); } catch { /* read-only context */ }
+                });
             },
         },
     });
@@ -50,5 +52,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: error.message }, { status });
     }
 
-    return NextResponse.json({ ok: true });
+    // NextResponse.json()은 독립 Response 객체 — pendingCookies를 명시적으로 복사해야
+    // Set-Cookie 헤더가 브라우저에 전달됨 (이것이 없으면 미들웨어가 세션을 못 읽어 /auth로 튕김)
+    const response = NextResponse.json({ ok: true });
+    pendingCookies.forEach(({ name, value, options }) => {
+        response.cookies.set(name, value, options);
+    });
+    return response;
 }
