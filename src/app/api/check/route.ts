@@ -54,14 +54,27 @@ export async function GET() {
     const url = supabaseUrl || SUPABASE_URL_HARD;
     const key = supabaseAnonKey || SUPABASE_ANON_KEY_HARD;
 
-    // GoTrue /auth/v1/health 는 anon 으로 항상 200 반환. RLS / PostgREST 인증 정책에
-    // 영향받지 않으므로 Supabase 서버 자체의 생존만 검증하는 데 가장 안정적.
-    // (이전: /rest/v1/sites, /rest/v1/ 는 RLS 또는 PostgREST 인증 변경에 따라 401 가능)
+    // /auth/v1/token?grant_type=password 로 invalid 자격증명 POST.
+    // → 400 invalid_credentials 응답이면 Supabase 가 살아있다는 100% 증거.
+    // (admin-login 라우트에서 이미 Workers 호환성 검증된 endpoint — 동일 패턴 재활용)
+    // /auth/v1/health, /rest/v1/sites, /rest/v1/ 모두 Workers 에서 401 받는 케이스 확인.
     const res = await fetch(
-      `${url}/auth/v1/health?apikey=${encodeURIComponent(key)}`
+      `${url}/auth/v1/token?grant_type=password&apikey=${encodeURIComponent(key)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "healthcheck@nowhere.invalid", password: "x" }),
+      }
     );
-    if (!res.ok) {
+    // 응답을 받았다는 것 자체가 Supabase 서버 가동 증거.
+    // 200/400 = 정상 응답, 401 = apikey 미인식 (env var 문제), 5xx = 서버 다운.
+    // 5xx 만 진짜 fail 로 간주.
+    if (res.status >= 500) {
       throw new Error(`HTTP ${res.status}`);
+    }
+    // 401 도 fail (apikey 손상). 그 외 (200, 400, 422 등) 는 정상.
+    if (res.status === 401) {
+      throw new Error(`HTTP 401 (apikey not recognized)`);
     }
 
     results.supabase = ok("Connected");
