@@ -54,10 +54,11 @@ export async function GET() {
     const url = supabaseUrl || SUPABASE_URL_HARD;
     const key = supabaseAnonKey || SUPABASE_ANON_KEY_HARD;
 
-    // apikey 를 URL 쿼리로 전달 — Workers 헤더 손상 우회.
+    // GoTrue /auth/v1/health 는 anon 으로 항상 200 반환. RLS / PostgREST 인증 정책에
+    // 영향받지 않으므로 Supabase 서버 자체의 생존만 검증하는 데 가장 안정적.
+    // (이전: /rest/v1/sites, /rest/v1/ 는 RLS 또는 PostgREST 인증 변경에 따라 401 가능)
     const res = await fetch(
-      `${url}/rest/v1/sites?select=id&limit=1&apikey=${encodeURIComponent(key)}`,
-      { headers: { Authorization: `Bearer ${key}` } }
+      `${url}/auth/v1/health?apikey=${encodeURIComponent(key)}`
     );
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`);

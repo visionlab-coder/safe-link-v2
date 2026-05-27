@@ -343,48 +343,36 @@ function WorkerTBMDetailContent() {
 
         setIsSubmitting(true);
         try {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) return;
-
             const signatureImage = signaturePadRef.current?.toDataURL("image/png");
-
-            // 중복 서명 체크 (이미 서명한 경우 성공 처리)
-            const { data: existingAck } = await supabase.from("tbm_ack")
-                .select("id").eq("tbm_id", tbm.id).eq("worker_id", session.user.id).single();
-            if (existingAck) {
-                setIsSigned(true);
-                setTimeout(() => router.replace("/worker"), 1200);
+            if (!signatureImage) {
+                alert(t.signHere + " !");
                 return;
             }
 
-            const { error: ackError } = await supabase.from("tbm_ack").insert({
-                tbm_id: tbm.id,
-                worker_id: session.user.id,
-                signature_data: signatureImage,
-                ack_at: new Date().toISOString(),
+            // /api/tbm/sign — createBrowserClient 의존 제거. 서버측 raw fetch + 쿠키 파싱.
+            // Workers 환경에서 클라이언트 supabase 호출이 간헐 실패하던 문제 해결.
+            const res = await fetch("/api/tbm/sign", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ tbm_id: tbm.id, signature_data: signatureImage }),
             });
 
-            if (ackError) {
-                // unique constraint 에러는 이미 서명된 것이므로 성공 처리
-                if (ackError.message.includes('duplicate') || ackError.message.includes('unique')) {
-                    setIsSigned(true);
-                    setTimeout(() => router.replace("/worker"), 1200);
-                    return;
-                }
-                console.error("서명 저장 실패:", ackError.message);
-                alert("서명 저장에 실패했습니다: " + ackError.message);
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({})) as { error?: string };
+                console.error("서명 저장 실패:", body.error);
+                alert("서명 저장에 실패했습니다: " + (body.error ?? `HTTP ${res.status}`));
                 return;
             }
 
             setIsSigned(true);
-            // 서명 완료 후 화면 클리어 → 근로자 메인으로 이동
             setTransData({ text: "", pron: "", rev: "" });
             signaturePadRef.current?.clear();
             playNotificationSound();
             setTimeout(() => router.replace("/worker"), 2000);
         } catch (e) {
             console.error("서명 저장 실패:", e);
+            alert("서명 저장 중 네트워크 오류가 발생했습니다.");
         } finally {
             setIsSubmitting(false);
         }
