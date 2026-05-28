@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { createClient as createServerClient } from "@/utils/supabase/server";
 import { checkWorkerLoginLimit, checkWorkerLoginPhoneLimit } from "@/utils/rate-limit";
 
 export const runtime = "nodejs";
@@ -88,18 +87,35 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const tokenHash = linkData.properties.hashed_token;
+  const verificationType = linkData.properties.verification_type ?? "magiclink";
   const authUserId = linkData.user?.id ?? null;
 
-  // Exchange the magic-link token for a session server-side.
-  // The cookie-aware server client writes sb-access-token / sb-refresh-token
-  // into the response automatically via Next.js cookies().
-  const serverClient = await createServerClient();
-  const { error: otpErr } = await serverClient.auth.verifyOtp({
-    token_hash: tokenHash,
-    type: "magiclink",
-  });
+  // 🚨 P2/P5 박제: @supabase/ssr 의 verifyOtp 가 Workers 에서 apikey 헤더 손상으로
+  // SESSION_EXCHANGE_FAILED. GoTrue REST API 에 raw fetch 직접 호출.
+  // admin-login route 와 동일 패턴 (apikey URL param + JSON 응답 직접 파싱).
+  const verifyRes = await fetch(
+    `${supabaseUrl}/auth/v1/verify?apikey=${encodeURIComponent(serviceKey)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: verificationType, token_hash: tokenHash }),
+    }
+  );
 
-  if (otpErr) {
+  if (!verifyRes.ok) {
+    return NextResponse.json({ error: "SESSION_EXCHANGE_FAILED" }, { status: 500 });
+  }
+
+  const session = (await verifyRes.json()) as {
+    access_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+    expires_at?: number;
+    token_type?: string;
+    user?: Record<string, unknown>;
+  };
+
+  if (!session.access_token) {
     return NextResponse.json({ error: "SESSION_EXCHANGE_FAILED" }, { status: 500 });
   }
 
@@ -128,5 +144,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }
 
-  return NextResponse.json({ ok: true });
+  // 🚨 P1 박제: @supabase/ssr 표준 쿠키 형식으로 직접 설정.
+  // httpOnly:false 필수 — createBrowserClient 가 document.cookie 로 읽기 위해.
+  const projectRef = new URL(supabaseUrl).hostname.split(".")[0];
+  const cookieName = `sb-${projectRef}-auth-token`;
+  const cookieValue = `base64-${Buffer.from(JSON.stringify(session)).toString("base64")}`;
+  const maxAge = session.expires_in ?? 3600;
+
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set(cookieName, cookieValue, {
+    httpOnly: false,
+    sameSite: "lax",
+    path: "/",
+    maxAge,
+    secure: process.env.NODE_ENV === "production",
+  });
+  return response;
 }

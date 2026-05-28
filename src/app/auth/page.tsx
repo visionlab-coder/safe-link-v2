@@ -140,16 +140,24 @@ function AuthContent() {
   }, [urlLang, searchParams]);
 
   useEffect(() => {
+    // P6 박제: createBrowserClient 의존 제거. /api/auth/me 단일화.
+    // Workers 환경에서 supabase.auth.getSession() / from('profiles').select() 가
+    // 간헐적으로 실패하는 케이스 우회.
     const checkUser = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).single();
-          setExistingUser({ email: session.user.email || "", role: profile?.role || null });
+        const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          user?: { email?: string | null };
+          profile?: { role?: string | null } | null;
+        };
+        if (data.user) {
+          setExistingUser({
+            email: data.user.email || "",
+            role: data.profile?.role || null,
+          });
         }
-      } catch {
-        await supabase.auth.signOut();
-      }
+      } catch { /* unauthenticated → 무시 */ }
     };
     checkUser();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -215,9 +223,10 @@ function AuthContent() {
         return;
       }
 
-      // Pick up the session cookies the server just set
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
+      // P6 박제: createBrowserClient.getSession 대신 /api/auth/me 호출.
+      // worker-login route 가 이미 쿠키를 박았으므로 me 가 200 이면 진입.
+      const meRes = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+      if (meRes.ok) {
         sessionStorage.setItem("safe-link-session-active", "true");
         if (!localStorage.getItem("safe-link-remember")) {
           localStorage.setItem("safe-link-remember", "false");
