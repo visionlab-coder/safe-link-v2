@@ -77,17 +77,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
   }
 
-  const fullName = String(body.full_name || "").trim();
-  const nationality = String(body.nationality || "KR").trim().toUpperCase();
-  const trade = String(body.trade || "general").trim();
-  const preferredLang = String(body.preferred_lang || "ko").trim().toLowerCase();
+  // 🟢 V2 NFC 간편 등록 정책 (하이정보 APM 응답 전까지)
+  // 영문 이니셜 + 전화번호 뒷 4자리 + 사이트만 있으면 등록 가능.
+  // full_name / nationality / trade / preferred_lang 은 기본값으로 채움.
   const nameInitials = String(body.name_initials || "").trim().replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase() || null;
   const phoneLast4 = String(body.phone_last4 || "").trim().replace(/\D/g, "").slice(-4) || null;
+  const fullName = String(body.full_name || nameInitials || "").trim();
+  const nationality = String(body.nationality || "KR").trim().toUpperCase();
+  const rawTrade = String(body.trade || "general").trim();
+  const trade = TRADE_CODES.includes(rawTrade) ? rawTrade : "general";
+  const preferredLang = String(body.preferred_lang || "ko").trim().toLowerCase() || "ko";
 
+  // 필수: 영문이름(이니셜) + 전화번호 뒷 4자리. 나머지는 기본값.
+  if (!nameInitials) return NextResponse.json({ error: "name_initials_required" }, { status: 400 });
+  if (!phoneLast4 || phoneLast4.length !== 4) return NextResponse.json({ error: "phone_last4_required" }, { status: 400 });
   if (!fullName) return NextResponse.json({ error: "full_name_required" }, { status: 400 });
-  if (!nationality || nationality.length < 2) return NextResponse.json({ error: "nationality_required" }, { status: 400 });
-  if (!trade || !TRADE_CODES.includes(trade)) return NextResponse.json({ error: "trade_invalid" }, { status: 400 });
-  if (!preferredLang || preferredLang.length < 2) return NextResponse.json({ error: "preferred_lang_required" }, { status: 400 });
 
   const consentSignedAt = body.consent_signed_at ? new Date(body.consent_signed_at).toISOString() : null;
   let assignedSiteId = body.assigned_site_id?.trim() || null;

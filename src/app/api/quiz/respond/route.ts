@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { getCookieUser } from "@/utils/auth/cookie-user";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
@@ -16,9 +16,9 @@ function createService() {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user }, error: userErr } = await supabase.auth.getUser();
-  if (userErr || !user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  // P5 박제
+  const user = await getCookieUser();
+  if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
   let body: { quizResponseId?: string; answers?: number[] };
   try {
@@ -90,9 +90,9 @@ export async function POST(req: NextRequest) {
 
 // GET /api/quiz/respond?quizSessionId=xxx → 내 퀴즈 조회
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user }, error: userErr } = await supabase.auth.getUser();
-  if (userErr || !user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  // P5 박제
+  const user = await getCookieUser();
+  if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
   const quizSessionId = req.nextUrl.searchParams.get("quizSessionId");
   if (!quizSessionId) return NextResponse.json({ error: "quizSessionId_required" }, { status: 400 });

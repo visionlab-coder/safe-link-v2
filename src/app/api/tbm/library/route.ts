@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 export const runtime = "nodejs";
 import { createClient } from '@/utils/supabase/server';
+import { getCookieUser } from '@/utils/auth/cookie-user';
 
 /**
  * GET /api/tbm/library
@@ -8,6 +9,10 @@ import { createClient } from '@/utils/supabase/server';
  * Query params: category, subcategory, accident_type, critical_only
  */
 export async function GET(request: NextRequest) {
+    // 🟢 인증 추가 (레드팀 발견: 기존 무인증 노출) — 로그인된 사용자만 조회.
+    const user = await getCookieUser();
+    if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+
     const supabase = await createClient();
     const { searchParams } = request.nextUrl;
 

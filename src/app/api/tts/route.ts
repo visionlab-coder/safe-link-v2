@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 export const runtime = "nodejs";
-import { createClient } from "@/utils/supabase/server";
+import { getCookieUser } from "@/utils/auth/cookie-user";
 import { getErrorMessage } from '@/utils/errors';
 import { checkTtsLimit } from "@/utils/rate-limit";
 
@@ -40,9 +40,9 @@ async function fetchOpenAiTTS(text: string, gender: string, apiKey: string): Pro
  * Standard-only 언어(uz/ne/km/my/mn/kk)는 OpenAI tts-1-hd 우선 사용
  */
 export async function GET(request: NextRequest) {
-    const supabase = await createClient();
-    const { data: { user }, error: userErr } = await supabase.auth.getUser();
-    if (userErr || !user) return new Response("UNAUTHORIZED", { status: 401 });
+    // P5 박제: createServerClient.getUser() → getCookieUser() (raw JWT 파싱)
+    const user = await getCookieUser();
+    if (!user) return new Response("UNAUTHORIZED", { status: 401 });
     if (!(await checkTtsLimit(user.id))) {
         return new Response("RATE_LIMITED", { status: 429 });
     }

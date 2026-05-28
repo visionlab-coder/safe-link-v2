@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from "@/utils/supabase/server";
+import { getCookieUser } from "@/utils/auth/cookie-user";
 import { checkQuizTranslateLimit } from "@/utils/rate-limit";
 
 export const runtime = "nodejs";
@@ -14,9 +14,9 @@ interface GeminiResponse {
  * POST: Translate quiz question + options to target language using Gemini
  */
 export async function POST(request: NextRequest) {
-    const supabase = await createClient();
-    const { data: { user }, error: userErr } = await supabase.auth.getUser();
-    if (userErr || !user) {
+    // P5 박제
+    const user = await getCookieUser();
+    if (!user) {
         return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     }
     if (!(await checkQuizTranslateLimit(user.id))) {

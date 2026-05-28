@@ -4,7 +4,6 @@ import { Suspense, useEffect, useState } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, CheckCircle, Eraser, Nfc, ScanLine, UserPlus } from "lucide-react";
-import { createClient } from "@/utils/supabase/client";
 import { detectNfcSupport, eraseNfcTag, NfcError, readNfcUrl, writeNfcUrl } from "@/utils/nfc/web-nfc";
 import Image from "next/image";
 
@@ -35,17 +34,15 @@ function WorkerEnrollInner() {
   const [readPayload, setReadPayload] = useState("");
 
   useEffect(() => {
+    // P6 박제: createBrowserClient 의존 제거. /api/auth/me 단일화.
     const loadAdminSite = async () => {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("site_id")
-        .eq("id", session.user.id)
-        .maybeSingle();
-      const currentSiteId = (profile as { site_id?: string | null } | null)?.site_id;
-      if (currentSiteId) setSiteId(currentSiteId);
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { profile?: { site_id?: string | null } | null };
+        const currentSiteId = data.profile?.site_id;
+        if (currentSiteId) setSiteId(currentSiteId);
+      } catch { /* unauthenticated → RoleGuard 가 처리 */ }
     };
     loadAdminSite();
   }, []);
@@ -70,17 +67,15 @@ function WorkerEnrollInner() {
     let workerId = existingWorkerId;
 
     if (!workerId) {
-      const name = fullName.trim();
-      if (!name) {
-        setError("카드 라벨과 향후 ERP 매칭을 위해 근로자 이름이 필요합니다.");
-        return;
-      }
+      // 🟢 V2 NFC 간편 등록: 영문 이니셜 + 전화번호 뒷 4자리.
+      // full_name 은 옵션. 입력 없으면 이니셜 그대로 사용 (서버에서 처리).
       const cleanInitials = nameInitials.trim().replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase();
       const cleanLast4 = phoneLast4.trim().replace(/\D/g, "").slice(-4);
       if (!cleanInitials || cleanLast4.length !== 4) {
-        setError("이름 이니셜과 휴대폰 번호 뒤 4자리를 입력하세요.");
+        setError("영문 이니셜과 휴대폰 번호 뒤 4자리를 입력하세요.");
         return;
       }
+      const name = fullName.trim() || cleanInitials;
 
       const res = await fetch("/api/nfc/workers", {
         method: "POST",

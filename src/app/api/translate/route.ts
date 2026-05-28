@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 export const runtime = "nodejs";
 import { createServiceClient } from '@/utils/supabase/service';
-import { createClient } from '@/utils/supabase/server';
+import { getCookieUser } from '@/utils/auth/cookie-user';
 import { verifyTravelToken } from '@/lib/travel-auth';
 import { checkTranslateLimit } from '@/utils/rate-limit';
 import { CONSTRUCTION_GLOSSARY } from '@/constants/glossary';
@@ -46,9 +46,9 @@ export async function POST(request: NextRequest) {
         // travel token은 IP 기반 제한
         rateLimitKey = `ip:${request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown"}`;
     } else {
-        const supa = await createClient();
-        const { data: { user }, error: userErr } = await supa.auth.getUser();
-        if (userErr || !user) {
+        // P5 박제: createServerClient.getUser() → getCookieUser() (raw JWT 파싱)
+        const user = await getCookieUser();
+        if (!user) {
             return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
         }
         rateLimitKey = `uid:${user.id}`;

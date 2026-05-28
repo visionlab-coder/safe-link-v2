@@ -1,0 +1,185 @@
+
+> safe-link-v2@0.1.0 dev
+> next dev -p 3002
+
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of C:\Users\seowo\Documents\package-lock.json as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles: 
+   * C:\Users\seowo\Documents\dev\seowon-projects\SAFE-LINK-V2\package-lock.json
+
+   ▲ Next.js 15.5.18
+   - Local:        http://localhost:3002
+   - Network:      http://172.24.80.1:3002
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1645ms
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 853ms (166 modules)
+ ○ Compiling /auth ...
+connect EACCES 142.251.24.95:443
+
+Retrying 1/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 1/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 1/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 1/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 1/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 1/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 1/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 1/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 2/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 2/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 2/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 2/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 2/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 2/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 2/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 2/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 3/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 3/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 3/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 3/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 3/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 3/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 3/3...
+connect EACCES 142.251.24.95:443
+
+Retrying 3/3...
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (133kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+Error: connect EACCES 142.251.24.95:443
+    at <unknown> (Error: connect EACCES 142.251.24.95:443) {
+  errno: -4092,
+  code: 'EACCES',
+  syscall: 'connect',
+  address: '142.251.24.95',
+  port: 443
+}
+ ⨯ Failed to download `Noto Sans` from Google Fonts. Using fallback font instead.
+
+Failed to fetch `Noto Sans` from Google Fonts.}
+Error: connect EACCES 142.251.24.95:443
+    at <unknown> (Error: connect EACCES 142.251.24.95:443) {
+  errno: -4092,
+  code: 'EACCES',
+  syscall: 'connect',
+  address: '142.251.24.95',
+  port: 443
+}
+ ⨯ Failed to download `Noto Sans KR` from Google Fonts. Using fallback font instead.
+
+Failed to fetch `Noto Sans KR` from Google Fonts.}
+Error: connect EACCES 142.251.24.95:443
+    at <unknown> (Error: connect EACCES 142.251.24.95:443) {
+  errno: -4092,
+  code: 'EACCES',
+  syscall: 'connect',
+  address: '142.251.24.95',
+  port: 443
+}
+ ⨯ Failed to download `Noto Sans SC` from Google Fonts. Using fallback font instead.
+
+Failed to fetch `Noto Sans SC` from Google Fonts.}
+Error: connect EACCES 142.251.24.95:443
+    at <unknown> (Error: connect EACCES 142.251.24.95:443) {
+  errno: -4092,
+  code: 'EACCES',
+  syscall: 'connect',
+  address: '142.251.24.95',
+  port: 443
+}
+ ⨯ Failed to download `Noto Sans TC` from Google Fonts. Using fallback font instead.
+
+Failed to fetch `Noto Sans TC` from Google Fonts.}
+Error: connect EACCES 142.251.24.95:443
+    at <unknown> (Error: connect EACCES 142.251.24.95:443) {
+  errno: -4092,
+  code: 'EACCES',
+  syscall: 'connect',
+  address: '142.251.24.95',
+  port: 443
+}
+ ⨯ Failed to download `Noto Sans JP` from Google Fonts. Using fallback font instead.
+
+Failed to fetch `Noto Sans JP` from Google Fonts.}
+Error: connect EACCES 142.251.24.95:443
+    at <unknown> (Error: connect EACCES 142.251.24.95:443) {
+  errno: -4092,
+  code: 'EACCES',
+  syscall: 'connect',
+  address: '142.251.24.95',
+  port: 443
+}
+ ⨯ Failed to download `Noto Sans Thai` from Google Fonts. Using fallback font instead.
+
+Failed to fetch `Noto Sans Thai` from Google Fonts.}
+Error: connect EACCES 142.251.24.95:443
+    at <unknown> (Error: connect EACCES 142.251.24.95:443) {
+  errno: -4092,
+  code: 'EACCES',
+  syscall: 'connect',
+  address: '142.251.24.95',
+  port: 443
+}
+ ⨯ Failed to download `Noto Sans Devanagari` from Google Fonts. Using fallback font instead.
+
+Failed to fetch `Noto Sans Devanagari` from Google Fonts.}
+Error: connect EACCES 142.251.24.95:443
+    at <unknown> (Error: connect EACCES 142.251.24.95:443) {
+  errno: -4092,
+  code: 'EACCES',
+  syscall: 'connect',
+  address: '142.251.24.95',
+  port: 443
+}
+ ⨯ Failed to download `Noto Sans Arabic` from Google Fonts. Using fallback font instead.
+
+Failed to fetch `Noto Sans Arabic` from Google Fonts.}
+ ✓ Compiled /auth in 4.6s (845 modules)
+ GET /auth 200 in 5104ms
+ ✓ Compiled in 671ms (338 modules)

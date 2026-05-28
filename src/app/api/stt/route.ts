@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 export const runtime = "nodejs";
-import { createClient } from "@/utils/supabase/server";
+import { getCookieUser } from "@/utils/auth/cookie-user";
 import { getErrorMessage } from '@/utils/errors';
 import { checkSttLimit } from "@/utils/rate-limit";
 import { CONSTRUCTION_SPEECH_HINTS, WHISPER_CONTEXT_PROMPT } from '@/constants/construction-terms';
@@ -193,9 +193,9 @@ interface SpeechRecognitionResponse {
 }
 
 export async function POST(req: Request) {
-    const supabase = await createClient();
-    const { data: { user }, error: userErr } = await supabase.auth.getUser();
-    if (userErr || !user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+    // P5 박제: createServerClient.getUser() → getCookieUser() (raw JWT 파싱)
+    const user = await getCookieUser();
+    if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     if (!(await checkSttLimit(user.id))) {
         return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
     }

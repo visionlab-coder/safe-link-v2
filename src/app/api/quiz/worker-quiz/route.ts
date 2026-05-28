@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { getCookieUser } from "@/utils/auth/cookie-user";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
@@ -16,9 +16,9 @@ function createService() {
 }
 
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user }, error: userErr } = await supabase.auth.getUser();
-  if (userErr || !user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  // P5 박제
+  const user = await getCookieUser();
+  if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
   const service = createService();
 
