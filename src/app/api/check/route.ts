@@ -4,10 +4,7 @@ import { requireAdmin } from "@/utils/nfc/require-admin";
 
 export const runtime = "nodejs";
 
-// Workers 런타임에서 @supabase/supabase-js 의 createClient 가 apikey 헤더를 손상시키는 케이스가 있어
-// supabase health check 도 raw fetch + apikey URL param 으로 수행.
-const SUPABASE_URL_HARD = "https://wzmzpuxpcpuvuacwmslj.supabase.co";
-const SUPABASE_ANON_KEY_HARD = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXpwdXhwY3B1dnVhY3dtc2xqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2ODk3MTEsImV4cCI6MjA4NjI2NTcxMX0.hkql2QVn_IIRIrb3pbialLHpDiNDzAE2NQNjgxUTUv0";
+// Supabase 가용성은 requireAdmin() 통과 자체가 증거이므로 별도 health endpoint 호출 안 함.
 
 interface HealthItem {
   status: "pending" | "ok" | "error";
@@ -49,37 +46,22 @@ export async function GET() {
   const pusherKey = process.env.PUSHER_KEY?.trim();
   const pusherCluster = process.env.PUSHER_CLUSTER?.trim();
 
-  try {
-    // env var 가 가끔 누락되는 케이스 대비해 하드코딩 값과 폴백.
-    const url = supabaseUrl || SUPABASE_URL_HARD;
-    const key = supabaseAnonKey || SUPABASE_ANON_KEY_HARD;
-
-    // /auth/v1/token?grant_type=password 로 invalid 자격증명 POST.
-    // → 400 invalid_credentials 응답이면 Supabase 가 살아있다는 100% 증거.
-    // (admin-login 라우트에서 이미 Workers 호환성 검증된 endpoint — 동일 패턴 재활용)
-    // /auth/v1/health, /rest/v1/sites, /rest/v1/ 모두 Workers 에서 401 받는 케이스 확인.
-    const res = await fetch(
-      `${url}/auth/v1/token?grant_type=password&apikey=${encodeURIComponent(key)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: "healthcheck@nowhere.invalid", password: "x" }),
-      }
-    );
-    // 응답을 받았다는 것 자체가 Supabase 서버 가동 증거.
-    // 200/400 = 정상 응답, 401 = apikey 미인식 (env var 문제), 5xx = 서버 다운.
-    // 5xx 만 진짜 fail 로 간주.
-    if (res.status >= 500) {
-      throw new Error(`HTTP ${res.status}`);
-    }
-    // 401 도 fail (apikey 손상). 그 외 (200, 400, 422 등) 는 정상.
-    if (res.status === 401) {
-      throw new Error(`HTTP 401 (apikey not recognized)`);
-    }
-
-    results.supabase = ok("Connected");
-  } catch (error: unknown) {
-    results.supabase = fail(getErrorMessage(error));
+  // ✅ Supabase 가용성: requireAdmin() 통과 자체가 가장 확실한 증거.
+  //   - requireAdmin 은 쿠키 파싱 → JWT 검증 → /rest/v1/profiles 조회 (Supabase REST API 호출)
+  //   - 모두 통과해야 ctx 반환됨. 즉 여기 도달했다는 것은:
+  //     · GoTrue 가 발급한 JWT 가 유효
+  //     · PostgREST 가 응답 반환
+  //     · RLS 정책 정상 작동
+  //   → 별도 health endpoint 호출 불필요. (이전 시도들 모두 Workers 에서 401 또는
+  //     rate-limit 으로 false-negative 발생: /auth/v1/token, /auth/v1/health,
+  //     /rest/v1/sites, /rest/v1/, /auth/v1/settings)
+  //
+  //   추가 변수 / Workers 헤더 손상 / rate limit / RLS 변경 등 모든 false-negative
+  //   원인 제거. requireAdmin 이 동작했다 = supabase 살아있다. 끝.
+  if (supabaseUrl && supabaseAnonKey) {
+    results.supabase = ok("Connected (verified via requireAdmin)");
+  } else {
+    results.supabase = fail("Missing SUPABASE env vars");
   }
 
   try {
