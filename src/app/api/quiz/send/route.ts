@@ -7,18 +7,7 @@ export const runtime = "nodejs";
 // POST /api/quiz/send
 // body: { quizSessionId, tbmSessionId? }
 
-interface GeminiResponse {
-  candidates?: Array<{
-    content?: { parts?: Array<{ text?: string }> };
-  }>;
-}
-
-const LANG_NAMES: Record<string, string> = {
-  ko: "한국어", en: "English", zh: "中文", vi: "Tiếng Việt",
-  th: "ภาษาไทย", uz: "O'zbek", ph: "Filipino", ru: "Русский",
-  km: "ខ្មែរ", id: "Bahasa Indonesia", mn: "Монгол",
-  my: "မြန်မာ", ne: "नेपाली", bn: "বাংলা", kk: "Қазақ", jp: "日本語",
-};
+// Gemini 의존 제거. Cloud Translation API (translateText) 만 사용.
 
 type QuizQuestion = {
   id: string;
@@ -27,6 +16,31 @@ type QuizQuestion = {
   options_ko: string[];
   answer_index: number;
 };
+
+// 🚨 옵션 1 대 1 별도 번역 (Google Cloud Translation API).
+// 이전 구현은 Gemini 에게 question + options 를 통째로 JSON 으로 번역 요청 → LLM 이
+// 옵션 순서를 임의로 변경하여 채점 시 인덱스 불일치 → 다국어 워커만 오답 처리되는
+// CRITICAL 버그. (한국어 워커는 분기에서 번역 안 함 → 정상 채점)
+//
+// Cloud Translation 은 각 문자열을 1 대 1 매핑으로 번역하므로 순서 변경 절대 없음.
+// + 결과 검증 (개수 일치 / 빈값 없음) → 실패 시 원본 ko 폴백.
+async function translateText(text: string, targetLang: string, apiKey: string): Promise<string> {
+  const res = await fetch(
+    `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ q: text, target: targetLang, source: "ko", format: "text" }),
+    }
+  );
+  if (!res.ok) throw new Error(`translate_http_${res.status}`);
+  const data = (await res.json()) as {
+    data?: { translations?: Array<{ translatedText?: string }> };
+  };
+  const translated = data.data?.translations?.[0]?.translatedText;
+  if (!translated) throw new Error("translate_empty");
+  return translated;
+}
 
 async function translateQuiz(
   question: QuizQuestion,
@@ -37,47 +51,24 @@ async function translateQuiz(
     return { question: question.question_ko, options: question.options_ko };
   }
 
-  const langName = LANG_NAMES[targetLang] ?? targetLang;
-  const prompt = `Translate this safety quiz to ${langName}. Return ONLY JSON: {"question":"...","options":["...","...","..."]}
-Korean question: ${question.question_ko}
-Korean options: ${JSON.stringify(question.options_ko)}`;
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
-  let res: Response;
   try {
-    res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
-        }),
-        signal: controller.signal,
-      }
-    );
+    // 질문 + 각 옵션을 1 대 1 번역 (순서 절대 보존)
+    const [translatedQ, ...translatedOpts] = await Promise.all([
+      translateText(question.question_ko, targetLang, apiKey),
+      ...question.options_ko.map((opt) => translateText(opt, targetLang, apiKey)),
+    ]);
+
+    // 검증: 옵션 개수 일치 + 모두 비어있지 않음
+    if (translatedOpts.length !== question.options_ko.length) {
+      return { question: question.question_ko, options: question.options_ko };
+    }
+    if (translatedOpts.some((o) => !o || !o.trim())) {
+      return { question: question.question_ko, options: question.options_ko };
+    }
+
+    return { question: translatedQ, options: translatedOpts };
   } catch {
-    return { question: question.question_ko, options: question.options_ko };
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!res.ok) return { question: question.question_ko, options: question.options_ko };
-
-  const data = (await res.json()) as GeminiResponse;
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-  const match = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
-  if (!match) return { question: question.question_ko, options: question.options_ko };
-
-  try {
-    const parsed = JSON.parse(match[1]);
-    return {
-      question: parsed.question ?? question.question_ko,
-      options: parsed.options ?? question.options_ko,
-    };
-  } catch {
+    // 번역 실패 → 한국어 원본 사용 (채점 일관성 우선)
     return { question: question.question_ko, options: question.options_ko };
   }
 }

@@ -8,7 +8,8 @@ export const runtime = "nodejs";
 // body: { tbmSessionId, tbmText, workerLangs?, maxQuestions? }
 // 반환: { questions: [{ id, question_ko, options_ko, answer_index, keyword }], source: "tbm"|"fallback" }
 
-// 매일 3문제 기본값. TBM 내용 없을 때 사용하는 안전 상식 예시 풀 (21문제 × 일별 로테이션)
+// TBM 내용 없을 때 사용하는 안전 상식 예시 풀.
+// 50문제 — 매 호출마다 무작위 셔플 + 최근 출제된 키워드는 자동 제외 (중복 회피).
 const FALLBACK_QUIZ_POOL: Omit<QuizQuestion, "id">[] = [
   { keyword: "추락방지", question_ko: "고소작업(2m 이상) 시 반드시 착용해야 할 안전장비는?", options_ko: ["안전대(안전벨트)", "방진마스크", "차광안경", "귀마개"], answer_index: 0 },
   { keyword: "안전모", question_ko: "건설현장에서 안전모를 착용하는 주된 이유는?", options_ko: ["낙하물로부터 머리 보호", "자외선 차단", "보온 유지", "신호 식별"], answer_index: 0 },
@@ -31,6 +32,37 @@ const FALLBACK_QUIZ_POOL: Omit<QuizQuestion, "id">[] = [
   { keyword: "작업허가", question_ko: "밀폐 공간 작업 전 반드시 확인해야 할 것은?", options_ko: ["산소 농도 및 유해가스 측정", "조명 밝기 확인", "작업 공구 수량", "인원 인원수 확인"], answer_index: 0 },
   { keyword: "4대보험", question_ko: "외국인 근로자도 산재보험 적용 대상인가요?", options_ko: ["예, 내국인과 동일하게 적용됩니다", "아니오, 외국인은 제외됩니다", "비자 종류에 따라 다릅니다", "계약서에만 따릅니다"], answer_index: 0 },
   { keyword: "산소결핍", question_ko: "산소결핍 공간에서 작업 시 착용해야 할 장비는?", options_ko: ["공기호흡기 또는 송기마스크", "방진마스크", "방독마스크", "일반 마스크"], answer_index: 0 },
+  // ─── 추가 풀 (29 문제) ────────────────────────────────────────────
+  { keyword: "응급처치", question_ko: "현장에서 부상자 발생 시 가장 먼저 해야 할 일은?", options_ko: ["119 신고 및 응급처치", "사진 촬영", "작업 계속", "퇴근"], answer_index: 0 },
+  { keyword: "심폐소생술", question_ko: "심폐소생술(CPR)에서 가슴 압박 깊이는 약 몇 cm인가요?", options_ko: ["5~6cm", "1~2cm", "3~4cm", "8~10cm"], answer_index: 0 },
+  { keyword: "사다리", question_ko: "사다리 작업 시 올바른 안전 수칙은?", options_ko: ["3점 지지 유지", "한 손만 잡기", "최상단에서 작업", "혼자 이동"], answer_index: 0 },
+  { keyword: "차량안전", question_ko: "현장 내 차량 이동 시 작업자가 지켜야 할 사항은?", options_ko: ["서행 및 신호 준수", "최단거리로 횡단", "차량 뒤편 통과", "추월"], answer_index: 0 },
+  { keyword: "토사붕괴", question_ko: "토사붕괴 위험이 있는 굴착 구간에서 해야 할 조치는?", options_ko: ["흙막이 설치 및 출입 통제", "굴착 계속", "물 뿌리기", "방치"], answer_index: 0 },
+  { keyword: "열사병", question_ko: "여름철 야외 작업 중 열사병 예방법은?", options_ko: ["충분한 수분 섭취와 그늘 휴식", "장시간 직사광선 작업", "음료 자제", "두꺼운 옷"], answer_index: 0 },
+  { keyword: "한랭", question_ko: "동절기 옥외 작업 시 동상 예방 방법은?", options_ko: ["방한복 착용 및 주기적 실내 휴식", "얇은 옷", "장시간 야외 노출", "맨손 작업"], answer_index: 0 },
+  { keyword: "미끄럼", question_ko: "비 오는 날 현장에서 미끄럼 사고 예방법은?", options_ko: ["미끄럼방지 안전화 착용 및 통로 정비", "달리기", "빠른 이동", "물 청소 생략"], answer_index: 0 },
+  { keyword: "폭발위험", question_ko: "유증기 공간에서 작업 시 사용 금지되는 것은?", options_ko: ["스파크가 발생하는 도구", "방폭공구", "공기 환기", "방폭조명"], answer_index: 0 },
+  { keyword: "누전차단기", question_ko: "임시 분전반에 반드시 설치해야 할 보호 장치는?", options_ko: ["누전차단기(ELB)", "라디오", "USB 충전기", "선풍기"], answer_index: 0 },
+  { keyword: "접지", question_ko: "전기 장비를 안전하게 사용하기 위해 필요한 것은?", options_ko: ["접지선 연결", "맨발 사용", "물 묻은 손", "절연 무시"], answer_index: 0 },
+  { keyword: "가스용접", question_ko: "가스용접 작업 시 가장 큰 위험 요소는?", options_ko: ["화재·폭발", "소음", "냄새", "직사광선"], answer_index: 0 },
+  { keyword: "절단작업", question_ko: "절단작업 시 비산물 차단을 위해 필요한 것은?", options_ko: ["방호 차단막 설치", "주변에 알림 없이 작업", "주변 청소 생략", "공구 노출"], answer_index: 0 },
+  { keyword: "추락방호망", question_ko: "고소작업 시 추락방호망의 설치 목적은?", options_ko: ["추락 시 충격 흡수 및 부상 최소화", "장식", "보온", "차양"], answer_index: 0 },
+  { keyword: "위험성평가", question_ko: "작업 시작 전 위험성평가의 목적은?", options_ko: ["사전에 위험 요인 식별 및 대책 수립", "작업 속도 향상", "비용 절감", "근로자 평가"], answer_index: 0 },
+  { keyword: "안전교육", question_ko: "신규 입소자가 받아야 할 안전교육 시간은?", options_ko: ["8시간 이상", "30분", "1시간", "받지 않아도 됨"], answer_index: 0 },
+  { keyword: "타워크레인", question_ko: "타워크레인 작업 중 풍속이 몇 m/s 이상이면 작업 중단인가요?", options_ko: ["10m/s", "1m/s", "3m/s", "20m/s"], answer_index: 0 },
+  { keyword: "발판설치", question_ko: "비계 발판 설치 시 발판 사이 틈은 몇 cm 이내여야 하나요?", options_ko: ["3cm 이내", "10cm", "20cm", "제한 없음"], answer_index: 0 },
+  { keyword: "안전난간", question_ko: "안전난간의 상부 난간대 높이는 최소 몇 cm 이상인가요?", options_ko: ["90cm 이상", "30cm", "50cm", "70cm"], answer_index: 0 },
+  { keyword: "지게차", question_ko: "지게차 운행 중 시야 확보가 어려울 때 해야 할 일은?", options_ko: ["유도자 배치 및 서행", "더 빠른 운행", "후진 금지", "혼자 진행"], answer_index: 0 },
+  { keyword: "이동식크레인", question_ko: "이동식 크레인의 아웃트리거를 사용하는 이유는?", options_ko: ["전도(넘어짐) 방지", "무게 증가", "장식", "냉각"], answer_index: 0 },
+  { keyword: "용접보호구", question_ko: "아크 용접 작업 시 눈을 보호하기 위해 필요한 것은?", options_ko: ["용접 차광면", "선글라스", "맨눈", "투명안경"], answer_index: 0 },
+  { keyword: "고소작업대", question_ko: "고소작업대(차) 사용 시 작업자가 반드시 착용해야 하는 것은?", options_ko: ["안전대 체결", "선글라스", "장갑만", "착용 불필요"], answer_index: 0 },
+  { keyword: "가설계단", question_ko: "가설계단 사용 시 안전 수칙은?", options_ko: ["손잡이 잡고 한 단씩 이동", "뛰어 이동", "양손에 짐 들기", "역방향 이동"], answer_index: 0 },
+  { keyword: "화재대피", question_ko: "현장에서 화재 발생 시 가장 먼저 해야 할 일은?", options_ko: ["대피 후 119 신고", "혼자 진압 시도", "촬영", "작업 계속"], answer_index: 0 },
+  { keyword: "전선관리", question_ko: "현장 전선이 통로에 깔려 있을 때 해야 할 조치는?", options_ko: ["케이블 보호대 설치 또는 매달기", "그냥 사용", "끊기", "발로 옮기기"], answer_index: 0 },
+  { keyword: "양중작업", question_ko: "양중작업 중 인양물 아래에 들어가면 안 되는 이유는?", options_ko: ["낙하 시 중대 재해 발생", "시야 확보", "장비 손상", "동선 효율"], answer_index: 0 },
+  { keyword: "안전점검", question_ko: "작업 시작 전 안전점검의 의미는?", options_ko: ["위험요소 사전 확인 및 제거", "출근 확인", "도구 분실 확인", "복장 점검"], answer_index: 0 },
+  { keyword: "낙하물방지", question_ko: "고층 작업 중 낙하물 방지망(추락방호망)을 설치하는 위치는?", options_ko: ["작업 구역 직하부", "지상 출입구만", "지하실", "장식적 위치"], answer_index: 0 },
+  { keyword: "근로시간", question_ko: "법정 1일 근로시간을 초과한 야간작업 시 필수 조치는?", options_ko: ["충분한 휴식 및 안전관리자 입회", "혼자 작업", "조명 끄기", "휴식 없이 연속"], answer_index: 0 },
 ];
 
 interface GeminiResponse {
@@ -155,14 +187,40 @@ export async function POST(req: NextRequest) {
     if (parts.length) tbmText = parts.join("\n\n");
   }
 
-  // TBM 내용 없으면 일별 로테이션 예시 문제 사용 (fallback)
+  // TBM 내용 없으면 안전 상식 풀에서 무작위 출제 (fallback)
   let source: "tbm" | "fallback" = "tbm";
   let questions: QuizQuestion[];
 
   if (!tbmText) {
     source = "fallback";
-    // 매 호출마다 다른 문제 셋: 풀 전체를 무작위로 섞어 앞에서 N개 선택
-    const shuffledPool = [...FALLBACK_QUIZ_POOL].sort(() => Math.random() - 0.5);
+
+    // 🟢 중복 회피: 같은 사이트에서 최근 10 개 퀴즈 세션의 keyword 들을 제외 풀에 추가.
+    //   - 풀 50 문제 중 최근 출제 키워드 제외 → 항상 새로운 문제 출제.
+    //   - 제외 후 남은 풀이 부족하면 (maxQuestions 미만) 전체 풀로 폴백.
+    const siteIdForExclude = guard.ctx.user.site_id ?? null;
+    const excludedKeywords = new Set<string>();
+    if (siteIdForExclude) {
+      const { data: recentSessions } = await guard.ctx.service
+        .from("tbm_quiz_sessions")
+        .select("questions")
+        .eq("site_id", siteIdForExclude)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      for (const session of recentSessions ?? []) {
+        const qs = (session as { questions?: QuizQuestion[] }).questions ?? [];
+        for (const q of qs) {
+          if (q.keyword) excludedKeywords.add(q.keyword);
+        }
+      }
+    }
+
+    let candidatePool = FALLBACK_QUIZ_POOL.filter((q) => !excludedKeywords.has(q.keyword));
+    // 제외 후 풀이 너무 작으면 전체 풀 사용 (출제 가능성 보장)
+    if (candidatePool.length < maxQuestions) {
+      candidatePool = FALLBACK_QUIZ_POOL;
+    }
+
+    const shuffledPool = [...candidatePool].sort(() => Math.random() - 0.5);
     questions = shuffledPool.slice(0, maxQuestions).map((q, i) => {
       // 선지 순서도 무작위 (정답이 항상 A번으로 고정되지 않도록)
       const correctAnswer = q.options_ko[q.answer_index];
