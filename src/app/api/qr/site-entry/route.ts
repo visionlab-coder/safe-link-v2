@@ -214,13 +214,35 @@ export async function POST(req: NextRequest) {
   if (workerErr) return NextResponse.json({ error: "worker_lookup_failed" }, { status: 500 });
   if (workers && workers.length > 1) return NextResponse.json({ error: "worker_match_ambiguous" }, { status: 409 });
 
-  // C-9: 미등록 근로자 게스트 자동 생성 차단 — nfc_workers에 없으면 관리자 사전 등록 필요
-  if (!workers || workers.length === 0) {
-    return NextResponse.json({ error: "worker_not_registered" }, { status: 404 });
-  }
-
+  // 🟢 V2 정책: 미등록 워커도 사이트 QR 스캔 + 이니셜 + 뒷4자리로 자동 가입 가능.
+  //   - 이전 C-9 (사전 등록 필수) 정책 완화.
+  //   - 관리자가 NFC 발급하지 않아도 첫 입장 시 nfc_workers 자동 생성.
+  //   - 같은 사이트 내 (initials + last4) 중복은 위 limit(2) + length>1 검증으로 차단됨.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const worker: any = workers[0];
+  let worker: any;
+  if (!workers || workers.length === 0) {
+    const { data: newWorker, error: createErr } = await service
+      .from("nfc_workers")
+      .insert({
+        name_initials: initials,
+        phone_last4: phoneLast4,
+        full_name: initials,
+        nationality,
+        preferred_lang: preferredLang,
+        trade: "general",
+        assigned_site_id: site.id,
+        is_active: true,
+        consent_signed_at: new Date().toISOString(),
+      })
+      .select("id, worker_code, full_name, nationality, preferred_lang, auth_user_id, assigned_site_id, is_active")
+      .single();
+    if (createErr || !newWorker) {
+      return NextResponse.json({ error: "worker_auto_enroll_failed", detail: createErr?.message }, { status: 500 });
+    }
+    worker = newWorker;
+  } else {
+    worker = workers[0];
+  }
   const nowIso = new Date().toISOString();
   const { data: updatedWorker, error: updateErr } = await service
     .from("nfc_workers")
