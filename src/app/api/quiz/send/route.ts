@@ -42,11 +42,18 @@ async function translateText(text: string, targetLang: string, apiKey: string): 
   return translated;
 }
 
+type TranslatedQuiz = {
+  question: string;
+  options: string[];
+  question_ko?: string;
+  options_ko?: string[];
+};
+
 async function translateQuiz(
   question: QuizQuestion,
   targetLang: string,
   apiKey: string
-): Promise<{ question: string; options: string[] }> {
+): Promise<TranslatedQuiz> {
   if (targetLang === "ko") {
     return { question: question.question_ko, options: question.options_ko };
   }
@@ -168,14 +175,29 @@ export async function POST(req: NextRequest) {
   }
 
   // 언어별 번역 + 퀴즈 발송 기록
+  // 🟢 1번 문제에만 한국어 원문(question_ko, options_ko)을 함께 저장 →
+  //    워커 페이지에서 자국어 + 한국어 병기 표시 (한국어 학습 유도).
+  //    2~3번 문제는 자국어만 (집중력 유지).
+  //    한국어 워커는 question === question_ko 라 중복 표시 안 됨.
   let sentCount = 0;
-  const translatedByLang: Record<string, { question: string; options: string[] }[]> = {};
+  const translatedByLang: Record<
+    string,
+    { question: string; options: string[]; question_ko?: string; options_ko?: string[] }[]
+  > = {};
 
   await Promise.all(
     Array.from(langGroups.entries()).map(async ([lang]) => {
       const translated = await Promise.all(
         questions.map((q) => translateQuiz(q, lang, apiKey))
       );
+      // 첫 번째 문제만 한국어 원문 합성 (워커 언어 != ko 일 때만 의미)
+      if (translated.length > 0 && lang !== "ko") {
+        translated[0] = {
+          ...translated[0],
+          question_ko: questions[0].question_ko,
+          options_ko: questions[0].options_ko,
+        };
+      }
       translatedByLang[lang] = translated;
     })
   );

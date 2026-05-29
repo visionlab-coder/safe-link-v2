@@ -58,7 +58,13 @@ const i18n: Record<string, Record<string, string>> = {
 };
 const getT = (lang: string) => i18n[lang] ?? i18n["en"];
 
-type TranslatedQuestion = { question: string; options: string[] };
+type TranslatedQuestion = {
+  question: string;
+  options: string[];
+  // 1번 문제에만 채워짐 (한국어 학습용 병기).
+  question_ko?: string;
+  options_ko?: string[];
+};
 type QuizResponse = {
   id: string;
   lang: string;
@@ -210,17 +216,26 @@ export default function WorkerQuizPage() {
             </div>
 
             <div className="flex flex-col gap-6">
-              {quizResponse.questions_translated.map((q, qIdx) => (
+              {quizResponse.questions_translated.map((q, qIdx) => {
+                // 🟢 1번 문제 + 한국어 원문 있을 때만 병기 (워커가 한국어 친숙화)
+                const showKo = qIdx === 0 && q.question_ko && q.question_ko !== q.question;
+                return (
                 <section key={qIdx} className="glass rounded-[32px] p-6 border-white/10 flex flex-col gap-4">
                   <div className="flex items-start gap-3">
                     <span className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-sm font-black shrink-0 mt-0.5">
                       {qIdx + 1}
                     </span>
-                    <h2 className="text-lg font-black text-white leading-snug">{q.question}</h2>
+                    <div className="flex flex-col gap-1.5">
+                      <h2 className="text-lg font-black text-white leading-snug">{q.question}</h2>
+                      {showKo && (
+                        <p className="text-sm text-slate-400 leading-snug font-medium">🇰🇷 {q.question_ko}</p>
+                      )}
+                    </div>
                   </div>
                   <div className="flex flex-col gap-2 pl-11">
                     {q.options.map((opt, optIdx) => {
                       const isSelected = selectedAnswers[qIdx] === optIdx;
+                      const koOpt = showKo && q.options_ko?.[optIdx];
                       return (
                         <button
                           key={optIdx}
@@ -230,19 +245,25 @@ export default function WorkerQuizPage() {
                               ? "bg-purple-500/20 border-purple-500/60 text-purple-300"
                               : "glass border-white/10 text-slate-300 hover:bg-white/5"}`}
                         >
-                          <div className="flex items-center gap-3">
-                            <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0
+                          <div className="flex items-start gap-3">
+                            <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5
                               ${isSelected ? "bg-purple-500 text-white" : "bg-white/10 text-slate-500"}`}>
                               {String.fromCharCode(65 + optIdx)}
                             </span>
-                            <span>{opt}</span>
+                            <div className="flex flex-col gap-0.5">
+                              <span>{opt}</span>
+                              {koOpt && koOpt !== opt && (
+                                <span className="text-xs font-medium text-slate-500">{koOpt}</span>
+                              )}
+                            </div>
                           </div>
                         </button>
                       );
                     })}
                   </div>
                 </section>
-              ))}
+                );
+              })}
             </div>
 
             <button
