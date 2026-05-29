@@ -46,7 +46,8 @@ function cleanLang(value: unknown, country: string): string {
 }
 
 function cleanInitials(value: unknown): string | null {
-  const initials = String(value || "").trim().replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase();
+  // V2: 최대 6자까지 허용 (NGUYEN/SMITH 등 6자 영문 이름 짤림 방지). 영문/숫자만.
+  const initials = String(value || "").trim().replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toUpperCase();
   return initials.length > 0 ? initials : null;
 }
 
