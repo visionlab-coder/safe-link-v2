@@ -119,7 +119,12 @@ function AdminLiveContent() {
             ...(Object.keys(translations).length > 0 && { translations }),
         };
         if (siteId) payload.site_id = siteId;
-        await supabase.from("live_translations").insert(payload);
+        const { error } = await supabase.from("live_translations").insert(payload);
+        if (error) {
+            console.error("[admin/live] live_translations insert failed:", error.message);
+            setTranscripts(prev => [...prev, { text: `[저장 실패] ${error.message}`, time }]);
+            return;
+        }
 
         setTimeout(() => {
             scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });

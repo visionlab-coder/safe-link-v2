@@ -84,25 +84,24 @@ async function generateQuizFromText(
   apiKey: string
 ): Promise<QuizQuestion[]> {
   const prompt = `당신은 건설현장 안전교육 퀴즈 출제 전문가입니다.
-아래는 오늘 TBM(Tool Box Meeting)에서 실제로 다룬 내용입니다.
-(TBM 교육 공지문 + 현장 발화 내용이 포함될 수 있습니다)
+아래 내용은 오늘 TBM(Tool Box Meeting)에서 실제로 안내된 교육 공지와 현장 발화입니다.
 
-이 내용에서 안전 핵심 키워드를 최대 5개 추출하고,
-각 키워드에 대해 객관식 또는 OX 형식의 퀴즈 문항을 생성하세요.
+입력 내용에서 안전 핵심 키워드를 최대 5개 추출하고, 각 키워드에 대해 객관식 또는 OX 형식의 퀴즈 문항을 생성하세요.
 
 규칙:
-- 오늘 TBM에서 실제로 언급된 내용만 출제 (추측 금지)
-- 각 문항: 정답 1개 + 오답 2~3개 (총 3~4개 선지)
-- 건설현장 맥락에 맞는 실용적인 문제
-- 한국어로 작성
+- 오늘 TBM에서 실제로 언급된 내용만 출제합니다.
+- 각 문항은 정답 1개와 오답 2~3개로 구성합니다.
+- 건설현장 근로자가 바로 이해할 수 있는 실무적인 문장으로 작성합니다.
+- 한국어로 작성합니다.
+- 응답은 설명 없이 JSON 배열만 반환합니다.
 
 오늘 TBM 내용:
 ${tbmText.slice(0, 4000)}
 
-반드시 아래 JSON 배열 형식으로만 응답하세요:
+반드시 아래 JSON 배열 형식으로만 응답하세요.
 [
   {
-    "keyword": "키워드",
+    "keyword": "핵심 키워드",
     "question_ko": "문제",
     "options_ko": ["정답", "오답1", "오답2"],
     "answer_index": 0
@@ -168,7 +167,7 @@ export async function POST(req: NextRequest) {
         .maybeSingle(),
       guard.ctx.service
         .from("live_translations")
-        .select("original_text")
+        .select("text_ko")
         .eq("session_id", tbmSessionId)
         .order("created_at", { ascending: true })
         .limit(150),
@@ -177,7 +176,7 @@ export async function POST(req: NextRequest) {
     const noticeText =
       (sessionRes.data?.tbm_notices as { content_ko?: string } | null)?.content_ko ?? "";
     const liveText = (translationsRes.data ?? [])
-      .map((t: { original_text: string }) => t.original_text)
+      .map((t: { text_ko: string }) => t.text_ko)
       .join(" ");
 
     const parts: string[] = [];

@@ -92,8 +92,12 @@ export async function GET() {
             byInitLast.set(key, (byInitLast.get(key) ?? 0) + 1);
             if (w.phone) byPhone.set(w.phone, (byPhone.get(w.phone) ?? 0) + 1);
 
-            // NO_AUTH 만 있는 워커는 정상 (첫 QR 진입 전). 다른 flag 가 있으면 진짜 issue.
-            const realFlags = flags.filter((f) => f !== "NO_AUTH");
+            // QR V2 자동가입 정책: phone 은 저장하지 않고 phone_last4 만 받음
+            //   → PHONE_NULL 은 자동가입 워커의 정상 상태 (false positive)
+            // NO_AUTH 도 첫 QR 진입 전 정상 상태.
+            // 위 둘을 제외한 flag 가 있을 때만 진짜 issue 로 카운트.
+            const INFORMATIONAL_FLAGS = new Set(["NO_AUTH", "PHONE_NULL"]);
+            const realFlags = flags.filter((f) => !INFORMATIONAL_FLAGS.has(f));
             if (realFlags.length > 0) {
                 issues.push(`${w.name_initials}/${w.phone_last4}: ${realFlags.join(",")}`);
             }
