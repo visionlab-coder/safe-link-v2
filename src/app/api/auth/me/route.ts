@@ -10,12 +10,25 @@ export const runtime = "nodejs";
 // Workers 런타임의 @supabase/ssr · @supabase/supabase-js 불안정성을
 // 우회하기 위해 raw 쿠키 파싱 + raw fetch (+ apikey URL param) 사용.
 //
+// 🚨 세션 풀림 박제 (2026-06-08): access_token 1h 만료 시 refresh_token 으로
+// 자동 갱신 + 응답에 새 cookie 세팅. 이전 버전은 만료 시 401 만 반환 →
+// 로그인 1시간 후 자동 풀림 현상의 직접 원인이었음.
+//
 // anon key 는 클라이언트 번들에 이미 노출된 공개 값이라 하드코딩 안전.
 
 const SUPABASE_URL = "https://wzmzpuxpcpuvuacwmslj.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXpwdXhwY3B1dnVhY3dtc2xqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2ODk3MTEsImV4cCI6MjA4NjI2NTcxMX0.hkql2QVn_IIRIrb3pbialLHpDiNDzAE2NQNjgxUTUv0";
 const PROJECT_REF = "wzmzpuxpcpuvuacwmslj";
 const COOKIE_NAME = `sb-${PROJECT_REF}-auth-token`;
+
+type StoredSession = {
+    access_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+    expires_at?: number;
+    token_type?: string;
+    user?: Record<string, unknown>;
+};
 
 function decodeJwtPayload(token: string): { sub?: string; email?: string; exp?: number } | null {
     try {
@@ -30,13 +43,35 @@ function decodeJwtPayload(token: string): { sub?: string; email?: string; exp?: 
     }
 }
 
+async function refreshSession(refreshToken: string): Promise<StoredSession | null> {
+    try {
+        const res = await fetch(
+            `${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token&apikey=${encodeURIComponent(SUPABASE_ANON_KEY)}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ refresh_token: refreshToken }),
+            }
+        );
+        if (!res.ok) return null;
+        const next = (await res.json()) as StoredSession;
+        return next.access_token ? next : null;
+    } catch {
+        return null;
+    }
+}
+
+function sessionCookieValue(session: StoredSession): string {
+    return `base64-${Buffer.from(JSON.stringify(session)).toString("base64")}`;
+}
+
 export async function GET(req: NextRequest) {
     const rawCookie = req.cookies.get(COOKIE_NAME)?.value;
     if (!rawCookie) {
         return NextResponse.json({ error: "no_cookie" }, { status: 401 });
     }
 
-    let session: { access_token?: string; refresh_token?: string } | null = null;
+    let session: StoredSession | null = null;
     try {
         const inner = rawCookie.startsWith("base64-")
             ? Buffer.from(rawCookie.slice(7), "base64").toString("utf-8")
@@ -46,17 +81,34 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "invalid_cookie" }, { status: 401 });
     }
 
-    const accessToken = session?.access_token;
+    let accessToken = session?.access_token;
     if (!accessToken) {
         return NextResponse.json({ error: "no_access_token" }, { status: 401 });
     }
 
-    const payload = decodeJwtPayload(accessToken);
+    let payload = decodeJwtPayload(accessToken);
     if (!payload?.sub) {
         return NextResponse.json({ error: "invalid_jwt" }, { status: 401 });
     }
+
+    let refreshedCookie: string | null = null;
+    let refreshedMaxAge = 3600;
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
-        return NextResponse.json({ error: "expired" }, { status: 401 });
+        const refreshToken = session?.refresh_token;
+        if (!refreshToken) {
+            return NextResponse.json({ error: "expired" }, { status: 401 });
+        }
+        const next = await refreshSession(refreshToken);
+        if (!next?.access_token) {
+            return NextResponse.json({ error: "refresh_failed" }, { status: 401 });
+        }
+        accessToken = next.access_token;
+        payload = decodeJwtPayload(accessToken);
+        if (!payload?.sub) {
+            return NextResponse.json({ error: "invalid_refreshed_jwt" }, { status: 401 });
+        }
+        refreshedCookie = sessionCookieValue(next);
+        refreshedMaxAge = next.expires_in ?? 3600;
     }
 
     const userId = payload.sub;
@@ -87,7 +139,7 @@ export async function GET(req: NextRequest) {
     }>;
     const profile = rows[0] ?? null;
 
-    return NextResponse.json({
+    const response = NextResponse.json({
         user: { id: userId, email },
         profile: profile
             ? {
@@ -99,5 +151,18 @@ export async function GET(req: NextRequest) {
                   site_id: profile.site_id ?? null,
               }
             : null,
+        ...(refreshedCookie ? { refreshed: true } : {}),
     });
+
+    if (refreshedCookie) {
+        response.cookies.set(COOKIE_NAME, refreshedCookie, {
+            httpOnly: false,
+            sameSite: "lax",
+            path: "/",
+            maxAge: refreshedMaxAge,
+            secure: process.env.NODE_ENV === "production",
+        });
+    }
+
+    return response;
 }

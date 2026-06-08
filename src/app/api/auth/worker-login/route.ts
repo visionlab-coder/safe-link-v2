@@ -64,13 +64,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // C-06: 전화번호만으로 신규 계정 생성 차단 — 사전 등록된 근로자만 허용.
   // nfc_workers.phone(전체 번호) 또는 profiles.phone_number(전체 번호) 중 하나라도 존재해야 함.
   // phone_last4(뒤 4자리)는 충돌 공간이 너무 작아 인증 게이트로 사용 불가.
+  //
+  // 🚨 사이트 격리 박제 (2026-06-08): assigned_site_id 같이 가져와 profile.site_id 에
+  // 박는다. 이전 버전은 site_id 누락 → /admin/chat 에서 사이트 관리자에게 안 보이거나
+  // 본사 관리자에게만 보여 "현장 분리 풀림" 증상 발생.
   const [nfcWorkerResult, profileResult] = await Promise.all([
-    service.from("nfc_workers").select("id").eq("phone", phoneDigits).eq("is_active", true).limit(1).maybeSingle(),
+    service.from("nfc_workers").select("id, assigned_site_id").eq("phone", phoneDigits).eq("is_active", true).limit(1).maybeSingle(),
     service.from("profiles").select("id").eq("phone_number", phoneDigits).limit(1).maybeSingle(),
   ]);
   if (!nfcWorkerResult.data && !profileResult.data) {
     return NextResponse.json({ error: "WORKER_NOT_REGISTERED" }, { status: 403 });
   }
+  const nfcAssignedSiteId = (nfcWorkerResult.data as { assigned_site_id?: string | null } | null)?.assigned_site_id ?? null;
 
   // generateLink creates the user if they don't exist yet, or issues a token
   // for an existing user — no password ever required.
@@ -129,10 +134,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       .maybeSingle();
 
     if (existingProfile) {
-      await service
-        .from("profiles")
-        .update({ preferred_lang: lang, phone_number: phoneDigits })
-        .eq("id", authUserId);
+      // 기존 프로필: site_id 가 비어있을 때만 nfc_workers 매칭값으로 보강 (덮어쓰기 금지)
+      const updatePayload: Record<string, unknown> = {
+        preferred_lang: lang,
+        phone_number: phoneDigits,
+      };
+      if (nfcAssignedSiteId) {
+        const { data: cur } = await service
+          .from("profiles")
+          .select("site_id")
+          .eq("id", authUserId)
+          .maybeSingle();
+        if (cur && !cur.site_id) updatePayload.site_id = nfcAssignedSiteId;
+      }
+      await service.from("profiles").update(updatePayload).eq("id", authUserId);
     } else {
       await service.from("profiles").insert({
         id: authUserId,
@@ -140,6 +155,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         role: "WORKER",
         preferred_lang: lang,
         phone_number: phoneDigits,
+        ...(nfcAssignedSiteId ? { site_id: nfcAssignedSiteId } : {}),
       });
     }
   }

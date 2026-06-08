@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient, type SupabaseClient } from "@supabase/supabase-js";
-import { createClient as createServerClient } from "@/utils/supabase/server";
 import { checkQrEntryLimit } from "@/utils/rate-limit";
 
 export const runtime = "nodejs";
@@ -389,13 +388,48 @@ export async function POST(req: NextRequest) {
     ? verifyType as AllowedVerifyType
     : "magiclink";
 
-  const serverClient = await createServerClient();
-  const { error: otpErr } = await serverClient.auth.verifyOtp({
-    token_hash: tokenHash,
-    type: safeVerifyType,
+  // 🚨 P5/P7 박제: @supabase/ssr 의 verifyOtp + cookieStore.set 이 Cloudflare Workers
+  // Route Handler 에서 silent throw → set-cookie 누락 → /worker 진입 시 middleware
+  // 가 인증 못 알아보고 /auth 로 redirect (사용자 "전화번호 로그인 화면으로 튕김" 증상).
+  // GoTrue REST API 에 raw fetch 직접 호출 + NextResponse.cookies.set 으로 수동 쿠키 설정.
+  const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
+  const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim();
+  if (!supabaseUrl || !serviceKey) return NextResponse.json(basePayload);
+
+  const verifyRes = await fetch(
+    `${supabaseUrl}/auth/v1/verify?apikey=${encodeURIComponent(serviceKey)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: safeVerifyType, token_hash: tokenHash }),
+    }
+  );
+  if (!verifyRes.ok) return NextResponse.json(basePayload);
+
+  const session = (await verifyRes.json()) as {
+    access_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+    expires_at?: number;
+    token_type?: string;
+    user?: Record<string, unknown>;
+  };
+  if (!session.access_token) return NextResponse.json(basePayload);
+
+  // P1 박제: @supabase/ssr 표준 쿠키 형식. httpOnly:false 필수 — createBrowserClient
+  // 가 document.cookie 로 읽기 위해.
+  const projectRef = new URL(supabaseUrl).hostname.split(".")[0];
+  const cookieName = `sb-${projectRef}-auth-token`;
+  const cookieValue = `base64-${Buffer.from(JSON.stringify(session)).toString("base64")}`;
+  const maxAge = session.expires_in ?? 3600;
+
+  const response = NextResponse.json({ ...basePayload, session_established: true });
+  response.cookies.set(cookieName, cookieValue, {
+    httpOnly: false,
+    sameSite: "lax",
+    path: "/",
+    maxAge,
+    secure: process.env.NODE_ENV === "production",
   });
-
-  if (otpErr) return NextResponse.json(basePayload);
-
-  return NextResponse.json({ ...basePayload, session_established: true });
+  return response;
 }

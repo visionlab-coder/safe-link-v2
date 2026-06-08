@@ -17,37 +17,100 @@ const AI_API_PREFIXES = [
 const SUPABASE_URL = "https://wzmzpuxpcpuvuacwmslj.supabase.co"
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXpwdXhwY3B1dnVhY3dtc2xqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2ODk3MTEsImV4cCI6MjA4NjI2NTcxMX0.hkql2QVn_IIRIrb3pbialLHpDiNDzAE2NQNjgxUTUv0"
 
+const PROJECT_REF = new URL(SUPABASE_URL).hostname.split('.')[0]
+const COOKIE_NAME = `sb-${PROJECT_REF}-auth-token`
+
 // @supabase/ssr / @supabase/supabase-js 는 Cloudflare Workers 런타임에서
 // apikey 헤더를 손상시켜 intermittent 401이 발생함.
 // 미들웨어는 raw cookie 파싱 + raw fetch만 사용 — Vercel / Workers 모두 완전 검증.
+//
+// 🚨 세션 풀림 박제 (2026-06-08): access_token 만료 감지 시 refresh_token 으로
+// GoTrue /auth/v1/token 호출 → 새 세션 받아 응답 cookie 갱신.
+// 이전 버전은 만료 즉시 /auth 로 redirect → 사용자 1시간마다 로그인 풀림.
 
-function parseAuthCookie(request: NextRequest): { accessToken: string; userId: string } | null {
+type StoredSession = {
+    access_token?: string
+    refresh_token?: string
+    expires_in?: number
+    expires_at?: number
+    token_type?: string
+    user?: Record<string, unknown>
+}
+
+function readSessionCookie(request: NextRequest): StoredSession | null {
     try {
-        const projectRef = new URL(SUPABASE_URL).hostname.split('.')[0]
-        const raw = request.cookies.get(`sb-${projectRef}-auth-token`)?.value
+        const raw = request.cookies.get(COOKIE_NAME)?.value
         if (!raw) return null
-
         const jsonStr = raw.startsWith('base64-')
             ? Buffer.from(raw.slice(7), 'base64').toString('utf-8')
             : raw
-        const session = JSON.parse(jsonStr) as { access_token?: string }
-        if (!session.access_token) return null
-
-        // JWT payload 디코딩 (서명 검증 불필요 — httpOnly 쿠키는 JS에서 변조 불가)
-        const payloadStr = Buffer.from(
-            session.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'),
-            'base64'
-        ).toString('utf-8')
-        const payload = JSON.parse(payloadStr) as { sub?: string; exp?: number }
-
-        // 만료 체크
-        if (payload.exp && payload.exp < Date.now() / 1000) return null
-        if (!payload.sub) return null
-
-        return { accessToken: session.access_token, userId: payload.sub }
+        return JSON.parse(jsonStr) as StoredSession
     } catch {
         return null
     }
+}
+
+function decodeJwtPayload(token: string): { sub?: string; exp?: number } | null {
+    try {
+        const payloadStr = Buffer.from(
+            token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'),
+            'base64'
+        ).toString('utf-8')
+        return JSON.parse(payloadStr)
+    } catch {
+        return null
+    }
+}
+
+async function refreshSession(refreshToken: string): Promise<StoredSession | null> {
+    try {
+        const res = await fetch(
+            `${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token&apikey=${encodeURIComponent(SUPABASE_ANON_KEY)}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: refreshToken }),
+            }
+        )
+        if (!res.ok) return null
+        const next = await res.json() as StoredSession
+        return next.access_token ? next : null
+    } catch {
+        return null
+    }
+}
+
+function sessionCookieValue(session: StoredSession): string {
+    return `base64-${Buffer.from(JSON.stringify(session)).toString('base64')}`
+}
+
+type AuthResult = {
+    userId: string
+    accessToken: string
+    refreshed: StoredSession | null
+}
+
+async function resolveAuth(request: NextRequest): Promise<AuthResult | null> {
+    const session = readSessionCookie(request)
+    if (!session?.access_token) return null
+
+    let payload = decodeJwtPayload(session.access_token)
+    if (!payload?.sub) return null
+
+    // 토큰 유효 → 그대로 사용
+    if (!payload.exp || payload.exp >= Date.now() / 1000) {
+        return { userId: payload.sub, accessToken: session.access_token, refreshed: null }
+    }
+
+    // 만료 → refresh_token 으로 자동 갱신
+    if (!session.refresh_token) return null
+    const next = await refreshSession(session.refresh_token)
+    if (!next?.access_token) return null
+
+    payload = decodeJwtPayload(next.access_token)
+    if (!payload?.sub) return null
+
+    return { userId: payload.sub, accessToken: next.access_token, refreshed: next }
 }
 
 async function getProfileRole(userId: string, accessToken: string): Promise<string | null> {
@@ -70,16 +133,28 @@ async function getProfileRole(userId: string, accessToken: string): Promise<stri
     }
 }
 
+function withRefreshedCookie(response: NextResponse, refreshed: StoredSession | null): NextResponse {
+    if (!refreshed) return response
+    response.cookies.set(COOKIE_NAME, sessionCookieValue(refreshed), {
+        httpOnly: false,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: refreshed.expires_in ?? 3600,
+        secure: process.env.NODE_ENV === 'production',
+    })
+    return response
+}
+
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
 
     // AI API: 세션 여부만 확인 (역할 불필요)
     if (AI_API_PREFIXES.some(prefix => pathname.startsWith(prefix))) {
-        const auth = parseAuthCookie(request)
+        const auth = await resolveAuth(request)
         if (!auth) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-        return NextResponse.next({ request })
+        return withRefreshedCookie(NextResponse.next({ request }), auth.refreshed)
     }
 
     // /admin, /worker, /system: 역할 기반 접근 제어
@@ -89,7 +164,7 @@ export async function middleware(request: NextRequest) {
         pathname.startsWith('/system')
 
     if (needsRoleCheck) {
-        const auth = parseAuthCookie(request)
+        const auth = await resolveAuth(request)
         if (!auth) {
             return NextResponse.redirect(new URL('/auth', request.url))
         }
@@ -109,6 +184,8 @@ export async function middleware(request: NextRequest) {
                 return NextResponse.redirect(new URL('/auth', request.url))
             }
         }
+
+        return withRefreshedCookie(NextResponse.next({ request }), auth.refreshed)
     }
 
     return NextResponse.next({ request })

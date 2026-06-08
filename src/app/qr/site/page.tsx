@@ -349,9 +349,9 @@ function SiteQrEntryInner() {
             <span className="text-xs font-bold text-gray-400">{text.initialsLabel}</span>
             <input
               value={initials}
-              onChange={(event) => setInitials(event.target.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase())}
+              onChange={(event) => setInitials(event.target.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toUpperCase())}
               placeholder={text.initialsPlaceholder}
-              maxLength={4}
+              maxLength={6}
               className="h-14 rounded-lg border border-gray-800 bg-gray-900 px-4 font-mono text-lg font-black outline-none focus:border-blue-400"
             />
           </label>

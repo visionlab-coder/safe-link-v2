@@ -125,6 +125,11 @@ function AuthContent() {
   const [adminSignupMode, setAdminSignupMode] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
 
+  // 🔐 2026-06-08: phone+name 흐름 폐기 → 이니셜 + 휴대전화 뒷 4자리 단일 흐름.
+  const [initials, setInitials] = useState("");
+  const [phoneLast4, setPhoneLast4] = useState("");
+  const [multipleSites, setMultipleSites] = useState<Array<{ site_id: string; name: string; site_code: string | null }>>([]);
+
   useEffect(() => {
     const savedLang = localStorage.getItem("safe-link-lang");
     if (!urlLang && savedLang) {
@@ -193,21 +198,23 @@ function AuthContent() {
 
   // No auto-login — worker enters fresh every time
 
-  const handleWorkerEnter = async () => {
-    if (!phone || !workerName.trim()) return;
+  // 🔐 2026-06-08: 이니셜 + 휴대전화 뒷 4자리 빠른 로그인.
+  // phone+name 흐름 폐기 — 단일 로그인 흐름으로 통합 (NFC 사전 등록 전제).
+  const submitQuickLogin = async (siteId?: string) => {
+    if (!initials.trim() || phoneLast4.length !== 4) return;
     setLoading(true);
     const activeLang = lang || "ko";
 
     try {
-      // Server issues a session via magic link — no password ever leaves the client
-      const res = await fetch("/api/auth/worker-login", {
+      const res = await fetch("/api/auth/worker-quick-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          phoneNumber: phone,
-          displayName: workerName.trim(),
-          lang: activeLang,
+          name_initials: initials.trim(),
+          phone_last4: phoneLast4,
+          preferred_lang: activeLang,
+          ...(siteId ? { site_id: siteId } : {}),
         }),
       });
 
@@ -216,6 +223,20 @@ function AuthContent() {
         setLoading(false);
         return;
       }
+
+      if (res.status === 409) {
+        const body = await res.json().catch(() => ({})) as { sites?: Array<{ site_id: string; name: string; site_code: string | null }> };
+        setMultipleSites(body.sites ?? []);
+        setLoading(false);
+        return;
+      }
+
+      if (res.status === 404) {
+        alert("입력한 이니셜과 뒷 4자리에 일치하는 근로자가 없습니다. 관리자에게 NFC 등록을 요청해주세요.");
+        setLoading(false);
+        return;
+      }
+
       if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: string };
         alert(sanitizeAuthError(body.error ?? "unknown"));
@@ -223,8 +244,7 @@ function AuthContent() {
         return;
       }
 
-      // P6 박제: createBrowserClient.getSession 대신 /api/auth/me 호출.
-      // worker-login route 가 이미 쿠키를 박았으므로 me 가 200 이면 진입.
+      // 세션 쿠키는 응답에 이미 박힘 — /api/auth/me 로 확정 후 /worker 진입
       const meRes = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
       if (meRes.ok) {
         sessionStorage.setItem("safe-link-session-active", "true");
@@ -240,6 +260,8 @@ function AuthContent() {
     }
     setLoading(false);
   };
+
+  const handleWorkerEnter = () => submitQuickLogin();
 
   const handleAdminLogin = async () => {
     if (!adminEmail || !password) return;
@@ -512,38 +534,57 @@ function AuthContent() {
                   </div>
                 </div>
 
-                {/* Phone with country code */}
-                <div className="flex items-center overflow-hidden" style={fieldBox}>
-                  <select value={countryCode} onChange={e => setCountryCode(e.target.value)}
-                    className="bg-transparent text-xs font-bold text-slate-400 outline-none px-3 py-3.5"
-                    style={{ borderRight: "1px solid rgba(255,255,255,0.07)", minWidth: 66 }}>
-                    {languages.map(l => (
-                      <option key={l.code} value={DIAL_CODES[l.code] || "+82"} style={{ background: "#0d0e18" }}>
-                        {DIAL_CODES[l.code] || "+82"}
-                      </option>
-                    ))}
-                  </select>
-                  <input type="tel" placeholder={t.phone} value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    className="flex-1 bg-transparent text-white text-sm placeholder-slate-700 outline-none px-3 py-3.5" />
+                {/* 이니셜 (4~6자) */}
+                <div style={fieldBox}>
+                  <input
+                    type="text"
+                    placeholder="이름 이니셜 (예: BK, NGUYEN)"
+                    value={initials}
+                    onChange={e => setInitials(e.target.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toUpperCase())}
+                    maxLength={6}
+                    className="w-full bg-transparent text-white text-base font-mono font-black tracking-wider placeholder-slate-700 outline-none px-4 py-3.5"
+                  />
                 </div>
 
-                {/* Name */}
+                {/* 휴대전화 뒷 4자리 */}
                 <div style={fieldBox}>
-                  <input type="text" placeholder={t.name} value={workerName}
-                    onChange={e => setWorkerName(e.target.value)}
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    placeholder="휴대전화 뒷 4자리 (예: 1234)"
+                    value={phoneLast4}
+                    onChange={e => setPhoneLast4(e.target.value.replace(/\D/g, "").slice(0, 4))}
                     onKeyDown={e => e.key === "Enter" && handleWorkerEnter()}
-                    className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
+                    maxLength={4}
+                    className="w-full bg-transparent text-white text-base font-mono font-black tracking-[0.3em] placeholder-slate-700 outline-none px-4 py-3.5"
+                  />
                 </div>
+
+                {/* 복수 사이트 매칭 시 사이트 선택 */}
+                {multipleSites.length > 0 && (
+                  <div className="flex flex-col gap-2 p-3 rounded-xl" style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.25)" }}>
+                    <p className="text-amber-300 text-xs font-bold">같은 정보의 근로자가 복수 현장에 있습니다. 본인 현장을 선택하세요.</p>
+                    {multipleSites.map(s => (
+                      <button
+                        key={s.site_id}
+                        onClick={() => { setMultipleSites([]); submitQuickLogin(s.site_id); }}
+                        className="w-full text-left p-3 rounded-lg text-sm font-bold text-white"
+                        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}
+                      >
+                        {s.name}{s.site_code ? ` · ${s.site_code}` : ""}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {/* Hint */}
                 <div className="flex items-start gap-2">
                   <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-slate-600" />
-                  <p className="text-[11px] text-slate-600 leading-snug">{t.newUser}</p>
+                  <p className="text-[11px] text-slate-600 leading-snug">관리자에게 NFC 카드 등록을 미리 요청해주세요.</p>
                 </div>
 
                 {/* CTA */}
-                <button onClick={handleWorkerEnter} disabled={loading || !phone || !workerName.trim()}
+                <button onClick={handleWorkerEnter} disabled={loading || !initials.trim() || phoneLast4.length !== 4}
                   className="w-full py-3.5 font-black text-sm text-white rounded-xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: "linear-gradient(135deg,#059669 0%,#10B981 100%)", boxShadow: "0 4px 24px rgba(16,185,129,0.28)" }}>
                   {loading ? <Spinner /> : t.doEnter}
