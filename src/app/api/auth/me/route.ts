@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
 
     // 프로필 조회 — apikey URL param, Bearer = 사용자 JWT (RLS 적용)
     const profileRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/profiles?select=role,preferred_lang,display_name,title,site_code,site_id&id=eq.${userId}&limit=1&apikey=${encodeURIComponent(SUPABASE_ANON_KEY)}`,
+        `${SUPABASE_URL}/rest/v1/profiles?select=role,preferred_lang,display_name,title,site_code,site_id,trade,nationality&id=eq.${userId}&limit=1&apikey=${encodeURIComponent(SUPABASE_ANON_KEY)}`,
         {
             headers: { Authorization: `Bearer ${accessToken}` },
         }
@@ -136,6 +136,8 @@ export async function GET(req: NextRequest) {
         title?: string;
         site_code?: string;
         site_id?: string;
+        trade?: string;
+        nationality?: string;
     }>;
     const profile = rows[0] ?? null;
 
@@ -149,6 +151,8 @@ export async function GET(req: NextRequest) {
                   title: profile.title ?? null,
                   site_code: profile.site_code ?? null,
                   site_id: profile.site_id ?? null,
+                  trade: profile.trade ?? null,
+                  nationality: profile.nationality ?? null,
               }
             : null,
         ...(refreshedCookie ? { refreshed: true } : {}),

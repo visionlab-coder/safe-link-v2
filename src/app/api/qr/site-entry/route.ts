@@ -156,6 +156,19 @@ async function recordQrTbmAttendance(args: {
   return { action: "checked_in" as const, session };
 }
 
+// 🆕 2026-06-09: 공종별 자동 배속 — site_id + trade 조합 QR
+//   QR URL 예: /qr/site?site_id=...&trade=rebar
+//   팀장(TEAM_LEADER) 가 본인 site+trade 로 QR 생성 → 워커 스캔 → 자동 trade 배속.
+const VALID_TRADES = [
+  "rebar", "formwork", "concrete", "scaffold", "electrical",
+  "mep", "finishing", "earthwork", "structural", "general",
+];
+
+function cleanTrade(value: unknown): string | null {
+  const v = String(value ?? "").trim().toLowerCase();
+  return VALID_TRADES.includes(v) ? v : null;
+}
+
 export async function POST(req: NextRequest) {
   let body: {
     site_id?: unknown;
@@ -164,6 +177,7 @@ export async function POST(req: NextRequest) {
     phone_last4?: unknown;
     nationality?: unknown;
     preferred_lang?: unknown;
+    trade?: unknown;
   };
   try {
     body = await req.json();
@@ -182,6 +196,9 @@ export async function POST(req: NextRequest) {
   const service = createService();
   const site = await resolveSiteByRef(service, String(body.site_id || ""));
   if (!site) return NextResponse.json({ error: "site_not_found" }, { status: 404 });
+
+  // QR URL 에서 박혀 들어온 공종 — 자동 배속용
+  const requestedTrade = cleanTrade(body.trade);
 
   if (body.mode === "info") {
     return NextResponse.json({
@@ -229,7 +246,8 @@ export async function POST(req: NextRequest) {
         full_name: initials,
         nationality,
         preferred_lang: preferredLang,
-        trade: "general",
+        // QR URL 에 trade 박혀 있으면 자동 배속 — 없으면 'general'
+        trade: requestedTrade ?? "general",
         assigned_site_id: site.id,
         is_active: true,
         consent_signed_at: new Date().toISOString(),
@@ -244,16 +262,22 @@ export async function POST(req: NextRequest) {
     worker = workers[0];
   }
   const nowIso = new Date().toISOString();
+  const workerUpdate: Record<string, unknown> = {
+    nationality,
+    preferred_lang: preferredLang,
+    nationality_confirmed_at: nowIso,
+    updated_at: nowIso,
+  };
+  // 팀 QR 스캔 시 기존 trade 가 'general' 이면 신규 trade 로 덮어쓰기 (자동 배속)
+  // 기존이 명시적 trade(rebar 등) 이면 보존 — 팀장의 명시 변경 외에는 자동 변경 안 함
+  if (requestedTrade && (!worker.trade || worker.trade === "general")) {
+    workerUpdate.trade = requestedTrade;
+  }
   const { data: updatedWorker, error: updateErr } = await service
     .from("nfc_workers")
-    .update({
-      nationality,
-      preferred_lang: preferredLang,
-      nationality_confirmed_at: nowIso,
-      updated_at: nowIso,
-    })
+    .update(workerUpdate)
     .eq("id", worker.id)
-    .select("id, worker_code, full_name, nationality, preferred_lang, auth_user_id, assigned_site_id")
+    .select("id, worker_code, full_name, nationality, preferred_lang, auth_user_id, assigned_site_id, trade")
     .single();
 
   if (updateErr || !updatedWorker) {
@@ -356,6 +380,9 @@ export async function POST(req: NextRequest) {
           // 🆕 2026-06-09: 정확한 깃발 표시용 — admin/chat 등 UI 가
           // preferred_lang 이 아닌 nationality 기준 국기 사용.
           nationality: nationality,
+          // 🆕 2026-06-09: 공종별 자동 배속 — QR URL 의 trade 동기화.
+          // 안전관리자/공무가 admin/teams 에서 공종별 인원 현황 조회 시 사용.
+          trade: updatedWorker.trade ?? null,
         },
         { onConflict: "id" }
       ),

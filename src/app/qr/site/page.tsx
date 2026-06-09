@@ -88,6 +88,8 @@ function errorMessage(lang: QrLanguageCode, code: string) {
 function SiteQrEntryInner() {
   const searchParams = useSearchParams();
   const siteId = searchParams.get("site_id") ?? "";
+  // 🆕 팀 QR — URL 에 trade 박혀 있으면 자동 배속
+  const trade = searchParams.get("trade") ?? "";
   const initialLang = findQrLanguageByCode(searchParams.get("lang") ?? "ko").lang;
   const supabase = createClient();
   const [selectedLang, setSelectedLang] = useState<QrLanguageCode>(initialLang);
@@ -195,6 +197,7 @@ function SiteQrEntryInner() {
           phone_last4: phoneLast4,
           nationality: language.country,
           preferred_lang: language.lang,
+          ...(trade ? { trade } : {}),
         }),
       });
       const data: EntryResult = await res.json();

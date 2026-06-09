@@ -32,14 +32,16 @@ export type AllowedRole = "admin" | "worker" | "hq" | "system";
 /** 공종/팀 분류 — profiles.trade 컬럼에 저장.
  *  TEAM_LEADER 가 본인 팀 식별 + 워커 분류용. */
 export type TradeType =
-  | "rebar"      // 철근반
-  | "formwork"   // 거푸집반
-  | "concrete"   // 콘크리트반 / 타설
-  | "finishing"  // 마감반 (조적·미장·도장 등)
-  | "mep"        // 기계·설비·전기 (Mechanical, Electrical, Plumbing)
-  | "earthwork"  // 토공·터파기
-  | "structural" // 구체조립
-  | "general";   // 일반/공통
+  | "rebar"       // 철근반
+  | "formwork"    // 거푸집반
+  | "concrete"    // 콘크리트반 / 타설
+  | "scaffold"    // 비계반
+  | "electrical"  // 전기반
+  | "mep"         // 기계·설비·배관 (HVAC, plumbing)
+  | "finishing"   // 마감반 (조적·미장·도장 등)
+  | "earthwork"   // 토공·터파기
+  | "structural"  // 구체조립
+  | "general";    // 일반/공통
 
 /** 역할별 권한 등급 (높을수록 상위 권한) */
 export const ROLE_HIERARCHY: Record<ProfileRole, number> = {
@@ -134,8 +136,10 @@ export const TRADE_LABEL: Record<TradeType, string> = {
   rebar: "철근반",
   formwork: "거푸집반",
   concrete: "콘크리트반",
-  finishing: "마감반",
+  scaffold: "비계반",
+  electrical: "전기반",
   mep: "설비반",
+  finishing: "마감반",
   earthwork: "토공반",
   structural: "구체조립반",
   general: "일반",
