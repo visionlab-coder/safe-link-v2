@@ -37,13 +37,6 @@ function sanitizeAuthError(msg: string): string {
   return "오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
 }
 
-const DIAL_CODES: Record<string, string> = {
-  ko: "+82", vi: "+84", zh: "+86", th: "+66", uz: "+998",
-  ph: "+63", km: "+855", id: "+62", mn: "+976", my: "+95",
-  ne: "+977", bn: "+880", kk: "+7", ru: "+7", en: "+1",
-  jp: "+81", fr: "+33", es: "+34", ar: "+966", hi: "+91",
-};
-
 type Mode = "lang" | "role" | "worker" | "admin";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,17 +108,15 @@ function AuthContent() {
   const [loading, setLoading] = useState(false);
   const [existingUser, setExistingUser] = useState<{ email: string; role: string | null } | null>(null);
 
-  const [phone, setPhone] = useState("");
-  const [workerName, setWorkerName] = useState("");
+  // 🔐 2026-06-08: phone+name 흐름 폐기 → 이니셜 + 휴대전화 뒷 4자리 단일 흐름.
+  // 기존 phone, workerName, countryCode state 도 같이 제거 (UI 무효화 + ESLint unused-vars 박제).
   const [password, setPassword] = useState("");
   const [passConfirm, setPassConfirm] = useState("");
   const [backupEmail, setBackupEmail] = useState("");
-  const [countryCode, setCountryCode] = useState(DIAL_CODES[urlLang || "ko"] || "+82");
   const [hoveredLang, setHoveredLang] = useState<string | null>(null);
   const [adminSignupMode, setAdminSignupMode] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
 
-  // 🔐 2026-06-08: phone+name 흐름 폐기 → 이니셜 + 휴대전화 뒷 4자리 단일 흐름.
   const [initials, setInitials] = useState("");
   const [phoneLast4, setPhoneLast4] = useState("");
   const [multipleSites, setMultipleSites] = useState<Array<{ site_id: string; name: string; site_code: string | null }>>([]);
@@ -134,7 +125,6 @@ function AuthContent() {
     const savedLang = localStorage.getItem("safe-link-lang");
     if (!urlLang && savedLang) {
       setLang(savedLang);
-      setCountryCode(DIAL_CODES[savedLang] || "+82");
       // setMode("role"); // 로컬 저장소가 있어도 항상 언어 선택부터 시작하도록 주석 처리
     }
     
@@ -191,7 +181,6 @@ function AuthContent() {
 
   const handleLangSelect = (code: string) => {
     setLang(code);
-    setCountryCode(DIAL_CODES[code] || "+82");
     localStorage.setItem("safe-link-lang", code);
     setMode("role");
   };
