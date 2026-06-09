@@ -375,11 +375,19 @@ function AuthContent() {
                       style={{ color: isHov ? "#93C5FD" : "#4B5563" }}>
                       {l.name}
                     </span>
+                    {l.code !== "ko" && (
+                      <span className="text-[8px] font-medium text-center leading-tight"
+                        style={{ color: isHov ? "#60A5FA" : "#374151" }}>
+                        ({l.koreanName})
+                      </span>
+                    )}
                   </button>
                 );
               })}
             </div>
-            <p className="text-center text-xs text-slate-700 mt-5">탭하면 즉시 해당 언어로 전환됩니다</p>
+            <p className="text-center text-xs text-slate-700 mt-5">
+              탭하면 즉시 해당 언어로 전환됩니다 / Tap to switch language
+            </p>
           </div>
         </div>
       </main>
