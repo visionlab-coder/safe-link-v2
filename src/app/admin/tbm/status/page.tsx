@@ -9,16 +9,25 @@ import RoleGuard from "@/components/RoleGuard";
 import ExportMenu from "@/components/ExportMenu";
 import { exportData, type ExportFormat } from "@/utils/export-files";
 
+// 언어 폴백용 — nationality 가 없을 때만 사용
 const isoMap: Record<string, string> = {
     ko: "kr", en: "us", vi: "vn", zh: "cn", th: "th", uz: "uz", ph: "ph",
     km: "kh", id: "id", mn: "mn", my: "mm", ne: "np", bn: "bd", kk: "kz",
     ru: "ru", jp: "jp", fr: "fr", es: "es", ar: "sa", hi: "in",
 };
 
+// nationality(ISO 3166-1) → flagcdn iso. 영어 사용자도 실제 국적 깃발 표시.
+function flagIsoForWorker(w: { nationality?: string | null; preferred_lang?: string }): string {
+    const nat = (w.nationality ?? "").trim().toUpperCase();
+    if (nat && /^[A-Z]{2}$/.test(nat)) return nat.toLowerCase();
+    return isoMap[w.preferred_lang ?? ""] ?? "un";
+}
+
 type WorkerStatus = {
     id: string;
     display_name: string;
     preferred_lang: string;
+    nationality?: string | null;
     signed: boolean;
     signed_at?: string;
     signature_data?: string;
@@ -416,7 +425,7 @@ function TBMStatusPageContent() {
         const tbm = allTbms[0] || null;
         setLatestTBM(tbm);
 
-        let workerQuery = supabase.from("profiles").select("id, display_name, preferred_lang").eq("role", "WORKER");
+        let workerQuery = supabase.from("profiles").select("id, display_name, preferred_lang, nationality").eq("role", "WORKER");
         if (adminSiteId) workerQuery = workerQuery.eq("site_id", adminSiteId);
         const { data: workerProfiles } = await workerQuery;
         if (!tbm || !workerProfiles) {
@@ -451,7 +460,7 @@ function TBMStatusPageContent() {
             const { data: p } = await supabase.from("profiles").select("site_id").eq("id", session.user.id).single();
             adminSiteId = p?.site_id || null;
         }
-        let workerQuery = supabase.from("profiles").select("id, display_name, preferred_lang").eq("role", "WORKER");
+        let workerQuery = supabase.from("profiles").select("id, display_name, preferred_lang, nationality").eq("role", "WORKER");
         if (adminSiteId) workerQuery = workerQuery.eq("site_id", adminSiteId);
         const { data: workerProfiles } = await workerQuery;
         if (!workerProfiles) { setLoading(false); return; }
@@ -651,8 +660,8 @@ function TBMStatusPageContent() {
                                         <div className="flex items-center gap-5">
                                             <div className="relative">
                                                 <Image
-                                                    src={`https://flagcdn.com/w80/${isoMap[worker.preferred_lang] || "un"}.png`}
-                                                    alt={worker.preferred_lang}
+                                                    src={`https://flagcdn.com/w80/${flagIsoForWorker(worker)}.png`}
+                                                    alt={worker.nationality ?? worker.preferred_lang}
                                                     width={80}
                                                     height={56}
                                                     className="w-12 h-8.5 object-cover rounded-xl shadow-lg border border-white/10"

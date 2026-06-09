@@ -48,14 +48,23 @@ const ui: Record<string, Record<string, string>> = {
 
 const getUI = (lang: string) => ui[lang] || ui["en"];
 
+// 언어 코드 → 국가 ISO (preferred_lang 폴백용 — nationality 가 없을 때만 사용)
 const isoMap: Record<string, string> = {
     ko: "kr", en: "us", vi: "vn", zh: "cn", th: "th", uz: "uz", ph: "ph",
     km: "kh", id: "id", mn: "mn", my: "mm", ne: "np", bn: "bd", kk: "kz",
     ru: "ru", jp: "jp", fr: "fr", es: "es", ar: "sa", hi: "in",
 };
 
+// nationality(ISO 3166-1 alpha-2) → flagcdn iso (소문자)
+// nationality 가 있을 때 정확한 국기 표시 (영어 사용자도 KR/US/PH 등 실제 국적 깃발).
+function flagIsoForWorker(w: { nationality?: string | null; preferred_lang?: string }): string {
+    const nat = (w.nationality ?? "").trim().toUpperCase();
+    if (nat && /^[A-Z]{2}$/.test(nat)) return nat.toLowerCase();
+    return isoMap[w.preferred_lang ?? ""] ?? "un";
+}
 
-type WorkerProfile = { id: string; display_name: string; preferred_lang: string; };
+
+type WorkerProfile = { id: string; display_name: string; preferred_lang: string; nationality?: string | null; };
 type Message = {
     id: string;
     from_user: string;
@@ -142,7 +151,7 @@ function AdminChatContent() {
         const isGlobal = GLOBAL_ROLES.includes((profileRes.data?.role ?? "").toUpperCase());
         let workersQuery = supabase
             .from("profiles")
-            .select("id, display_name, preferred_lang, role")
+            .select("id, display_name, preferred_lang, role, nationality")
             .eq("role", "WORKER");
         if (!isGlobal && mySiteId) workersQuery = workersQuery.eq("site_id", mySiteId);
         const workersRes = await workersQuery;
@@ -631,8 +640,8 @@ function AdminChatContent() {
                                     >
                                         <div className="relative flex-shrink-0">
                                             <Image
-                                                src={`https://flagcdn.com/w40/${isoMap[w.preferred_lang] || "un"}.png`}
-                                                alt={w.preferred_lang}
+                                                src={`https://flagcdn.com/w40/${flagIsoForWorker(w)}.png`}
+                                                alt={w.nationality ?? w.preferred_lang}
                                                 width={40}
                                                 height={40}
                                                 className={`w-10 h-10 object-cover rounded-full shadow border-2 ${onlineUsers.has(w.id) ? 'border-green-400 ring-2 ring-green-400/40' : 'border-slate-100'}`}

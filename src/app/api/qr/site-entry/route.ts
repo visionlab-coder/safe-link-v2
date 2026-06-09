@@ -353,6 +353,9 @@ export async function POST(req: NextRequest) {
           preferred_lang: preferredLang,
           site_id: site.id,
           site_code: site.name ?? null,
+          // 🆕 2026-06-09: 정확한 깃발 표시용 — admin/chat 등 UI 가
+          // preferred_lang 이 아닌 nationality 기준 국기 사용.
+          nationality: nationality,
         },
         { onConflict: "id" }
       ),

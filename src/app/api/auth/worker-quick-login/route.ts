@@ -168,6 +168,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (existing) {
       const upd: Record<string, unknown> = { preferred_lang: preferredLang };
       if (worker.assigned_site_id && !existing.site_id) upd.site_id = worker.assigned_site_id;
+      // 🆕 정확한 국기 표시용 — nfc_workers.nationality 동기화
+      if (worker.nationality) upd.nationality = worker.nationality;
       await service.from("profiles").update(upd).eq("id", authUserId);
     } else {
       await service.from("profiles").insert({
@@ -176,6 +178,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         role: "WORKER",
         preferred_lang: preferredLang,
         ...(worker.assigned_site_id ? { site_id: worker.assigned_site_id } : {}),
+        ...(worker.nationality ? { nationality: worker.nationality } : {}),
       });
     }
 
