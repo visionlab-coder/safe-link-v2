@@ -105,7 +105,11 @@ const ui: Record<string, any> = {
 const getUI = (lang: string) => ui[lang] || ui["en"];
 
 function toDateStr(d: Date): string {
-    return d.toISOString().split("T")[0];
+    // 🔧 KST(+09:00) 기준 날짜. TBM 조회 필터가 +09:00 윈도우라, UTC 날짜를 쓰면
+    // 한국시간 00:00~09:00 사이에 '오늘'이 어제로 잡혀, 당일 생성된 TBM/서명이 조회 범위
+    // 밖으로 빠지고(latestTBM=null) 서명 표시·PDF 내보내기가 모두 동작하지 않는 버그가 있었음.
+    const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+    return kst.toISOString().split("T")[0];
 }
 
 function TBMStatusPageContent() {
@@ -220,6 +224,13 @@ function TBMStatusPageContent() {
                 { key: "preferred_lang", label: "언어" },
                 { key: "signed", label: "서명 여부", value: row => row.signed ? "완료" : "미서명" },
                 { key: "signed_at", label: "서명 시각", value: row => row.signed_at || "" },
+                {
+                    key: "signature", label: "서명",
+                    value: row => row.signed ? "서명함" : "-",  // excel/json: 텍스트
+                    html: row => row.signed && row.signature_data   // pdf/word: 서명 이미지
+                        ? `<img src="${row.signature_data}" style="height:34px;max-width:130px;object-fit:contain" />`
+                        : "-",
+                },
             ],
             rows: workers,
             raw: { tbm: latestTBM, workers },

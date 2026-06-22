@@ -4,6 +4,8 @@ export type ExportColumn<T> = {
   key: keyof T | string;
   label: string;
   value?: (row: T) => string | number | null | undefined;
+  /** PDF/Word 등 HTML 출력에서 raw HTML(예: 서명 <img>)을 렌더. 지정 시 escape 안 함. excel/json은 value 사용. */
+  html?: (row: T) => string;
 };
 
 export type ExportFormat = "pdf" | "excel" | "word" | "hwp" | "json";
@@ -74,7 +76,7 @@ function buildHtml<T>(payload: ExportPayload<T>) {
   <table>
     <thead><tr>${payload.columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}</tr></thead>
     <tbody>
-      ${payload.rows.map((row) => `<tr>${payload.columns.map((column) => `<td>${escapeHtml(cellValue(row, column))}</td>`).join("")}</tr>`).join("")}
+      ${payload.rows.map((row) => `<tr>${payload.columns.map((column) => `<td>${column.html ? column.html(row) : escapeHtml(cellValue(row, column))}</td>`).join("")}</tr>`).join("")}
     </tbody>
   </table>
 </body>

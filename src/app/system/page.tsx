@@ -299,7 +299,9 @@ export default function SystemAdminPage() {
         setLoading(true);
         const supabase = createClient();
 
-        const today = new Date().toISOString().split('T')[0];
+        // 🔧 KST 기준 오늘. created_at 필터가 +09:00 윈도우라 UTC 날짜를 쓰면
+        // 한국시간 00:00~09:00 사이에 당일 TBM/알림 집계가 누락됨(tbm/status와 동일 버그).
+        const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
         const dayStart = `${today}T00:00:00+09:00`;
         const dayEnd = `${today}T23:59:59+09:00`;
 

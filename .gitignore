@@ -55,3 +55,7 @@ whoami_output.txt
 next-env.d.ts
 
 .vercel
+
+# 자격증명 (생성: 2026-06-09)
+.env.credentials
+.env.admin-credentials

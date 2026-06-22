@@ -6,6 +6,7 @@ import { verifyTravelToken } from '@/lib/travel-auth';
 import { checkTranslateLimit } from '@/utils/rate-limit';
 import { CONSTRUCTION_GLOSSARY } from '@/constants/glossary';
 import { getErrorMessage } from '@/utils/errors';
+import { getLabOverride } from '@/utils/lab/engine-config';
 import { hangulize } from '@/utils/hangulize';
 import { stripEmoji } from '@/utils/strip-emoji';
 import pinyin from 'tiny-pinyin';
@@ -58,7 +59,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
     }
 
-    const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();
+    // 🧪 Lab 런타임 오버라이드: 운영(APP_MODE!=lab)에선 항상 null → 아래 모든 분기는 기존 env 그대로.
+    const lab = await getLabOverride();
+    const apiKey = lab?.googleKey || process.env.GOOGLE_CLOUD_API_KEY?.trim();
 
     if (!apiKey) {
         return NextResponse.json({ error: "Missing GOOGLE_CLOUD_API_KEY" }, { status: 500 });
@@ -105,12 +108,15 @@ export async function POST(request: NextRequest) {
         const targetLang = langMap[tl] || tl;
 
         // === 1. Naver Papago (아시아권 언어 고품질 번역) ===
-        const NAVER_ID = process.env.NAVER_CLIENT_ID?.trim();
-        const NAVER_SECRET = process.env.NAVER_CLIENT_SECRET?.trim();
-        
+        const NAVER_ID = lab?.papagoId || process.env.NAVER_CLIENT_ID?.trim();
+        const NAVER_SECRET = lab?.papagoSecret || process.env.NAVER_CLIENT_SECRET?.trim();
+
         // 파파고 지원 언어 목록
         const papagoLangs = ['ko', 'en', 'zh-CN', 'vi', 'id', 'th', 'ru', 'ja', 'fr', 'es'];
-        const usePapago = NAVER_ID && NAVER_SECRET && papagoLangs.includes(sourceLang) && papagoLangs.includes(targetLang);
+        // 🧪 Lab 강제 엔진: forced 지정 시 해당 엔진만 사용(운영은 forced=undefined → 기존 우선순위)
+        const forced = lab?.translateEngine;
+        const usePapago = (forced ? forced === "papago" : true)
+            && NAVER_ID && NAVER_SECRET && papagoLangs.includes(sourceLang) && papagoLangs.includes(targetLang);
 
         let translatedText = "";
         let engine = "google";
@@ -148,7 +154,7 @@ export async function POST(request: NextRequest) {
         // === 1.5. Gemini 건설현장 번역 (비Papago 언어 + Papago 실패 시) ===
         // Google 단독으로는 건설 안전 문맥 없이 직역 → 오역/오해 위험
         // LOW-2 fix: Papago 장애 시에도 Gemini 건설 컨텍스트 번역 시도
-        if (!translatedText) {
+        if (!translatedText && forced !== "google") {
             const geminiTranslated = await geminiConstructionTranslate(processedText, sl, tl, apiKey);
             if (geminiTranslated) {
                 translatedText = geminiTranslated;

@@ -21,7 +21,9 @@
       "Bash(mkdir -p \"/c/Users/seowo/.claude/skills/workers-supabase-repair\")",
       "Read(//c/Users/seowo/.claude/skills/**)",
       "mcp__claude_ai_Slack__slack_search_channels",
-      "mcp__claude_ai_Slack__slack_send_message"
+      "mcp__claude_ai_Slack__slack_send_message",
+      "mcp__claude_ai_Gmail__search_threads",
+      "mcp__claude_ai_Google_Drive__search_files"
     ]
   }
 }

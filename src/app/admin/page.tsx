@@ -450,6 +450,35 @@ function AdminDashboardContent() {
                         </div>
                     </motion.section>
 
+                    {/* 🔧 AI 엔진·키 설정 Card */}
+                    <motion.section
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.42 }}
+                        onClick={() => router.push('/lab')}
+                        className="glass rounded-[48px] p-10 border-white/10 hover:border-emerald-500/30 transition-all cursor-pointer tap-effect group shadow-2xl relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/5 blur-[120px] rounded-full -mr-48 -mt-48 transition-all group-hover:bg-emerald-500/10" />
+                        <div className="flex flex-col gap-4 relative md:h-full">
+                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-emerald-400 mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </div>
+                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">AI 엔진 · 키 설정</h3>
+                            <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
+                                통번역 엔진(Flitto·Google·Gemini)과 API 키를 재배포 없이 즉시 교체·테스트합니다.
+                            </p>
+                            <div className="mt-4 flex items-center gap-2 text-emerald-400 font-black tracking-widest text-sm uppercase">
+                                <span>Engine Switch</span>
+                                <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
+                            </div>
+                        </div>
+                    </motion.section>
+
                     {/* 🎙️ Live Interpreter Card */}
                     <motion.section
                         initial={{ opacity: 0, y: 20 }}
