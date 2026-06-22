@@ -8,7 +8,8 @@
 - Head SHA: `0161079`
 - Default branch synced: true (`master` = `origin/master`); wip 미머지(배포 게이트)
 - Current track: `mobile-partial`
-- Next READY: `MC-004 배포 준비 검토(GATE)` — 폰 반영 위한 안전 배포 경로
+- Next READY: `MC-005 PR #1 머지 후 폰 확인` (머지=운영배포는 사용자 결정)
+- **배포(MC-004)**: Q-001 수정만 hotfix 분리 → PR #1 OPEN (github visionlab-coder/safe-link-v2/pull/1). 머지 시 Vercel 프로덕션→폰 반영
 - **아키텍처(2026-06-22)**: 단일 앱 = 배포 웹앱 전체 first-party WebView 호스팅(`server.url`). 상세 `GOAL.md > Architecture Decision`
 - **핵심 3종 2대 실기기 검증 PASS(2026-06-23)**: 라이브 통역(양방향)·TBM·1:1·관리자/근로자 로그인 정상 작동(사용자 2폰 확인)
 - **Q-001 한국어 버그 수정**: '갑시다'→'갑시습니다' 손상 제거(politeness.ts), 12/12+tsc green. ⚠️ 폰 반영은 vercel 재배포 필요

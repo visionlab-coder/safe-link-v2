@@ -10,12 +10,12 @@
   "main_synced": true,
   "track": "mobile-partial",
   "last_done_increment": {
-    "id": "Q-001",
-    "sha": "working-tree",
-    "status": "code-fixed + unit-verified (deploy로 폰 반영)",
-    "summary": "한국어 존댓말 변환 버그 수정 — politeness.ts: '갑시다/합시다'(청유형 존댓말)가 catch-all 규칙에 걸려 '갑시습니다'로 손상되던 문제. (1) '이미 존댓말' 검사에 시다 추가, (2) catch-all에 negative lookbehind (?<!시) 추가. politeness-smoke 12/12 pass(갑시다 보존 + 기존 변환 회귀 없음), root tsc green. ⚠️ 폰은 vercel 배포본을 로드하므로 이 수정은 재배포 후 반영됨. MC-003(라이브통역 2대·근로자·1:1)은 사용자 2대 실기기 기능 검증 완료."
+    "id": "MC-004",
+    "sha": "fdd9379 (hotfix/q001-korean-politeness)",
+    "status": "PR OPEN — 사용자 승인 후 push+PR 완료, 머지 대기",
+    "summary": "안전 배포 경로 실행 — Q-001 한국어 수정(politeness.ts 1파일)만 master 기반 hotfix 브랜치로 분리(격리 worktree 사용, 보호 PoC 파일 무접촉). 18커밋 통째 머지 회피. origin push + PR #1 생성(github visionlab-coder/safe-link-v2/pull/1). 머지 시 Vercel 프로덕션 배포 → 폰 반영. 머지(=운영 배포)는 사용자 결정."
   },
-  "next_ready_task": "MC-004 배포 준비 검토(GATE) — Q-001 한국어 수정 + 모바일 작업을 vercel에 반영하려면 배포 필요. 단 wip→master 머지는 미검증 웹 PoC 동반(이전 게이트 분석 참조). 안전 배포 경로 제시만, 실행은 승인 후.",
+  "next_ready_task": "MC-005 PR #1 머지 후 폰에서 한국어 수정 확인(갑시다 정상) → 이후 비-게이트 후속(TBM 푸시 네이티브 @capacitor/local-notifications / 오프라인 UX / QR·NFC 네이티브 브릿지 / iOS M-004) 중 택1",
   "done_bar": [
     {
       "id": "M1",
@@ -102,6 +102,6 @@
       "npm.cmd run android:assemble:debug --prefix apps/mobile",
       "npm.cmd audit --prefix apps/mobile"
     ],
-    "summary": "Q-001 한국어 존댓말 버그 수정(갑시다→갑시습니다 손상 제거), politeness-smoke 12/12 + tsc green. MC-003 핵심 3종 2대 실기기 기능 검증 완료(사용자 확인). 폰 반영은 배포 필요(MC-004 게이트)"
+    "summary": "MC-004 안전 배포 경로 실행 — politeness.ts만 master 기반 hotfix로 분리(격리 worktree), PR #1 생성. 머지 시 Vercel 프로덕션→폰 반영. 머지는 사용자 결정."
   }
 }

@@ -4,13 +4,11 @@
 
 > **MC 트랙(최우선)**: 단일 앱이 배포 웹앱 전체를 호스팅(관리자·근로자 전 기능). 핵심 3종 = TBM 브로드캐스팅·라이브 통역·1:1 대화. 라이브/대화 증분은 build-green ≠ 완료 → 실기기 검증 전까지 DEVICE-PENDING.
 
-## READY
-
-1. MC-004 — 배포 준비 검토 (GATE, 분석만)
-   - Done: Q-001 한국어 수정 + 모바일 작업이 폰(vercel 로드)에 반영되도록 안전 배포 경로를 제시. 단 wip→master 머지는 미검증 웹 PoC를 동반하므로 분리 배포/검증 옵션을 정리. 실행은 사용자 승인 후.
-   - Scope: 분석·문서. 실제 머지/배포/푸시 없음(게이트).
-   - Verify: 배포 옵션·리스크·롤백 경로 제시, 사용자 결정 대기
-   - 후속 후보(비-게이트): TBM 푸시 네이티브(@capacitor/local-notifications), 오프라인/네트워크 실패 UX, QR/NFC 네이티브 브릿지, iOS(M-004).
+1. MC-005 — PR #1 머지 후 폰 확인 + 후속 택1
+   - Done: 사용자가 PR #1 머지(=Vercel 프로덕션 배포) 후, 폰에서 "갑시다" 정상 출력 확인. 이후 비-게이트 후속 1건 진행.
+   - Scope: 머지 자체는 사용자 결정(운영 배포). 머지 후 확인 + 다음 증분 선택.
+   - 후속 후보(비-게이트): TBM 푸시 네이티브(@capacitor/local-notifications) / 오프라인·네트워크 실패 UX / QR·NFC 네이티브 브릿지 / iOS(M-004).
+   - Note: 머지 후 hotfix worktree(`../slv2-hotfix-q001`) 정리 가능.
 
 ## BLOCKED
 
@@ -20,6 +18,7 @@
 
 ## DONE
 
+- MC-004 @ fdd9379 (PR #1 OPEN) — 안전 배포 경로 실행 · Verify: Q-001(politeness.ts 1파일)만 master 기반 hotfix 분리(격리 worktree, 보호 PoC 무접촉), origin push + PR #1 생성(visionlab-coder/safe-link-v2/pull/1) · Note: 머지=Vercel 프로덕션 배포→폰 반영, 머지는 사용자 결정. 18커밋 통째 머지 회피
 - Q-001 @ working-tree — 한국어 존댓말 변환 버그 수정 · Verify: politeness.ts 청유형 '갑시다/합시다'가 '갑시습니다'로 손상되던 것 수정(시다 polite 인식 + catch-all negative lookbehind), politeness-smoke 12/12 + tsc green · Files: src/utils/politeness.ts, scripts/politeness-smoke.mjs · Note: 소스만 변경, 폰 반영은 vercel 재배포 필요
 - MC-003 @ working-tree (DEVICE-VERIFIED) — 핵심 3종 2대 실기기 검증 · Verify: 사용자 2폰에서 라이브 통역 양방향·근로자/관리자 로그인·TBM·1:1 기능 정상(한국어 어미 artifact는 Q-001로 수정) · Note: 코드 변경 없는 검증 증분
 - MC-002 @ working-tree (DEVICE-VERIFIED) — 단일 앱 셸 게이팅 검증 통과 · Verify: 사용자 안드로이드 실기기에서 관리자 로그인·TBM·일반 기능 정상 작동 확인 → WebView 웹앱 인증·기능 호스팅 입증, server.url 단일-앱-셸 접근 viable 확정 · Note: 라이브통역 2대·근로자·1:1 추가 확인 대기(MC-003)
