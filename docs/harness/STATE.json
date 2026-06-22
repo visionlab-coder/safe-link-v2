@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "project": "SAFE-LINK V2 Mobile Commercialization",
   "repo": "SAFE-LINK-V2",
-  "calibrated_at": "2026-06-22T15:01:20+09:00",
+  "calibrated_at": "2026-06-22T15:51:05+09:00",
   "current_branch": "wip/ai-engine-upgrade-20260622",
   "head_sha": "710647d7fb824c92ed847fc5326a7a08e17d32d1",
   "main_sha": "311c84ea7063d7416028a473d3ce05875444344f",
@@ -10,11 +10,11 @@
   "main_synced": true,
   "track": "mobile-partial",
   "last_done_increment": {
-    "id": "S-002",
+    "id": "M-005",
     "sha": "working-tree",
-    "summary": "Mobile auth API/CORS contract — Capacitor-origin preflight, mobile token response on admin-login, auth/me CORS; contract smoke 8/8 green"
+    "summary": "Mobile admin login + token store — @capacitor/preferences 저장, adminLogin/authFetch(Bearer)/logout, App AdminAuthPanel 최소 흐름; mobile typecheck+vite build green"
   },
-  "next_ready_task": "M-005 모바일 admin 로그인과 secure storage 연결",
+  "next_ready_task": "M-006 근로자 TBM 첫 vertical slice",
   "done_bar": [
     {
       "id": "M1",
@@ -86,7 +86,7 @@
     "store submission"
   ],
   "verification": {
-    "last_green_at": "2026-06-22T15:01:20+09:00",
+    "last_green_at": "2026-06-22T15:51:05+09:00",
     "commands": [
       "git diff --check",
       "node scripts/check-sensitive-strings.mjs .harness-blocklist.local",
@@ -101,6 +101,6 @@
       "npm.cmd run android:assemble:debug --prefix apps/mobile",
       "npm.cmd audit --prefix apps/mobile"
     ],
-    "summary": "S-002 mobile auth/CORS contract — preflight allow/deny, mobile token response, auth/me CORS, web-compat; contract smoke 8/8 + typecheck green (build pending session gate)"
+    "summary": "M-005 mobile admin login + secure token store (@capacitor/preferences), Bearer authFetch, AdminAuthPanel; mobile typecheck + vite build green (S-002 web build green prior)"
   }
 }

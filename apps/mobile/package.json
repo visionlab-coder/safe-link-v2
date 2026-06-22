@@ -1,0 +1,32 @@
+{
+  "name": "@safe-link/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
+    "cap:add:android": "cap add android",
+    "cap:sync": "cap sync android",
+    "android:assemble:debug": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/assemble-android-debug.ps1"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/preferences": "^8.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/cli": "^8.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.2.0"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
+  }
+}

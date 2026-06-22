@@ -4,11 +4,11 @@
 
 ## READY
 
-1. M-005 — 모바일 admin 로그인과 secure storage 연결
-   - Done: 모바일 앱이 admin-login(mobile mode)에서 받은 session token을 Capacitor secure storage에 저장하고 이후 요청에 Bearer로 부착, 로그아웃 시 제거한다.
-   - Scope: 모바일 측 토큰 저장·주입·삭제 + admin 진입 최소 흐름. worker·전체 UI는 제외.
-   - Verify: 토큰 저장/복원, Bearer 부착 요청 인증 통과, 로그아웃 토큰 제거, mobile typecheck/build green
-   - Risk: secure storage 미지원 단말 fallback, 토큰 만료 시 refresh 처리
+1. M-006 — 근로자 TBM 첫 vertical slice (모바일)
+   - Done: 근로자가 모바일에서 로그인(worker quick-login mobile token) → 오늘 TBM 조회·내용 표시까지 동작. 음성재생·서명은 후속 증분.
+   - Scope: worker-quick-login mobile token 계약 확장 + TBM 조회 최소 화면. 서명·번역채팅·음성 제외.
+   - Verify: worker 토큰 발급/저장(M-005 store 재사용), TBM 조회 인증 통과, mobile typecheck/build green
+   - Risk: worker RLS site 일치, 오프라인/재시도, TBM 실시간 갱신은 별도
 
 ## BLOCKED
 
@@ -18,6 +18,7 @@
 
 ## DONE
 
+- M-005 @ working-tree — 모바일 admin 로그인 + secure token store · Verify: @capacitor/preferences 저장, adminLogin(mobile)→token 저장, authFetch Bearer 주입, logout 제거, AdminAuthPanel 최소 흐름, mobile typecheck+vite build green · Files: apps/mobile/src/lib/auth/{token-store,client}.ts, app/AdminAuthPanel.tsx, app/App.tsx, styles/app.css · Note: Preferences는 평문 → 상용 전 암호화 백엔드 교체 권장
 - S-002 @ working-tree — 모바일 인증 API·CORS 계약 · Verify: preflight 허용(204)/거부(403), 모바일 토큰응답 게이트(X-Safe-Link-Client+허용origin), auth/me 401에도 CORS, 웹 no-CORS 호환, contract smoke 8/8, typecheck green · Files: utils/auth/mobile-cors.ts, api/auth/admin-login, api/auth/me, scripts/mobile-auth-cors-smoke.mjs
 - M-003 @ working-tree — 최소 Android Capacitor 셸 구축 · Verify: Vite build, cap sync, Gradle assembleDebug, APK 4,194,299 bytes, package `com.safelink.mobile.dev`, npm audit 0, secret scan clean
 - S-001 @ working-tree — Supabase access token fail-closed 검증 기반 · Verify: missing/forged/Auth rejection 401 contract smoke, cookie/Bearer 추출, typecheck/build green
