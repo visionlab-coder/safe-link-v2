@@ -37,6 +37,15 @@ interface LocalM2M100Response {
     processing_ms?: number;
 }
 
+interface MultilingualGlossaryTerm {
+    glossaryId: number;
+    standard: string;
+    standardCore: string;
+    pivotEnglish: string;
+    localTerm: string;
+    language: string;
+}
+
 /**
  * 하이브리드 번역 API
  * 1단계: Google Cloud Translation API (0.3초, 고품질 번역)
@@ -93,7 +102,10 @@ export async function POST(request: NextRequest) {
                 .sort((a, b) => b[0].length - a[0].length);
             for (const [slang, std] of sortedEntries) {
                 const escapedSlang = slang.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                processedText = processedText.replace(new RegExp(escapedSlang, 'g'), std as string);
+                const pattern = Array.from(slang).length === 1
+                    ? `(?<![\\p{L}\\p{N}])${escapedSlang}(?![\\p{L}\\p{N}])`
+                    : escapedSlang;
+                processedText = processedText.replace(new RegExp(pattern, 'gu'), std as string);
             }
         } else if (tl === 'ko') {
             // 외국어→한국어: 건설 전문 용어를 한국어로 치환 후 번역 (품질 향상)
@@ -333,17 +345,27 @@ async function tryM2M100Translate(
     const url = process.env.M2M100_TRANSLATE_URL?.trim() || "http://127.0.0.1:8100";
 
     try {
+        const terminology = await prepareM2M100Terminology(text, source, target);
         const response = await fetch(`${url}/translate`, {
             method: "POST",
             headers: { "Content-Type": "application/json; charset=utf-8" },
             signal: controller.signal,
             cache: "no-store",
-            body: JSON.stringify({ text, source, target, reverse: includeReverse }),
+            body: JSON.stringify({
+                text: terminology.text,
+                source,
+                target,
+                reverse: includeReverse,
+            }),
         });
         if (!response.ok) return null;
 
         const result = await response.json() as LocalM2M100Response;
-        const translated = result.translated?.trim() || "";
+        const translated = enforceM2M100Terminology(
+            result.translated?.trim() || "",
+            target,
+            terminology.terms,
+        );
         const reverseTranslated = result.reverse_translated?.trim() || "";
         if (!isUsableLocalTranslation(text, translated)) return null;
 
@@ -357,6 +379,125 @@ async function tryM2M100Translate(
     } finally {
         clearTimeout(timeout);
     }
+}
+
+let _multilingualGlossaryCache: MultilingualGlossaryTerm[] | null = null;
+let _multilingualGlossaryCacheAt = 0;
+
+async function fetchMultilingualGlossary(): Promise<MultilingualGlossaryTerm[]> {
+    if (
+        _multilingualGlossaryCache &&
+        Date.now() - _multilingualGlossaryCacheAt < GLOSSARY_CACHE_TTL_MS
+    ) {
+        return _multilingualGlossaryCache;
+    }
+
+    try {
+        const sb = createServiceClient();
+        const { data, error } = await sb
+            .from("site_term_translations")
+            .select("glossary_id, pivot_en, lang_code, local_slang, construction_glossary(standard)");
+        if (error || !data) return _multilingualGlossaryCache ?? [];
+
+        const rows = data as unknown as Array<{
+            glossary_id: number;
+            pivot_en: string;
+            lang_code: string;
+            local_slang: string;
+            construction_glossary: { standard?: string } | Array<{ standard?: string }> | null;
+        }>;
+        _multilingualGlossaryCache = rows.flatMap((row) => {
+            const relation = Array.isArray(row.construction_glossary)
+                ? row.construction_glossary[0]
+                : row.construction_glossary;
+            const standard = relation?.standard?.trim() || "";
+            const standardCore = standard.split(/[,(]/)[0].trim();
+            const pivotMatch = row.pivot_en?.match(/\(([^)]+)\)/);
+            const pivotEnglish = (pivotMatch?.[1] || row.pivot_en || "").trim();
+            if (!standardCore || !pivotEnglish || !row.local_slang?.trim()) return [];
+            return [{
+                glossaryId: row.glossary_id,
+                standard,
+                standardCore,
+                pivotEnglish,
+                localTerm: row.local_slang.trim(),
+                language: normalizeGlossaryLanguage(row.lang_code),
+            }];
+        });
+        _multilingualGlossaryCacheAt = Date.now();
+        return _multilingualGlossaryCache;
+    } catch {
+        return _multilingualGlossaryCache ?? [];
+    }
+}
+
+async function prepareM2M100Terminology(
+    text: string,
+    source: string,
+    target: string,
+): Promise<{ text: string; terms: MultilingualGlossaryTerm[] }> {
+    const glossary = await fetchMultilingualGlossary();
+    const targetTerms = glossary.filter((term) => term.language === target);
+    const sourceTerms = glossary.filter((term) => term.language === source);
+    const applied: MultilingualGlossaryTerm[] = [];
+    let prepared = text;
+
+    if (source === "ko") {
+        for (const term of targetTerms.sort((a, b) => b.standardCore.length - a.standardCore.length)) {
+            if (!prepared.includes(term.standardCore)) continue;
+            prepared = prepared.replaceAll(term.standardCore, term.pivotEnglish);
+            applied.push(term);
+        }
+    } else {
+        for (const sourceTerm of sourceTerms.sort((a, b) => b.localTerm.length - a.localTerm.length)) {
+            if (!prepared.toLowerCase().includes(sourceTerm.localTerm.toLowerCase())) continue;
+            prepared = prepared.replace(
+                new RegExp(escapeRegExp(sourceTerm.localTerm), "giu"),
+                sourceTerm.pivotEnglish,
+            );
+            const targetTerm = target === "ko"
+                ? sourceTerm
+                : targetTerms.find((candidate) => candidate.glossaryId === sourceTerm.glossaryId);
+            if (targetTerm) applied.push(targetTerm);
+        }
+    }
+
+    return { text: prepared, terms: applied };
+}
+
+function enforceM2M100Terminology(
+    translated: string,
+    target: string,
+    terms: MultilingualGlossaryTerm[],
+): string {
+    let result = translated;
+    for (const term of terms) {
+        const required = target === "ko" ? term.standardCore : term.localTerm;
+        if (result.toLowerCase().includes(required.toLowerCase())) continue;
+
+        const pivotWords = term.pivotEnglish.match(/[A-Za-z]+/g) ?? [];
+        const distinctiveWord = pivotWords.at(-1);
+        if (distinctiveWord && new RegExp(`\\b${escapeRegExp(distinctiveWord)}\\b`, "iu").test(result)) {
+            result = result.replace(
+                new RegExp(`\\b(?:${pivotWords.slice(0, -1).map(escapeRegExp).join("\\s+")}\\s+)?${escapeRegExp(distinctiveWord)}\\b`, "iu"),
+                required,
+            );
+        } else {
+            result = `${required}: ${result}`;
+        }
+    }
+    return result;
+}
+
+function normalizeGlossaryLanguage(language: string): string {
+    const aliases: Record<string, string> = {
+        ph: "tl", kh: "km", lk: "si", bd: "bn", np: "ne", mm: "my", pk: "ur",
+    };
+    return aliases[language] ?? language;
+}
+
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function isUsableLocalTranslation(source: string, translated: string): boolean {

@@ -4,6 +4,7 @@ export {
     ON_DEVICE_SPEECH_DEFAULTS,
     ON_DEVICE_STT_MODEL,
     ON_DEVICE_TTS_MODEL,
+    getOnDeviceSttModelId,
 } from "./config";
 export type {
     OnDeviceModelDescriptor,
