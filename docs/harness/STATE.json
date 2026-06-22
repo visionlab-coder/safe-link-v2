@@ -10,18 +10,18 @@
   "main_synced": true,
   "track": "mobile-partial",
   "last_done_increment": {
-    "id": "MC-001",
+    "id": "MC-002",
     "sha": "working-tree",
-    "status": "build-green / DEVICE-PENDING",
-    "summary": "단일 앱 셸 전환 — capacitor server.url로 배포 웹앱 전체(safe-link-v2.vercel.app) first-party 호스팅(관리자·근로자 전 기능 한 앱), AndroidManifest RECORD_AUDIO/CAMERA/MODIFY_AUDIO_SETTINGS/POST_NOTIFICATIONS, MainActivity 런타임 권한 요청(WebView getUserMedia grant 전제); build+cap sync+assembleDebug green. ⚠️ 인증 지속·WebView 마이크 동작은 실기기 검증 전까지 미확정(게이팅 베팅)"
+    "status": "DEVICE-VERIFIED (gating PASS)",
+    "summary": "단일 앱 셸 게이팅 검증 — 사용자 실기기(안드로이드)에서 MC-001 APK 설치 후 확인: 관리자 모드 로그인·TBM 동작, 그 외 기능 정상 작동. WebView 인증·기능 접근 확인 → 단일-앱-셸(server.url 웹앱 전체 호스팅) 접근 viability 확정. ✅ 라이브 통역 마이크(2대 양방향)·근로자 모드·1:1 대화는 사용자 추가 확인 대기(부분 미세 확인)"
   },
-  "next_ready_task": "MC-002 (device) 게이팅 검증 — 실기기에서 웹앱 로그인 지속 + 라이브 통역 마이크 동작 확인(MOBILE_E2E_TEST_GUIDE T9~T11). 통과 시에만 TBM 브로드캐스팅 네이티브 강화로 진행",
+  "next_ready_task": "MC-003 라이브 통역 2대 양방향 + 1:1 대화 실기기 확인 마무리 → 통과 시 TBM 브로드캐스팅/푸시 네이티브 강화(local-notifications) 검토",
   "done_bar": [
     {
       "id": "M1",
       "text": "핵심 모바일 E2E 시나리오가 Android/iOS 실기기에서 통과한다.",
       "met": false,
-      "evidence": "테스트 가이드 작성 완료(MOBILE_E2E_TEST_GUIDE.md, T1~T8); 실기기 실행은 미수행, iOS는 M-004 BLOCKED"
+      "evidence": "Android 실기기에서 단일앱 셸 검증 PASS — 관리자 로그인·TBM·일반 기능 정상(사용자 확인). 라이브통역(2대)·근로자모드·1:1 추가 확인 대기, iOS는 M-004 BLOCKED"
     },
     {
       "id": "M2",
@@ -102,6 +102,6 @@
       "npm.cmd run android:assemble:debug --prefix apps/mobile",
       "npm.cmd audit --prefix apps/mobile"
     ],
-    "summary": "MC-001 단일 앱 셸(server.url 웹앱 전체 호스팅 + 마이크/카메라/알림 권한); build+cap sync+assembleDebug green. 인증·마이크 실동작은 DEVICE-PENDING(MC-002 게이팅 검증)"
+    "summary": "MC-002 단일앱 셸 게이팅 DEVICE-VERIFIED — 안드로이드 실기기에서 관리자 로그인·TBM·일반 기능 정상(사용자 확인). 접근 viability 확정. 라이브통역 2대 양방향·근로자·1:1 추가 확인 대기"
   }
 }

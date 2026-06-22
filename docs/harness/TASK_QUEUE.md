@@ -6,12 +6,12 @@
 
 ## READY
 
-1. MC-002 — (device) 게이팅 검증: 인증 지속 + WebView 마이크
-   - Done: MC-001 APK를 실기기에 설치 → ① 웹앱 로그인(관리자·근로자) 세션이 앱 재실행 후에도 지속, ② 라이브 통역 페이지에서 마이크 권한 grant + getUserMedia 실제 캡처 동작을 확인. 결과를 E2E 가이드 T9~T11에 기록.
-   - Scope: 실기기 수동 검증(사용자 수행). 코드 변경 없음. WebView-임베드 접근 전체의 viability를 결정하는 스파이크.
-   - Verify: T9(인증 지속) T10(마이크 캡처) T11(관리자/근로자 역할 전환) Pass/Fail 기록
-   - Risk: 실패 시 = server.url WebView에서 쿠키/마이크 미지원 → 접근 재검토(in-app WebChromeClient onPermissionRequest override 또는 네이티브 플러그인 필요). 한 스파이크로 조기 판별.
-   - Dependency: 라이브/TBM/대화 모든 후속은 이 검증 통과가 전제.
+1. MC-003 — 라이브 통역(2대)·근로자모드·1:1 실기기 확인 마무리
+   - Done: ① 근로자 모드 로그인·전 기능 접근, ② 라이브 통역 2대(관리자↔근로자) 양방향 마이크→STT→번역→TTS, ③ 1:1 대화 음성 교환을 실기기로 확인하고 E2E T11~T13에 기록. 이상 없으면 MC Done Bar 핵심 충족.
+   - Scope: 실기기 수동 검증(사용자 수행). 코드 변경 없음. 문제 발견 시에만 해당 증분 재오픈.
+   - Verify: T11(역할 전환) T12(라이브 통역 양방향) T13(TBM 브로드캐스팅 수신·1:1) Pass/Fail
+   - Risk: 마이크 2대 동시·에코, TBM 근로자 단말 수신(웹 realtime RLS site_id 경로 의존) — 문제 시 해당 부분만 후속.
+   - 다음 후보(통과 시): TBM 푸시 네이티브 강화(@capacitor/local-notifications), 오프라인/네트워크 실패 UX, QR/NFC 네이티브 브릿지.
 
 ## BLOCKED
 
@@ -21,7 +21,8 @@
 
 ## DONE
 
-- MC-001 @ working-tree (build-green / DEVICE-PENDING) — 단일 앱 셸 전환 · Verify: capacitor server.url=safe-link-v2.vercel.app로 웹앱 전체 first-party 호스팅(관리자·근로자 전 기능), AndroidManifest 마이크/카메라/알림 권한, MainActivity 런타임 권한 요청, build+cap sync+assembleDebug green · Files: apps/mobile/capacitor.config.ts, android/app/src/main/AndroidManifest.xml, android/.../MainActivity.java · Note: 인증 지속·WebView 마이크 실동작은 MC-002 실기기 검증 필요(미확정)
+- MC-002 @ working-tree (DEVICE-VERIFIED) — 단일 앱 셸 게이팅 검증 통과 · Verify: 사용자 안드로이드 실기기에서 관리자 로그인·TBM·일반 기능 정상 작동 확인 → WebView 웹앱 인증·기능 호스팅 입증, server.url 단일-앱-셸 접근 viable 확정 · Note: 라이브통역 2대·근로자·1:1 추가 확인 대기(MC-003)
+- MC-001 @ working-tree — 단일 앱 셸 전환 · Verify: capacitor server.url=safe-link-v2.vercel.app로 웹앱 전체 first-party 호스팅(관리자·근로자 전 기능), AndroidManifest 마이크/카메라/알림 권한, MainActivity 런타임 권한 요청, build+cap sync+assembleDebug green · Files: apps/mobile/capacitor.config.ts, android/app/src/main/AndroidManifest.xml, android/.../MainActivity.java · Note: 인증 지속·WebView 마이크 실동작은 MC-002 실기기 검증 필요(미확정)
 - M-010 @ working-tree — 실기기 E2E 테스트 가이드 · Verify: 8개 시나리오(T1~T8: 진단·관리자/근로자 로그인·TBM 서명·번역·QR·NFC·오프라인) 사전조건/단계/기대결과/기록란 + 결과 요약 템플릿 + M1 통과기준, placeholder/state check green · Files: docs/harness/MOBILE_E2E_TEST_GUIDE.md · Note: 문서만, iOS는 M-004 BLOCKED, 실기기 실행은 사용자 수행
 - M-009 @ working-tree — NFC 스캔 adapter (모바일) · Verify: Web NFC(NDEFReader) getNfcCapability/scanNfcOnce/parseSafeLinkNfc, unsupported·permission_denied·cancelled·error 분기, URL payload worker/site 토큰 파싱, NfcScanPanel+App 통합, mobile typecheck+vite build green · Files: apps/mobile/src/lib/capability/nfc.ts, app/NfcScanPanel.tsx, app/App.tsx · Note: Android Chrome 전용·HTTPS 필요, iOS는 네이티브 후속(M-004 계열)
 - M-008 @ working-tree — 모바일 TBM 서명 캔버스 UI · Verify: 터치 pointer-events 캔버스(DPR·지우기·빈서명 방지), data URL→signTbm 제출, WorkerTbmPanel 조회→서명→제출 완성, mobile typecheck+vite build green · Files: apps/mobile/src/app/SignatureCanvas.tsx, WorkerTbmPanel.tsx

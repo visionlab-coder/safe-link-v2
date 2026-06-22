@@ -8,14 +8,15 @@
 - Head SHA: `0161079`
 - Default branch synced: true (`master` = `origin/master`); wip 미머지(배포 게이트)
 - Current track: `mobile-partial`
-- Next READY: `MC-002 (device) 게이팅 검증 — 인증 지속 + WebView 마이크`
+- Next READY: `MC-003 라이브 통역(2대)·근로자모드·1:1 실기기 확인 마무리`
 - **아키텍처 전환(2026-06-22)**: 단일 앱 = 배포 웹앱 전체를 first-party WebView 호스팅(`server.url`). 관리자·근로자 전 기능 한 앱. 상세 `GOAL.md > Architecture Decision`
+- **게이팅 검증 PASS(2026-06-22)**: Android 실기기에서 관리자 로그인·TBM·일반 기능 정상(사용자 확인) → 단일-앱-셸 접근 viability 확정
 - 최우선 핵심 3종: TBM 브로드캐스팅 · 라이브 통역 · 1:1 대화
-- 이번 세션 증분: S-002·M-005~M-010·MC-001 (MC-001은 build-green/DEVICE-PENDING)
+- 이번 세션 증분: S-002·M-005~M-010·MC-001·MC-002(device-verified)
 
-## Last Done Increment (build-green / DEVICE-PENDING)
+## Last Done Increment (DEVICE-VERIFIED — gating PASS)
 
-MC-001 단일 앱 셸 전환. `capacitor.config.ts`에 `server.url=https://safe-link-v2.vercel.app` → 앱이 배포 웹앱 전체를 first-party로 로드(관리자·근로자 모두 웹앱 로그인으로 전 기능). AndroidManifest에 RECORD_AUDIO·MODIFY_AUDIO_SETTINGS·CAMERA·POST_NOTIFICATIONS 추가, MainActivity에서 실행 시 런타임 권한 요청(WebView getUserMedia grant 전제). build+cap sync+assembleDebug green. ⚠️ **인증 세션 지속·WebView 마이크 실동작은 실기기 검증 전까지 미확정** — 이 검증이 WebView-임베드 접근 전체의 게이팅 베팅(MC-002).
+MC-002 단일 앱 셸 게이팅 검증 통과. 사용자가 안드로이드 실기기에 MC-001 APK 설치 후 확인: **관리자 모드 로그인·TBM 동작, 그 외 기능 정상 작동**. WebView가 웹앱 인증·기능을 정상 호스팅함을 실기기로 입증 → `server.url` 단일-앱-셸(웹 PoC 코드 그대로 재사용) 접근이 viable함을 확정. 남은 명시 확인: 라이브 통역 마이크 2대 양방향, 근로자 모드, 1:1 대화.
 
 ## Current State
 
