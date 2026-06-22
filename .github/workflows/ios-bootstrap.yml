@@ -5,8 +5,6 @@ on:
   push:
     branches:
       - codex/ios-bootstrap-20260623
-    paths:
-      - ".github/workflows/ios-bootstrap.yml"
 
 permissions:
   contents: read
