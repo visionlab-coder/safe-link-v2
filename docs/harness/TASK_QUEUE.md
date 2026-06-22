@@ -4,11 +4,11 @@
 
 ## READY
 
-1. M-006 — 근로자 TBM 첫 vertical slice (모바일)
-   - Done: 근로자가 모바일에서 로그인(worker quick-login mobile token) → 오늘 TBM 조회·내용 표시까지 동작. 음성재생·서명은 후속 증분.
-   - Scope: worker-quick-login mobile token 계약 확장 + TBM 조회 최소 화면. 서명·번역채팅·음성 제외.
-   - Verify: worker 토큰 발급/저장(M-005 store 재사용), TBM 조회 인증 통과, mobile typecheck/build green
-   - Risk: worker RLS site 일치, 오프라인/재시도, TBM 실시간 갱신은 별도
+1. M-007 — 카메라·QR 스캔 adapter (모바일)
+   - Done: 모바일에서 카메라/QR 스캔 capability adapter(Capacitor) 제공 + 권한 요청/거부/복구 처리. QR 스캔 결과로 worker/site 식별 최소 연결.
+   - Scope: QR/카메라 adapter + 권한 UX. NFC는 별도 증분. 서명·음성 제외.
+   - Verify: 권한 요청/거부 분기, 스캔 결과 파싱, web fallback(미지원 단말), mobile typecheck/build green
+   - Risk: 기기별 카메라 권한·iOS/Android 차이, 플러그인 네이티브 sync 필요
 
 ## BLOCKED
 
@@ -18,6 +18,7 @@
 
 ## DONE
 
+- M-006 @ working-tree — 근로자 TBM vertical slice · Verify: worker-quick-login 모바일 토큰+CORS, /api/tbm/today(Bearer+RLS site스코프+CORS), 모바일 workerLogin/getTodayTbms+WorkerTbmPanel, endpoint smoke 6/6, root+mobile typecheck/build green · Files: api/auth/worker-quick-login, api/tbm/today, apps/mobile/src/lib/auth/client.ts, app/WorkerTbmPanel.tsx, app/App.tsx
 - M-005 @ working-tree — 모바일 admin 로그인 + secure token store · Verify: @capacitor/preferences 저장, adminLogin(mobile)→token 저장, authFetch Bearer 주입, logout 제거, AdminAuthPanel 최소 흐름, mobile typecheck+vite build green · Files: apps/mobile/src/lib/auth/{token-store,client}.ts, app/AdminAuthPanel.tsx, app/App.tsx, styles/app.css · Note: Preferences는 평문 → 상용 전 암호화 백엔드 교체 권장
 - S-002 @ working-tree — 모바일 인증 API·CORS 계약 · Verify: preflight 허용(204)/거부(403), 모바일 토큰응답 게이트(X-Safe-Link-Client+허용origin), auth/me 401에도 CORS, 웹 no-CORS 호환, contract smoke 8/8, typecheck green · Files: utils/auth/mobile-cors.ts, api/auth/admin-login, api/auth/me, scripts/mobile-auth-cors-smoke.mjs
 - M-003 @ working-tree — 최소 Android Capacitor 셸 구축 · Verify: Vite build, cap sync, Gradle assembleDebug, APK 4,194,299 bytes, package `com.safelink.mobile.dev`, npm audit 0, secret scan clean

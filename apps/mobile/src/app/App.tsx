@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getRuntimeConfig } from "../config/runtime";
 import { getPlatformInfo } from "../lib/platform";
 import { AdminAuthPanel } from "./AdminAuthPanel";
+import { WorkerTbmPanel } from "./WorkerTbmPanel";
 
 type NetworkState = "checking" | "online" | "offline";
 
@@ -91,6 +92,8 @@ export function App() {
       </section>
 
       <AdminAuthPanel />
+
+      <WorkerTbmPanel />
 
       <section className="notice">
         <strong>현재 범위</strong>

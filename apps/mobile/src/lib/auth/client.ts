@@ -62,3 +62,33 @@ export async function isAuthenticated(): Promise<boolean> {
 export async function logout(): Promise<void> {
     await clearSession();
 }
+
+// 📱 M-006 — 근로자 로그인 (이니셜 + 휴대폰 뒷4자리) → 모바일 토큰 저장
+export async function workerLogin(initials: string, phoneLast4: string): Promise<LoginResult> {
+    let res: Response;
+    try {
+        res = await fetch(`${apiBase()}/api/auth/worker-quick-login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", [MOBILE_CLIENT_HEADER]: MOBILE_CLIENT_VALUE },
+            credentials: "omit",
+            body: JSON.stringify({ name_initials: initials, phone_last4: phoneLast4 }),
+        });
+    } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : "network_error" };
+    }
+    const data = (await res.json().catch(() => ({}))) as { session?: { access_token?: string }; error?: string };
+    if (!res.ok) return { ok: false, error: data.error || `login_failed_${res.status}` };
+    if (!data.session?.access_token) return { ok: false, error: "no_session_token" };
+    await saveSession(data.session as Parameters<typeof saveSession>[0]);
+    return { ok: true };
+}
+
+export type Tbm = { id: string; content_ko: string; site_id: string | null; created_at: string };
+
+// 📱 M-006 — 근로자 TBM 조회 (Bearer 주입, RLS site 스코프)
+export async function getTodayTbms(): Promise<Tbm[]> {
+    const res = await authFetch("/api/tbm/today");
+    if (!res.ok) return [];
+    const data = (await res.json()) as { tbms?: Tbm[] };
+    return data.tbms ?? [];
+}

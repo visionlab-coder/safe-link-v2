@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "project": "SAFE-LINK V2 Mobile Commercialization",
   "repo": "SAFE-LINK-V2",
-  "calibrated_at": "2026-06-22T15:51:05+09:00",
+  "calibrated_at": "2026-06-22T16:16:08+09:00",
   "current_branch": "wip/ai-engine-upgrade-20260622",
   "head_sha": "710647d7fb824c92ed847fc5326a7a08e17d32d1",
   "main_sha": "311c84ea7063d7416028a473d3ce05875444344f",
@@ -10,11 +10,11 @@
   "main_synced": true,
   "track": "mobile-partial",
   "last_done_increment": {
-    "id": "M-005",
+    "id": "M-006",
     "sha": "working-tree",
-    "summary": "Mobile admin login + token store — @capacitor/preferences 저장, adminLogin/authFetch(Bearer)/logout, App AdminAuthPanel 최소 흐름; mobile typecheck+vite build green"
+    "summary": "Worker TBM vertical slice — worker-quick-login mobile token+CORS, /api/tbm/today (Bearer+RLS+CORS), mobile workerLogin/getTodayTbms + WorkerTbmPanel; endpoint smoke 6/6, root+mobile typecheck/build green"
   },
-  "next_ready_task": "M-006 근로자 TBM 첫 vertical slice",
+  "next_ready_task": "M-007 카메라·QR adapter",
   "done_bar": [
     {
       "id": "M1",
@@ -86,7 +86,7 @@
     "store submission"
   ],
   "verification": {
-    "last_green_at": "2026-06-22T15:51:05+09:00",
+    "last_green_at": "2026-06-22T16:16:08+09:00",
     "commands": [
       "git diff --check",
       "node scripts/check-sensitive-strings.mjs .harness-blocklist.local",
@@ -101,6 +101,6 @@
       "npm.cmd run android:assemble:debug --prefix apps/mobile",
       "npm.cmd audit --prefix apps/mobile"
     ],
-    "summary": "M-005 mobile admin login + secure token store (@capacitor/preferences), Bearer authFetch, AdminAuthPanel; mobile typecheck + vite build green (S-002 web build green prior)"
+    "summary": "M-006 worker TBM slice — worker-quick-login mobile token+CORS, /api/tbm/today Bearer+RLS+CORS, mobile WorkerTbmPanel; endpoint smoke 6/6, root typecheck+build + mobile typecheck+build green"
   }
 }
