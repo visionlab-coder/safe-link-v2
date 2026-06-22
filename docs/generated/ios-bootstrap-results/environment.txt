@@ -1,0 +1,8 @@
+completed_at=2026-06-22T23:48:03Z
+branch=codex/ios-bootstrap-20260623
+head=031dc02691371a9b893bb8b54f60bbd2cf4a9cac
+provisional_android_base=88785ad63b613e680b55f9c16c39568c2f7482e3
+node=v22.22.3
+npm=10.9.8
+xcode=Xcode 26.5 Build version 17F42 
+sdk=26.5

@@ -1,0 +1,18 @@
+{
+	"appId": "com.safelink.mobile.dev",
+	"appName": "SAFE-LINK Dev",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https",
+		"url": "https://safe-link-v2.vercel.app",
+		"cleartext": false,
+		"errorPath": "error.html"
+	},
+	"android": {
+		"allowMixedContent": false
+	},
+	"packageClassList": [
+		"LocalNotificationsPlugin",
+		"PreferencesPlugin"
+	]
+}
