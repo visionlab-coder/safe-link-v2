@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.safelink.mobile.dev",
+      "sha256_cert_fingerprints": [
+        "C6:55:2C:4D:33:33:06:6A:26:9E:24:68:E8:58:F1:EE:68:ED:58:E6:A9:F0:1D:99:FF:6C:48:04:F0:BA:DE:52"
+      ]
+    }
+  }
+]
