@@ -1,0 +1,106 @@
+{
+  "schema_version": "1.0.0",
+  "project": "SAFE-LINK V2 Mobile Commercialization",
+  "repo": "SAFE-LINK-V2",
+  "calibrated_at": "2026-06-22T15:01:20+09:00",
+  "current_branch": "wip/ai-engine-upgrade-20260622",
+  "head_sha": "710647d7fb824c92ed847fc5326a7a08e17d32d1",
+  "main_sha": "311c84ea7063d7416028a473d3ce05875444344f",
+  "origin_main_sha": "311c84ea7063d7416028a473d3ce05875444344f",
+  "main_synced": true,
+  "track": "mobile-partial",
+  "last_done_increment": {
+    "id": "S-002",
+    "sha": "working-tree",
+    "summary": "Mobile auth API/CORS contract — Capacitor-origin preflight, mobile token response on admin-login, auth/me CORS; contract smoke 8/8 green"
+  },
+  "next_ready_task": "M-005 모바일 admin 로그인과 secure storage 연결",
+  "done_bar": [
+    {
+      "id": "M1",
+      "text": "핵심 모바일 E2E 시나리오가 Android/iOS 실기기에서 통과한다.",
+      "met": false,
+      "evidence": "not run"
+    },
+    {
+      "id": "M2",
+      "text": "단일 코드베이스에서 양 플랫폼 테스트 빌드가 재현된다.",
+      "met": false,
+      "evidence": "Android debug APK green; iOS build pending M-004"
+    },
+    {
+      "id": "M3",
+      "text": "필수 네이티브 capability가 구현 또는 명시적 제외 상태다.",
+      "met": false,
+      "evidence": "capability audit pending"
+    },
+    {
+      "id": "M4",
+      "text": "상용 보안 release blocker가 0개다.",
+      "met": false,
+      "evidence": "S-001 token verification + S-002 mobile auth/CORS contract complete; middleware and remaining API coverage pending"
+    },
+    {
+      "id": "M5",
+      "text": "스토어 제출 전 체크리스트가 완료된다.",
+      "met": false,
+      "evidence": "release preparation pending"
+    }
+  ],
+  "open_flags": [
+    {
+      "flag": "user_worktree_changes",
+      "state": "open",
+      "resolves_in": "모바일 작업은 기존 WIP 파일과 분리"
+    },
+    {
+      "flag": "ios_build_environment",
+      "state": "open",
+      "resolves_in": "M-004"
+    },
+    {
+      "flag": "mobile_architecture",
+      "state": "accepted-capacitor-local-spa",
+      "resolves_in": "done"
+    },
+    {
+      "flag": "existing_build_warnings",
+      "state": "open",
+      "resolves_in": "해당 READY가 큐에 등록될 때"
+    },
+    {
+      "flag": "next_workspace_root_warning",
+      "state": "open",
+      "resolves_in": "모바일 셸 build 설정 전에 검토"
+    },
+    {
+      "flag": "android_debug_build",
+      "state": "green",
+      "resolves_in": "done"
+    }
+  ],
+  "gates_pending": [
+    "developer account ownership and fees",
+    "app signing credentials",
+    "production database changes",
+    "store submission"
+  ],
+  "verification": {
+    "last_green_at": "2026-06-22T15:01:20+09:00",
+    "commands": [
+      "git diff --check",
+      "node scripts/check-sensitive-strings.mjs .harness-blocklist.local",
+      "node scripts/check-harness-placeholders.mjs docs/harness",
+      "node scripts/check-state-json.mjs docs/harness/STATE.json",
+      "node --no-warnings --experimental-strip-types scripts/auth-token-verification-smoke.mjs",
+      "npm.cmd exec tsc -- --noEmit",
+      "npm.cmd run build",
+      "npm.cmd run typecheck --prefix apps/mobile",
+      "npm.cmd run build --prefix apps/mobile",
+      "npm.cmd run cap:sync --prefix apps/mobile",
+      "npm.cmd run android:assemble:debug --prefix apps/mobile",
+      "npm.cmd audit --prefix apps/mobile"
+    ],
+    "summary": "S-002 mobile auth/CORS contract — preflight allow/deny, mobile token response, auth/me CORS, web-compat; contract smoke 8/8 + typecheck green (build pending session gate)"
+  }
+}

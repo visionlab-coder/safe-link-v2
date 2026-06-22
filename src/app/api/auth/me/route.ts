@@ -5,6 +5,7 @@ import {
     type StoredAuthSession,
 } from "@/utils/auth/access-token-core";
 import { verifyAccessToken } from "@/utils/auth/verify-access-token";
+import { withMobileCors, handleMobilePreflight } from "@/utils/auth/mobile-cors";
 
 export const runtime = "nodejs";
 
@@ -49,7 +50,7 @@ function sessionCookieValue(session: StoredAuthSession): string {
     return `base64-${Buffer.from(JSON.stringify(session)).toString("base64")}`;
 }
 
-export async function GET(req: NextRequest) {
+async function handleMe(req: NextRequest): Promise<NextResponse> {
     const rawCookie = req.cookies.get(COOKIE_NAME)?.value;
     const resolved = resolveRequestAccessToken({
         authorization: req.headers.get("authorization"),
@@ -145,4 +146,16 @@ export async function GET(req: NextRequest) {
     }
 
     return response;
+}
+
+// 📱 모바일(Capacitor) preflight (S-002)
+export async function OPTIONS(req: NextRequest) {
+    return handleMobilePreflight(req) ?? new NextResponse(null, { status: 405 });
+}
+
+// GET 래퍼 — 허용 mobile origin이면 모든 응답(성공/401)에 CORS 부착.
+// 웹/비허용 origin은 무변경(withMobileCors no-op) → 웹 호환 유지.
+export async function GET(req: NextRequest) {
+    const res = await handleMe(req);
+    return withMobileCors(res, req.headers.get("origin"));
 }
