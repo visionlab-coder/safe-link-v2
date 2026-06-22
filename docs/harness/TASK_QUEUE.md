@@ -18,9 +18,11 @@
 - MC-007-C (오프라인 캐시) — 보류: SW/PWA 부재, 원격 SSR 캐시는 스테일·인증 리스크 + 핵심 온라인 필수 + MC-006이 graceful UX 제공. 풀 캐시는 별도 신중 설계.
    - Note: iOS(M-004) Codex 진행 중 간섭 금지. 잠긴 worktree 폴더(`../slv2-hotfix-*`) 수동 삭제 가능(무해).
 
-## 사용자 확인 대기
+## 사용자 확인/액션 대기
 
-- MC-005 — Q-001 한국어 수정 폰 반영 확인(Vercel 배포 후 갑시다 정상). 사용자 측 검증.
+- #4 마무리 검증 — 최신 APK(18bf0523) 설치 + 웹 PR #2/#3/#4 배포 반영 후 실기기에서: 한국어(갑시다)·TBM 로컬알림·딥링크(스캔→앱)·오프라인 캐시 확인(E2E T9~T15).
+- #2 FCM 원격 푸시 — **사용자 액션 필요**: Firebase 프로젝트 생성 → google-services.json + FCM 서버키 제공 시 구현 진행(앱 종료 상태 푸시). 현재는 인앱 로컬알림(#A)으로 대체 동작.
+- MC-005 — Q-001 한국어 수정 폰 반영 확인.
 
 ## BLOCKED
 
@@ -30,6 +32,8 @@
 
 ## DONE
 
+- MC-009 (#3) @ PR #4 (배포됨) / DEVICE-PENDING — TBM 오프라인 캐시(안전 버전) · Verify: localStorage 캐시+오프라인 폴백+배너, 글로벌 SW 미사용, 온라인 무변화(stale 금지), 오프라인 번역 스킵, root tsc green, PR #4 머지→Vercel · Files: src/utils/native/tbm-cache.ts, src/app/worker/tbm/[id]/page.tsx
+- MC-008 (#1) @ 9e42051 + APK 18bf0523 (배포됨, PR #3) / DEVICE-PENDING — 딥링크 App Links · Verify: AndroidManifest VIEW 인텐트필터(autoVerify, host safe-link-v2.vercel.app) + public/.well-known/assetlinks.json(디버그 지문), 미들웨어 통과, APK 18bf0523 · Note: 릴리스 빌드는 릴리스 서명 지문 추가 필요
 - MC-007-A @ 8350722 (배포됨, PR #2) / DEVICE-PENDING — TBM·메시지 인앱 로컬 알림 · Verify: @capacitor/local-notifications@8.2(APK 689964b0) + feature-detected local-notify.ts + worker/page.tsx realtime 훅(notifyNative), 브라우저 no-op, root tsc green, PR #2 머지→Vercel · Files: src/utils/native/local-notify.ts, src/app/worker/page.tsx, apps/mobile/package.json · Note: 알림 실동작 실기기 확인 필요, 종료상태=FCM 후속
 - MC-006 @ working-tree (build-green / DEVICE-PENDING) — 오프라인/네트워크 실패 UX · Verify: Capacitor server.errorPath=error.html + public/error.html(한국어 안내·다시시도·online 자동 재접속), build+cap sync(android assets 반영)+assembleDebug green(APK 74ef9c49), errorPath synced 확인 · Files: apps/mobile/capacitor.config.ts, apps/mobile/public/error.html · Note: 실제 오프라인 전환 동작 실기기 확인 필요
 - MC-004 @ f8f4bcf (MERGED, 배포 트리거) — Q-001 한국어 수정 운영 배포 · Verify: PR #1 사용자 승인 후 master 머지(fast-forward, politeness.ts 1파일), origin/master 반영 확인 → Vercel 프로덕션 자동배포 트리거 · Note: 18커밋 통째 머지 회피(미검증 웹 PoC 운영 미반영). 폰 반영 확인=MC-005

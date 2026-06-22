@@ -8,8 +8,9 @@
 - Head SHA: `0161079`
 - Default branch synced: true (`master` = `origin/master`); wip 미머지(배포 게이트)
 - Current track: `mobile-partial`
-- Next READY: 사용자 결정 (딥링크 / FCM / 오프라인 풀캐시 / 마무리) — 아래 MC-007 결과 참조
-- **MC-007 순차 결과**: A 배포 완료. B(QR·NFC)=인앱 스캐너 부재로 N/A(딥링크가 진짜 버전). C(오프라인 캐시)=리스크>이득, MC-006으로 충분해 보류
+- Next READY: `#4 마무리` — 최신 APK 설치 + 웹 배포 반영 후 실기기 검증 / `#2 FCM`은 Firebase 게이트(사용자)
+- **1→2→3→4 순차 결과**: #1 딥링크 배포(APK 18bf0523 + assetlinks PR #3) · #2 FCM=Firebase 게이트 대기 · #3 TBM 오프라인캐시 배포(PR #4) · #4 검증 단계
+- 배포된 웹 PR: #2(TBM 로컬알림 훅)·#3(assetlinks)·#4(오프라인 캐시) → 모두 master 머지·Vercel. 최신 APK `18bf0523`
 - **MC-007-A 배포(2026-06-23)**: TBM/메시지 인앱 로컬 알림 — @capacitor/local-notifications + feature-detected 웹 훅. PR #2 머지(`8350722`)→Vercel. 새 APK `689964b0`. 알림 실동작 device-pending
 - **배포 완료(MC-004)**: Q-001 수정 master 머지(`f8f4bcf`). 폰 반영 확인(MC-005)은 사용자 대기
 - **MC-006 오프라인 UX**: server.errorPath + 오프라인 안내 페이지(자동 재접속), build green. device-pending

@@ -10,13 +10,13 @@
   "main_synced": true,
   "track": "mobile-partial",
   "last_done_increment": {
-    "id": "MC-008 (#1 딥링크)",
-    "sha": "9e42051 (origin/master, PR #3) + APK 18bf0523",
-    "status": "배포됨 + APK빌드 / DEVICE-PENDING (App Links 검증·오픈 실기기 확인)",
-    "summary": "#1 딥링크(Android App Links) — QR/NFC 스캔으로 열린 safe-link-v2.vercel.app URL을 브라우저 대신 앱이 처리. 네이티브: AndroidManifest VIEW 인텐트필터 autoVerify=true(scheme https, host safe-link-v2.vercel.app), APK 18bf0523. 웹: public/.well-known/assetlinks.json(디버그 SHA-256 지문) PR #3 머지(9e42051)→Vercel. 미들웨어 통과 확인(정적, 가로채기 없음). ⚠️ 폰: 새 APK 설치 후 Android가 assetlinks 검증→스캔 시 앱 오픈 확인 필요. 릴리스 빌드는 릴리스 서명 지문 추가 필요.",
-    "sequence": "사용자 1→2→3→4 순차 진행 중: #1 완료, 다음 #2 FCM"
+    "id": "MC-009 (#3 오프라인 캐시)",
+    "sha": "PR #4 merged origin/master + (#1 9e42051, #1 APK 18bf0523)",
+    "status": "배포됨 / DEVICE-PENDING",
+    "summary": "#3 TBM 오프라인 캐시(안전 버전) — 글로벌 SW 없이 worker TBM 상세를 localStorage 저장, 오프라인일 때만 폴백+배너, 오프라인 번역 스킵. 온라인 동작 무변화(온라인-무TBM stale 금지). 웹 전용(네이티브 무관), PR #4 머지→Vercel. root tsc green. src/utils/native/tbm-cache.ts + worker/tbm/[id]/page.tsx.",
+    "sequence": "1→2→3→4: #1(딥링크) 배포완료, #2(FCM) 게이트 대기, #3(오프라인캐시) 배포완료, #4 마무리 검증 단계"
   },
-  "next_ready_task": "#2 FCM 원격 푸시 — 앱 종료 상태에서도 TBM 알림. ⚠️ Firebase 프로젝트 생성 + google-services.json 필요(사용자만 가능=크리덴셜 게이트). 코드/네이티브 스캐폴딩은 준비하되 작동은 google-services.json 투입 후. 이어서 #3 오프라인 SW, #4 마무리 검증.",
+  "next_ready_task": "#4 마무리 — 최신 APK(18bf0523: server.url+권한+로컬알림+App Links+offline errorPath) 설치 + 웹 PR #2/#3/#4 배포 반영 후 실기기 검증(알림·딥링크·오프라인·한국어). #2 FCM은 Firebase 프로젝트(google-services.json) 대기 — 사용자 액션 필요.",
   "done_bar": [
     {
       "id": "M1",
@@ -103,6 +103,6 @@
       "npm.cmd run android:assemble:debug --prefix apps/mobile",
       "npm.cmd audit --prefix apps/mobile"
     ],
-    "summary": "#1 딥링크(App Links) 배포 — 인텐트필터(APK 18bf0523) + assetlinks.json(PR #3, 9e42051→Vercel). App Links 검증·오픈 device-pending. 다음 #2 FCM(Firebase 게이트)."
+    "summary": "1→2→3→4 진행: #1 딥링크 배포(APK 18bf0523 + assetlinks PR #3), #2 FCM=Firebase 게이트 대기, #3 TBM 오프라인캐시 배포(PR #4). #4 마무리 검증 단계. 모든 변경 feature-detected/오프라인 한정으로 PoC 무영향."
   }
 }
