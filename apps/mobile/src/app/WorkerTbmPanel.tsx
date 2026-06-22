@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { workerLogin, getTodayTbms, logout, type Tbm } from "../lib/auth/client";
+import { workerLogin, getTodayTbms, logout, signTbm, type Tbm } from "../lib/auth/client";
+import { SignatureCanvas } from "./SignatureCanvas";
 
 // 📱 M-006 — 근로자 TBM 최소 vertical slice (이니셜+뒷4 로그인 → TBM 조회)
 export function WorkerTbmPanel() {
@@ -8,6 +9,17 @@ export function WorkerTbmPanel() {
     const [tbms, setTbms] = useState<Tbm[] | null>(null);
     const [status, setStatus] = useState("");
     const [busy, setBusy] = useState(false);
+    const [signing, setSigning] = useState<Tbm | null>(null);
+    const [signBusy, setSignBusy] = useState(false);
+
+    const submitSign = async (dataUrl: string) => {
+        if (!signing) return;
+        setSignBusy(true);
+        const r = await signTbm(signing.id, dataUrl);
+        setSignBusy(false);
+        setSigning(null);
+        setStatus(r.ok ? "✅ 서명 제출 완료" : `❌ 서명 실패: ${r.error}`);
+    };
 
     const onLogin = async () => {
         setBusy(true); setStatus("로그인 중…");
@@ -35,11 +47,18 @@ export function WorkerTbmPanel() {
                         <p className="auth-status">표시할 TBM이 없습니다 (현장 일치 확인).</p>
                     ) : (
                         tbms.map((t) => (
-                            <div key={t.id} className="status-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
+                            <div key={t.id} className="status-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
                                 <strong className="tone-good">{new Date(t.created_at).toLocaleString("ko-KR")}</strong>
                                 <span>{t.content_ko}</span>
+                                <button className="auth-btn" style={{ marginTop: 4, padding: "8px 16px" }} onClick={() => setSigning(t)}>서명하기</button>
                             </div>
                         ))
+                    )}
+                    {signing && (
+                        <div style={{ marginTop: 12 }}>
+                            <p className="auth-status">서명 대상: {signing.content_ko.slice(0, 30)}…</p>
+                            <SignatureCanvas busy={signBusy} onCancel={() => setSigning(null)} onSubmit={submitSign} />
+                        </div>
                     )}
                     <button className="auth-btn" onClick={onRefresh}>새로고침</button>
                     <button className="auth-btn" onClick={onLogout} style={{ background: "#555" }}>로그아웃</button>

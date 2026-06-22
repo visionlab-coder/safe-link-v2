@@ -4,11 +4,11 @@
 
 ## READY
 
-1. M-008 — 모바일 TBM 서명 캔버스 UI
-   - Done: 근로자가 모바일에서 TBM 선택 → 서명 캔버스(터치)로 서명 → signTbm(S-004) 제출까지 동작. WorkerTbmPanel 확장.
-   - Scope: 터치 서명 캔버스(signature_pad 또는 canvas) + data URL 생성 + 제출. 음성·번역채팅 제외.
-   - Verify: 캔버스 그리기/지우기, data URL 생성, signTbm 제출 흐름, mobile typecheck/build green
-   - Risk: 터치 좌표·캔버스 해상도, 빈 서명 방지
+1. M-009 — NFC 스캔 adapter (모바일)
+   - Done: 모바일에서 NFC 태그 스캔 capability adapter(Web NFC, Android Chrome 우선) + 권한/미지원 처리. NFC 태그로 worker/site 식별 최소 연결.
+   - Scope: NFC adapter + 권한 UX + unsupported(iOS/web) 명시. 쓰기 제외, 읽기만.
+   - Verify: 지원 감지, 권한 요청/거부, 태그 payload 파싱, mobile typecheck/build green
+   - Risk: Web NFC는 Android Chrome 한정(iOS는 네이티브 필요), HTTPS 요구
 
 ## BLOCKED
 
@@ -18,6 +18,7 @@
 
 ## DONE
 
+- M-008 @ working-tree — 모바일 TBM 서명 캔버스 UI · Verify: 터치 pointer-events 캔버스(DPR·지우기·빈서명 방지), data URL→signTbm 제출, WorkerTbmPanel 조회→서명→제출 완성, mobile typecheck+vite build green · Files: apps/mobile/src/app/SignatureCanvas.tsx, WorkerTbmPanel.tsx
 - S-005 @ working-tree — translate 모바일 Bearer+CORS · Verify: X-Safe-Link-Client로 travel-token과 모바일 JWT 구분, 모바일 서명검증, OPTIONS 허용/거부, travel·웹 경로 보존, translate smoke 6/6, root+mobile typecheck/build green · Files: api/translate, apps/mobile/src/lib/auth/client.ts(translateText)
 - S-004 @ working-tree — tbm/sign 모바일 Bearer+CORS · Verify: cookie-only 미검증 → resolveRequestAccessToken+verifyAccessToken(서명검증, 보안 강화), OPTIONS preflight 허용(204)/거부(403), 무토큰 401+CORS, 웹 no-CORS 호환, sign smoke 5/5, root+mobile typecheck/build green · Files: api/tbm/sign, apps/mobile/src/lib/auth/client.ts(signTbm) · translate는 S-005로 분리
 - M-007 @ working-tree — 카메라·QR 스캔 adapter · Verify: BarcodeDetector+getUserMedia QR 스캔, 권한 요청/거부/취소 분기, SAFE-LINK QR 파싱, iOS/미지원 unsupported 명시, QrScanPanel, mobile typecheck+vite build green · Files: apps/mobile/src/lib/capability/qr.ts, app/QrScanPanel.tsx, app/App.tsx · Note: iOS WKWebView는 네이티브 스캐너 후속(M-008 후보)
