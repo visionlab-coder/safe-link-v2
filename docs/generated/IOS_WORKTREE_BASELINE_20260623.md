@@ -34,20 +34,30 @@ Conditional shared paths:
 
 Changes to conditional paths must be isolated in a dedicated commit and followed by Android regression verification.
 
-## Next READY
+## Completed increment
 
 `IOS-001A — macOS bootstrap command and verification package`
 
-Prepare a deterministic macOS/Xcode 26 handoff that:
+Prepared:
 
-- checks Node 22+, Xcode 26+, and command line tools;
-- installs `@capacitor/ios` at the same Capacitor version family;
-- creates the iOS project using Swift Package Manager;
-- performs an unsigned simulator build;
-- records the exact build command and output;
-- makes no Android path changes.
+- `apps/mobile/scripts/bootstrap-ios-macos.sh`
+- `apps/mobile/scripts/verify-ios-isolation.sh`
+- `docs/generated/IOS_MACOS_BOOTSTRAP_GUIDE_20260623.md`
+- `docs/generated/IOS_MACOS_BOOTSTRAP_RESULT_TEMPLATE.md`
 
-Actual iOS project generation remains macOS-only.
+The bootstrap defaults to read-only `--check`. Explicit `--apply` installs the aligned Capacitor iOS package, creates the Swift Package Manager project, and performs an unsigned Simulator build. Android path guards run before and after generation.
+
+Actual iOS project generation and Xcode build remain macOS-only and are not claimed as executed on Windows.
+
+## Next READY
+
+`IOS-001B — incorporate the final Android checkpoint and execute the macOS bootstrap`
+
+Gate:
+
+- Claude's Android native files must be committed.
+- A Mac with Xcode 26+ must be available.
+- The final Android commit SHA must be supplied as `IOS_ANDROID_BASE_SHA`.
 
 ## Verification commands
 
