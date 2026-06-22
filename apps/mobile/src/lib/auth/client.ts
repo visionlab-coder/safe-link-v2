@@ -92,3 +92,20 @@ export async function getTodayTbms(): Promise<Tbm[]> {
     const data = (await res.json()) as { tbms?: Tbm[] };
     return data.tbms ?? [];
 }
+
+// 📱 S-004 — 근로자 TBM 서명 제출 (Bearer 주입). 서명 이미지는 data URL.
+export async function signTbm(tbmId: string, signatureDataUrl: string): Promise<LoginResult> {
+    let res: Response;
+    try {
+        res = await authFetch("/api/tbm/sign", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tbm_id: tbmId, signature_data: signatureDataUrl }),
+        });
+    } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : "network_error" };
+    }
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) return { ok: false, error: data.error || `sign_failed_${res.status}` };
+    return { ok: true };
+}

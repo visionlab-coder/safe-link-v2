@@ -4,11 +4,11 @@
 
 ## READY
 
-1. S-004 — 모바일 Bearer 인증을 TBM 서명·번역 라우트로 확대
-   - Done: 근로자가 모바일에서 TBM 서명(/api/tbm/sign)과 번역(/api/translate)을 Bearer 토큰으로 호출 가능(현재 cookie-only). 공통 CORS·resolveRequestAccessToken 적용.
-   - Scope: tbm/sign·translate의 Bearer-aware 인증 + CORS. worker UI 음성·전체채팅 제외.
-   - Verify: Bearer 호출 인증 통과, preflight 허용/거부, 웹 cookie 호환, contract smoke, root typecheck/build green
-   - Risk: 라우트별 인증 패턴 상이(getCookieUser vs raw parse) 통일 필요, RLS/site 일치
+1. S-005 — translate 라우트 모바일 Bearer+CORS 확대
+   - Done: 근로자가 모바일에서 /api/translate 를 Bearer 토큰으로 호출(현재 getCookieUser cookie-only). OPTIONS preflight + 응답 CORS. 웹 cookie·travel-token 경로 무영향.
+   - Scope: translate 인증을 bearer/cookie 양용 + CORS. 거대 라우트라 인증/래핑만 최소 변경. 음성·전체 UI 제외.
+   - Verify: Bearer 호출 인증 통과, preflight 허용/거부, 웹/ travel-token 호환, contract smoke, root typecheck/build green
+   - Risk: 라우트 거대·다중 return → CORS 래핑 신중, travel-token 분기 보존
 
 ## BLOCKED
 
@@ -18,6 +18,7 @@
 
 ## DONE
 
+- S-004 @ working-tree — tbm/sign 모바일 Bearer+CORS · Verify: cookie-only 미검증 → resolveRequestAccessToken+verifyAccessToken(서명검증, 보안 강화), OPTIONS preflight 허용(204)/거부(403), 무토큰 401+CORS, 웹 no-CORS 호환, sign smoke 5/5, root+mobile typecheck/build green · Files: api/tbm/sign, apps/mobile/src/lib/auth/client.ts(signTbm) · translate는 S-005로 분리
 - M-007 @ working-tree — 카메라·QR 스캔 adapter · Verify: BarcodeDetector+getUserMedia QR 스캔, 권한 요청/거부/취소 분기, SAFE-LINK QR 파싱, iOS/미지원 unsupported 명시, QrScanPanel, mobile typecheck+vite build green · Files: apps/mobile/src/lib/capability/qr.ts, app/QrScanPanel.tsx, app/App.tsx · Note: iOS WKWebView는 네이티브 스캐너 후속(M-008 후보)
 - M-006 @ working-tree — 근로자 TBM vertical slice · Verify: worker-quick-login 모바일 토큰+CORS, /api/tbm/today(Bearer+RLS site스코프+CORS), 모바일 workerLogin/getTodayTbms+WorkerTbmPanel, endpoint smoke 6/6, root+mobile typecheck/build green · Files: api/auth/worker-quick-login, api/tbm/today, apps/mobile/src/lib/auth/client.ts, app/WorkerTbmPanel.tsx, app/App.tsx
 - M-005 @ working-tree — 모바일 admin 로그인 + secure token store · Verify: @capacitor/preferences 저장, adminLogin(mobile)→token 저장, authFetch Bearer 주입, logout 제거, AdminAuthPanel 최소 흐름, mobile typecheck+vite build green · Files: apps/mobile/src/lib/auth/{token-store,client}.ts, app/AdminAuthPanel.tsx, app/App.tsx, styles/app.css · Note: Preferences는 평문 → 상용 전 암호화 백엔드 교체 권장
