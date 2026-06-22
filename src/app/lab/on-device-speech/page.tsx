@@ -78,8 +78,8 @@ export default function OnDeviceSpeechPage() {
     const [ttsProgress, setTtsProgress] = useState<number | null>(null);
     const [ttsText, setTtsText] = useState("안전모를 반드시 착용해 주세요.");
     const [voiceId, setVoiceId] = useState<VoiceId>("M1");
-    const [speed, setSpeed] = useState(1.15);
-    const [qualitySteps, setQualitySteps] = useState(4);
+    const [speed, setSpeed] = useState(1.2);
+    const [qualitySteps, setQualitySteps] = useState(2);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
     const [ttsStats, setTtsStats] = useState<{
         duration: number;
@@ -317,8 +317,8 @@ export default function OnDeviceSpeechPage() {
                                     {VOICES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
                                 </select>
                             </Control>
-                            <Control label={`품질 단계 ${qualitySteps} ${qualitySteps === 4 ? "· 저지연" : ""}`}>
-                                <input type="range" min={4} max={8} value={qualitySteps} onChange={(event) => setQualitySteps(Number(event.target.value))} disabled={ttsBusy} className="w-full" />
+                            <Control label={`품질 단계 ${qualitySteps} ${qualitySteps === 2 ? "· 초저지연" : qualitySteps <= 4 ? "· 저지연" : ""}`}>
+                                <input type="range" min={2} max={8} value={qualitySteps} onChange={(event) => setQualitySteps(Number(event.target.value))} disabled={ttsBusy} className="w-full" />
                             </Control>
                         </div>
 

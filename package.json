@@ -9,7 +9,8 @@
     "preview": "opennextjs-cloudflare build && wrangler dev",
     "start": "next start",
     "lint": "eslint",
-    "flitto:rtt:smoke": "node scripts/flitto-rtt-smoke.mjs"
+    "flitto:rtt:smoke": "node scripts/flitto-rtt-smoke.mjs",
+    "m2m100:start": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-m2m100-onnx-local.ps1"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",

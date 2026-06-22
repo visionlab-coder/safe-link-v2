@@ -31,6 +31,7 @@ type WorkerRequest =
 
 let engine: TextToSpeech | null = null;
 let loadedBackend: OnDeviceSpeechBackend | null = null;
+let loadedRequestBackend: OnDeviceSpeechBackend | null = null;
 let style: Style | null = null;
 let loadedVoiceId: VoiceId | null = null;
 let warmedUp = false;
@@ -42,10 +43,10 @@ function send(type: string, payload: Record<string, unknown> = {}) {
 }
 
 async function loadEngine(backend: OnDeviceSpeechBackend) {
-    if (engine && loadedBackend === backend) return engine;
+    if (engine && loadedRequestBackend === backend) return engine;
 
     await disposeEngine();
-    let activeBackend = backend;
+    let activeBackend = await selectBackend(backend);
     let result;
 
     try {
@@ -61,7 +62,35 @@ async function loadEngine(backend: OnDeviceSpeechBackend) {
 
     engine = result.textToSpeech;
     loadedBackend = activeBackend;
+    loadedRequestBackend = backend;
     return engine;
+}
+
+async function selectBackend(requested: OnDeviceSpeechBackend): Promise<OnDeviceSpeechBackend> {
+    if (requested !== "webgpu") return requested;
+
+    const gpu = (navigator as Navigator & {
+        gpu?: {
+            requestAdapter(): Promise<{
+                info?: { architecture?: string; device?: string };
+                isFallbackAdapter?: boolean;
+            } | null>;
+        };
+    }).gpu;
+    if (!gpu) return "wasm";
+
+    try {
+        const adapter = await gpu.requestAdapter();
+        const descriptor = `${adapter?.info?.architecture ?? ""} ${adapter?.info?.device ?? ""}`.toLowerCase();
+        if (!adapter || adapter.isFallbackAdapter || descriptor.includes("swiftshader")) {
+            send("status", { message: "소프트웨어 GPU 대신 멀티스레드 WASM을 사용합니다." });
+            return "wasm";
+        }
+    } catch {
+        return "wasm";
+    }
+
+    return "webgpu";
 }
 
 function createEngine(backend: OnDeviceSpeechBackend) {
@@ -113,6 +142,7 @@ async function disposeEngine() {
     }
     engine = null;
     loadedBackend = null;
+    loadedRequestBackend = null;
     style = null;
     loadedVoiceId = null;
     warmedUp = false;

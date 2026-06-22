@@ -14,6 +14,7 @@ type Masked = {
 
 const ENGINES = [
     { v: "", label: "자동(기존 우선순위)" },
+    { v: "m2m100", label: "M2M100 (오픈소스·로컬)" },
     { v: "papago", label: "Papago (네이버)" },
     { v: "google", label: "Google Translate" },
     { v: "gemini", label: "Gemini (건설문맥)" },
@@ -29,7 +30,7 @@ const KEY_FIELDS: { k: keyof Masked; label: string }[] = [
 ];
 
 export default function LabPage() {
-    const [labMode, setLabMode] = useState<boolean | null>(null);
+    const [rootAdmin, setRootAdmin] = useState<boolean | null>(null);
     const [current, setCurrent] = useState<Masked | null>(null);
     const [engine, setEngine] = useState("");
     const [inputs, setInputs] = useState<Record<string, string>>({});
@@ -39,7 +40,7 @@ export default function LabPage() {
     const load = async () => {
         const r = await fetch("/api/lab/engine-config", { cache: "no-store" });
         const d = await r.json();
-        setLabMode(!!d.labMode);
+        setRootAdmin(!!d.rootAdmin);
         setCurrent(d.config ?? null);
         setEngine(d.config?.translateEngine ?? "");
     };
@@ -73,13 +74,13 @@ export default function LabPage() {
         setTest(r.ok ? `[${d.engine}] ${d.translated}` : `❌ ${d.error}`);
     };
 
-    if (labMode === null) return <main style={{ padding: 24 }}>로딩…</main>;
-    if (!labMode) return (
+    if (rootAdmin === null) return <main style={{ padding: 24 }}>로딩…</main>;
+    if (!rootAdmin) return (
         <main style={{ maxWidth: 640, margin: "0 auto", padding: 24, fontFamily: "system-ui" }}>
-            <h1 style={{ fontSize: 20, fontWeight: 700 }}>🧪 SAFE-LINK Lab</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700 }}>🔐 접근 권한 없음</h1>
             <p style={{ color: "#c0392b", marginTop: 12 }}>
-                Lab 모드 비활성. 이 환경은 <code>APP_MODE=lab</code> 이 아닙니다 (운영 보호).
-                테스트하려면 Lab 배포 또는 로컬 <code>.env.local</code> 에 <code>APP_MODE=lab</code> 설정.
+                AI 엔진·API키 설정은 <b>SAFE-LINK 루트 관리자</b>(MASTER)만 접근할 수 있습니다.
+                권한이 필요하면 시스템 관리자에게 문의하세요.
             </p>
         </main>
     );

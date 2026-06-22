@@ -11,7 +11,7 @@ import { encrypt, decrypt } from "@/utils/crypto";
  *  - 저장소: Upstash Redis(배포), 미설정 시 in-memory(로컬 dev 단일 인스턴스).
  */
 
-export type TranslateEngine = "papago" | "google" | "gemini" | "flitto";
+export type TranslateEngine = "m2m100" | "papago" | "google" | "gemini" | "flitto";
 
 export interface LabEngineConfig {
     translateEngine?: TranslateEngine;   // 강제 엔진(미지정 시 기존 우선순위)
@@ -73,7 +73,7 @@ async function writeRaw(record: Record<string, string>): Promise<void> {
  * 운영 라우트용 — lab 모드가 아니면 null(=기존 env 사용). lab 모드면 복호화된 오버라이드 반환.
  */
 export async function getLabOverride(): Promise<LabEngineConfig | null> {
-    if (!isLabMode()) return null;
+    // 루트관리자가 설정한 런타임 키/엔진을 운영에서도 반영. 설정 없으면(Redis 비어있음) null → 기존 env 폴백.
     try {
         const raw = await readRaw();
         if (!raw) return null;
@@ -111,7 +111,7 @@ export async function getLabConfigMasked(): Promise<(Omit<LabEngineConfig, never
 
 /** 부분 업데이트 — 전달된 필드만 암호화 저장. 빈 문자열이면 해당 필드 삭제. */
 export async function setLabConfig(patch: LabConfigInput): Promise<void> {
-    if (!isLabMode()) throw new Error("Lab mode disabled (APP_MODE!=lab)");
+    // 인증(루트관리자)은 API 라우트(require-root-admin)에서 강제. 여기선 데이터 저장만 담당.
     const raw = (await readRaw()) ?? {};
     if (patch.translateEngine !== undefined) {
         if (patch.translateEngine) raw.translateEngine = patch.translateEngine;

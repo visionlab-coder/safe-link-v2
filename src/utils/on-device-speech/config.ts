@@ -26,8 +26,8 @@ export const ON_DEVICE_SPEECH_DEFAULTS = {
         chunkLengthSeconds: 6,
     },
     tts: {
-        speed: 1.15,
-        qualitySteps: 4,
+        speed: 1.2,
+        qualitySteps: 2,
     },
     fallback: {
         sttApi: "/api/stt",
