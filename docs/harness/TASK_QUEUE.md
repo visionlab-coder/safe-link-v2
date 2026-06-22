@@ -4,11 +4,11 @@
 
 ## READY
 
-1. M-010 — 실기기 E2E 테스트 가이드 (Android/iOS 수동)
-   - Done: 실기기에서 핵심 모바일 시나리오(관리자 로그인→TBM 조회/서명, 근로자 로그인→오늘 TBM→서명→번역, QR/NFC 스캔)를 수동 검증하는 단계별 가이드 + 결과 기록 템플릿 문서.
-   - Scope: docs 문서만 추가. 코드 변경 없음. Android는 debug APK, iOS는 빌드 미확보 시 "BLOCKED(M-004)" 명시.
-   - Verify: 각 시나리오 사전조건/단계/기대결과/기록란, placeholder check green
-   - Risk: iOS 빌드 미확보(M-004 BLOCKED) → iOS 항목은 가이드만, 실행은 보류
+1. S-006 — 나머지 모바일 인증/CORS 커버리지
+   - Done: middleware와 아직 모바일 Bearer+CORS가 적용되지 않은 API route를 점검하여, 모바일 클라이언트가 호출하는 경로에 일관된 토큰 검증/CORS 계약 적용. 미사용 경로는 명시적 제외 기록.
+   - Scope: 모바일이 실제 호출하는 endpoint만. 운영 RLS/tenant 변경 없음(그건 S-003 게이트).
+   - Verify: 대상 route 목록화, Bearer+CORS smoke green, 웹 no-CORS 호환 유지, root+mobile typecheck/build green
+   - Risk: middleware 변경은 인증 광범위 영향 → 큰 변경이면 게이트로 분리
 
 ## BLOCKED
 
@@ -18,6 +18,7 @@
 
 ## DONE
 
+- M-010 @ working-tree — 실기기 E2E 테스트 가이드 · Verify: 8개 시나리오(T1~T8: 진단·관리자/근로자 로그인·TBM 서명·번역·QR·NFC·오프라인) 사전조건/단계/기대결과/기록란 + 결과 요약 템플릿 + M1 통과기준, placeholder/state check green · Files: docs/harness/MOBILE_E2E_TEST_GUIDE.md · Note: 문서만, iOS는 M-004 BLOCKED, 실기기 실행은 사용자 수행
 - M-009 @ working-tree — NFC 스캔 adapter (모바일) · Verify: Web NFC(NDEFReader) getNfcCapability/scanNfcOnce/parseSafeLinkNfc, unsupported·permission_denied·cancelled·error 분기, URL payload worker/site 토큰 파싱, NfcScanPanel+App 통합, mobile typecheck+vite build green · Files: apps/mobile/src/lib/capability/nfc.ts, app/NfcScanPanel.tsx, app/App.tsx · Note: Android Chrome 전용·HTTPS 필요, iOS는 네이티브 후속(M-004 계열)
 - M-008 @ working-tree — 모바일 TBM 서명 캔버스 UI · Verify: 터치 pointer-events 캔버스(DPR·지우기·빈서명 방지), data URL→signTbm 제출, WorkerTbmPanel 조회→서명→제출 완성, mobile typecheck+vite build green · Files: apps/mobile/src/app/SignatureCanvas.tsx, WorkerTbmPanel.tsx
 - S-005 @ working-tree — translate 모바일 Bearer+CORS · Verify: X-Safe-Link-Client로 travel-token과 모바일 JWT 구분, 모바일 서명검증, OPTIONS 허용/거부, travel·웹 경로 보존, translate smoke 6/6, root+mobile typecheck/build green · Files: api/translate, apps/mobile/src/lib/auth/client.ts(translateText)

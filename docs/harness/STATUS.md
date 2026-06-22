@@ -8,12 +8,12 @@
 - Head SHA: `0161079`
 - Default branch synced: true (`master` = `origin/master`); wip 미머지(배포 게이트)
 - Current track: `mobile-partial`
-- Next READY: `M-010 실기기 E2E 테스트 가이드`
-- 이번 세션 증분 8개: S-002·M-005·M-006·M-007·S-004·S-005·M-008·M-009 (총 DONE 13)
+- Next READY: `S-006 나머지 모바일 인증/CORS 커버리지`
+- 이번 세션 증분 9개: S-002·M-005·M-006·M-007·S-004·S-005·M-008·M-009·M-010 (총 DONE 14)
 
 ## Last Done Increment
 
-M-009 모바일 NFC 스캔 adapter 완료. Web NFC(NDEFReader) capability 어댑터 + NfcScanPanel UI를 App에 통합. 미지원(iOS/desktop)·권한 거부·취소·읽기오류 분기 처리, SAFE-LINK URL payload에서 worker/site 토큰 파싱. Android Chrome 전용이며 iOS는 네이티브 후속(M-004 계열). mobile typecheck+vite build green. 실기기 E2E·iOS·배포는 미수행.
+M-010 실기기 E2E 테스트 가이드 완료(`docs/harness/MOBILE_E2E_TEST_GUIDE.md`). 8개 시나리오(T1 진단·T2 관리자 로그인·T3 근로자 TBM 조회·T4 터치 서명·T5 번역·T6 QR·T7 NFC·T8 오프라인) 사전조건/단계/기대결과/기록란 + 결과 요약 템플릿 + Done Bar M1 통과기준. iOS는 M-004(빌드 환경) BLOCKED 명시. 문서만 추가(코드 변경 없음), 실기기 실행은 사용자 측 수행 대기.
 
 ## Current State
 

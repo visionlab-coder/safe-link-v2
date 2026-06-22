@@ -10,17 +10,17 @@
   "main_synced": true,
   "track": "mobile-partial",
   "last_done_increment": {
-    "id": "M-009",
+    "id": "M-010",
     "sha": "working-tree",
-    "summary": "모바일 NFC 스캔 adapter — Web NFC(NDEFReader) capability 어댑터(getNfcCapability/scanNfcOnce/parseSafeLinkNfc), unsupported·permission_denied·cancelled·error 분기, NfcScanPanel UI + App 통합; Android Chrome 전용·iOS는 네이티브 후속; mobile typecheck+vite build green"
+    "summary": "실기기 E2E 테스트 가이드(MOBILE_E2E_TEST_GUIDE.md) — 8개 시나리오(T1~T8: 진단·관리자/근로자 로그인·TBM 서명·번역·QR·NFC·오프라인) 사전조건/단계/기대결과/기록란 + 결과 요약 템플릿 + Done Bar M1 통과기준; iOS는 M-004 BLOCKED 명시; 문서만 추가(코드 변경 없음)"
   },
-  "next_ready_task": "M-010 실기기 E2E 테스트 가이드 (Android/iOS 수동 시나리오 + 결과 기록 템플릿)",
+  "next_ready_task": "S-006 나머지 모바일 인증/CORS 커버리지 (middleware + 미적용 API route Bearer+CORS 점검)",
   "done_bar": [
     {
       "id": "M1",
       "text": "핵심 모바일 E2E 시나리오가 Android/iOS 실기기에서 통과한다.",
       "met": false,
-      "evidence": "not run"
+      "evidence": "테스트 가이드 작성 완료(MOBILE_E2E_TEST_GUIDE.md, T1~T8); 실기기 실행은 미수행, iOS는 M-004 BLOCKED"
     },
     {
       "id": "M2",
@@ -101,6 +101,6 @@
       "npm.cmd run android:assemble:debug --prefix apps/mobile",
       "npm.cmd audit --prefix apps/mobile"
     ],
-    "summary": "M-009 모바일 NFC 스캔 adapter (Web NFC/NDEFReader, 권한·미지원 분기, NfcScanPanel+App 통합); mobile typecheck+vite build green"
+    "summary": "M-010 실기기 E2E 테스트 가이드 문서(8개 시나리오 + 결과 템플릿 + M1 통과기준); placeholder/state check green"
   }
 }
