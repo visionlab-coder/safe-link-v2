@@ -159,6 +159,8 @@ xcodebuild \
   CODE_SIGNING_ALLOWED=NO \
   build | tee "$BUILD_LOG"
 
+perl -pi -e 's/[ \t]+$//' "$BUILD_LOG"
+
 step "postflight protected-path verification"
 assert_clean_android_paths
 git -C "$REPO_ROOT" status --short

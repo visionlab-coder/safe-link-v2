@@ -655,18 +655,18 @@ SwiftEmitModule normal arm64 Emitting\ module\ for\ PreferencesPlugin (in target
 
 EmitSwiftModule normal arm64 (in target 'PreferencesPlugin' from project 'CapacitorPreferences')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App.xcodeproj
-    
+
 
 SwiftEmitModule normal arm64 Emitting\ module\ for\ LocalNotificationsPlugin (in target 'LocalNotificationsPlugin' from project 'CapacitorLocalNotifications')
 
 EmitSwiftModule normal arm64 (in target 'LocalNotificationsPlugin' from project 'CapacitorLocalNotifications')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App.xcodeproj
-    
+
 
 SwiftCompile normal arm64 Compiling\ PreferencesPlugin.swift /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/node_modules/@capacitor/preferences/ios/Sources/PreferencesPlugin/PreferencesPlugin.swift (in target 'PreferencesPlugin' from project 'CapacitorPreferences')
 SwiftCompile normal arm64 /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/node_modules/@capacitor/preferences/ios/Sources/PreferencesPlugin/PreferencesPlugin.swift (in target 'PreferencesPlugin' from project 'CapacitorPreferences')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App.xcodeproj
-    
+
 
 SwiftDriverJobDiscovery normal arm64 Emitting module for PreferencesPlugin (in target 'PreferencesPlugin' from project 'CapacitorPreferences')
 
@@ -684,7 +684,7 @@ SwiftCompile normal arm64 Compiling\ Preferences.swift /Users/runner/work/safe-l
 
 SwiftCompile normal arm64 /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/node_modules/@capacitor/preferences/ios/Sources/PreferencesPlugin/Preferences.swift (in target 'PreferencesPlugin' from project 'CapacitorPreferences')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App.xcodeproj
-    
+
 
 Copy /Users/runner/work/safe-link-v2/safe-link-v2/.tmp/ios-derived-data/Build/Products/Debug-iphonesimulator/PreferencesPlugin.swiftmodule/arm64-apple-ios-simulator.swiftmodule /Users/runner/work/safe-link-v2/safe-link-v2/.tmp/ios-derived-data/Build/Intermediates.noindex/CapacitorPreferences.build/Debug-iphonesimulator/PreferencesPlugin.build/Objects-normal/arm64/PreferencesPlugin.swiftmodule (in target 'PreferencesPlugin' from project 'CapacitorPreferences')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/node_modules/@capacitor/preferences
@@ -706,7 +706,7 @@ SwiftEmitModule normal x86_64 Emitting\ module\ for\ PreferencesPlugin (in targe
 
 EmitSwiftModule normal x86_64 (in target 'PreferencesPlugin' from project 'CapacitorPreferences')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App.xcodeproj
-    
+
 
 Copy /Users/runner/work/safe-link-v2/safe-link-v2/.tmp/ios-derived-data/Build/Products/Debug-iphonesimulator/LocalNotificationsPlugin.swiftmodule/arm64-apple-ios-simulator.swiftmodule /Users/runner/work/safe-link-v2/safe-link-v2/.tmp/ios-derived-data/Build/Intermediates.noindex/CapacitorLocalNotifications.build/Debug-iphonesimulator/LocalNotificationsPlugin.build/Objects-normal/arm64/LocalNotificationsPlugin.swiftmodule (in target 'LocalNotificationsPlugin' from project 'CapacitorLocalNotifications')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/node_modules/@capacitor/local-notifications
@@ -754,14 +754,14 @@ SwiftEmitModule normal x86_64 Emitting\ module\ for\ LocalNotificationsPlugin (i
 
 EmitSwiftModule normal x86_64 (in target 'LocalNotificationsPlugin' from project 'CapacitorLocalNotifications')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App.xcodeproj
-    
+
 
 SwiftDriverJobDiscovery normal x86_64 Emitting module for LocalNotificationsPlugin (in target 'LocalNotificationsPlugin' from project 'CapacitorLocalNotifications')
 
 SwiftCompile normal x86_64 Compiling\ PreferencesPlugin.swift /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/node_modules/@capacitor/preferences/ios/Sources/PreferencesPlugin/PreferencesPlugin.swift (in target 'PreferencesPlugin' from project 'CapacitorPreferences')
 SwiftCompile normal x86_64 /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/node_modules/@capacitor/preferences/ios/Sources/PreferencesPlugin/PreferencesPlugin.swift (in target 'PreferencesPlugin' from project 'CapacitorPreferences')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App.xcodeproj
-    
+
 
 SwiftDriver\ Compilation\ Requirements LocalNotificationsPlugin normal x86_64 com.apple.xcode.tools.swift.compiler (in target 'LocalNotificationsPlugin' from project 'CapacitorLocalNotifications')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App.xcodeproj
@@ -772,12 +772,12 @@ SwiftDriverJobDiscovery normal arm64 Compiling Preferences.swift (in target 'Pre
 SwiftCompile normal x86_64 Compiling\ Preferences.swift /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/node_modules/@capacitor/preferences/ios/Sources/PreferencesPlugin/Preferences.swift (in target 'PreferencesPlugin' from project 'CapacitorPreferences')
 SwiftCompile normal x86_64 /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/node_modules/@capacitor/preferences/ios/Sources/PreferencesPlugin/Preferences.swift (in target 'PreferencesPlugin' from project 'CapacitorPreferences')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App.xcodeproj
-    
+
 
 SwiftCompile normal x86_64 Compiling\ LocalNotificationsPlugin.swift /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/node_modules/@capacitor/local-notifications/ios/Sources/LocalNotificationsPlugin/LocalNotificationsPlugin.swift (in target 'LocalNotificationsPlugin' from project 'CapacitorLocalNotifications')
 SwiftCompile normal x86_64 /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/node_modules/@capacitor/local-notifications/ios/Sources/LocalNotificationsPlugin/LocalNotificationsPlugin.swift (in target 'LocalNotificationsPlugin' from project 'CapacitorLocalNotifications')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App.xcodeproj
-    
+
 
 SwiftDriverJobDiscovery normal arm64 Compiling PreferencesPlugin.swift (in target 'PreferencesPlugin' from project 'CapacitorPreferences')
 
@@ -810,13 +810,13 @@ SwiftDriver\ Compilation PreferencesPlugin normal arm64 com.apple.xcode.tools.sw
 SwiftCompile normal arm64 Compiling\ LocalNotificationsPlugin.swift /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/node_modules/@capacitor/local-notifications/ios/Sources/LocalNotificationsPlugin/LocalNotificationsPlugin.swift (in target 'LocalNotificationsPlugin' from project 'CapacitorLocalNotifications')
 SwiftCompile normal arm64 /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/node_modules/@capacitor/local-notifications/ios/Sources/LocalNotificationsPlugin/LocalNotificationsPlugin.swift (in target 'LocalNotificationsPlugin' from project 'CapacitorLocalNotifications')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App.xcodeproj
-    
+
 
 SwiftCompile normal x86_64 Compiling\ LocalNotificationsHandler.swift /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/node_modules/@capacitor/local-notifications/ios/Sources/LocalNotificationsPlugin/LocalNotificationsHandler.swift (in target 'LocalNotificationsPlugin' from project 'CapacitorLocalNotifications')
 
 SwiftCompile normal x86_64 /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/node_modules/@capacitor/local-notifications/ios/Sources/LocalNotificationsPlugin/LocalNotificationsHandler.swift (in target 'LocalNotificationsPlugin' from project 'CapacitorLocalNotifications')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App.xcodeproj
-    
+
 
 SwiftDriverJobDiscovery normal x86_64 Compiling Preferences.swift (in target 'PreferencesPlugin' from project 'CapacitorPreferences')
 
@@ -829,7 +829,7 @@ SwiftDriverJobDiscovery normal x86_64 Compiling LocalNotificationsPlugin.swift (
 SwiftCompile normal arm64 Compiling\ LocalNotificationsHandler.swift /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/node_modules/@capacitor/local-notifications/ios/Sources/LocalNotificationsPlugin/LocalNotificationsHandler.swift (in target 'LocalNotificationsPlugin' from project 'CapacitorLocalNotifications')
 SwiftCompile normal arm64 /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/node_modules/@capacitor/local-notifications/ios/Sources/LocalNotificationsPlugin/LocalNotificationsHandler.swift (in target 'LocalNotificationsPlugin' from project 'CapacitorLocalNotifications')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App.xcodeproj
-    
+
 
 SwiftDriverJobDiscovery normal x86_64 Compiling LocalNotificationsHandler.swift (in target 'LocalNotificationsPlugin' from project 'CapacitorLocalNotifications')
 
@@ -887,19 +887,19 @@ SwiftEmitModule normal arm64 Emitting\ module\ for\ CapApp_SPM (in target 'CapAp
 
 SwiftCompile normal arm64 /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/CapApp-SPM/Sources/CapApp-SPM/CapApp-SPM.swift (in target 'CapApp-SPM' from project 'CapApp-SPM')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App.xcodeproj
-    
+
 
 SwiftCompile normal arm64 Compiling\ CapApp-SPM.swift /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/CapApp-SPM/Sources/CapApp-SPM/CapApp-SPM.swift (in target 'CapApp-SPM' from project 'CapApp-SPM')
 
 SwiftCompile normal arm64 /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/CapApp-SPM/Sources/CapApp-SPM/CapApp-SPM.swift (in target 'CapApp-SPM' from project 'CapApp-SPM')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App.xcodeproj
-    
+
 
 SwiftEmitModule normal x86_64 Emitting\ module\ for\ CapApp_SPM (in target 'CapApp-SPM' from project 'CapApp-SPM')
 
 SwiftCompile normal x86_64 /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/CapApp-SPM/Sources/CapApp-SPM/CapApp-SPM.swift (in target 'CapApp-SPM' from project 'CapApp-SPM')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App.xcodeproj
-    
+
 
 SwiftDriverJobDiscovery normal arm64 Emitting module for CapApp_SPM (in target 'CapApp-SPM' from project 'CapApp-SPM')
 
@@ -933,7 +933,7 @@ SwiftCompile normal x86_64 Compiling\ CapApp-SPM.swift /Users/runner/work/safe-l
 
 SwiftCompile normal x86_64 /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/CapApp-SPM/Sources/CapApp-SPM/CapApp-SPM.swift (in target 'CapApp-SPM' from project 'CapApp-SPM')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App.xcodeproj
-    
+
 
 SwiftDriverJobDiscovery normal x86_64 Emitting module for CapApp_SPM (in target 'CapApp-SPM' from project 'CapApp-SPM')
 
@@ -1254,12 +1254,12 @@ SwiftEmitModule normal x86_64 Emitting\ module\ for\ App (in target 'App' from p
 
 EmitSwiftModule normal x86_64 (in target 'App' from project 'App')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App
-    
+
 
 SwiftCompile normal x86_64 Compiling\ AppDelegate.swift /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App/AppDelegate.swift (in target 'App' from project 'App')
 SwiftCompile normal x86_64 /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App/AppDelegate.swift (in target 'App' from project 'App')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App
-    
+
 
 SwiftDriverJobDiscovery normal x86_64 Emitting module for App (in target 'App' from project 'App')
 
@@ -1294,7 +1294,7 @@ SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/safe-link-v2/safe-li
 SwiftCompile normal x86_64 Compiling\ GeneratedAssetSymbols.swift /Users/runner/work/safe-link-v2/safe-link-v2/.tmp/ios-derived-data/Build/Intermediates.noindex/App.build/Debug-iphonesimulator/App.build/DerivedSources/GeneratedAssetSymbols.swift (in target 'App' from project 'App')
 SwiftCompile normal x86_64 /Users/runner/work/safe-link-v2/safe-link-v2/.tmp/ios-derived-data/Build/Intermediates.noindex/App.build/Debug-iphonesimulator/App.build/DerivedSources/GeneratedAssetSymbols.swift (in target 'App' from project 'App')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App
-    
+
 
 SwiftExplicitDependencyCompileModuleFromInterface arm64 /Users/runner/work/safe-link-v2/safe-link-v2/.tmp/ios-derived-data/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules/Capacitor-3Q7MLK9UVM1Y7.swiftmodule
 
@@ -1381,7 +1381,7 @@ SwiftEmitModule normal arm64 Emitting\ module\ for\ App (in target 'App' from pr
 
 EmitSwiftModule normal arm64 (in target 'App' from project 'App')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App
-    
+
 
 SwiftDriverJobDiscovery normal x86_64 Compiling GeneratedAssetSymbols.swift (in target 'App' from project 'App')
 
@@ -1389,7 +1389,7 @@ SwiftCompile normal arm64 Compiling\ AppDelegate.swift /Users/runner/work/safe-l
 
 SwiftCompile normal arm64 /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App/App/AppDelegate.swift (in target 'App' from project 'App')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App
-    
+
 
 SwiftDriverJobDiscovery normal arm64 Emitting module for App (in target 'App' from project 'App')
 
@@ -1425,7 +1425,7 @@ SwiftCompile normal arm64 Compiling\ GeneratedAssetSymbols.swift /Users/runner/w
 
 SwiftCompile normal arm64 /Users/runner/work/safe-link-v2/safe-link-v2/.tmp/ios-derived-data/Build/Intermediates.noindex/App.build/Debug-iphonesimulator/App.build/DerivedSources/GeneratedAssetSymbols.swift (in target 'App' from project 'App')
     cd /Users/runner/work/safe-link-v2/safe-link-v2/apps/mobile/ios/App
-    
+
 
 SwiftDriverJobDiscovery normal arm64 Compiling AppDelegate.swift (in target 'App' from project 'App')
 

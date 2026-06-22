@@ -36,6 +36,8 @@ jobs:
           apps/mobile/scripts/bootstrap-ios-macos.sh --apply
 
       - name: Verify iOS contracts
+        env:
+          IOS_ANDROID_BASE_SHA: 88785ad63b613e680b55f9c16c39568c2f7482e3
         run: |
           node apps/mobile/scripts/test-ios-security-validator.mjs
           node apps/mobile/scripts/test-ios-bridge-contract.mjs
