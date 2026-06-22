@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "allowedOrigins": [
+    "https://safe-link-v2.vercel.app"
+  ],
+  "maxMessageBytes": 4096,
+  "maxResultLength": 2048,
+  "allowedResultOrigins": [
+    "https://safe-link-v2.vercel.app"
+  ],
+  "allowedResultPathPrefixes": [
+    "/qr",
+    "/n",
+    "/w",
+    "/nfc"
+  ],
+  "operations": {
+    "app.capabilities": {
+      "payloadKeys": []
+    },
+    "qr.scan": {
+      "payloadKeys": []
+    },
+    "qr.presentResult": {
+      "payloadKeys": [
+        "value"
+      ]
+    },
+    "nfc.scan": {
+      "payloadKeys": []
+    },
+    "nfc.presentResult": {
+      "payloadKeys": [
+        "value"
+      ]
+    },
+    "secureSession.status": {
+      "payloadKeys": []
+    },
+    "secureSession.clear": {
+      "payloadKeys": []
+    }
+  }
+}
+

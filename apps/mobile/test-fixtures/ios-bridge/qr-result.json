@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "id": "req_qr_0001",
+  "operation": "qr.presentResult",
+  "payload": {
+    "value": "https://safe-link-v2.vercel.app/qr/site?site=SEOUL01"
+  }
+}

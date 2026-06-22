@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "id": "req_unk_001",
+  "operation": "shell.execute",
+  "payload": {}
+}
+

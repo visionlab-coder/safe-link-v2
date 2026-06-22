@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "id": "req_nfc_001",
+  "operation": "nfc.presentResult",
+  "payload": {
+    "value": "https://safe-link-v2.vercel.app/n/worker-token"
+  }
+}

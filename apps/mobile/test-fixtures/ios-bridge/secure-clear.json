@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "id": "req_clear01",
+  "operation": "secureSession.clear",
+  "payload": {}
+}

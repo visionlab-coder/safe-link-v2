@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "id": "req_evil001",
+  "operation": "app.capabilities",
+  "payload": {}
+}

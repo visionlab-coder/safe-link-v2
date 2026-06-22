@@ -81,6 +81,20 @@ Verification:
 
 The next unblocked local task is documentation and native interface design only. Native application of these settings remains gated by `IOS-001B`.
 
+## Parallel completed increment
+
+`IOS-002C — remote WebView native bridge contract`
+
+Prepared:
+
+- exact-origin and main-frame trust boundary;
+- static allowlist for capabilities, QR, NFC and secure-session clear/status;
+- explicit prohibition on tokens, cookies, passwords, signatures and service credentials;
+- SAFE-LINK result URL origin/path validation;
+- valid and hostile bridge-message regression fixtures.
+
+The bridge deliberately cannot read Keychain values. Native-owned authentication is required before Keychain can replace JavaScript-readable web refresh tokens.
+
 ## Verification commands
 
 ```powershell

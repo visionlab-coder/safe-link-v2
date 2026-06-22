@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "id": "req_caps_001",
+  "operation": "app.capabilities",
+  "payload": {}
+}

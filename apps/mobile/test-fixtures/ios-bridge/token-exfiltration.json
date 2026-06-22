@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "id": "req_token01",
+  "operation": "app.capabilities",
+  "payload": {
+    "refresh_token": "must-never-cross-the-bridge"
+  }
+}
