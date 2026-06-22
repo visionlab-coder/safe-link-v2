@@ -4,11 +4,11 @@
 
 ## READY
 
-1. M-009 — NFC 스캔 adapter (모바일)
-   - Done: 모바일에서 NFC 태그 스캔 capability adapter(Web NFC, Android Chrome 우선) + 권한/미지원 처리. NFC 태그로 worker/site 식별 최소 연결.
-   - Scope: NFC adapter + 권한 UX + unsupported(iOS/web) 명시. 쓰기 제외, 읽기만.
-   - Verify: 지원 감지, 권한 요청/거부, 태그 payload 파싱, mobile typecheck/build green
-   - Risk: Web NFC는 Android Chrome 한정(iOS는 네이티브 필요), HTTPS 요구
+1. M-010 — 실기기 E2E 테스트 가이드 (Android/iOS 수동)
+   - Done: 실기기에서 핵심 모바일 시나리오(관리자 로그인→TBM 조회/서명, 근로자 로그인→오늘 TBM→서명→번역, QR/NFC 스캔)를 수동 검증하는 단계별 가이드 + 결과 기록 템플릿 문서.
+   - Scope: docs 문서만 추가. 코드 변경 없음. Android는 debug APK, iOS는 빌드 미확보 시 "BLOCKED(M-004)" 명시.
+   - Verify: 각 시나리오 사전조건/단계/기대결과/기록란, placeholder check green
+   - Risk: iOS 빌드 미확보(M-004 BLOCKED) → iOS 항목은 가이드만, 실행은 보류
 
 ## BLOCKED
 
@@ -18,6 +18,7 @@
 
 ## DONE
 
+- M-009 @ working-tree — NFC 스캔 adapter (모바일) · Verify: Web NFC(NDEFReader) getNfcCapability/scanNfcOnce/parseSafeLinkNfc, unsupported·permission_denied·cancelled·error 분기, URL payload worker/site 토큰 파싱, NfcScanPanel+App 통합, mobile typecheck+vite build green · Files: apps/mobile/src/lib/capability/nfc.ts, app/NfcScanPanel.tsx, app/App.tsx · Note: Android Chrome 전용·HTTPS 필요, iOS는 네이티브 후속(M-004 계열)
 - M-008 @ working-tree — 모바일 TBM 서명 캔버스 UI · Verify: 터치 pointer-events 캔버스(DPR·지우기·빈서명 방지), data URL→signTbm 제출, WorkerTbmPanel 조회→서명→제출 완성, mobile typecheck+vite build green · Files: apps/mobile/src/app/SignatureCanvas.tsx, WorkerTbmPanel.tsx
 - S-005 @ working-tree — translate 모바일 Bearer+CORS · Verify: X-Safe-Link-Client로 travel-token과 모바일 JWT 구분, 모바일 서명검증, OPTIONS 허용/거부, travel·웹 경로 보존, translate smoke 6/6, root+mobile typecheck/build green · Files: api/translate, apps/mobile/src/lib/auth/client.ts(translateText)
 - S-004 @ working-tree — tbm/sign 모바일 Bearer+CORS · Verify: cookie-only 미검증 → resolveRequestAccessToken+verifyAccessToken(서명검증, 보안 강화), OPTIONS preflight 허용(204)/거부(403), 무토큰 401+CORS, 웹 no-CORS 호환, sign smoke 5/5, root+mobile typecheck/build green · Files: api/tbm/sign, apps/mobile/src/lib/auth/client.ts(signTbm) · translate는 S-005로 분리

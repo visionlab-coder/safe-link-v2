@@ -4,6 +4,7 @@ import { getPlatformInfo } from "../lib/platform";
 import { AdminAuthPanel } from "./AdminAuthPanel";
 import { WorkerTbmPanel } from "./WorkerTbmPanel";
 import { QrScanPanel } from "./QrScanPanel";
+import { NfcScanPanel } from "./NfcScanPanel";
 
 type NetworkState = "checking" | "online" | "offline";
 
@@ -97,6 +98,8 @@ export function App() {
       <WorkerTbmPanel />
 
       <QrScanPanel />
+
+      <NfcScanPanel />
 
       <section className="notice">
         <strong>현재 범위</strong>

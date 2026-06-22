@@ -8,12 +8,12 @@
 - Head SHA: `0161079`
 - Default branch synced: true (`master` = `origin/master`); wip 미머지(배포 게이트)
 - Current track: `mobile-partial`
-- Next READY: `M-009 NFC 스캔 adapter`
-- 이번 세션 증분 7개: S-002·M-005·M-006·M-007·S-004·S-005·M-008 (총 DONE 12)
+- Next READY: `M-010 실기기 E2E 테스트 가이드`
+- 이번 세션 증분 8개: S-002·M-005·M-006·M-007·S-004·S-005·M-008·M-009 (총 DONE 13)
 
 ## Last Done Increment
 
-M-008 모바일 TBM 서명 캔버스 UI 완료. 모바일 근로자 핵심 흐름(로그인→오늘 TBM 조회→터치 서명→제출→번역) + 관리자 로그인 + QR 스캔이 한 코드베이스에서 동작(빌드/스모크 green). 실기기 E2E·iOS·배포는 미수행.
+M-009 모바일 NFC 스캔 adapter 완료. Web NFC(NDEFReader) capability 어댑터 + NfcScanPanel UI를 App에 통합. 미지원(iOS/desktop)·권한 거부·취소·읽기오류 분기 처리, SAFE-LINK URL payload에서 worker/site 토큰 파싱. Android Chrome 전용이며 iOS는 네이티브 후속(M-004 계열). mobile typecheck+vite build green. 실기기 E2E·iOS·배포는 미수행.
 
 ## Current State
 

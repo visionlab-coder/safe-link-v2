@@ -10,11 +10,11 @@
   "main_synced": true,
   "track": "mobile-partial",
   "last_done_increment": {
-    "id": "M-008",
+    "id": "M-009",
     "sha": "working-tree",
-    "summary": "모바일 TBM 서명 캔버스 UI — 터치 pointer-events 캔버스(DPR·빈서명 방지), data URL → signTbm 제출, WorkerTbmPanel 통합(조회→서명→제출 완성); mobile typecheck+vite build green"
+    "summary": "모바일 NFC 스캔 adapter — Web NFC(NDEFReader) capability 어댑터(getNfcCapability/scanNfcOnce/parseSafeLinkNfc), unsupported·permission_denied·cancelled·error 분기, NfcScanPanel UI + App 통합; Android Chrome 전용·iOS는 네이티브 후속; mobile typecheck+vite build green"
   },
-  "next_ready_task": "M-009 NFC 스캔 adapter (Web NFC, Android 우선)",
+  "next_ready_task": "M-010 실기기 E2E 테스트 가이드 (Android/iOS 수동 시나리오 + 결과 기록 템플릿)",
   "done_bar": [
     {
       "id": "M1",
@@ -32,7 +32,7 @@
       "id": "M3",
       "text": "필수 네이티브 capability가 구현 또는 명시적 제외 상태다.",
       "met": false,
-      "evidence": "QR(BarcodeDetector) adapter done (M-007); NFC·push·iOS native scanner pending"
+      "evidence": "QR(BarcodeDetector) M-007 + NFC(Web NFC/NDEFReader) M-009 adapter done; push·iOS native scanner pending"
     },
     {
       "id": "M4",
@@ -101,6 +101,6 @@
       "npm.cmd run android:assemble:debug --prefix apps/mobile",
       "npm.cmd audit --prefix apps/mobile"
     ],
-    "summary": "M-008 모바일 TBM 서명 캔버스 UI (터치 캔버스→signTbm 제출, 조회→서명 완성); mobile typecheck+vite build green"
+    "summary": "M-009 모바일 NFC 스캔 adapter (Web NFC/NDEFReader, 권한·미지원 분기, NfcScanPanel+App 통합); mobile typecheck+vite build green"
   }
 }
