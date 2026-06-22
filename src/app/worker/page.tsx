@@ -8,6 +8,7 @@ import { createClient } from "@/utils/supabase/client";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import { playNotificationSound } from "@/utils/notifications";
 import BrandLogo from "@/components/BrandLogo";
+import { ensureLocalNotifyPermission, notifyNative } from "@/utils/native/local-notify";
 
 const workerUI: Record<string, any> = {
     ko: {
@@ -627,6 +628,9 @@ function WorkerHomeContent() {
         };
         fetchProfile();
 
+        // 네이티브 앱에서만 로컬 알림 권한 요청(브라우저 no-op)
+        ensureLocalNotifyPermission();
+
         const channel = supabase
             .channel("worker_tbm_realtime")
             .on(
@@ -636,6 +640,8 @@ function WorkerHomeContent() {
                     setHasNewTBM(true);
                     setNewTBMTime(new Date().toLocaleTimeString());
                     triggerAlert();
+                    // 모바일 앱: 화면 밖(백그라운드)에서도 보이도록 로컬 알림
+                    notifyNative("🚨 새 안전 지침(TBM)", "작업 투입 전 TBM을 확인하고 서명해 주세요.");
                 }
             )
             .subscribe();
@@ -653,9 +659,11 @@ function WorkerHomeContent() {
                         setNewChatCount(prev => prev + 1);
                         setNewChatTime(new Date().toLocaleTimeString());
                         triggerAlert();
+                        // 모바일 앱: 관리자 1:1 메시지 로컬 알림
+                        notifyNative("💬 관리자 메시지", "관리자가 대화를 요청했습니다.");
 
                         // 자동 활성화 옵션: 알림과 함께 즉각적인 대화창 이동 지원 (선택적)
-                        // router.push("/worker/chat"); 
+                        // router.push("/worker/chat");
                     }
                 }
             )
