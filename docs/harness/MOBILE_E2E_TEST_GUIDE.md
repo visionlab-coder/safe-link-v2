@@ -21,12 +21,20 @@
 ### 빌드 산출물 만들기 (Android)
 ```bash
 cd apps/mobile
-npm run build          # Vite 번들
+npm run build          # Vite 번들 (.env의 VITE_* 공개 config 주입)
 npm run cap:sync       # Capacitor 동기화
-npm run android:assemble:debug
+# JAVA_HOME=Android Studio JBR, ANDROID_HOME=C:\tmp\android-sdk
+cd android && ./gradlew assembleDebug
 # 산출 APK: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 APK를 실기기로 전송 후 설치(개발자 모드 / 출처 불명 앱 허용).
+
+#### 현재 테스트 빌드 (option A — 모바일 분리 진행)
+- 경로: `apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`
+- 크기: 4,275,450 bytes
+- SHA-256: `3d3579c9e1ac9787d24999c8aa3bcf7b1b0bffeb375183a96f240db8a07b44b1`
+- 주입 config: API base `https://safe-link-v2.vercel.app`, Supabase `wzmzpuxpcpuvuacwmslj`, `VITE_APP_ENV=production`
+- 포함: M-005~M-010 전체(관리자/근로자 로그인·TBM·서명·번역·QR·NFC). 웹 PoC 코드 미포함(분리).
 
 ---
 

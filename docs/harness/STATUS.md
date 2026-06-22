@@ -26,7 +26,8 @@ M-010 실기기 E2E 테스트 가이드 완료(`docs/harness/MOBILE_E2E_TEST_GUI
 - `/api/auth/me`는 모바일 Bearer token과 기존 cookie refresh 경로를 함께 지원
 - root package와 사용자 STT/TTS WIP를 보호하기 위해 mobile package는 독립 설치
 - Android Studio 2025.3.4.7, JDK 21, 로컬 SDK API 36 build chain 확인
-- debug APK: 4,194,299 bytes, SHA-256 `EF8DF76F1DDBA275D0C8F706833409A9ED88E1818D232E6A5E8152C89971C5AA`
+- debug APK(M-003 최초): 4,194,299 bytes, SHA-256 `EF8DF76F1DDBA275D0C8F706833409A9ED88E1818D232E6A5E8152C89971C5AA`
+- debug APK(option A 테스트빌드, M-005~M-010+Vercel config): 4,275,450 bytes, SHA-256 `3d3579c9e1ac9787d24999c8aa3bcf7b1b0bffeb375183a96f240db8a07b44b1`, SDK `C:\tmp\android-sdk`
 - development package: `com.safelink.mobile.dev`, min SDK 24, target SDK 36
 - 상세 근거: `MOBILE_CAPABILITY_AUDIT.md`
 - 구현 계약: `ADR-001-MOBILE-ARCHITECTURE.md`
