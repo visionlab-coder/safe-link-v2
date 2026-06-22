@@ -8,12 +8,14 @@
 - Head SHA: `0161079`
 - Default branch synced: true (`master` = `origin/master`); wip 미머지(배포 게이트)
 - Current track: `mobile-partial`
-- Next READY: `S-006 나머지 모바일 인증/CORS 커버리지`
-- 이번 세션 증분 9개: S-002·M-005·M-006·M-007·S-004·S-005·M-008·M-009·M-010 (총 DONE 14)
+- Next READY: `MC-002 (device) 게이팅 검증 — 인증 지속 + WebView 마이크`
+- **아키텍처 전환(2026-06-22)**: 단일 앱 = 배포 웹앱 전체를 first-party WebView 호스팅(`server.url`). 관리자·근로자 전 기능 한 앱. 상세 `GOAL.md > Architecture Decision`
+- 최우선 핵심 3종: TBM 브로드캐스팅 · 라이브 통역 · 1:1 대화
+- 이번 세션 증분: S-002·M-005~M-010·MC-001 (MC-001은 build-green/DEVICE-PENDING)
 
-## Last Done Increment
+## Last Done Increment (build-green / DEVICE-PENDING)
 
-M-010 실기기 E2E 테스트 가이드 완료(`docs/harness/MOBILE_E2E_TEST_GUIDE.md`). 8개 시나리오(T1 진단·T2 관리자 로그인·T3 근로자 TBM 조회·T4 터치 서명·T5 번역·T6 QR·T7 NFC·T8 오프라인) 사전조건/단계/기대결과/기록란 + 결과 요약 템플릿 + Done Bar M1 통과기준. iOS는 M-004(빌드 환경) BLOCKED 명시. 문서만 추가(코드 변경 없음), 실기기 실행은 사용자 측 수행 대기.
+MC-001 단일 앱 셸 전환. `capacitor.config.ts`에 `server.url=https://safe-link-v2.vercel.app` → 앱이 배포 웹앱 전체를 first-party로 로드(관리자·근로자 모두 웹앱 로그인으로 전 기능). AndroidManifest에 RECORD_AUDIO·MODIFY_AUDIO_SETTINGS·CAMERA·POST_NOTIFICATIONS 추가, MainActivity에서 실행 시 런타임 권한 요청(WebView getUserMedia grant 전제). build+cap sync+assembleDebug green. ⚠️ **인증 세션 지속·WebView 마이크 실동작은 실기기 검증 전까지 미확정** — 이 검증이 WebView-임베드 접근 전체의 게이팅 베팅(MC-002).
 
 ## Current State
 

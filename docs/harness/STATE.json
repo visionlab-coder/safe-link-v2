@@ -10,11 +10,12 @@
   "main_synced": true,
   "track": "mobile-partial",
   "last_done_increment": {
-    "id": "M-010",
+    "id": "MC-001",
     "sha": "working-tree",
-    "summary": "실기기 E2E 테스트 가이드(MOBILE_E2E_TEST_GUIDE.md) — 8개 시나리오(T1~T8: 진단·관리자/근로자 로그인·TBM 서명·번역·QR·NFC·오프라인) 사전조건/단계/기대결과/기록란 + 결과 요약 템플릿 + Done Bar M1 통과기준; iOS는 M-004 BLOCKED 명시; 문서만 추가(코드 변경 없음)"
+    "status": "build-green / DEVICE-PENDING",
+    "summary": "단일 앱 셸 전환 — capacitor server.url로 배포 웹앱 전체(safe-link-v2.vercel.app) first-party 호스팅(관리자·근로자 전 기능 한 앱), AndroidManifest RECORD_AUDIO/CAMERA/MODIFY_AUDIO_SETTINGS/POST_NOTIFICATIONS, MainActivity 런타임 권한 요청(WebView getUserMedia grant 전제); build+cap sync+assembleDebug green. ⚠️ 인증 지속·WebView 마이크 동작은 실기기 검증 전까지 미확정(게이팅 베팅)"
   },
-  "next_ready_task": "S-006 나머지 모바일 인증/CORS 커버리지 (middleware + 미적용 API route Bearer+CORS 점검)",
+  "next_ready_task": "MC-002 (device) 게이팅 검증 — 실기기에서 웹앱 로그인 지속 + 라이브 통역 마이크 동작 확인(MOBILE_E2E_TEST_GUIDE T9~T11). 통과 시에만 TBM 브로드캐스팅 네이티브 강화로 진행",
   "done_bar": [
     {
       "id": "M1",
@@ -32,7 +33,7 @@
       "id": "M3",
       "text": "필수 네이티브 capability가 구현 또는 명시적 제외 상태다.",
       "met": false,
-      "evidence": "QR(BarcodeDetector) M-007 + NFC(Web NFC/NDEFReader) M-009 adapter done; push·iOS native scanner pending"
+      "evidence": "단일앱 셸(MC-001): manifest 마이크/카메라/알림 권한 + MainActivity 런타임 요청 추가(build green). QR(M-007)·NFC(M-009) 로컬 adapter 보존. WebView 마이크 실동작·푸시·딥링크는 device 검증/후속 pending"
     },
     {
       "id": "M4",
@@ -101,6 +102,6 @@
       "npm.cmd run android:assemble:debug --prefix apps/mobile",
       "npm.cmd audit --prefix apps/mobile"
     ],
-    "summary": "M-010 실기기 E2E 테스트 가이드 문서(8개 시나리오 + 결과 템플릿 + M1 통과기준); placeholder/state check green"
+    "summary": "MC-001 단일 앱 셸(server.url 웹앱 전체 호스팅 + 마이크/카메라/알림 권한); build+cap sync+assembleDebug green. 인증·마이크 실동작은 DEVICE-PENDING(MC-002 게이팅 검증)"
   }
 }

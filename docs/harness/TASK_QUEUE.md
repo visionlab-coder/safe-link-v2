@@ -2,13 +2,16 @@
 
 > 한 세션 = READY 1개. BLOCKED·게이트는 손대지 않는다.
 
+> **MC 트랙(최우선)**: 단일 앱이 배포 웹앱 전체를 호스팅(관리자·근로자 전 기능). 핵심 3종 = TBM 브로드캐스팅·라이브 통역·1:1 대화. 라이브/대화 증분은 build-green ≠ 완료 → 실기기 검증 전까지 DEVICE-PENDING.
+
 ## READY
 
-1. S-006 — 나머지 모바일 인증/CORS 커버리지
-   - Done: middleware와 아직 모바일 Bearer+CORS가 적용되지 않은 API route를 점검하여, 모바일 클라이언트가 호출하는 경로에 일관된 토큰 검증/CORS 계약 적용. 미사용 경로는 명시적 제외 기록.
-   - Scope: 모바일이 실제 호출하는 endpoint만. 운영 RLS/tenant 변경 없음(그건 S-003 게이트).
-   - Verify: 대상 route 목록화, Bearer+CORS smoke green, 웹 no-CORS 호환 유지, root+mobile typecheck/build green
-   - Risk: middleware 변경은 인증 광범위 영향 → 큰 변경이면 게이트로 분리
+1. MC-002 — (device) 게이팅 검증: 인증 지속 + WebView 마이크
+   - Done: MC-001 APK를 실기기에 설치 → ① 웹앱 로그인(관리자·근로자) 세션이 앱 재실행 후에도 지속, ② 라이브 통역 페이지에서 마이크 권한 grant + getUserMedia 실제 캡처 동작을 확인. 결과를 E2E 가이드 T9~T11에 기록.
+   - Scope: 실기기 수동 검증(사용자 수행). 코드 변경 없음. WebView-임베드 접근 전체의 viability를 결정하는 스파이크.
+   - Verify: T9(인증 지속) T10(마이크 캡처) T11(관리자/근로자 역할 전환) Pass/Fail 기록
+   - Risk: 실패 시 = server.url WebView에서 쿠키/마이크 미지원 → 접근 재검토(in-app WebChromeClient onPermissionRequest override 또는 네이티브 플러그인 필요). 한 스파이크로 조기 판별.
+   - Dependency: 라이브/TBM/대화 모든 후속은 이 검증 통과가 전제.
 
 ## BLOCKED
 
@@ -18,6 +21,7 @@
 
 ## DONE
 
+- MC-001 @ working-tree (build-green / DEVICE-PENDING) — 단일 앱 셸 전환 · Verify: capacitor server.url=safe-link-v2.vercel.app로 웹앱 전체 first-party 호스팅(관리자·근로자 전 기능), AndroidManifest 마이크/카메라/알림 권한, MainActivity 런타임 권한 요청, build+cap sync+assembleDebug green · Files: apps/mobile/capacitor.config.ts, android/app/src/main/AndroidManifest.xml, android/.../MainActivity.java · Note: 인증 지속·WebView 마이크 실동작은 MC-002 실기기 검증 필요(미확정)
 - M-010 @ working-tree — 실기기 E2E 테스트 가이드 · Verify: 8개 시나리오(T1~T8: 진단·관리자/근로자 로그인·TBM 서명·번역·QR·NFC·오프라인) 사전조건/단계/기대결과/기록란 + 결과 요약 템플릿 + M1 통과기준, placeholder/state check green · Files: docs/harness/MOBILE_E2E_TEST_GUIDE.md · Note: 문서만, iOS는 M-004 BLOCKED, 실기기 실행은 사용자 수행
 - M-009 @ working-tree — NFC 스캔 adapter (모바일) · Verify: Web NFC(NDEFReader) getNfcCapability/scanNfcOnce/parseSafeLinkNfc, unsupported·permission_denied·cancelled·error 분기, URL payload worker/site 토큰 파싱, NfcScanPanel+App 통합, mobile typecheck+vite build green · Files: apps/mobile/src/lib/capability/nfc.ts, app/NfcScanPanel.tsx, app/App.tsx · Note: Android Chrome 전용·HTTPS 필요, iOS는 네이티브 후속(M-004 계열)
 - M-008 @ working-tree — 모바일 TBM 서명 캔버스 UI · Verify: 터치 pointer-events 캔버스(DPR·지우기·빈서명 방지), data URL→signTbm 제출, WorkerTbmPanel 조회→서명→제출 완성, mobile typecheck+vite build green · Files: apps/mobile/src/app/SignatureCanvas.tsx, WorkerTbmPanel.tsx
