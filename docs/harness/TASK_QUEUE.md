@@ -4,11 +4,19 @@
 
 > **MC 트랙(최우선)**: 단일 앱이 배포 웹앱 전체를 호스팅(관리자·근로자 전 기능). 핵심 3종 = TBM 브로드캐스팅·라이브 통역·1:1 대화. 라이브/대화 증분은 build-green ≠ 완료 → 실기기 검증 전까지 DEVICE-PENDING.
 
-1. MC-007-B — QR·NFC (순차 B)
-   - QR: 웹앱 자체 QR(BarcodeDetector 카메라)이 WebView에서 동작(카메라 권한 MC-001) → 코드 불필요, E2E 확인만.
-   - NFC: Android 시스템 WebView는 Web NFC(NDEFReader) 미지원 가능성 → 네이티브 NFC 플러그인 + 웹 feature-detected 브릿지 필요 여부 조사 후 결정. 웹앱의 실제 NFC 사용 흐름(worker 태그 read vs admin 관리) 확인 먼저.
-   - 그 다음 C(오프라인 캐시): 원격 웹앱 캐시는 서비스워커(웹측) 필요 → MC-006으로 충분한지/추가할지 판단.
-   - Note: iOS(M-004) Codex 진행 중 간섭 금지. 잠긴 worktree 폴더(`../slv2-hotfix-q001`, `../slv2-hotfix-mc007`) 수동 삭제 가능(무해).
+> **MC-007 순차 결과**: A 배포 완료. B/C는 조사 결과 현 아키텍처에서 빌드 불필요/보류(아래). 다음은 사용자 결정.
+
+1. (사용자 결정) 다음 후속 택1
+   - 옵션 1 — 딥링크(B의 진짜 버전): QR/NFC 스캔 시 브라우저 대신 앱 오픈. Android App Links(인텐트 필터 + 도메인 `assetlinks.json` 배치 필요). 중간 난이도.
+   - 옵션 2 — FCM 원격 푸시: 앱 종료 시에도 TBM 알림. Firebase 프로젝트 크리덴셜 게이트.
+   - 옵션 3 — 오프라인 풀 캐시(C): 서비스워커. 스테일·인증 리스크라 신중 설계 필요(현재 MC-006으로 graceful 처리됨).
+   - 옵션 4 — 마무리: MC-007-A 폰 실동작 확인 후 안정화.
+
+## 조사 완료(빌드 불필요/보류)
+
+- MC-007-B (QR·NFC) — N/A: 웹앱에 인앱 스캐너 없음(new NDEFReader·new BarcodeDetector 0건). QR=생성기, 스캔=폰 카메라/OS URL 오픈, NFC=OS URL+서버 API. 브릿지 대상 없음 → 네이티브 스캐너 미빌드(헛코드 방지). 가치 버전=딥링크(옵션 1).
+- MC-007-C (오프라인 캐시) — 보류: SW/PWA 부재, 원격 SSR 캐시는 스테일·인증 리스크 + 핵심 온라인 필수 + MC-006이 graceful UX 제공. 풀 캐시는 별도 신중 설계.
+   - Note: iOS(M-004) Codex 진행 중 간섭 금지. 잠긴 worktree 폴더(`../slv2-hotfix-*`) 수동 삭제 가능(무해).
 
 ## 사용자 확인 대기
 
