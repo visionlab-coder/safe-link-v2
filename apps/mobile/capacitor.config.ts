@@ -14,7 +14,10 @@ const config: CapacitorConfig = {
     androidScheme: "https",
     // first-party 로 배포 도메인을 로드 → Supabase 세션 쿠키 정상 유지(iframe 3rd-party 문제 회피).
     url: webappUrl,
-    cleartext: false
+    cleartext: false,
+    // 원격 로드 실패(네트워크 끊김/서버 도달 불가) 시 로컬 오프라인 안내 페이지 표시.
+    // 네트워크 복구 시 자동으로 운영 웹앱 재진입(public/error.html).
+    errorPath: "error.html"
   },
   android: {
     allowMixedContent: false

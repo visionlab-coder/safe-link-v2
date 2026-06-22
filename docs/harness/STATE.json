@@ -10,12 +10,12 @@
   "main_synced": true,
   "track": "mobile-partial",
   "last_done_increment": {
-    "id": "MC-004",
-    "sha": "f8f4bcf (origin/master)",
-    "status": "MERGED + 프로덕션 배포 트리거됨",
-    "summary": "Q-001 한국어 수정 운영 배포 — PR #1 사용자 승인 후 master 머지(f8f4bcf, fast-forward, politeness.ts 1파일). origin/master 반영 확인 → Vercel 프로덕션 자동배포 트리거. 폰(WebView)은 배포 완료 후 갑시다 정상 출력 예상. 18커밋 통째 머지 회피(미검증 웹 PoC 운영 미반영 유지). hotfix 원격 브랜치 삭제, 로컬 worktree 해제."
+    "id": "MC-006",
+    "sha": "working-tree",
+    "status": "build-green / DEVICE-PENDING (오프라인 동작 실기기 확인 필요)",
+    "summary": "오프라인/네트워크 실패 UX — Capacitor server.errorPath=error.html 추가. 원격(vercel) 로드 실패 시 로컬 오프라인 안내 페이지(public/error.html) 표시: 한국어 안내 + 다시시도 버튼 + online 이벤트 시 자동 재접속. GOAL Production Context(불안정 네트워크)·Quality Bar(실패 상태/복구 경로 표시) 충족. build+cap sync+assembleDebug green(APK 74ef9c49). 웹/PoC 무영향(네이티브 셸만). ⚠️ 실제 오프라인 전환 동작은 실기기 확인 필요. (Q-001 폰 반영 확인=MC-005는 사용자 측 대기)"
   },
-  "next_ready_task": "MC-005 폰에서 한국어 수정 반영 확인(배포 완료 후 갑시다 정상) → 이후 비-게이트 후속(TBM 푸시 네이티브 @capacitor/local-notifications / 오프라인 UX / QR·NFC 네이티브 브릿지) 중 택1. iOS(M-004)는 Codex(codex/ios-bootstrap-20260623) 진행 중 — 간섭 금지.",
+  "next_ready_task": "MC-007 비-게이트 후속 택1 — TBM 푸시 네이티브(@capacitor/local-notifications; 단 WebView 웹앱이 Capacitor 비인지라 브릿지 설계 필요) / QR·NFC 네이티브 브릿지 / 오프라인 캐시 강화. iOS(M-004)는 Codex 진행 중 간섭 금지.",
   "done_bar": [
     {
       "id": "M1",
@@ -102,6 +102,6 @@
       "npm.cmd run android:assemble:debug --prefix apps/mobile",
       "npm.cmd audit --prefix apps/mobile"
     ],
-    "summary": "MC-004 Q-001 한국어 수정 운영 배포 — PR #1 master 머지(f8f4bcf), Vercel 프로덕션 자동배포 트리거. 폰 반영 확인 대기(MC-005). iOS는 Codex 진행 중."
+    "summary": "MC-006 오프라인/네트워크 실패 UX — server.errorPath + public/error.html(자동 재접속), build+cap sync+assembleDebug green(APK 74ef9c49). 실기기 오프라인 동작 확인 대기. Q-001은 master 배포 완료(폰 확인=MC-005 사용자 대기)."
   }
 }

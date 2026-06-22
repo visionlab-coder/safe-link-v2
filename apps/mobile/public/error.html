@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>SAFE-LINK · 연결 오류</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: flex; align-items: center; justify-content: center;
+      font-family: -apple-system, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+      background: #0f1115; color: #e9edf2; padding: 24px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .card { width: 100%; max-width: 360px; text-align: center; }
+    .mark {
+      width: 56px; height: 56px; border-radius: 14px; margin: 0 auto 20px;
+      display: flex; align-items: center; justify-content: center;
+      background: #1d2230; font-weight: 800; letter-spacing: 1px; color: #5b9dff;
+    }
+    h1 { font-size: 20px; margin: 0 0 10px; }
+    p { font-size: 14px; line-height: 1.6; color: #aab3c0; margin: 0 0 8px; }
+    #status { font-size: 13px; margin: 16px 0 20px; color: #ffb454; min-height: 18px; }
+    button {
+      width: 100%; padding: 14px 16px; border: 0; border-radius: 12px;
+      background: #2f6dff; color: #fff; font-size: 16px; font-weight: 700;
+      cursor: pointer; transition: opacity .15s;
+    }
+    button:active { opacity: .7; }
+    button[disabled] { opacity: .5; cursor: default; }
+    .hint { margin-top: 18px; font-size: 12px; color: #6b7585; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="mark">SL</div>
+    <h1>연결할 수 없습니다</h1>
+    <p>SAFE-LINK 서버에 연결하지 못했습니다.</p>
+    <p>현장 네트워크(데이터/Wi-Fi) 상태를 확인해 주세요.</p>
+    <div id="status">오프라인 상태입니다…</div>
+    <button id="retry" type="button">다시 시도</button>
+    <div class="hint">네트워크가 복구되면 자동으로 다시 연결됩니다.</div>
+  </main>
+
+  <script>
+    // server.url 과 동일 — 네트워크 복구 시 운영 웹앱으로 재진입
+    var APP_URL = "https://safe-link-v2.vercel.app";
+    var statusEl = document.getElementById("status");
+    var retryEl = document.getElementById("retry");
+
+    function setOnlineUI() {
+      if (navigator.onLine) {
+        statusEl.textContent = "네트워크 감지됨 — 다시 연결하는 중…";
+        reconnect();
+      } else {
+        statusEl.textContent = "오프라인 상태입니다…";
+      }
+    }
+
+    function reconnect() {
+      retryEl.disabled = true;
+      retryEl.textContent = "연결 중…";
+      // 캐시 회피용 타임스탬프 없이 운영 URL 로 재진입 (실패 시 다시 errorPath 로 복귀)
+      window.location.replace(APP_URL);
+    }
+
+    retryEl.addEventListener("click", function () {
+      statusEl.textContent = "다시 연결하는 중…";
+      reconnect();
+    });
+
+    window.addEventListener("online", setOnlineUI);
+    window.addEventListener("offline", function () {
+      statusEl.textContent = "오프라인 상태입니다…";
+    });
+
+    // 진입 시 이미 온라인이면 즉시 재연결 시도
+    setOnlineUI();
+  </script>
+</body>
+</html>

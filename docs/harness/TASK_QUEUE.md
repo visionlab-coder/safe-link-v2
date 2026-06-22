@@ -4,11 +4,15 @@
 
 > **MC 트랙(최우선)**: 단일 앱이 배포 웹앱 전체를 호스팅(관리자·근로자 전 기능). 핵심 3종 = TBM 브로드캐스팅·라이브 통역·1:1 대화. 라이브/대화 증분은 build-green ≠ 완료 → 실기기 검증 전까지 DEVICE-PENDING.
 
-1. MC-005 — 폰에서 한국어 수정 반영 확인 + 후속 택1
-   - Done: Vercel 프로덕션 배포 완료(보통 1~3분) 후, 폰에서 "갑시다" 정상 출력 확인. 이후 비-게이트 후속 1건 진행.
-   - Scope: 폰 확인(사용자) + 다음 증분 선택.
-   - 후속 후보(비-게이트): TBM 푸시 네이티브(@capacitor/local-notifications) / 오프라인·네트워크 실패 UX / QR·NFC 네이티브 브릿지.
-   - Note: iOS(M-004)는 Codex 진행 중 간섭 금지. 잠긴 worktree 폴더 `../slv2-hotfix-q001`는 수동 삭제 가능(무해).
+1. MC-007 — 비-게이트 후속 택1
+   - 후보 A: TBM 푸시 네이티브(@capacitor/local-notifications) — 단 WebView가 원격 웹앱을 로드하므로 웹앱이 Capacitor 비인지 → 네이티브가 Supabase realtime 구독하거나 웹앱→브릿지 호출 설계 필요(중간 난이도). 진짜 원격 푸시(앱 종료 시)는 FCM=크리덴셜 게이트.
+   - 후보 B: QR·NFC 네이티브 브릿지 — 기존 로컬 adapter(M-007/M-009)를 웹앱 흐름과 연결.
+   - 후보 C: 오프라인 캐시 강화 — 최근 TBM/번역 캐시로 오프라인 열람.
+   - Note: iOS(M-004)는 Codex 진행 중 간섭 금지. 잠긴 worktree 폴더 `../slv2-hotfix-q001` 수동 삭제 가능(무해).
+
+## 사용자 확인 대기
+
+- MC-005 — Q-001 한국어 수정 폰 반영 확인(Vercel 배포 후 갑시다 정상). 사용자 측 검증.
 
 ## BLOCKED
 
@@ -18,6 +22,7 @@
 
 ## DONE
 
+- MC-006 @ working-tree (build-green / DEVICE-PENDING) — 오프라인/네트워크 실패 UX · Verify: Capacitor server.errorPath=error.html + public/error.html(한국어 안내·다시시도·online 자동 재접속), build+cap sync(android assets 반영)+assembleDebug green(APK 74ef9c49), errorPath synced 확인 · Files: apps/mobile/capacitor.config.ts, apps/mobile/public/error.html · Note: 실제 오프라인 전환 동작 실기기 확인 필요
 - MC-004 @ f8f4bcf (MERGED, 배포 트리거) — Q-001 한국어 수정 운영 배포 · Verify: PR #1 사용자 승인 후 master 머지(fast-forward, politeness.ts 1파일), origin/master 반영 확인 → Vercel 프로덕션 자동배포 트리거 · Note: 18커밋 통째 머지 회피(미검증 웹 PoC 운영 미반영). 폰 반영 확인=MC-005
 - Q-001 @ working-tree — 한국어 존댓말 변환 버그 수정 · Verify: politeness.ts 청유형 '갑시다/합시다'가 '갑시습니다'로 손상되던 것 수정(시다 polite 인식 + catch-all negative lookbehind), politeness-smoke 12/12 + tsc green · Files: src/utils/politeness.ts, scripts/politeness-smoke.mjs · Note: 소스만 변경, 폰 반영은 vercel 재배포 필요
 - MC-003 @ working-tree (DEVICE-VERIFIED) — 핵심 3종 2대 실기기 검증 · Verify: 사용자 2폰에서 라이브 통역 양방향·근로자/관리자 로그인·TBM·1:1 기능 정상(한국어 어미 artifact는 Q-001로 수정) · Note: 코드 변경 없는 검증 증분
