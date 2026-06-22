@@ -12,6 +12,7 @@ import SignatureCanvas from "react-signature-canvas";
 import { hangulize } from "@/utils/hangulize";
 import { playPremiumAudio } from "@/utils/tts";
 import { playNotificationSound } from "@/utils/notifications";
+import { saveTbmCache, loadTbmCache, isOffline } from "@/utils/native/tbm-cache";
 
 // ── 언어 코드 매핑 ── (미사용 — 향후 TTS 연동 예정)
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -158,6 +159,7 @@ function WorkerTBMDetailContent() {
     const signaturePadRef = useRef<SignatureCanvas | null>(null);
 
     const [tbm, setTbm] = useState<any>(null);
+    const [fromCache, setFromCache] = useState(false);
     const [loading, setLoading] = useState(true);
     const [translating, setTranslating] = useState(false);
     const [preferredLang, setPreferredLang] = useState("ko");
@@ -229,6 +231,19 @@ function WorkerTBMDetailContent() {
 
         setTbm(tbmData);
 
+        // #3 오프라인 캐시: 성공 시 저장. 데이터 없고 '오프라인'일 때만 캐시 폴백(온라인-무TBM 시 stale 금지).
+        if (tbmData) {
+            saveTbmCache(session.user.id, tbmData);
+            setFromCache(false);
+        } else if (isOffline()) {
+            const cached = loadTbmCache(session.user.id);
+            if (cached) {
+                tbmData = cached;
+                setTbm(cached);
+                setFromCache(true);
+            }
+        }
+
         if (tbmData) {
             const { data: ackData } = await supabase
                 .from("tbm_ack")
@@ -238,7 +253,7 @@ function WorkerTBMDetailContent() {
                 .single();
             if (ackData) setIsSigned(true);
 
-            if (tbmData.content_ko && lang !== "ko") {
+            if (tbmData.content_ko && lang !== "ko" && !isOffline()) {
                 setTranslating(true);
 
                 const result = await translateChunked(
@@ -453,6 +468,12 @@ function WorkerTBMDetailContent() {
                 </header>
 
                 <main className="flex-1 flex flex-col pt-8 pb-32 px-4 md:px-8 max-w-2xl mx-auto w-full gap-8">
+
+                    {fromCache && (
+                        <div className="rounded-2xl bg-amber-500/15 border border-amber-400/30 text-amber-200 text-sm px-4 py-3">
+                            📴 오프라인 — 저장된 TBM을 표시합니다. 네트워크 복구 후 최신 내용으로 갱신하세요.
+                        </div>
+                    )}
 
                     {loading ? (
                         <div className="flex-1 flex items-center justify-center">
