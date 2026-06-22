@@ -4,11 +4,11 @@
 
 > **MC 트랙(최우선)**: 단일 앱이 배포 웹앱 전체를 호스팅(관리자·근로자 전 기능). 핵심 3종 = TBM 브로드캐스팅·라이브 통역·1:1 대화. 라이브/대화 증분은 build-green ≠ 완료 → 실기기 검증 전까지 DEVICE-PENDING.
 
-1. MC-007 — 비-게이트 후속 택1
-   - 후보 A: TBM 푸시 네이티브(@capacitor/local-notifications) — 단 WebView가 원격 웹앱을 로드하므로 웹앱이 Capacitor 비인지 → 네이티브가 Supabase realtime 구독하거나 웹앱→브릿지 호출 설계 필요(중간 난이도). 진짜 원격 푸시(앱 종료 시)는 FCM=크리덴셜 게이트.
-   - 후보 B: QR·NFC 네이티브 브릿지 — 기존 로컬 adapter(M-007/M-009)를 웹앱 흐름과 연결.
-   - 후보 C: 오프라인 캐시 강화 — 최근 TBM/번역 캐시로 오프라인 열람.
-   - Note: iOS(M-004)는 Codex 진행 중 간섭 금지. 잠긴 worktree 폴더 `../slv2-hotfix-q001` 수동 삭제 가능(무해).
+1. MC-007-B — QR·NFC (순차 B)
+   - QR: 웹앱 자체 QR(BarcodeDetector 카메라)이 WebView에서 동작(카메라 권한 MC-001) → 코드 불필요, E2E 확인만.
+   - NFC: Android 시스템 WebView는 Web NFC(NDEFReader) 미지원 가능성 → 네이티브 NFC 플러그인 + 웹 feature-detected 브릿지 필요 여부 조사 후 결정. 웹앱의 실제 NFC 사용 흐름(worker 태그 read vs admin 관리) 확인 먼저.
+   - 그 다음 C(오프라인 캐시): 원격 웹앱 캐시는 서비스워커(웹측) 필요 → MC-006으로 충분한지/추가할지 판단.
+   - Note: iOS(M-004) Codex 진행 중 간섭 금지. 잠긴 worktree 폴더(`../slv2-hotfix-q001`, `../slv2-hotfix-mc007`) 수동 삭제 가능(무해).
 
 ## 사용자 확인 대기
 
@@ -22,6 +22,7 @@
 
 ## DONE
 
+- MC-007-A @ 8350722 (배포됨, PR #2) / DEVICE-PENDING — TBM·메시지 인앱 로컬 알림 · Verify: @capacitor/local-notifications@8.2(APK 689964b0) + feature-detected local-notify.ts + worker/page.tsx realtime 훅(notifyNative), 브라우저 no-op, root tsc green, PR #2 머지→Vercel · Files: src/utils/native/local-notify.ts, src/app/worker/page.tsx, apps/mobile/package.json · Note: 알림 실동작 실기기 확인 필요, 종료상태=FCM 후속
 - MC-006 @ working-tree (build-green / DEVICE-PENDING) — 오프라인/네트워크 실패 UX · Verify: Capacitor server.errorPath=error.html + public/error.html(한국어 안내·다시시도·online 자동 재접속), build+cap sync(android assets 반영)+assembleDebug green(APK 74ef9c49), errorPath synced 확인 · Files: apps/mobile/capacitor.config.ts, apps/mobile/public/error.html · Note: 실제 오프라인 전환 동작 실기기 확인 필요
 - MC-004 @ f8f4bcf (MERGED, 배포 트리거) — Q-001 한국어 수정 운영 배포 · Verify: PR #1 사용자 승인 후 master 머지(fast-forward, politeness.ts 1파일), origin/master 반영 확인 → Vercel 프로덕션 자동배포 트리거 · Note: 18커밋 통째 머지 회피(미검증 웹 PoC 운영 미반영). 폰 반영 확인=MC-005
 - Q-001 @ working-tree — 한국어 존댓말 변환 버그 수정 · Verify: politeness.ts 청유형 '갑시다/합시다'가 '갑시습니다'로 손상되던 것 수정(시다 polite 인식 + catch-all negative lookbehind), politeness-smoke 12/12 + tsc green · Files: src/utils/politeness.ts, scripts/politeness-smoke.mjs · Note: 소스만 변경, 폰 반영은 vercel 재배포 필요

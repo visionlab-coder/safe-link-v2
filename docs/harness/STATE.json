@@ -10,12 +10,12 @@
   "main_synced": true,
   "track": "mobile-partial",
   "last_done_increment": {
-    "id": "MC-006",
-    "sha": "working-tree",
-    "status": "build-green / DEVICE-PENDING (오프라인 동작 실기기 확인 필요)",
-    "summary": "오프라인/네트워크 실패 UX — Capacitor server.errorPath=error.html 추가. 원격(vercel) 로드 실패 시 로컬 오프라인 안내 페이지(public/error.html) 표시: 한국어 안내 + 다시시도 버튼 + online 이벤트 시 자동 재접속. GOAL Production Context(불안정 네트워크)·Quality Bar(실패 상태/복구 경로 표시) 충족. build+cap sync+assembleDebug green(APK 74ef9c49). 웹/PoC 무영향(네이티브 셸만). ⚠️ 실제 오프라인 전환 동작은 실기기 확인 필요. (Q-001 폰 반영 확인=MC-005는 사용자 측 대기)"
+    "id": "MC-007-A",
+    "sha": "8350722 (origin/master, PR #2 merged)",
+    "status": "배포됨 + APK빌드 / DEVICE-PENDING (알림 실동작 실기기 확인)",
+    "summary": "A) TBM/메시지 인앱 로컬 알림 — 사용자 결정(웹앱 안전수정 OK + 로컬알림 먼저). 네이티브: @capacitor/local-notifications@8.2 설치, APK 689964b0. 웹(feature-detected): src/utils/native/local-notify.ts + worker/page.tsx 기존 realtime 구독(tbm_notices·messages)에 notifyNative+권한요청 추가. 브라우저 무영향(window.Capacitor 없으면 no-op). root tsc green. PR #2 master 머지(8350722)→Vercel 배포. ⚠️ 폰: 새 APK 설치 + 배포 반영 후 알림 실동작 확인 필요. 종료상태 알림은 FCM(후속 게이트)."
   },
-  "next_ready_task": "MC-007 비-게이트 후속 택1 — TBM 푸시 네이티브(@capacitor/local-notifications; 단 WebView 웹앱이 Capacitor 비인지라 브릿지 설계 필요) / QR·NFC 네이티브 브릿지 / 오프라인 캐시 강화. iOS(M-004)는 Codex 진행 중 간섭 금지.",
+  "next_ready_task": "MC-007-B QR·NFC — QR은 웹앱이 WebView에서 이미 처리(확인만). NFC는 Android 시스템 WebView가 Web NFC 미지원 가능성 → 네이티브 NFC 플러그인+웹 브릿지 필요 여부 조사 후 진행. 이어서 C(오프라인 캐시).",
   "done_bar": [
     {
       "id": "M1",
@@ -102,6 +102,6 @@
       "npm.cmd run android:assemble:debug --prefix apps/mobile",
       "npm.cmd audit --prefix apps/mobile"
     ],
-    "summary": "MC-006 오프라인/네트워크 실패 UX — server.errorPath + public/error.html(자동 재접속), build+cap sync+assembleDebug green(APK 74ef9c49). 실기기 오프라인 동작 확인 대기. Q-001은 master 배포 완료(폰 확인=MC-005 사용자 대기)."
+    "summary": "MC-007-A TBM/메시지 인앱 로컬 알림 — @capacitor/local-notifications(APK 689964b0) + feature-detected 웹 훅(PR #2 머지 8350722→Vercel). 알림 실동작 device-pending. 다음 B(QR/NFC)."
   }
 }

@@ -8,9 +8,10 @@
 - Head SHA: `0161079`
 - Default branch synced: true (`master` = `origin/master`); wip 미머지(배포 게이트)
 - Current track: `mobile-partial`
-- Next READY: `MC-007 비-게이트 후속 택1` (TBM 푸시 네이티브 / QR·NFC 브릿지 / 오프라인 캐시)
-- **배포 완료(MC-004)**: Q-001 수정 master 머지(`f8f4bcf`) → Vercel 프로덕션 배포. 폰 반영 확인(MC-005)은 사용자 대기
-- **MC-006 오프라인 UX**: server.errorPath + 오프라인 안내 페이지(자동 재접속), build green. 실기기 오프라인 동작 확인 필요(device-pending)
+- Next READY: `MC-007-B QR·NFC` (QR은 WebView에서 이미 동작 — 확인만 / NFC는 조사 후) → 이어서 C(오프라인 캐시)
+- **MC-007-A 배포(2026-06-23)**: TBM/메시지 인앱 로컬 알림 — @capacitor/local-notifications + feature-detected 웹 훅. PR #2 머지(`8350722`)→Vercel. 새 APK `689964b0`. 알림 실동작 device-pending
+- **배포 완료(MC-004)**: Q-001 수정 master 머지(`f8f4bcf`). 폰 반영 확인(MC-005)은 사용자 대기
+- **MC-006 오프라인 UX**: server.errorPath + 오프라인 안내 페이지(자동 재접속), build green. device-pending
 - **iOS(M-004)**: Codex `codex/ios-bootstrap-20260623` 진행 중 — 간섭 금지
 - **아키텍처(2026-06-22)**: 단일 앱 = 배포 웹앱 전체 first-party WebView 호스팅(`server.url`). 상세 `GOAL.md > Architecture Decision`
 - **핵심 3종 2대 실기기 검증 PASS(2026-06-23)**: 라이브 통역(양방향)·TBM·1:1·관리자/근로자 로그인 정상 작동(사용자 2폰 확인)
