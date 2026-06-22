@@ -8,15 +8,15 @@
 - Head SHA: `0161079`
 - Default branch synced: true (`master` = `origin/master`); wip 미머지(배포 게이트)
 - Current track: `mobile-partial`
-- Next READY: `MC-003 라이브 통역(2대)·근로자모드·1:1 실기기 확인 마무리`
-- **아키텍처 전환(2026-06-22)**: 단일 앱 = 배포 웹앱 전체를 first-party WebView 호스팅(`server.url`). 관리자·근로자 전 기능 한 앱. 상세 `GOAL.md > Architecture Decision`
-- **게이팅 검증 PASS(2026-06-22)**: Android 실기기에서 관리자 로그인·TBM·일반 기능 정상(사용자 확인) → 단일-앱-셸 접근 viability 확정
-- 최우선 핵심 3종: TBM 브로드캐스팅 · 라이브 통역 · 1:1 대화
-- 이번 세션 증분: S-002·M-005~M-010·MC-001·MC-002(device-verified)
+- Next READY: `MC-004 배포 준비 검토(GATE)` — 폰 반영 위한 안전 배포 경로
+- **아키텍처(2026-06-22)**: 단일 앱 = 배포 웹앱 전체 first-party WebView 호스팅(`server.url`). 상세 `GOAL.md > Architecture Decision`
+- **핵심 3종 2대 실기기 검증 PASS(2026-06-23)**: 라이브 통역(양방향)·TBM·1:1·관리자/근로자 로그인 정상 작동(사용자 2폰 확인)
+- **Q-001 한국어 버그 수정**: '갑시다'→'갑시습니다' 손상 제거(politeness.ts), 12/12+tsc green. ⚠️ 폰 반영은 vercel 재배포 필요
+- 이번 세션 증분: S-002·M-005~M-010·MC-001·MC-002·MC-003(device)·Q-001
 
-## Last Done Increment (DEVICE-VERIFIED — gating PASS)
+## Last Done Increment
 
-MC-002 단일 앱 셸 게이팅 검증 통과. 사용자가 안드로이드 실기기에 MC-001 APK 설치 후 확인: **관리자 모드 로그인·TBM 동작, 그 외 기능 정상 작동**. WebView가 웹앱 인증·기능을 정상 호스팅함을 실기기로 입증 → `server.url` 단일-앱-셸(웹 PoC 코드 그대로 재사용) 접근이 viable함을 확정. 남은 명시 확인: 라이브 통역 마이크 2대 양방향, 근로자 모드, 1:1 대화.
+Q-001 한국어 존댓말 변환 버그 수정. `politeness.ts`에서 청유형 존댓말 '갑시다/합시다'가 catch-all 규칙(`X다→X습니다`)에 걸려 '갑시습니다'로 손상되던 문제를, ① '이미 존댓말' 검사에 `시다` 추가 + ② catch-all에 negative lookbehind `(?<!시)` 추가로 해결. `scripts/politeness-smoke.mjs` 12/12 pass(갑시다 보존 + 간다→갑니다 등 기존 변환 회귀 없음), root `tsc --noEmit` green. **소스만 변경 → 운영 PoC 무중단; 폰(vercel 로드)은 재배포 후 반영.** 더불어 핵심 3종이 사용자 2대 실기기로 기능 검증 완료.
 
 ## Current State
 

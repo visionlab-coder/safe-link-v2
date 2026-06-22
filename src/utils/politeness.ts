@@ -13,7 +13,7 @@ export function ensurePoliteKo(text: string): string {
     const trimmed = text.trim();
 
     // 이미 존대말이면 그대로 반환
-    if (/(?:요|까|죠|니다|세요|니까|시오|바랍니다)[.!?]?$/.test(trimmed)) {
+    if (/(?:요|까|죠|니다|세요|니까|시오|바랍니다|시다)[.!?]?$/.test(trimmed)) {
         return trimmed;
     }
 
@@ -75,8 +75,8 @@ export function ensurePoliteKo(text: string): string {
         { from: /넓다[.!?]?$/, to: "넓습니다." },
         { from: /깊다[.!?]?$/, to: "깊습니다." },
 
-        // 받침 있는 동사 + 다 → 습니다
-        { from: /([가-힣])다[.!?]?$/, to: "$1습니다." },
+        // 받침 있는 동사 + 다 → 습니다 (단, 청유형 "~시다"(갑시다/합시다)는 이미 존댓말이므로 제외)
+        { from: /([가-힣])(?<!시)다[.!?]?$/, to: "$1습니다." },
 
         // === 반말 어미 ===
         { from: /해[.!?]?$/, to: "하세요." },        // 조심해 → 조심하세요
@@ -182,7 +182,7 @@ export function formalizeKo(text: string): string {
     if (exactMapping[trimmed]) return exactMapping[trimmed];
 
     // 2. 이미 존대말이면 그대로 반환
-    if (/(?:요|까|죠|니다|세요|니까|시오|바랍니다)[.!?]?$/.test(trimmed)) {
+    if (/(?:요|까|죠|니다|세요|니까|시오|바랍니다|시다)[.!?]?$/.test(trimmed)) {
         return trimmed;
     }
 

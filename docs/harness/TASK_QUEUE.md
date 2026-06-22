@@ -6,12 +6,11 @@
 
 ## READY
 
-1. MC-003 — 라이브 통역(2대)·근로자모드·1:1 실기기 확인 마무리
-   - Done: ① 근로자 모드 로그인·전 기능 접근, ② 라이브 통역 2대(관리자↔근로자) 양방향 마이크→STT→번역→TTS, ③ 1:1 대화 음성 교환을 실기기로 확인하고 E2E T11~T13에 기록. 이상 없으면 MC Done Bar 핵심 충족.
-   - Scope: 실기기 수동 검증(사용자 수행). 코드 변경 없음. 문제 발견 시에만 해당 증분 재오픈.
-   - Verify: T11(역할 전환) T12(라이브 통역 양방향) T13(TBM 브로드캐스팅 수신·1:1) Pass/Fail
-   - Risk: 마이크 2대 동시·에코, TBM 근로자 단말 수신(웹 realtime RLS site_id 경로 의존) — 문제 시 해당 부분만 후속.
-   - 다음 후보(통과 시): TBM 푸시 네이티브 강화(@capacitor/local-notifications), 오프라인/네트워크 실패 UX, QR/NFC 네이티브 브릿지.
+1. MC-004 — 배포 준비 검토 (GATE, 분석만)
+   - Done: Q-001 한국어 수정 + 모바일 작업이 폰(vercel 로드)에 반영되도록 안전 배포 경로를 제시. 단 wip→master 머지는 미검증 웹 PoC를 동반하므로 분리 배포/검증 옵션을 정리. 실행은 사용자 승인 후.
+   - Scope: 분석·문서. 실제 머지/배포/푸시 없음(게이트).
+   - Verify: 배포 옵션·리스크·롤백 경로 제시, 사용자 결정 대기
+   - 후속 후보(비-게이트): TBM 푸시 네이티브(@capacitor/local-notifications), 오프라인/네트워크 실패 UX, QR/NFC 네이티브 브릿지, iOS(M-004).
 
 ## BLOCKED
 
@@ -21,6 +20,8 @@
 
 ## DONE
 
+- Q-001 @ working-tree — 한국어 존댓말 변환 버그 수정 · Verify: politeness.ts 청유형 '갑시다/합시다'가 '갑시습니다'로 손상되던 것 수정(시다 polite 인식 + catch-all negative lookbehind), politeness-smoke 12/12 + tsc green · Files: src/utils/politeness.ts, scripts/politeness-smoke.mjs · Note: 소스만 변경, 폰 반영은 vercel 재배포 필요
+- MC-003 @ working-tree (DEVICE-VERIFIED) — 핵심 3종 2대 실기기 검증 · Verify: 사용자 2폰에서 라이브 통역 양방향·근로자/관리자 로그인·TBM·1:1 기능 정상(한국어 어미 artifact는 Q-001로 수정) · Note: 코드 변경 없는 검증 증분
 - MC-002 @ working-tree (DEVICE-VERIFIED) — 단일 앱 셸 게이팅 검증 통과 · Verify: 사용자 안드로이드 실기기에서 관리자 로그인·TBM·일반 기능 정상 작동 확인 → WebView 웹앱 인증·기능 호스팅 입증, server.url 단일-앱-셸 접근 viable 확정 · Note: 라이브통역 2대·근로자·1:1 추가 확인 대기(MC-003)
 - MC-001 @ working-tree — 단일 앱 셸 전환 · Verify: capacitor server.url=safe-link-v2.vercel.app로 웹앱 전체 first-party 호스팅(관리자·근로자 전 기능), AndroidManifest 마이크/카메라/알림 권한, MainActivity 런타임 권한 요청, build+cap sync+assembleDebug green · Files: apps/mobile/capacitor.config.ts, android/app/src/main/AndroidManifest.xml, android/.../MainActivity.java · Note: 인증 지속·WebView 마이크 실동작은 MC-002 실기기 검증 필요(미확정)
 - M-010 @ working-tree — 실기기 E2E 테스트 가이드 · Verify: 8개 시나리오(T1~T8: 진단·관리자/근로자 로그인·TBM 서명·번역·QR·NFC·오프라인) 사전조건/단계/기대결과/기록란 + 결과 요약 템플릿 + M1 통과기준, placeholder/state check green · Files: docs/harness/MOBILE_E2E_TEST_GUIDE.md · Note: 문서만, iOS는 M-004 BLOCKED, 실기기 실행은 사용자 수행
