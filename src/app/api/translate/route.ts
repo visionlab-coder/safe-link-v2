@@ -123,7 +123,11 @@ export async function POST(request: NextRequest) {
         const targetLang = langMap[tl] || tl;
         const forced = lab?.translateEngine;
 
-        if (!forced || forced === "m2m100") {
+        // m2m100(로컬 오픈소스)은 서비스 URL이 설정됐거나 루트관리자가 명시 선택한 경우에만 시도.
+        // (운영엔 127.0.0.1:8100 서비스가 없어 매 번역마다 실패·낭비되던 문제 수정)
+        const m2m100Enabled = forced === "m2m100"
+            || (!forced && !!process.env.M2M100_TRANSLATE_URL?.trim());
+        if (m2m100Enabled) {
             const localTranslation = await tryM2M100Translate(processedText, sl, tl, !fast);
             if (localTranslation) {
                 return NextResponse.json({
