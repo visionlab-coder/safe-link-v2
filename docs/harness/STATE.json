@@ -10,13 +10,13 @@
   "main_synced": true,
   "track": "mobile-partial",
   "last_done_increment": {
-    "id": "MC-007-B/C",
-    "sha": "investigation",
-    "status": "조사 완료 — 현 아키텍처에서 빌드 불필요(B N/A) / 보류 권장(C)",
-    "summary": "B(QR·NFC): 웹앱에 인앱 스캐너 없음(new NDEFReader·new BarcodeDetector 0건). QR은 생성기, 스캔은 폰 카메라/OS가 URL 오픈. NFC는 OS URL+서버 API. → 브릿지할 대상 없음, 네이티브 스캐너 빌드는 헛코드라 미진행. 진짜 가치 버전=딥링크(App Links, assetlinks.json 도메인 배치 필요=별개). C(오프라인 캐시): SW/PWA 없음. 원격 SSR 캐시는 스테일·인증 리스크 + 핵심(라이브통역) 온라인 필수 + MC-006이 graceful 오프라인 UX 제공 → 풀 캐시 보류 권장. A만 실제 배포됨(MC-007-A).",
-    "evidence_principle": "no-false-green: 없는 문제용 코드 미작성"
+    "id": "MC-008 (#1 딥링크)",
+    "sha": "9e42051 (origin/master, PR #3) + APK 18bf0523",
+    "status": "배포됨 + APK빌드 / DEVICE-PENDING (App Links 검증·오픈 실기기 확인)",
+    "summary": "#1 딥링크(Android App Links) — QR/NFC 스캔으로 열린 safe-link-v2.vercel.app URL을 브라우저 대신 앱이 처리. 네이티브: AndroidManifest VIEW 인텐트필터 autoVerify=true(scheme https, host safe-link-v2.vercel.app), APK 18bf0523. 웹: public/.well-known/assetlinks.json(디버그 SHA-256 지문) PR #3 머지(9e42051)→Vercel. 미들웨어 통과 확인(정적, 가로채기 없음). ⚠️ 폰: 새 APK 설치 후 Android가 assetlinks 검증→스캔 시 앱 오픈 확인 필요. 릴리스 빌드는 릴리스 서명 지문 추가 필요.",
+    "sequence": "사용자 1→2→3→4 순차 진행 중: #1 완료, 다음 #2 FCM"
   },
-  "next_ready_task": "사용자 결정 — (1) 딥링크(QR/NFC 스캔→앱 오픈, App Links) 진행 여부 / (2) 오프라인 풀캐시(SW) 진행 여부 / (3) FCM 원격 푸시(Firebase 게이트) / (4) MC-007-A 폰 실동작 확인 후 마무리. iOS는 Codex 진행 중.",
+  "next_ready_task": "#2 FCM 원격 푸시 — 앱 종료 상태에서도 TBM 알림. ⚠️ Firebase 프로젝트 생성 + google-services.json 필요(사용자만 가능=크리덴셜 게이트). 코드/네이티브 스캐폴딩은 준비하되 작동은 google-services.json 투입 후. 이어서 #3 오프라인 SW, #4 마무리 검증.",
   "done_bar": [
     {
       "id": "M1",
@@ -103,6 +103,6 @@
       "npm.cmd run android:assemble:debug --prefix apps/mobile",
       "npm.cmd audit --prefix apps/mobile"
     ],
-    "summary": "MC-007 순차 — A: TBM/메시지 인앱 로컬알림 배포(PR #2). B: QR/NFC 인앱 스캐너 부재로 N/A(딥링크가 진짜 버전). C: 풀 오프라인캐시 리스크>이득, MC-006으로 충분, 보류. no-false-green 준수."
+    "summary": "#1 딥링크(App Links) 배포 — 인텐트필터(APK 18bf0523) + assetlinks.json(PR #3, 9e42051→Vercel). App Links 검증·오픈 device-pending. 다음 #2 FCM(Firebase 게이트)."
   }
 }
