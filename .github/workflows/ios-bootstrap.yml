@@ -1,0 +1,55 @@
+name: iOS Bootstrap
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulator-build:
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Generate iOS project and build Simulator target
+        env:
+          IOS_ANDROID_BASE_SHA: 88785ad63b613e680b55f9c16c39568c2f7482e3
+        run: |
+          chmod +x apps/mobile/scripts/bootstrap-ios-macos.sh
+          chmod +x apps/mobile/scripts/verify-ios-isolation.sh
+          apps/mobile/scripts/bootstrap-ios-macos.sh --apply
+
+      - name: Verify iOS contracts
+        run: |
+          node apps/mobile/scripts/test-ios-security-validator.mjs
+          node apps/mobile/scripts/test-ios-bridge-contract.mjs
+          apps/mobile/scripts/verify-ios-isolation.sh
+
+      - name: Capture generated source
+        run: |
+          mkdir -p ios-bootstrap-artifact/apps/mobile
+          cp apps/mobile/package.json ios-bootstrap-artifact/apps/mobile/package.json
+          cp apps/mobile/package-lock.json ios-bootstrap-artifact/apps/mobile/package-lock.json
+          cp -R apps/mobile/ios ios-bootstrap-artifact/apps/mobile/ios
+          mkdir -p ios-bootstrap-artifact/docs/generated
+          cp -R docs/generated/ios-bootstrap-results ios-bootstrap-artifact/docs/generated/
+          git status --short > ios-bootstrap-artifact/git-status.txt
+
+      - name: Upload generated iOS project and evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: safe-link-ios-bootstrap
+          path: ios-bootstrap-artifact
+          if-no-files-found: error
+          retention-days: 14
