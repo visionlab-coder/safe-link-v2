@@ -109,3 +109,18 @@ export async function signTbm(tbmId: string, signatureDataUrl: string): Promise<
     if (!res.ok || !data.ok) return { ok: false, error: data.error || `sign_failed_${res.status}` };
     return { ok: true };
 }
+
+// 📱 S-005 — 번역 (Bearer 주입 → translate 라우트 모바일 분기)
+export async function translateText(
+    text: string,
+    sl: string,
+    tl: string,
+): Promise<{ translated: string; engine?: string } | null> {
+    const res = await authFetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, sl, tl, fast: true }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as { translated: string; engine?: string };
+}

@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "project": "SAFE-LINK V2 Mobile Commercialization",
   "repo": "SAFE-LINK-V2",
-  "calibrated_at": "2026-06-22T16:43:08+09:00",
+  "calibrated_at": "2026-06-22T17:56:25+09:00",
   "current_branch": "wip/ai-engine-upgrade-20260622",
   "head_sha": "710647d7fb824c92ed847fc5326a7a08e17d32d1",
   "main_sha": "311c84ea7063d7416028a473d3ce05875444344f",
@@ -10,11 +10,11 @@
   "main_synced": true,
   "track": "mobile-partial",
   "last_done_increment": {
-    "id": "S-004",
+    "id": "S-005",
     "sha": "working-tree",
-    "summary": "tbm/sign Bearer+서명검증+CORS (cookie-only 미검증 → 공통 resolveRequestAccessToken+verifyAccessToken 교체, 보안 강화), 모바일 signTbm; sign smoke 5/5, root+mobile typecheck/build green"
+    "summary": "translate 모바일 Bearer+CORS — X-Safe-Link-Client로 travel-token과 구분, 모바일 JWT 서명검증, 모바일 translateText; translate smoke 6/6(travel·웹 경로 보존), root+mobile typecheck/build green"
   },
-  "next_ready_task": "S-005 translate 라우트 모바일 Bearer+CORS 확대",
+  "next_ready_task": "M-008 모바일 TBM 서명 캔버스 UI (signature_pad → signTbm)",
   "done_bar": [
     {
       "id": "M1",
@@ -86,7 +86,7 @@
     "store submission"
   ],
   "verification": {
-    "last_green_at": "2026-06-22T16:43:08+09:00",
+    "last_green_at": "2026-06-22T17:56:25+09:00",
     "commands": [
       "git diff --check",
       "node scripts/check-sensitive-strings.mjs .harness-blocklist.local",
@@ -101,6 +101,6 @@
       "npm.cmd run android:assemble:debug --prefix apps/mobile",
       "npm.cmd audit --prefix apps/mobile"
     ],
-    "summary": "S-004 tbm/sign Bearer+서명검증+CORS (보안 강화), 모바일 signTbm; sign smoke 5/5, root typecheck+build + mobile typecheck green"
+    "summary": "S-005 translate 모바일 Bearer+CORS (travel-token X-Safe-Link-Client 구분, 웹/travel 경로 보존), 모바일 translateText; translate smoke 6/6, root typecheck+build + mobile typecheck green"
   }
 }

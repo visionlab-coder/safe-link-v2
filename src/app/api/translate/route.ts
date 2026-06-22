@@ -7,6 +7,9 @@ import { checkTranslateLimit } from '@/utils/rate-limit';
 import { CONSTRUCTION_GLOSSARY } from '@/constants/glossary';
 import { getErrorMessage } from '@/utils/errors';
 import { getLabOverride } from '@/utils/lab/engine-config';
+import { resolveRequestAccessToken } from '@/utils/auth/access-token-core';
+import { verifyAccessToken } from '@/utils/auth/verify-access-token';
+import { withMobileCors, handleMobilePreflight } from '@/utils/auth/mobile-cors';
 import { hangulize } from '@/utils/hangulize';
 import { stripEmoji } from '@/utils/strip-emoji';
 import pinyin from 'tiny-pinyin';
@@ -51,17 +54,27 @@ interface MultilingualGlossaryTerm {
  * 1단계: Google Cloud Translation API (0.3초, 고품질 번역)
  * 2단계: Gemini 2.5 Flash (발음 + 역번역) — 1단계와 병렬 실행
  */
-export async function POST(request: NextRequest) {
-    // 인증: travel_token (Travel Talk 흐름) 또는 Supabase 세션
+async function handleTranslate(request: NextRequest): Promise<NextResponse> {
+    // 인증: travel_token(Travel Talk) | 📱 모바일 Bearer JWT | 웹 cookie
+    // ⚠️ travel-token도 'Bearer '라 모바일 JWT와 충돌 → X-Safe-Link-Client: mobile 로 구분 (S-005)
     const authHeader = request.headers.get('authorization');
+    const isMobile = request.headers.get('x-safe-link-client') === 'mobile';
     let rateLimitKey: string;
-    if (authHeader?.startsWith('Bearer ')) {
+    if (authHeader?.startsWith('Bearer ') && !isMobile) {
         const token = authHeader.slice(7);
         if (!verifyTravelToken(token)) {
             return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
         }
         // travel token은 IP 기반 제한
         rateLimitKey = `ip:${request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown"}`;
+    } else if (isMobile) {
+        // 📱 모바일 Bearer(Supabase JWT) — 서명검증 (S-005)
+        const resolved = resolveRequestAccessToken({ authorization: authHeader, rawCookie: null });
+        const verified = resolved ? await verifyAccessToken(resolved.accessToken) : null;
+        if (!verified) {
+            return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+        }
+        rateLimitKey = `uid:${verified.sub}`;
     } else {
         // P5 박제: createServerClient.getUser() → getCookieUser() (raw JWT 파싱)
         const user = await getCookieUser();
@@ -319,6 +332,17 @@ export async function POST(request: NextRequest) {
         console.error("[Translation API] Error:", message);
         return NextResponse.json({ error: message }, { status: 500 });
     }
+}
+
+// 📱 모바일(Capacitor) preflight (S-005)
+export async function OPTIONS(request: NextRequest) {
+    return handleMobilePreflight(request) ?? new NextResponse(null, { status: 405 });
+}
+
+// POST 래퍼 — 허용 mobile origin이면 응답에 CORS 부착(웹/travel-token 무영향).
+export async function POST(request: NextRequest) {
+    const res = await handleTranslate(request);
+    return withMobileCors(res, request.headers.get("origin"));
 }
 
 
