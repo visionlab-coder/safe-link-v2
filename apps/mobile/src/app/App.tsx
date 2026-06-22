@@ -3,6 +3,7 @@ import { getRuntimeConfig } from "../config/runtime";
 import { getPlatformInfo } from "../lib/platform";
 import { AdminAuthPanel } from "./AdminAuthPanel";
 import { WorkerTbmPanel } from "./WorkerTbmPanel";
+import { QrScanPanel } from "./QrScanPanel";
 
 type NetworkState = "checking" | "online" | "offline";
 
@@ -94,6 +95,8 @@ export function App() {
       <AdminAuthPanel />
 
       <WorkerTbmPanel />
+
+      <QrScanPanel />
 
       <section className="notice">
         <strong>현재 범위</strong>

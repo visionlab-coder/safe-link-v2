@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "project": "SAFE-LINK V2 Mobile Commercialization",
   "repo": "SAFE-LINK-V2",
-  "calibrated_at": "2026-06-22T16:16:08+09:00",
+  "calibrated_at": "2026-06-22T16:31:27+09:00",
   "current_branch": "wip/ai-engine-upgrade-20260622",
   "head_sha": "710647d7fb824c92ed847fc5326a7a08e17d32d1",
   "main_sha": "311c84ea7063d7416028a473d3ce05875444344f",
@@ -10,11 +10,11 @@
   "main_synced": true,
   "track": "mobile-partial",
   "last_done_increment": {
-    "id": "M-006",
+    "id": "M-007",
     "sha": "working-tree",
-    "summary": "Worker TBM vertical slice — worker-quick-login mobile token+CORS, /api/tbm/today (Bearer+RLS+CORS), mobile workerLogin/getTodayTbms + WorkerTbmPanel; endpoint smoke 6/6, root+mobile typecheck/build green"
+    "summary": "Camera/QR adapter — BarcodeDetector+getUserMedia QR 스캔(권한 요청/거부/취소 처리), SAFE-LINK QR 파싱, QrScanPanel; mobile typecheck+vite build green (iOS는 네이티브 스캐너 후속)"
   },
-  "next_ready_task": "M-007 카메라·QR adapter",
+  "next_ready_task": "S-004 모바일 Bearer 인증을 TBM 서명·번역 라우트로 확대",
   "done_bar": [
     {
       "id": "M1",
@@ -32,7 +32,7 @@
       "id": "M3",
       "text": "필수 네이티브 capability가 구현 또는 명시적 제외 상태다.",
       "met": false,
-      "evidence": "capability audit pending"
+      "evidence": "QR(BarcodeDetector) adapter done (M-007); NFC·push·iOS native scanner pending"
     },
     {
       "id": "M4",
@@ -86,7 +86,7 @@
     "store submission"
   ],
   "verification": {
-    "last_green_at": "2026-06-22T16:16:08+09:00",
+    "last_green_at": "2026-06-22T16:31:27+09:00",
     "commands": [
       "git diff --check",
       "node scripts/check-sensitive-strings.mjs .harness-blocklist.local",
@@ -101,6 +101,6 @@
       "npm.cmd run android:assemble:debug --prefix apps/mobile",
       "npm.cmd audit --prefix apps/mobile"
     ],
-    "summary": "M-006 worker TBM slice — worker-quick-login mobile token+CORS, /api/tbm/today Bearer+RLS+CORS, mobile WorkerTbmPanel; endpoint smoke 6/6, root typecheck+build + mobile typecheck+build green"
+    "summary": "M-007 camera/QR adapter — BarcodeDetector+getUserMedia 스캔, 권한 처리, QR 파싱, QrScanPanel; mobile typecheck+vite build green"
   }
 }
