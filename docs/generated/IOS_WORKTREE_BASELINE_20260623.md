@@ -59,6 +59,28 @@ Gate:
 - A Mac with Xcode 26+ must be available.
 - The final Android commit SHA must be supplied as `IOS_ANDROID_BASE_SHA`.
 
+## Parallel completed increment
+
+`IOS-002A — iOS security configuration contract and validator`
+
+Prepared:
+
+- fail-closed validation for permission descriptions and ATS;
+- Core NFC NDEF entitlement validation;
+- privacy-manifest UserDefaults reason and no-tracking validation;
+- WebView exact-origin allowlist and external-browser contract;
+- valid and invalid regression fixtures;
+- safe configuration templates for post-generation integration.
+
+Verification:
+
+- valid fixture accepted;
+- intentionally insecure fixture rejected;
+- security templates accepted;
+- Android protected paths unchanged.
+
+The next unblocked local task is documentation and native interface design only. Native application of these settings remains gated by `IOS-001B`.
+
 ## Verification commands
 
 ```powershell
