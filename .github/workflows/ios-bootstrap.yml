@@ -40,6 +40,11 @@ jobs:
           IOS_ANDROID_BASE_SHA: 88785ad63b613e680b55f9c16c39568c2f7482e3
         run: |
           node apps/mobile/scripts/test-ios-security-validator.mjs
+          node apps/mobile/scripts/validate-ios-security.mjs \
+            --info apps/mobile/ios/App/App/Info.plist \
+            --entitlements apps/mobile/ios/App/App/App.entitlements \
+            --privacy apps/mobile/ios/App/App/PrivacyInfo.xcprivacy \
+            --navigation apps/mobile/ios/App/App/navigation-policy.json
           node apps/mobile/scripts/test-ios-bridge-contract.mjs
           apps/mobile/scripts/verify-ios-isolation.sh
 
