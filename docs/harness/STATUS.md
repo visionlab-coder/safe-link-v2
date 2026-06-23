@@ -8,9 +8,10 @@
 - Head SHA: `0161079`
 - Default branch synced: true (`master` = `origin/master`); wip 미머지(배포 게이트)
 - Current track: `mobile-partial`
-- Next READY: `#4 마무리` — 최신 APK 설치 + 웹 배포 반영 후 실기기 검증 / `#2 FCM`은 Firebase 게이트(사용자)
-- **1→2→3→4 순차 결과**: #1 딥링크 배포(APK 18bf0523 + assetlinks PR #3) · #2 FCM=Firebase 게이트 대기 · #3 TBM 오프라인캐시 배포(PR #4) · #4 검증 단계
-- 배포된 웹 PR: #2(TBM 로컬알림 훅)·#3(assetlinks)·#4(오프라인 캐시) → 모두 master 머지·Vercel. 최신 APK `18bf0523`
+- **⚠️ 방향 전환(2026-06-23)**: 모바일 상용앱 = 범소프트웨어 네이티브 제작(기존 자산 최대 재사용). 우리=PoC 유지+벤더 지원. 자체 네이티브/스토어 중단. 상세 `GOAL.md` 상단
+- Next READY: 벤더 확정 4사항 회신 반영 → 이관 패키지 보완. 그 전까지 PoC 안정 유지
+- **VH-001 벤더 이관 패키지**: `docs/vendor-handoff/SAFE-LINK_VENDOR_HANDOFF.md` 작성 완료(API·스키마·플로우·로직·env·역할분담)
+- (PoC 자산) 배포된 웹 PR #2/#3/#4 + 최신 APK `18bf0523`는 현장 PoC로 계속 사용
 - **MC-007-A 배포(2026-06-23)**: TBM/메시지 인앱 로컬 알림 — @capacitor/local-notifications + feature-detected 웹 훅. PR #2 머지(`8350722`)→Vercel. 새 APK `689964b0`. 알림 실동작 device-pending
 - **배포 완료(MC-004)**: Q-001 수정 master 머지(`f8f4bcf`). 폰 반영 확인(MC-005)은 사용자 대기
 - **MC-006 오프라인 UX**: server.errorPath + 오프라인 안내 페이지(자동 재접속), build green. device-pending
