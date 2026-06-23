@@ -35,10 +35,40 @@ for (const relative of required) {
   if (!fs.existsSync(absolute)) errors.push(`missing required file: ${relative}`);
 }
 
-const tracked = execFileSync("git", ["ls-files"], {
-  cwd: root,
-  encoding: "utf8",
-}).split(/\r?\n/).filter(Boolean);
+function listSourceFiles() {
+  try {
+    return execFileSync("git", ["ls-files"], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).split(/\r?\n/).filter(Boolean);
+  } catch {
+    const ignoredDirectories = new Set([
+      ".git",
+      "node_modules",
+      "dist",
+      ".next",
+      ".tmp",
+      "DerivedData",
+    ]);
+    const files = [];
+    const visit = (directory) => {
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        if (entry.isDirectory() && ignoredDirectories.has(entry.name)) continue;
+        const absolute = path.join(directory, entry.name);
+        if (entry.isDirectory()) {
+          visit(absolute);
+        } else {
+          files.push(path.relative(root, absolute).replaceAll("\\", "/"));
+        }
+      }
+    };
+    visit(root);
+    return files;
+  }
+}
+
+const tracked = listSourceFiles();
 
 const forbiddenTracked = tracked.filter((file) =>
   /(^|\/)(\.env(?:\..*)?|.*\.(?:p12|mobileprovision|jks|keystore))$/i.test(file)
