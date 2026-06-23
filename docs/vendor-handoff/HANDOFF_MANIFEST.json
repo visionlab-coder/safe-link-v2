@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "product": "SAFE-LINK V2 iOS",
+  "repository": "https://github.com/visionlab-coder/safe-link-v2.git",
+  "branch": "codex/ios-bootstrap-20260623",
+  "iosImplementationCommit": "8f08a2e259fbe46194a02b9eeb1133912256c563",
+  "androidBaselineCommit": "88785ad63b613e680b55f9c16c39568c2f7482e3",
+  "xcodeProject": "apps/mobile/ios/App/App.xcodeproj",
+  "bundleIdAtHandoff": "com.safelink.mobile.dev",
+  "minimumIOS": "15.0",
+  "capacitorIOS": "8.4.1",
+  "validatedEnvironment": {
+    "node": "22.22.3",
+    "xcode": "26.5",
+    "iosSimulatorSDK": "26.5"
+  },
+  "lastGreenCI": {
+    "runId": 27992777097,
+    "url": "https://github.com/visionlab-coder/safe-link-v2/actions/runs/27992777097"
+  },
+  "sourceSecretsIncluded": false,
+  "signedIPAIncluded": false,
+  "physicalDeviceVerificationComplete": false
+}
