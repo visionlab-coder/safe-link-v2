@@ -1,3 +1,10 @@
+import {
+    cancelIosScan,
+    isIosNativeScanner,
+    nativeScanError,
+    scanIosNfc,
+} from "./safe-link-native";
+
 // 📡 M-009 — NFC 스캔 capability 어댑터 (Web NFC / NDEFReader).
 // Web NFC는 Android Chrome 한정 + HTTPS 필요. iOS/desktop → unsupported(네이티브 후속).
 // 읽기 전용. SAFE-LINK NFC 스티커(URL payload)에서 worker/site 토큰 추출.
@@ -24,6 +31,7 @@ declare global {
 export type NfcCapability = { supported: boolean };
 
 export function getNfcCapability(): NfcCapability {
+    if (isIosNativeScanner()) return { supported: true };
     return { supported: typeof window !== "undefined" && "NDEFReader" in window };
 }
 
@@ -33,6 +41,24 @@ export type NfcScanResult =
     | { ok: false; error: "unsupported" | "permission_denied" | "cancelled" | "error"; message?: string };
 
 export async function scanNfcOnce(signal?: AbortSignal): Promise<NfcScanResult> {
+    if (isIosNativeScanner()) {
+        const cancel = () => void cancelIosScan();
+        signal?.addEventListener("abort", cancel, { once: true });
+        try {
+            const result = await scanIosNfc();
+            return {
+                ok: true,
+                records: result.records?.length
+                    ? result.records
+                    : [{ recordType: "url", value: result.value }],
+            };
+        } catch (error) {
+            return { ok: false, ...nativeScanError(error) };
+        } finally {
+            signal?.removeEventListener("abort", cancel);
+        }
+    }
+
     if (!getNfcCapability().supported) {
         return { ok: false, error: "unsupported", message: "Web NFC 미지원 (Android Chrome 전용; iOS는 네이티브 필요)" };
     }

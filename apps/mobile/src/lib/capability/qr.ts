@@ -1,3 +1,10 @@
+import {
+    cancelIosScan,
+    isIosNativeScanner,
+    nativeScanError,
+    scanIosQr,
+} from "./safe-link-native";
+
 // 📷 M-007 — 카메라·QR 스캔 capability 어댑터.
 // 1순위: 웹 표준 BarcodeDetector + getUserMedia (Capacitor Android WebView=Chrome 에서 동작).
 // iOS WKWebView 는 BarcodeDetector 미지원 → unsupported 반환(네이티브 플러그인 후속 증분).
@@ -19,6 +26,9 @@ declare global {
 export type QrCapability = { camera: boolean; detector: boolean; supported: boolean };
 
 export function getQrCapability(): QrCapability {
+    if (isIosNativeScanner()) {
+        return { camera: true, detector: true, supported: true };
+    }
     const camera = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
     const detector = typeof window !== "undefined" && typeof window.BarcodeDetector === "function";
     return { camera, detector, supported: camera && detector };
@@ -30,6 +40,19 @@ export type QrScanResult =
 
 /** video 엘리먼트에 카메라를 연결하고 QR 1건 감지 시 반환. signal로 취소. */
 export async function scanQrOnce(video: HTMLVideoElement, signal?: AbortSignal): Promise<QrScanResult> {
+    if (isIosNativeScanner()) {
+        const cancel = () => void cancelIosScan();
+        signal?.addEventListener("abort", cancel, { once: true });
+        try {
+            const result = await scanIosQr();
+            return { ok: true, value: result.value };
+        } catch (error) {
+            return { ok: false, ...nativeScanError(error) };
+        } finally {
+            signal?.removeEventListener("abort", cancel);
+        }
+    }
+
     const cap = getQrCapability();
     if (!cap.supported) {
         return {
