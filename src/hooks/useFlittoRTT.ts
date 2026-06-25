@@ -35,6 +35,9 @@ type FlittoEvent = {
 
 const PCM_TARGET_SAMPLE_RATE = 16000;
 const SEND_CHUNK_MS = 100;
+const SPEECH_RMS_THRESHOLD = 0.012;
+const END_OF_SPEECH_SILENCE_MS = 800;
+const FINISH_DEBOUNCE_MS = 250;
 
 function convertFloatTo16BitPcm(input: Float32Array): ArrayBuffer {
     const buffer = new ArrayBuffer(input.length * 2);
@@ -92,8 +95,12 @@ export function useFlittoRTT({
     const serverStartRef = useRef(false);
     const pendingTranslationsRef = useRef<Map<string, FlittoTranslation>>(new Map());
     const finalTextsRef = useRef<Map<string, string>>(new Map());
+    const finishTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
     const pcmQueueRef = useRef<ArrayBuffer[]>([]);
     const sendTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const speechDetectedRef = useRef(false);
+    const silenceStartedAtRef = useRef(0);
+    const stopSentRef = useRef(false);
     const targetLangsRef = useRef(targetLangs);
     const onTranscriptRef = useRef(onTranscript);
     const onStatusRef = useRef(onStatus);
@@ -114,6 +121,11 @@ export function useFlittoRTT({
             sendTimerRef.current = null;
         }
         pcmQueueRef.current = [];
+        speechDetectedRef.current = false;
+        silenceStartedAtRef.current = 0;
+        stopSentRef.current = false;
+        for (const timer of finishTimersRef.current.values()) clearTimeout(timer);
+        finishTimersRef.current.clear();
 
         try {
             if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -156,6 +168,30 @@ export function useFlittoRTT({
         }
     }, []);
 
+    const restartStreaming = useCallback(() => {
+        const ws = wsRef.current;
+        if (!activeRef.current || !ws || ws.readyState !== WebSocket.OPEN || !stopSentRef.current) return;
+        stopSentRef.current = false;
+        speechDetectedRef.current = false;
+        silenceStartedAtRef.current = 0;
+        ws.send(JSON.stringify({ event: "start" }));
+        onStatusRef.current?.("restarting");
+    }, []);
+
+    const deliverFinal = useCallback((id: string, sourceText?: string) => {
+        const existingTimer = finishTimersRef.current.get(id);
+        if (existingTimer) clearTimeout(existingTimer);
+        finishTimersRef.current.set(id, setTimeout(() => {
+            finishTimersRef.current.delete(id);
+            const text = sourceText || finalTextsRef.current.get(id);
+            const translations = pendingTranslationsRef.current.get(id);
+            if (text) onTranscriptRef.current(text, translations);
+            pendingTranslationsRef.current.delete(id);
+            finalTextsRef.current.delete(id);
+            restartStreaming();
+        }, FINISH_DEBOUNCE_MS));
+    }, [restartStreaming]);
+
     const startAudio = useCallback(async () => {
         const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
@@ -186,6 +222,26 @@ export function useFlittoRTT({
             try {
                 const downsampled = downsampleTo16k(input, ctx.sampleRate);
                 pcmQueueRef.current.push(convertFloatTo16BitPcm(downsampled));
+
+                let sum = 0;
+                for (let index = 0; index < input.length; index += 1) {
+                    sum += input[index] * input[index];
+                }
+                const rms = Math.sqrt(sum / Math.max(input.length, 1));
+                const now = Date.now();
+                if (rms >= SPEECH_RMS_THRESHOLD) {
+                    speechDetectedRef.current = true;
+                    silenceStartedAtRef.current = 0;
+                } else if (speechDetectedRef.current && !stopSentRef.current) {
+                    if (!silenceStartedAtRef.current) silenceStartedAtRef.current = now;
+                    if (now - silenceStartedAtRef.current >= END_OF_SPEECH_SILENCE_MS) {
+                        flushPcmQueue();
+                        wsRef.current?.send(JSON.stringify({ event: "stop" }));
+                        stopSentRef.current = true;
+                        serverStartRef.current = false;
+                        onStatusRef.current?.("finalizing");
+                    }
+                }
             } catch (error) {
                 onErrorRef.current?.(error instanceof Error ? error.message : "PCM conversion failed");
             }
@@ -244,8 +300,10 @@ export function useFlittoRTT({
 
                 if (payload.event === "start") {
                     serverStartRef.current = true;
+                    speechDetectedRef.current = false;
+                    silenceStartedAtRef.current = 0;
                     onStatusRef.current?.("recording");
-                    await startAudio();
+                    if (!streamRef.current) await startAudio();
                     return;
                 }
 
@@ -255,10 +313,7 @@ export function useFlittoRTT({
                     if (id && text) {
                         finalTextsRef.current.set(id, text);
                         const translations = pendingTranslationsRef.current.get(id);
-                        if (translations) {
-                            pendingTranslationsRef.current.delete(id);
-                            onTranscriptRef.current(text, translations);
-                        }
+                        if (translations) deliverFinal(id, text);
                     }
                     return;
                 }
@@ -271,11 +326,8 @@ export function useFlittoRTT({
                         if (item.lang_code && item.text) translations[item.lang_code] = item.text;
                     }
                     const srcText = payload.data?.src_text?.trim() || finalTextsRef.current.get(id);
-                    if (srcText) {
-                        onTranscriptRef.current(srcText, translations);
-                    } else {
-                        pendingTranslationsRef.current.set(id, translations);
-                    }
+                    pendingTranslationsRef.current.set(id, translations);
+                    if (srcText) deliverFinal(id, srcText);
                     return;
                 }
 
@@ -300,7 +352,7 @@ export function useFlittoRTT({
             stop();
             onErrorRef.current?.(error instanceof Error ? error.message : "Flitto RTT start failed");
         }
-    }, [hintLangs, startAudio, stop, tokenEndpoint]);
+    }, [deliverFinal, hintLangs, startAudio, stop, tokenEndpoint]);
 
     const toggle = useCallback(() => {
         if (activeRef.current) {

@@ -76,12 +76,32 @@ function wavToRawPcm(wavFile) {
   }
 
   if (!fmt || !data) throw new Error("WAV file missing fmt or data chunk");
-  if (fmt.audioFormat !== 1 || fmt.channels !== 1 || fmt.sampleRate !== 16000 || fmt.bitsPerSample !== 16) {
+  if (fmt.audioFormat !== 1 || fmt.channels !== 1 || fmt.bitsPerSample !== 16) {
     throw new Error(
-      `WAV must be PCM 16kHz mono 16-bit. got format=${fmt.audioFormat} channels=${fmt.channels} sampleRate=${fmt.sampleRate} bits=${fmt.bitsPerSample}`,
+      `WAV must be PCM mono 16-bit. got format=${fmt.audioFormat} channels=${fmt.channels} sampleRate=${fmt.sampleRate} bits=${fmt.bitsPerSample}`,
     );
   }
-  return data;
+  if (fmt.sampleRate === 16000) return data;
+
+  const sourceSamples = new Int16Array(
+    data.buffer,
+    data.byteOffset,
+    Math.floor(data.byteLength / Int16Array.BYTES_PER_ELEMENT),
+  );
+  const ratio = fmt.sampleRate / 16000;
+  const output = Buffer.alloc(Math.round(sourceSamples.length / ratio) * 2);
+  for (let index = 0; index < output.length / 2; index += 1) {
+    const position = index * ratio;
+    const lower = Math.floor(position);
+    const upper = Math.min(lower + 1, sourceSamples.length - 1);
+    const weight = position - lower;
+    const sample = Math.round(
+      sourceSamples[lower] * (1 - weight) + sourceSamples[upper] * weight,
+    );
+    output.writeInt16LE(Math.max(-32768, Math.min(32767, sample)), index * 2);
+  }
+  console.log(`[flitto-rtt] resampled ${fmt.sampleRate}Hz -> 16000Hz`);
+  return output;
 }
 
 function chunkBuffer(buf, chunkBytes = 3200) {
@@ -113,6 +133,11 @@ async function main() {
   let serverStartSeen = false;
   let transcriptEndCount = 0;
   let finishCount = 0;
+  let audioStartedAt = 0;
+  let audioFinishedAt = 0;
+  let firstTranscriptAt = 0;
+  let transcriptEndAt = 0;
+  let finishAt = 0;
 
   console.log("[flitto-rtt] connect", redactUrl(wsUrl));
   console.log("[flitto-rtt] hint", hintLangs.join(","), "target", targetLangs.join(","));
@@ -175,17 +200,20 @@ async function main() {
         const audio = pcmPath ? fs.readFileSync(pcmPath) : wavPath ? wavToRawPcm(wavPath) : silencePcm(silenceMs);
         const chunks = chunkBuffer(audio);
         console.log("[flitto-rtt] => audio chunks", chunks.length, "bytes", audio.length);
+        audioStartedAt = Date.now();
         for (const chunk of chunks) {
           ws.send(chunk);
           // 16kHz 16-bit mono: 3200 bytes ~= 100ms audio. Keep stream-like pacing.
           await sleep(90);
         }
+        audioFinishedAt = Date.now();
         ws.send(JSON.stringify({ event: "stop" }));
         setTimeout(() => ws.close(1000, "audio test complete"), 3000);
         return;
       }
 
       if (event === "transcript") {
+        if (!firstTranscriptAt) firstTranscriptAt = Date.now();
         const data = payload.data || {};
         console.log("[flitto-rtt] <= transcript", {
           id: data.transcript_id,
@@ -199,6 +227,7 @@ async function main() {
 
       if (event === "transcript_end") {
         transcriptEndCount++;
+        transcriptEndAt = Date.now();
         const data = payload.data || {};
         console.log("[flitto-rtt] <= transcript_end", {
           id: data.transcript_id,
@@ -211,6 +240,7 @@ async function main() {
 
       if (event === "finish") {
         finishCount++;
+        finishAt = Date.now();
         const data = payload.data || {};
         console.log("[flitto-rtt] <= finish", {
           id: data.transcript_id,
@@ -235,6 +265,13 @@ async function main() {
         events,
         transcriptEndCount,
         finishCount,
+        latency: {
+          sessionReadyMs: audioStartedAt ? audioStartedAt - startedAt : null,
+          firstPartialFromAudioStartMs: firstTranscriptAt ? firstTranscriptAt - audioStartedAt : null,
+          finalSttFromAudioEndMs: transcriptEndAt ? transcriptEndAt - audioFinishedAt : null,
+          translationFromFinalSttMs: finishAt ? finishAt - transcriptEndAt : null,
+          translationFromAudioEndMs: finishAt ? finishAt - audioFinishedAt : null,
+        },
       });
     });
 
