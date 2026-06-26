@@ -21,6 +21,7 @@ export interface LabEngineConfig {
     geminiKey?: string;
     flittoToken?: string;
     updatedAt?: string;
+    updatedBy?: string;   // 마지막 변경자 이메일(감사) — 평문 키는 절대 저장 안 함
 }
 
 /** setLabConfig/route 입력용 — translateEngine은 ""(=해제) 허용 */
@@ -80,6 +81,7 @@ export async function getLabOverride(): Promise<LabEngineConfig | null> {
         const out: LabEngineConfig = {
             translateEngine: raw.translateEngine as TranslateEngine | undefined,
             updatedAt: raw.updatedAt,
+            updatedBy: raw.updatedBy,
         };
         for (const f of SECRET_FIELDS) {
             if (raw[f]) {
@@ -105,13 +107,14 @@ export async function getLabConfigMasked(): Promise<(Omit<LabEngineConfig, never
         geminiKey: mask(cfg.geminiKey),
         flittoToken: mask(cfg.flittoToken),
         updatedAt: cfg.updatedAt,
+        updatedBy: cfg.updatedBy,
         _masked: true,
     };
 }
 
 /** 부분 업데이트 — 전달된 필드만 암호화 저장. 빈 문자열이면 해당 필드 삭제. */
-export async function setLabConfig(patch: LabConfigInput): Promise<void> {
-    // 인증(루트관리자)은 API 라우트(require-root-admin)에서 강제. 여기선 데이터 저장만 담당.
+export async function setLabConfig(patch: LabConfigInput, actorEmail?: string): Promise<void> {
+    // 인증(루트/개발자)은 API 라우트에서 강제. 여기선 데이터 저장만 담당.
     const raw = (await readRaw()) ?? {};
     if (patch.translateEngine !== undefined) {
         if (patch.translateEngine) raw.translateEngine = patch.translateEngine;
@@ -124,5 +127,35 @@ export async function setLabConfig(patch: LabConfigInput): Promise<void> {
         else raw[f] = encrypt(v);
     }
     raw.updatedAt = new Date().toISOString();
+    if (actorEmail) raw.updatedBy = actorEmail;
     await writeRaw(raw);
+}
+
+/** 🔎 키 변경 감사로그 — 누가/언제/어떤 필드를 바꿨는지(값은 절대 저장 안 함). */
+export interface KeyChangeAudit {
+    at: string;
+    by: string;
+    engine?: string;       // 엔진 변경 시
+    fields: string[];      // 변경된 키 필드명(값 제외)
+}
+
+const AUDIT_KEY = "lab:engine-config:audit:v1";
+const AUDIT_CAP = 20;
+let _memAudit: KeyChangeAudit[] = [];
+
+export async function appendKeyChangeAudit(entry: KeyChangeAudit): Promise<void> {
+    const r = redis();
+    if (r) {
+        const list = (await r.get<KeyChangeAudit[]>(AUDIT_KEY)) ?? [];
+        list.unshift(entry);
+        await r.set(AUDIT_KEY, list.slice(0, AUDIT_CAP));
+        return;
+    }
+    _memAudit = [entry, ..._memAudit].slice(0, AUDIT_CAP);
+}
+
+export async function getKeyChangeAudit(): Promise<KeyChangeAudit[]> {
+    const r = redis();
+    if (r) return (await r.get<KeyChangeAudit[]>(AUDIT_KEY)) ?? [];
+    return _memAudit;
 }
