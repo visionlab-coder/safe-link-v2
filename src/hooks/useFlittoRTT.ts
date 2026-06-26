@@ -35,9 +35,13 @@ type FlittoEvent = {
 
 const PCM_TARGET_SAMPLE_RATE = 16000;
 const SEND_CHUNK_MS = 100;
-const SPEECH_RMS_THRESHOLD = 0.012;
+const SPEECH_RMS_THRESHOLD = 0.012;        // absolute floor (quiet rooms)
 const END_OF_SPEECH_SILENCE_MS = 800;
 const FINISH_DEBOUNCE_MS = 250;
+const NOISE_FLOOR_EMA = 0.05;              // ambient-noise tracking rate (per frame)
+const SPEECH_MARGIN = 2.5;                 // speech must exceed ambient noise floor × this
+const MAX_UTTERANCE_MS = 12000;            // force-finalize cap when no silence gap appears
+const TRANSLATION_FALLBACK_MS = 1500;      // deliver source-only if `finish` never arrives
 
 function convertFloatTo16BitPcm(input: Float32Array): ArrayBuffer {
     const buffer = new ArrayBuffer(input.length * 2);
@@ -100,6 +104,8 @@ export function useFlittoRTT({
     const sendTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const speechDetectedRef = useRef(false);
     const silenceStartedAtRef = useRef(0);
+    const speechStartedAtRef = useRef(0);
+    const noiseFloorRef = useRef(0);
     const stopSentRef = useRef(false);
     const targetLangsRef = useRef(targetLangs);
     const onTranscriptRef = useRef(onTranscript);
@@ -123,6 +129,8 @@ export function useFlittoRTT({
         pcmQueueRef.current = [];
         speechDetectedRef.current = false;
         silenceStartedAtRef.current = 0;
+        speechStartedAtRef.current = 0;
+        noiseFloorRef.current = 0;
         stopSentRef.current = false;
         for (const timer of finishTimersRef.current.values()) clearTimeout(timer);
         finishTimersRef.current.clear();
@@ -174,22 +182,25 @@ export function useFlittoRTT({
         stopSentRef.current = false;
         speechDetectedRef.current = false;
         silenceStartedAtRef.current = 0;
+        speechStartedAtRef.current = 0;
         ws.send(JSON.stringify({ event: "start" }));
         onStatusRef.current?.("restarting");
     }, []);
 
-    const deliverFinal = useCallback((id: string, sourceText?: string) => {
+    const deliverFinal = useCallback((id: string, sourceText?: string, delayMs: number = FINISH_DEBOUNCE_MS) => {
         const existingTimer = finishTimersRef.current.get(id);
         if (existingTimer) clearTimeout(existingTimer);
         finishTimersRef.current.set(id, setTimeout(() => {
             finishTimersRef.current.delete(id);
             const text = sourceText || finalTextsRef.current.get(id);
+            // Read translations at fire time: `finish` may have populated them after this
+            // was scheduled. If still absent (translation never arrived), deliver source-only.
             const translations = pendingTranslationsRef.current.get(id);
             if (text) onTranscriptRef.current(text, translations);
             pendingTranslationsRef.current.delete(id);
             finalTextsRef.current.delete(id);
             restartStreaming();
-        }, FINISH_DEBOUNCE_MS));
+        }, delayMs));
     }, [restartStreaming]);
 
     const startAudio = useCallback(async () => {
@@ -229,17 +240,33 @@ export function useFlittoRTT({
                 }
                 const rms = Math.sqrt(sum / Math.max(input.length, 1));
                 const now = Date.now();
-                if (rms >= SPEECH_RMS_THRESHOLD) {
+                // Adaptive end-of-speech: threshold tracks ambient noise so loud
+                // construction sites don't keep the gate permanently "speaking".
+                const speechThreshold = Math.max(SPEECH_RMS_THRESHOLD, noiseFloorRef.current * SPEECH_MARGIN);
+                if (rms >= speechThreshold) {
+                    if (!speechDetectedRef.current) speechStartedAtRef.current = now;
                     speechDetectedRef.current = true;
                     silenceStartedAtRef.current = 0;
-                } else if (speechDetectedRef.current && !stopSentRef.current) {
-                    if (!silenceStartedAtRef.current) silenceStartedAtRef.current = now;
-                    if (now - silenceStartedAtRef.current >= END_OF_SPEECH_SILENCE_MS) {
+                } else if (!speechDetectedRef.current) {
+                    // Track ambient noise floor only between utterances (EMA).
+                    noiseFloorRef.current = noiseFloorRef.current === 0
+                        ? rms
+                        : noiseFloorRef.current * (1 - NOISE_FLOOR_EMA) + rms * NOISE_FLOOR_EMA;
+                } else if (!stopSentRef.current && !silenceStartedAtRef.current) {
+                    silenceStartedAtRef.current = now;
+                }
+
+                if (speechDetectedRef.current && !stopSentRef.current) {
+                    const silenceEnded = silenceStartedAtRef.current > 0
+                        && now - silenceStartedAtRef.current >= END_OF_SPEECH_SILENCE_MS;
+                    const tooLong = speechStartedAtRef.current > 0
+                        && now - speechStartedAtRef.current >= MAX_UTTERANCE_MS;
+                    if (silenceEnded || tooLong) {
                         flushPcmQueue();
                         wsRef.current?.send(JSON.stringify({ event: "stop" }));
                         stopSentRef.current = true;
                         serverStartRef.current = false;
-                        onStatusRef.current?.("finalizing");
+                        onStatusRef.current?.(tooLong ? "finalizing-maxlen" : "finalizing");
                     }
                 }
             } catch (error) {
@@ -302,6 +329,7 @@ export function useFlittoRTT({
                     serverStartRef.current = true;
                     speechDetectedRef.current = false;
                     silenceStartedAtRef.current = 0;
+                    speechStartedAtRef.current = 0;
                     onStatusRef.current?.("recording");
                     if (!streamRef.current) await startAudio();
                     return;
@@ -313,7 +341,10 @@ export function useFlittoRTT({
                     if (id && text) {
                         finalTextsRef.current.set(id, text);
                         const translations = pendingTranslationsRef.current.get(id);
-                        if (translations) deliverFinal(id, text);
+                        // If translation already arrived, deliver promptly; otherwise schedule
+                        // a source-only fallback so a transcript is never lost when `finish`
+                        // is delayed or dropped. A later `finish` reschedules with translations.
+                        deliverFinal(id, text, translations ? FINISH_DEBOUNCE_MS : TRANSLATION_FALLBACK_MS);
                     }
                     return;
                 }
