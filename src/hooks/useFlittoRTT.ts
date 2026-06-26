@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createVadState, stepVad } from "@/lib/vad/finalize-decision.mjs";
 
 type FlittoTranslation = Record<string, string>;
 
@@ -35,13 +36,9 @@ type FlittoEvent = {
 
 const PCM_TARGET_SAMPLE_RATE = 16000;
 const SEND_CHUNK_MS = 100;
-const SPEECH_RMS_THRESHOLD = 0.012;        // absolute floor (quiet rooms)
-const END_OF_SPEECH_SILENCE_MS = 800;
 const FINISH_DEBOUNCE_MS = 250;
-const NOISE_FLOOR_EMA = 0.05;              // ambient-noise tracking rate (per frame)
-const SPEECH_MARGIN = 2.5;                 // speech must exceed ambient noise floor × this
-const MAX_UTTERANCE_MS = 12000;            // force-finalize cap when no silence gap appears
-const TRANSLATION_FALLBACK_MS = 1500;      // deliver source-only if `finish` never arrives
+const TRANSLATION_FALLBACK_MS = 3000;      // last-resort source-only delivery if `finish` never arrives
+// VAD thresholds live in @/lib/vad/finalize-decision (pure + unit-tested).
 
 function convertFloatTo16BitPcm(input: Float32Array): ArrayBuffer {
     const buffer = new ArrayBuffer(input.length * 2);
@@ -102,10 +99,8 @@ export function useFlittoRTT({
     const finishTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
     const pcmQueueRef = useRef<ArrayBuffer[]>([]);
     const sendTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-    const speechDetectedRef = useRef(false);
-    const silenceStartedAtRef = useRef(0);
-    const speechStartedAtRef = useRef(0);
-    const noiseFloorRef = useRef(0);
+    const vadStateRef = useRef(createVadState());
+    const deliveredRef = useRef<Set<string>>(new Set());
     const stopSentRef = useRef(false);
     const targetLangsRef = useRef(targetLangs);
     const onTranscriptRef = useRef(onTranscript);
@@ -127,10 +122,8 @@ export function useFlittoRTT({
             sendTimerRef.current = null;
         }
         pcmQueueRef.current = [];
-        speechDetectedRef.current = false;
-        silenceStartedAtRef.current = 0;
-        speechStartedAtRef.current = 0;
-        noiseFloorRef.current = 0;
+        vadStateRef.current = createVadState();
+        deliveredRef.current.clear();
         stopSentRef.current = false;
         for (const timer of finishTimersRef.current.values()) clearTimeout(timer);
         finishTimersRef.current.clear();
@@ -180,9 +173,9 @@ export function useFlittoRTT({
         const ws = wsRef.current;
         if (!activeRef.current || !ws || ws.readyState !== WebSocket.OPEN || !stopSentRef.current) return;
         stopSentRef.current = false;
-        speechDetectedRef.current = false;
-        silenceStartedAtRef.current = 0;
-        speechStartedAtRef.current = 0;
+        // Keep learned noiseFloor/calibration; only clear the per-utterance speech state.
+        const v = vadStateRef.current;
+        vadStateRef.current = { ...v, speechDetected: false, speechStartedAt: 0, silenceStartedAt: 0 };
         ws.send(JSON.stringify({ event: "start" }));
         onStatusRef.current?.("restarting");
     }, []);
@@ -192,11 +185,21 @@ export function useFlittoRTT({
         if (existingTimer) clearTimeout(existingTimer);
         finishTimersRef.current.set(id, setTimeout(() => {
             finishTimersRef.current.delete(id);
+            // Emit each utterance once. If the source-only fallback already fired and a
+            // late `finish` reschedules this, drop it instead of duplicating the line.
+            if (deliveredRef.current.has(id)) {
+                pendingTranslationsRef.current.delete(id);
+                finalTextsRef.current.delete(id);
+                return;
+            }
             const text = sourceText || finalTextsRef.current.get(id);
             // Read translations at fire time: `finish` may have populated them after this
             // was scheduled. If still absent (translation never arrived), deliver source-only.
             const translations = pendingTranslationsRef.current.get(id);
-            if (text) onTranscriptRef.current(text, translations);
+            if (text) {
+                deliveredRef.current.add(id);
+                onTranscriptRef.current(text, translations);
+            }
             pendingTranslationsRef.current.delete(id);
             finalTextsRef.current.delete(id);
             restartStreaming();
@@ -240,34 +243,15 @@ export function useFlittoRTT({
                 }
                 const rms = Math.sqrt(sum / Math.max(input.length, 1));
                 const now = Date.now();
-                // Adaptive end-of-speech: threshold tracks ambient noise so loud
-                // construction sites don't keep the gate permanently "speaking".
-                const speechThreshold = Math.max(SPEECH_RMS_THRESHOLD, noiseFloorRef.current * SPEECH_MARGIN);
-                if (rms >= speechThreshold) {
-                    if (!speechDetectedRef.current) speechStartedAtRef.current = now;
-                    speechDetectedRef.current = true;
-                    silenceStartedAtRef.current = 0;
-                } else if (!speechDetectedRef.current) {
-                    // Track ambient noise floor only between utterances (EMA).
-                    noiseFloorRef.current = noiseFloorRef.current === 0
-                        ? rms
-                        : noiseFloorRef.current * (1 - NOISE_FLOOR_EMA) + rms * NOISE_FLOOR_EMA;
-                } else if (!stopSentRef.current && !silenceStartedAtRef.current) {
-                    silenceStartedAtRef.current = now;
-                }
-
-                if (speechDetectedRef.current && !stopSentRef.current) {
-                    const silenceEnded = silenceStartedAtRef.current > 0
-                        && now - silenceStartedAtRef.current >= END_OF_SPEECH_SILENCE_MS;
-                    const tooLong = speechStartedAtRef.current > 0
-                        && now - speechStartedAtRef.current >= MAX_UTTERANCE_MS;
-                    if (silenceEnded || tooLong) {
-                        flushPcmQueue();
-                        wsRef.current?.send(JSON.stringify({ event: "stop" }));
-                        stopSentRef.current = true;
-                        serverStartRef.current = false;
-                        onStatusRef.current?.(tooLong ? "finalizing-maxlen" : "finalizing");
-                    }
+                // Adaptive end-of-speech decision (pure + unit-tested in finalize-decision).
+                const step = stepVad(vadStateRef.current, rms, now);
+                vadStateRef.current = step;
+                if (step.action !== "none" && !stopSentRef.current) {
+                    flushPcmQueue();
+                    wsRef.current?.send(JSON.stringify({ event: "stop" }));
+                    stopSentRef.current = true;
+                    serverStartRef.current = false;
+                    onStatusRef.current?.(step.action === "finalize-maxlen" ? "finalizing-maxlen" : "finalizing");
                 }
             } catch (error) {
                 onErrorRef.current?.(error instanceof Error ? error.message : "PCM conversion failed");
@@ -327,9 +311,9 @@ export function useFlittoRTT({
 
                 if (payload.event === "start") {
                     serverStartRef.current = true;
-                    speechDetectedRef.current = false;
-                    silenceStartedAtRef.current = 0;
-                    speechStartedAtRef.current = 0;
+                    // New listening segment: clear per-utterance speech state, keep noiseFloor.
+                    const v = vadStateRef.current;
+                    vadStateRef.current = { ...v, speechDetected: false, speechStartedAt: 0, silenceStartedAt: 0 };
                     onStatusRef.current?.("recording");
                     if (!streamRef.current) await startAudio();
                     return;
