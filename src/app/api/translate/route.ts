@@ -6,6 +6,10 @@ import { verifyTravelToken } from '@/lib/travel-auth';
 import { checkTranslateLimit } from '@/utils/rate-limit';
 import { CONSTRUCTION_GLOSSARY } from '@/constants/glossary';
 import { getErrorMessage } from '@/utils/errors';
+import { getLabOverride } from '@/utils/lab/engine-config';
+import { resolveRequestAccessToken } from '@/utils/auth/access-token-core';
+import { verifyAccessToken } from '@/utils/auth/verify-access-token';
+import { withMobileCors, handleMobilePreflight } from '@/utils/auth/mobile-cors';
 import { hangulize } from '@/utils/hangulize';
 import { stripEmoji } from '@/utils/strip-emoji';
 import pinyin from 'tiny-pinyin';
@@ -29,22 +33,48 @@ interface GeminiResponse {
     }>;
 }
 
+interface LocalM2M100Response {
+    translated?: string;
+    reverse_translated?: string;
+    engine?: string;
+    processing_ms?: number;
+}
+
+interface MultilingualGlossaryTerm {
+    glossaryId: number;
+    standard: string;
+    standardCore: string;
+    pivotEnglish: string;
+    localTerm: string;
+    language: string;
+}
+
 /**
  * 하이브리드 번역 API
  * 1단계: Google Cloud Translation API (0.3초, 고품질 번역)
  * 2단계: Gemini 2.5 Flash (발음 + 역번역) — 1단계와 병렬 실행
  */
-export async function POST(request: NextRequest) {
-    // 인증: travel_token (Travel Talk 흐름) 또는 Supabase 세션
+async function handleTranslate(request: NextRequest): Promise<NextResponse> {
+    // 인증: travel_token(Travel Talk) | 📱 모바일 Bearer JWT | 웹 cookie
+    // ⚠️ travel-token도 'Bearer '라 모바일 JWT와 충돌 → X-Safe-Link-Client: mobile 로 구분 (S-005)
     const authHeader = request.headers.get('authorization');
+    const isMobile = request.headers.get('x-safe-link-client') === 'mobile';
     let rateLimitKey: string;
-    if (authHeader?.startsWith('Bearer ')) {
+    if (authHeader?.startsWith('Bearer ') && !isMobile) {
         const token = authHeader.slice(7);
         if (!verifyTravelToken(token)) {
             return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
         }
         // travel token은 IP 기반 제한
         rateLimitKey = `ip:${request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown"}`;
+    } else if (isMobile) {
+        // 📱 모바일 Bearer(Supabase JWT) — 서명검증 (S-005)
+        const resolved = resolveRequestAccessToken({ authorization: authHeader, rawCookie: null });
+        const verified = resolved ? await verifyAccessToken(resolved.accessToken) : null;
+        if (!verified) {
+            return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+        }
+        rateLimitKey = `uid:${verified.sub}`;
     } else {
         // P5 박제: createServerClient.getUser() → getCookieUser() (raw JWT 파싱)
         const user = await getCookieUser();
@@ -58,14 +88,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
     }
 
-    const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();
-
-    if (!apiKey) {
-        return NextResponse.json({ error: "Missing GOOGLE_CLOUD_API_KEY" }, { status: 500 });
-    }
+    // 🧪 Lab 런타임 오버라이드: 운영(APP_MODE!=lab)에선 항상 null → 아래 모든 분기는 기존 env 그대로.
+    const lab = await getLabOverride();
+    const apiKey = lab?.googleKey || process.env.GOOGLE_CLOUD_API_KEY?.trim();
 
     try {
-        const { text, sl, tl, fast, pronunciation: includePronunciation = true, useGlossary = false } = await request.json();
+        const { text, sl, tl, fast, pronunciation: includePronunciation = true } = await request.json();
 
         if (!text || !sl || !tl) {
             return NextResponse.json({ error: "Missing required texts" }, { status: 400 });
@@ -78,7 +106,7 @@ export async function POST(request: NextRequest) {
         // 건설 현장 용어집 전처리 — useGlossary=true 로 명시한 호출(TBM/안전지시)에만 적용
         // 일반 채팅(밥 먹으러 가자 등)에는 건설 용어집 불필요 — 오역 방지
         let processedText = text;
-        if (useGlossary && sl === 'ko') {
+        if (sl === 'ko') {
             const glossary = await fetchGlossaryServer();
             // BUG-1 fix: 괄호 설명형 치환어는 번역 텍스트를 오염시킴 → skip
             // BUG-2 fix: 긴 슬랭 먼저 매칭해야 짧은 슬랭이 긴 슬랭 일부를 먼저 치환하는 문제 방지
@@ -87,7 +115,10 @@ export async function POST(request: NextRequest) {
                 .sort((a, b) => b[0].length - a[0].length);
             for (const [slang, std] of sortedEntries) {
                 const escapedSlang = slang.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                processedText = processedText.replace(new RegExp(escapedSlang, 'g'), std as string);
+                const pattern = Array.from(slang).length === 1
+                    ? `(?<![\\p{L}\\p{N}])${escapedSlang}(?![\\p{L}\\p{N}])`
+                    : escapedSlang;
+                processedText = processedText.replace(new RegExp(pattern, 'gu'), std as string);
             }
         } else if (tl === 'ko') {
             // 외국어→한국어: 건설 전문 용어를 한국어로 치환 후 번역 (품질 향상)
@@ -103,14 +134,44 @@ export async function POST(request: NextRequest) {
         };
         const sourceLang = langMap[sl] || sl;
         const targetLang = langMap[tl] || tl;
+        const forced = lab?.translateEngine;
+
+        // m2m100(로컬 오픈소스)은 서비스 URL이 설정됐거나 루트관리자가 명시 선택한 경우에만 시도.
+        // (운영엔 127.0.0.1:8100 서비스가 없어 매 번역마다 실패·낭비되던 문제 수정)
+        const m2m100Enabled = forced === "m2m100"
+            || (!forced && !!process.env.M2M100_TRANSLATE_URL?.trim());
+        if (m2m100Enabled) {
+            const localTranslation = await tryM2M100Translate(processedText, sl, tl, !fast);
+            if (localTranslation) {
+                return NextResponse.json({
+                    translated: stripEmoji(tl === "ko"
+                        ? formalizeKo(localTranslation.translated)
+                        : localTranslation.translated),
+                    pronunciation: getLocalPronunciation(localTranslation.translated, tl),
+                    reverse_translated: stripEmoji(sl === "ko"
+                        ? formalizeKo(localTranslation.reverseTranslated)
+                        : localTranslation.reverseTranslated),
+                    engine: "m2m100-local",
+                    processing_ms: localTranslation.processingMs,
+                });
+            }
+        }
+
+        if (!apiKey) {
+            return NextResponse.json({
+                error: "M2M100 unavailable and GOOGLE_CLOUD_API_KEY is missing",
+            }, { status: 503 });
+        }
 
         // === 1. Naver Papago (아시아권 언어 고품질 번역) ===
-        const NAVER_ID = process.env.NAVER_CLIENT_ID?.trim();
-        const NAVER_SECRET = process.env.NAVER_CLIENT_SECRET?.trim();
-        
+        const NAVER_ID = lab?.papagoId || process.env.NAVER_CLIENT_ID?.trim();
+        const NAVER_SECRET = lab?.papagoSecret || process.env.NAVER_CLIENT_SECRET?.trim();
+
         // 파파고 지원 언어 목록
         const papagoLangs = ['ko', 'en', 'zh-CN', 'vi', 'id', 'th', 'ru', 'ja', 'fr', 'es'];
-        const usePapago = NAVER_ID && NAVER_SECRET && papagoLangs.includes(sourceLang) && papagoLangs.includes(targetLang);
+        // 🧪 Lab 강제 엔진: forced 지정 시 해당 엔진만 사용(운영은 forced=undefined → 기존 우선순위)
+        const usePapago = (forced ? forced === "papago" : true)
+            && NAVER_ID && NAVER_SECRET && papagoLangs.includes(sourceLang) && papagoLangs.includes(targetLang);
 
         let translatedText = "";
         let engine = "google";
@@ -148,7 +209,7 @@ export async function POST(request: NextRequest) {
         // === 1.5. Gemini 건설현장 번역 (비Papago 언어 + Papago 실패 시) ===
         // Google 단독으로는 건설 안전 문맥 없이 직역 → 오역/오해 위험
         // LOW-2 fix: Papago 장애 시에도 Gemini 건설 컨텍스트 번역 시도
-        if (!translatedText) {
+        if (!translatedText && forced !== "google") {
             const geminiTranslated = await geminiConstructionTranslate(processedText, sl, tl, apiKey);
             if (geminiTranslated) {
                 translatedText = geminiTranslated;
@@ -273,12 +334,241 @@ export async function POST(request: NextRequest) {
     }
 }
 
+// 📱 모바일(Capacitor) preflight (S-005)
+export async function OPTIONS(request: NextRequest) {
+    return handleMobilePreflight(request) ?? new NextResponse(null, { status: 405 });
+}
+
+// POST 래퍼 — 허용 mobile origin이면 응답에 CORS 부착(웹/travel-token 무영향).
+export async function POST(request: NextRequest) {
+    const res = await handleTranslate(request);
+    return withMobileCors(res, request.headers.get("origin"));
+}
+
 
 /** 서버사이드 glossary fetch — 서비스 롤 클라이언트로 RLS 우회 */
+const M2M100_LANG_MAP: Record<string, string> = {
+    ko: "ko", en: "en", zh: "zh", vi: "vi", th: "th", uz: "uz",
+    ph: "tl", tl: "tl", km: "km", id: "id", mn: "mn", my: "my",
+    ne: "ne", bn: "bn", kk: "kk", ru: "ru", jp: "ja", ja: "ja",
+    fr: "fr", es: "es", ar: "ar", hi: "hi",
+};
+
+async function tryM2M100Translate(
+    text: string,
+    sourceLanguage: string,
+    targetLanguage: string,
+    includeReverse: boolean,
+): Promise<{
+    translated: string;
+    reverseTranslated: string;
+    processingMs: number;
+} | null> {
+    const source = M2M100_LANG_MAP[sourceLanguage];
+    const target = M2M100_LANG_MAP[targetLanguage];
+    if (!source || !target || source === target || text.length > 3000) return null;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    const url = process.env.M2M100_TRANSLATE_URL?.trim() || "http://127.0.0.1:8100";
+
+    try {
+        const terminology = await prepareM2M100Terminology(text, source, target);
+        const response = await fetch(`${url}/translate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json; charset=utf-8" },
+            signal: controller.signal,
+            cache: "no-store",
+            body: JSON.stringify({
+                text: terminology.text,
+                source,
+                target,
+                reverse: includeReverse,
+            }),
+        });
+        if (!response.ok) return null;
+
+        const result = await response.json() as LocalM2M100Response;
+        const translated = enforceM2M100Terminology(
+            result.translated?.trim() || "",
+            target,
+            terminology.terms,
+        );
+        const reverseTranslated = result.reverse_translated?.trim() || "";
+        if (!isUsableLocalTranslation(text, translated)) return null;
+
+        return {
+            translated,
+            reverseTranslated,
+            processingMs: result.processing_ms ?? 0,
+        };
+    } catch {
+        return null;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+let _multilingualGlossaryCache: MultilingualGlossaryTerm[] | null = null;
+let _multilingualGlossaryCacheAt = 0;
+
+async function fetchMultilingualGlossary(): Promise<MultilingualGlossaryTerm[]> {
+    if (
+        _multilingualGlossaryCache &&
+        Date.now() - _multilingualGlossaryCacheAt < GLOSSARY_CACHE_TTL_MS
+    ) {
+        return _multilingualGlossaryCache;
+    }
+
+    try {
+        const sb = createServiceClient();
+        const { data, error } = await sb
+            .from("site_term_translations")
+            .select("glossary_id, pivot_en, lang_code, local_slang, construction_glossary(standard)");
+        if (error || !data) return _multilingualGlossaryCache ?? [];
+
+        const rows = data as unknown as Array<{
+            glossary_id: number;
+            pivot_en: string;
+            lang_code: string;
+            local_slang: string;
+            construction_glossary: { standard?: string } | Array<{ standard?: string }> | null;
+        }>;
+        _multilingualGlossaryCache = rows.flatMap((row) => {
+            const relation = Array.isArray(row.construction_glossary)
+                ? row.construction_glossary[0]
+                : row.construction_glossary;
+            const standard = relation?.standard?.trim() || "";
+            const standardCore = standard.split(/[,(]/)[0].trim();
+            const pivotMatch = row.pivot_en?.match(/\(([^)]+)\)/);
+            const pivotEnglish = (pivotMatch?.[1] || row.pivot_en || "").trim();
+            if (!standardCore || !pivotEnglish || !row.local_slang?.trim()) return [];
+            return [{
+                glossaryId: row.glossary_id,
+                standard,
+                standardCore,
+                pivotEnglish,
+                localTerm: row.local_slang.trim(),
+                language: normalizeGlossaryLanguage(row.lang_code),
+            }];
+        });
+        _multilingualGlossaryCacheAt = Date.now();
+        return _multilingualGlossaryCache;
+    } catch {
+        return _multilingualGlossaryCache ?? [];
+    }
+}
+
+async function prepareM2M100Terminology(
+    text: string,
+    source: string,
+    target: string,
+): Promise<{ text: string; terms: MultilingualGlossaryTerm[] }> {
+    const glossary = await fetchMultilingualGlossary();
+    const targetTerms = glossary.filter((term) => term.language === target);
+    const sourceTerms = glossary.filter((term) => term.language === source);
+    const applied: MultilingualGlossaryTerm[] = [];
+    let prepared = text;
+
+    if (source === "ko") {
+        for (const term of targetTerms.sort((a, b) => b.standardCore.length - a.standardCore.length)) {
+            if (!prepared.includes(term.standardCore)) continue;
+            prepared = prepared.replaceAll(term.standardCore, term.pivotEnglish);
+            applied.push(term);
+        }
+    } else {
+        for (const sourceTerm of sourceTerms.sort((a, b) => b.localTerm.length - a.localTerm.length)) {
+            if (!prepared.toLowerCase().includes(sourceTerm.localTerm.toLowerCase())) continue;
+            prepared = prepared.replace(
+                new RegExp(escapeRegExp(sourceTerm.localTerm), "giu"),
+                sourceTerm.pivotEnglish,
+            );
+            const targetTerm = target === "ko"
+                ? sourceTerm
+                : targetTerms.find((candidate) => candidate.glossaryId === sourceTerm.glossaryId);
+            if (targetTerm) applied.push(targetTerm);
+        }
+    }
+
+    return { text: prepared, terms: applied };
+}
+
+function enforceM2M100Terminology(
+    translated: string,
+    target: string,
+    terms: MultilingualGlossaryTerm[],
+): string {
+    let result = translated;
+    for (const term of terms) {
+        const required = target === "ko" ? term.standardCore : term.localTerm;
+        if (result.toLowerCase().includes(required.toLowerCase())) continue;
+
+        const pivotWords = term.pivotEnglish.match(/[A-Za-z]+/g) ?? [];
+        const distinctiveWord = pivotWords.at(-1);
+        if (distinctiveWord && new RegExp(`\\b${escapeRegExp(distinctiveWord)}\\b`, "iu").test(result)) {
+            result = result.replace(
+                new RegExp(`\\b(?:${pivotWords.slice(0, -1).map(escapeRegExp).join("\\s+")}\\s+)?${escapeRegExp(distinctiveWord)}\\b`, "iu"),
+                required,
+            );
+        } else {
+            result = `${required}: ${result}`;
+        }
+    }
+    return result;
+}
+
+function normalizeGlossaryLanguage(language: string): string {
+    const aliases: Record<string, string> = {
+        ph: "tl", kh: "km", lk: "si", bd: "bn", np: "ne", mm: "my", pk: "ur",
+    };
+    return aliases[language] ?? language;
+}
+
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isUsableLocalTranslation(source: string, translated: string): boolean {
+    if (!translated || translated.includes("\uFFFD")) return false;
+    if (translated.length > Math.max(500, source.length * 8)) return false;
+
+    const words = translated.toLowerCase().split(/\s+/).filter(Boolean);
+    if (words.length >= 4) {
+        const counts = new Map<string, number>();
+        for (const word of words) counts.set(word, (counts.get(word) ?? 0) + 1);
+        if (Math.max(...counts.values()) / words.length > 0.4) return false;
+    }
+
+    return true;
+}
+
+function getLocalPronunciation(text: string, language: string): string {
+    if (!text) return "";
+    if (language === "zh") {
+        const romanized = pinyin.isSupported()
+            ? pinyin.convertToPinyin(text, " ", true)
+            : text;
+        return hangulize(romanized, "zh");
+    }
+    if (language === "jp" || language === "ja") return hangulize(text, "ja");
+
+    const latinScript = /^[a-zA-Z\s\-.,!?'"()0-9\u00C0-\u024F\u1E00-\u1EFF]+$/.test(
+        text.normalize("NFD").replace(/[\u0300-\u036f]/g, ""),
+    );
+    return latinScript ? hangulize(text, language) : "";
+}
+
+const GLOSSARY_CACHE_TTL_MS = 60_000;
 let _serverGlossaryCache: Record<string, string> | null = null;
+let _serverGlossaryCacheAt = 0;
 
 async function fetchGlossaryServer(): Promise<Record<string, string>> {
-    if (_serverGlossaryCache) return _serverGlossaryCache;
+    if (
+        _serverGlossaryCache &&
+        Date.now() - _serverGlossaryCacheAt < GLOSSARY_CACHE_TTL_MS
+    ) {
+        return _serverGlossaryCache;
+    }
     try {
         const sb = createServiceClient();
         const { data, error } = await sb
@@ -296,6 +586,7 @@ async function fetchGlossaryServer(): Promise<Record<string, string>> {
     } catch {
         _serverGlossaryCache = CONSTRUCTION_GLOSSARY;
     }
+    _serverGlossaryCacheAt = Date.now();
     return _serverGlossaryCache;
 }
 

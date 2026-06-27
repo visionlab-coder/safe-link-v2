@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { checkWorkerLoginLimit } from "@/utils/rate-limit";
+import { isMobileClient, withMobileCors, handleMobilePreflight } from "@/utils/auth/mobile-cors";
 
 export const runtime = "nodejs";
+
+// 📱 모바일(Capacitor) preflight (M-006)
+export async function OPTIONS(req: NextRequest) {
+    return handleMobilePreflight(req) ?? new NextResponse(null, { status: 405 });
+}
 
 // POST /api/auth/worker-quick-login
 // body: { name_initials, phone_last4, preferred_lang?, site_id? }
@@ -193,6 +199,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const cookieValue = `base64-${Buffer.from(JSON.stringify(session)).toString("base64")}`;
   const maxAge = session.expires_in ?? 3600;
 
+  // 📱 모바일이면 cookie 외 session token도 반환 (M-006)
+  const mobile = isMobileClient(req);
   const response = NextResponse.json({
     ok: true,
     worker: {
@@ -202,6 +210,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       assigned_site_id: worker.assigned_site_id,
       nationality: worker.nationality,
     },
+    ...(mobile
+      ? {
+          session: {
+            access_token: session.access_token,
+            refresh_token: session.refresh_token,
+            expires_in: session.expires_in,
+          },
+        }
+      : {}),
   });
   response.cookies.set(cookieName, cookieValue, {
     httpOnly: false,
@@ -210,5 +227,5 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     maxAge,
     secure: process.env.NODE_ENV === "production",
   });
-  return response;
+  return mobile ? withMobileCors(response, req.headers.get("origin")) : response;
 }

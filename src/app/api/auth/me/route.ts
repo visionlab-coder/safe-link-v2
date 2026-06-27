@@ -1,4 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+    parseSessionCookie,
+    resolveRequestAccessToken,
+    type StoredAuthSession,
+} from "@/utils/auth/access-token-core";
+import { verifyAccessToken } from "@/utils/auth/verify-access-token";
+import { withMobileCors, handleMobilePreflight } from "@/utils/auth/mobile-cors";
 
 export const runtime = "nodejs";
 
@@ -21,29 +28,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const PROJECT_REF = "wzmzpuxpcpuvuacwmslj";
 const COOKIE_NAME = `sb-${PROJECT_REF}-auth-token`;
 
-type StoredSession = {
-    access_token?: string;
-    refresh_token?: string;
-    expires_in?: number;
-    expires_at?: number;
-    token_type?: string;
-    user?: Record<string, unknown>;
-};
-
-function decodeJwtPayload(token: string): { sub?: string; email?: string; exp?: number } | null {
-    try {
-        const parts = token.split(".");
-        if (parts.length < 2) return null;
-        const payloadB64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-        const padded = payloadB64 + "=".repeat((4 - payloadB64.length % 4) % 4);
-        const json = Buffer.from(padded, "base64").toString("utf-8");
-        return JSON.parse(json);
-    } catch {
-        return null;
-    }
-}
-
-async function refreshSession(refreshToken: string): Promise<StoredSession | null> {
+async function refreshSession(refreshToken: string): Promise<StoredAuthSession | null> {
     try {
         const res = await fetch(
             `${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token&apikey=${encodeURIComponent(SUPABASE_ANON_KEY)}`,
@@ -54,65 +39,57 @@ async function refreshSession(refreshToken: string): Promise<StoredSession | nul
             }
         );
         if (!res.ok) return null;
-        const next = (await res.json()) as StoredSession;
+        const next = (await res.json()) as StoredAuthSession;
         return next.access_token ? next : null;
     } catch {
         return null;
     }
 }
 
-function sessionCookieValue(session: StoredSession): string {
+function sessionCookieValue(session: StoredAuthSession): string {
     return `base64-${Buffer.from(JSON.stringify(session)).toString("base64")}`;
 }
 
-export async function GET(req: NextRequest) {
+async function handleMe(req: NextRequest): Promise<NextResponse> {
     const rawCookie = req.cookies.get(COOKIE_NAME)?.value;
-    if (!rawCookie) {
-        return NextResponse.json({ error: "no_cookie" }, { status: 401 });
-    }
-
-    let session: StoredSession | null = null;
-    try {
-        const inner = rawCookie.startsWith("base64-")
-            ? Buffer.from(rawCookie.slice(7), "base64").toString("utf-8")
-            : rawCookie;
-        session = JSON.parse(inner);
-    } catch {
-        return NextResponse.json({ error: "invalid_cookie" }, { status: 401 });
-    }
-
-    let accessToken = session?.access_token;
-    if (!accessToken) {
+    const resolved = resolveRequestAccessToken({
+        authorization: req.headers.get("authorization"),
+        rawCookie,
+    });
+    if (!resolved) {
         return NextResponse.json({ error: "no_access_token" }, { status: 401 });
     }
 
-    let payload = decodeJwtPayload(accessToken);
-    if (!payload?.sub) {
-        return NextResponse.json({ error: "invalid_jwt" }, { status: 401 });
-    }
+    let accessToken = resolved.accessToken;
+    let verified = await verifyAccessToken(accessToken);
 
     let refreshedCookie: string | null = null;
     let refreshedMaxAge = 3600;
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+    if (!verified && resolved.source === "cookie") {
+        const session = resolved.session ?? parseSessionCookie(rawCookie);
         const refreshToken = session?.refresh_token;
         if (!refreshToken) {
-            return NextResponse.json({ error: "expired" }, { status: 401 });
+            return NextResponse.json({ error: "invalid_access_token" }, { status: 401 });
         }
         const next = await refreshSession(refreshToken);
         if (!next?.access_token) {
             return NextResponse.json({ error: "refresh_failed" }, { status: 401 });
         }
         accessToken = next.access_token;
-        payload = decodeJwtPayload(accessToken);
-        if (!payload?.sub) {
-            return NextResponse.json({ error: "invalid_refreshed_jwt" }, { status: 401 });
+        verified = await verifyAccessToken(accessToken);
+        if (!verified) {
+            return NextResponse.json({ error: "invalid_refreshed_token" }, { status: 401 });
         }
         refreshedCookie = sessionCookieValue(next);
         refreshedMaxAge = next.expires_in ?? 3600;
     }
 
-    const userId = payload.sub;
-    const email = payload.email ?? null;
+    if (!verified) {
+        return NextResponse.json({ error: "invalid_access_token" }, { status: 401 });
+    }
+
+    const userId = verified.sub;
+    const email = verified.email;
 
     // 프로필 조회 — apikey URL param, Bearer = 사용자 JWT (RLS 적용)
     const profileRes = await fetch(
@@ -169,4 +146,16 @@ export async function GET(req: NextRequest) {
     }
 
     return response;
+}
+
+// 📱 모바일(Capacitor) preflight (S-002)
+export async function OPTIONS(req: NextRequest) {
+    return handleMobilePreflight(req) ?? new NextResponse(null, { status: 405 });
+}
+
+// GET 래퍼 — 허용 mobile origin이면 모든 응답(성공/401)에 CORS 부착.
+// 웹/비허용 origin은 무변경(withMobileCors no-op) → 웹 호환 유지.
+export async function GET(req: NextRequest) {
+    const res = await handleMe(req);
+    return withMobileCors(res, req.headers.get("origin"));
 }

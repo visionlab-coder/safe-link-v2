@@ -1,5 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { parseSessionCookie } from "@/utils/auth/access-token-core";
+import { verifyAccessToken } from "@/utils/auth/verify-access-token";
 
 // 🔒 P5 박제 헬퍼.
 // @supabase/ssr 의 createServerClient.auth.getUser() 가 Workers 환경에서
@@ -22,37 +24,18 @@ export type CookieUser = {
     accessToken: string;
 };
 
-function decodeJwtPayload(token: string): { sub?: string; email?: string; exp?: number } | null {
-    try {
-        const parts = token.split(".");
-        if (parts.length < 2) return null;
-        const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-        const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
-        return JSON.parse(Buffer.from(padded, "base64").toString("utf-8"));
-    } catch {
-        return null;
-    }
-}
-
 export async function getCookieUser(): Promise<CookieUser | null> {
     const cookieStore = await cookies();
     const raw = cookieStore.get(COOKIE_NAME)?.value;
-    if (!raw) return null;
-    try {
-        const inner = raw.startsWith("base64-")
-            ? Buffer.from(raw.slice(7), "base64").toString("utf-8")
-            : raw;
-        const session = JSON.parse(inner) as { access_token?: string };
-        if (!session.access_token) return null;
-        const payload = decodeJwtPayload(session.access_token);
-        if (!payload?.sub) return null;
-        if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
-        return {
-            id: payload.sub,
-            email: payload.email ?? null,
-            accessToken: session.access_token,
-        };
-    } catch {
-        return null;
-    }
+    const session = parseSessionCookie(raw);
+    if (!session?.access_token) return null;
+
+    const verified = await verifyAccessToken(session.access_token);
+    if (!verified) return null;
+
+    return {
+        id: verified.sub,
+        email: verified.email,
+        accessToken: session.access_token,
+    };
 }

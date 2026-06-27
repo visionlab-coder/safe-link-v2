@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveRequestAccessToken } from "@/utils/auth/access-token-core";
+import { verifyAccessToken } from "@/utils/auth/verify-access-token";
+import { withMobileCors, handleMobilePreflight } from "@/utils/auth/mobile-cors";
 
 export const runtime = "nodejs";
 
@@ -14,35 +17,16 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const PROJECT_REF = "wzmzpuxpcpuvuacwmslj";
 const COOKIE_NAME = `sb-${PROJECT_REF}-auth-token`;
 
-function decodeJwtPayload(token: string): { sub?: string; exp?: number } | null {
-    try {
-        const parts = token.split(".");
-        if (parts.length < 2) return null;
-        const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-        const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
-        return JSON.parse(Buffer.from(padded, "base64").toString("utf-8"));
-    } catch { return null; }
-}
-
-function parseAccessTokenFromCookie(req: NextRequest): { accessToken: string; userId: string } | null {
-    const raw = req.cookies.get(COOKIE_NAME)?.value;
-    if (!raw) return null;
-    try {
-        const inner = raw.startsWith("base64-")
-            ? Buffer.from(raw.slice(7), "base64").toString("utf-8")
-            : raw;
-        const session = JSON.parse(inner) as { access_token?: string };
-        if (!session.access_token) return null;
-        const payload = decodeJwtPayload(session.access_token);
-        if (!payload?.sub) return null;
-        if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
-        return { accessToken: session.access_token, userId: payload.sub };
-    } catch { return null; }
-}
-
-export async function POST(req: NextRequest) {
-    const auth = parseAccessTokenFromCookie(req);
-    if (!auth) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+// S-004: cookie 전용 미검증 파싱 → 공통 bearer/cookie + 서명검증으로 교체(보안 강화 + 모바일 Bearer 지원).
+async function handleSign(req: NextRequest): Promise<NextResponse> {
+    const resolved = resolveRequestAccessToken({
+        authorization: req.headers.get("authorization"),
+        rawCookie: req.cookies.get(COOKIE_NAME)?.value,
+    });
+    if (!resolved) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+    const verified = await verifyAccessToken(resolved.accessToken);
+    if (!verified) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+    const auth = { accessToken: resolved.accessToken, userId: verified.sub };
 
     let body: { tbm_id?: string; signature_data?: string };
     try { body = await req.json(); }
@@ -99,4 +83,15 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ ok: true, signed_at: new Date().toISOString() });
+}
+
+// 📱 모바일(Capacitor) preflight (S-004)
+export async function OPTIONS(req: NextRequest) {
+    return handleMobilePreflight(req) ?? new NextResponse(null, { status: 405 });
+}
+
+// POST 래퍼 — 허용 mobile origin이면 응답에 CORS 부착(웹/비허용 origin 무영향).
+export async function POST(req: NextRequest) {
+    const res = await handleSign(req);
+    return withMobileCors(res, req.headers.get("origin"));
 }

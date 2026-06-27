@@ -8,12 +8,35 @@ import { createClient } from "@/utils/supabase/client";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
 import ExportMenu from "@/components/ExportMenu";
 import { exportData, type ExportFormat } from "@/utils/export-files";
+import { playPremiumAudio } from "@/utils/tts";
+
+const FLITTO_TARGET_LANGS = new Set(["ko", "en", "ja", "zh-CN", "zh-TW", "ru", "vi", "fr", "it", "ar", "es"]);
+
+function toFlittoLanguage(lang: string): string {
+    if (lang === "zh") return "zh-CN";
+    if (lang === "jp") return "ja";
+    return lang;
+}
+
+function getFlittoTranslation(
+    translations: Record<string, string> | undefined,
+    language: string,
+): string | undefined {
+    if (!translations) return undefined;
+    const flittoLanguage = toFlittoLanguage(language);
+    return translations[flittoLanguage] || translations[language];
+}
 
 function AdminLiveContent() {
     const router = useRouter();
     const [isLive, setIsLive] = useState(false);
     const [sessionId, setSessionId] = useState("");
-    const [transcripts, setTranscripts] = useState<Array<{ text: string; time: string }>>([]);
+    const [transcripts, setTranscripts] = useState<Array<{
+        text: string;
+        time: string;
+        role?: "admin" | "worker";
+        sourceText?: string;
+    }>>([]);
     const [siteId, setSiteId] = useState<string | null>(null);
     const [listenerCount, setListenerCount] = useState(0);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -21,6 +44,7 @@ function AdminLiveContent() {
     const lastSentRef = useRef<{ text: string; at: number }>({ text: "", at: 0 });
     // 현장 근로자 언어 목록 — 사전 번역 대상 (ref로 관리해 useCallback 재생성 방지)
     const siteWorkerLangsRef = useRef<string[]>([]);
+    const [siteWorkerLangs, setSiteWorkerLangs] = useState<string[]>([]);
 
     useEffect(() => {
         const load = async () => {
@@ -37,20 +61,21 @@ function AdminLiveContent() {
 
     // siteId 확정 후 현장 근로자 언어 목록 수집 (사전 번역에 사용)
     useEffect(() => {
-        if (!siteId) return;
         const supabase = createClient();
-        supabase
+        let query = supabase
             .from("profiles")
             .select("preferred_lang")
-            .eq("site_id", siteId)
+            .eq("role", "WORKER")
             .not("preferred_lang", "is", null)
-            .then(({ data }) => {
+        if (siteId) query = query.eq("site_id", siteId);
+        query.then(({ data }) => {
                 const langs = [...new Set(
                     (data || [])
                         .map((p: any) => p.preferred_lang as string)
                         .filter(l => l && l !== "ko")
                 )];
                 siteWorkerLangsRef.current = langs;
+                setSiteWorkerLangs(langs);
             });
     }, [siteId]);
 
@@ -58,25 +83,38 @@ function AdminLiveContent() {
     useEffect(() => {
         if (!adminId) return;
         const supabase = createClient();
-        const channelName = `live_audience_${siteId || 'global'}`;
+        const channelName = "live_audience_global";
         const channel = supabase.channel(channelName, { config: { presence: { key: adminId } } });
 
         channel
             .on('presence', { event: 'sync' }, () => {
                 const state = channel.presenceState();
-                const workerCount = Object.values(state).flat().filter((p: any) => (p as any).role === 'worker').length;
-                setListenerCount(workerCount);
+                const workers = Object.values(state).flat().filter((p: any) =>
+                    (p as any).role === "worker"
+                    && (!siteId || (p as any).siteId === siteId)
+                ) as Array<{ lang?: string }>;
+                const activeLangs = [...new Set(
+                    workers.map(worker => worker.lang).filter((lang): lang is string => Boolean(lang && lang !== "ko"))
+                )];
+                setListenerCount(workers.length);
+                if (activeLangs.length > 0) {
+                    siteWorkerLangsRef.current = activeLangs;
+                    setSiteWorkerLangs(activeLangs);
+                }
             })
             .subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
-                    await channel.track({ role: 'admin' });
+                    await channel.track({ role: "admin", siteId, userId: adminId });
                 }
             });
 
         return () => { supabase.removeChannel(channel); };
     }, [adminId, siteId]);
 
-    const handleTranscript = useCallback(async (text: string) => {
+    const handleTranscript = useCallback(async (
+        text: string,
+        flittoTranslations?: Record<string, string>,
+    ) => {
         const cleanText = text.trim().replace(/\s+/g, " ");
         if (!sessionId || !cleanText) return;
 
@@ -96,11 +134,23 @@ function AdminLiveContent() {
         if (langs.length > 0) {
             await Promise.all(
                 langs.map(async (lang) => {
+                    const flittoTranslation = getFlittoTranslation(flittoTranslations, lang);
+                    if (flittoTranslation) {
+                        translations[lang] = flittoTranslation;
+                        return;
+                    }
                     try {
                         const res = await fetch("/api/translate", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ text: cleanText, sl: "ko", tl: lang, pronunciation: false, useGlossary: true }),
+                            body: JSON.stringify({
+                                text: cleanText,
+                                sl: "ko",
+                                tl: lang,
+                                fast: true,
+                                pronunciation: false,
+                                useGlossary: true,
+                            }),
                         });
                         const data = await res.json();
                         if (data.translated) translations[lang] = data.translated;
@@ -131,13 +181,70 @@ function AdminLiveContent() {
         }, 100);
     }, [sessionId, siteId, adminId]);
 
-    const { isRecording, toggle: toggleRecording } = useCloudSTT({
+    const {
+        isRecording,
+        toggle: toggleRecording,
+        mute: muteRecording,
+        unmute: unmuteRecording,
+    } = useCloudSTT({
         lang: "ko",
         onTranscript: handleTranscript,
         chunkInterval: 6000,   // 6s — 교육 발화는 문장이 길므로 완전한 문장 단위 전송
         silenceDuration: 2500, // 2.5s — 자연 휴지 허용, 문장 경계에서 자동 분할
         live: true,
+        targetLangs: siteWorkerLangs
+            .map(toFlittoLanguage)
+            .filter(lang => FLITTO_TARGET_LANGS.has(lang)),
     });
+
+    useEffect(() => {
+        if (!adminId) return;
+        const supabase = createClient();
+        const channel = supabase
+            .channel(`live_worker_responses_${adminId}`)
+            .on("postgres_changes", {
+                event: "INSERT",
+                schema: "public",
+                table: "messages",
+            }, (payload) => {
+                const row = payload.new as {
+                    id?: string;
+                    site_id?: string | null;
+                    source_text?: string;
+                    translated_text?: string;
+                    to_user?: string;
+                    ai_analysis?: {
+                        channel?: string;
+                        speaker_name?: string;
+                    } | null;
+                };
+                if (row.to_user !== adminId) return;
+                if (row.ai_analysis?.channel !== "live_interpreter") return;
+                if (siteId && row.site_id !== siteId) return;
+
+                const sourceText = String(row.source_text || "").trim();
+                const translated = String(row.translated_text || sourceText).trim();
+                if (!translated) return;
+
+                const time = new Date().toLocaleTimeString("ko-KR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                });
+                setTranscripts(prev => [...prev, {
+                    text: translated,
+                    sourceText,
+                    time,
+                    role: "worker",
+                }]);
+
+                muteRecording();
+                playPremiumAudio(translated, "ko", "female", unmuteRecording);
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, [adminId, siteId, muteRecording, unmuteRecording]);
 
     const handleStartBroadcast = () => {
         const newSessionId = `live_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -252,9 +359,26 @@ function AdminLiveContent() {
                                     </div>
                                 )}
                                 {transcripts.map((item, idx) => (
-                                    <div key={idx} className="flex gap-4 items-start p-4 bg-white/5 rounded-[20px] border border-white/5 animate-float">
+                                    <div
+                                        key={idx}
+                                        className={`flex gap-4 items-start p-4 rounded-[20px] border animate-float ${
+                                            item.role === "worker"
+                                                ? "bg-emerald-500/10 border-emerald-500/20"
+                                                : "bg-white/5 border-white/5"
+                                        }`}
+                                    >
                                         <span className="text-[10px] font-black text-slate-600 whitespace-nowrap mt-1">{item.time}</span>
-                                        <p className="text-lg font-bold text-white leading-relaxed">{item.text}</p>
+                                        <div className="min-w-0 flex-1">
+                                            {item.role === "worker" && (
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">
+                                                    Worker
+                                                </span>
+                                            )}
+                                            <p className="text-lg font-bold text-white leading-relaxed">{item.text}</p>
+                                            {item.role === "worker" && item.sourceText && item.sourceText !== item.text && (
+                                                <p className="mt-1 text-sm font-semibold text-slate-500">{item.sourceText}</p>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
                             </div>

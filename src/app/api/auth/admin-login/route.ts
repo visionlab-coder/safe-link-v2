@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isMobileClient, withMobileCors, handleMobilePreflight } from "@/utils/auth/mobile-cors";
 
 export const runtime = "nodejs";
+
+// 📱 모바일(Capacitor) preflight — 허용 origin만 통과 (S-002)
+export async function OPTIONS(req: NextRequest) {
+    return handleMobilePreflight(req) ?? new NextResponse(null, { status: 405 });
+}
 
 // Cloudflare Workers 런타임은 `apikey` 같은 임의 헤더를 변형/제거할 수 있음.
 // 이 때문에 @supabase/ssr · @supabase/supabase-js · raw fetch with apikey 헤더가
@@ -104,7 +110,22 @@ export async function POST(req: NextRequest) {
     // httpOnly:true 면 브라우저 JS 가 쿠키를 못 봐서 클라이언트 측이 "세션 없음" 으로 판단,
     // 로그인 직후 즉시 /auth 로 강제 리다이렉트되는 무한 튕김 발생.
     // 이 형식 / 속성은 @supabase/ssr 표준과 동일하며 절대 변경 금지.
-    const response = NextResponse.json({ ok: true });
+    // 📱 모바일 클라이언트(X-Safe-Link-Client: mobile + 허용 origin)면 cookie 외에
+    //    session token도 반환 (WebView 쿠키 불안정 대비). 웹은 기존대로 cookie만. (S-002)
+    const mobile = isMobileClient(req);
+    const response = NextResponse.json(
+        mobile
+            ? {
+                  ok: true,
+                  session: {
+                      access_token: session.access_token,
+                      refresh_token: session.refresh_token,
+                      expires_in: session.expires_in,
+                      token_type: session.token_type,
+                  },
+              }
+            : { ok: true }
+    );
     response.cookies.set(cookieName, cookieValue, {
         httpOnly: false,
         sameSite: "lax",
@@ -112,5 +133,5 @@ export async function POST(req: NextRequest) {
         maxAge,
         secure: process.env.NODE_ENV === "production",
     });
-    return response;
+    return mobile ? withMobileCors(response, req.headers.get("origin")) : response;
 }

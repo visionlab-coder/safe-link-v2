@@ -1,11 +1,12 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { createClient } from "@/utils/supabase/client";
 import { playPremiumAudio, VoiceGender } from "@/utils/tts";
+import { useCloudSTT } from "@/hooks/useCloudSTT";
 
 interface Subtitle {
     id: string;
@@ -13,6 +14,7 @@ interface Subtitle {
     translated: string;
     reverseTranslated: string;
     time: string;
+    role?: "admin" | "worker";
 }
 
 const i18n: Record<string, Record<string, string>> = {
@@ -45,7 +47,12 @@ export default function WorkerLivePage() {
     const [isConnected, setIsConnected] = useState(false);
     const [audioEnabled, setAudioEnabled] = useState(true);
     // profileId와 siteId를 동시에 세팅하여 subscription이 한 번만 생성되도록
-    const [authReady, setAuthReady] = useState<{ profileId: string; siteId: string | null } | null>(null);
+    const [authReady, setAuthReady] = useState<{
+        profileId: string;
+        siteId: string | null;
+        displayName: string;
+    } | null>(null);
+    const [activeAdminId, setActiveAdminId] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const ttsQueueRef = useRef<string[]>([]);
     const isPlayingRef = useRef(false);
@@ -85,12 +92,96 @@ export default function WorkerLivePage() {
         };
     }, []);
 
+    const handleWorkerTranscript = useCallback(async (
+        text: string,
+        flittoTranslations?: Record<string, string>,
+    ) => {
+        if (!authReady?.siteId || !activeAdminId) return;
+        const cleanText = text.trim().replace(/\s+/g, " ");
+        if (!cleanText) return;
+
+        let koreanText = flittoTranslations?.ko?.trim() || "";
+        if (!koreanText) {
+            try {
+                const response = await fetch("/api/translate", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        text: cleanText,
+                        sl: langRef.current,
+                        tl: "ko",
+                        fast: true,
+                        pronunciation: false,
+                        useGlossary: true,
+                    }),
+                });
+                const data = await response.json();
+                koreanText = String(data.translated || "").trim();
+            } catch {
+                koreanText = "";
+            }
+        }
+        if (!koreanText) return;
+
+        const supabase = createClient();
+        const { data, error } = await supabase
+            .from("messages")
+            .insert({
+                site_id: authReady.siteId,
+                from_user: authReady.profileId,
+                to_user: activeAdminId,
+                source_lang: langRef.current,
+                target_lang: "ko",
+                source_text: cleanText,
+                translated_text: koreanText,
+                ai_analysis: {
+                    channel: "live_interpreter",
+                    speaker_name: authReady.displayName,
+                },
+            })
+            .select("id")
+            .single();
+
+        if (error) {
+            console.error("[worker/live] response insert failed:", error.message);
+            return;
+        }
+
+        const time = new Date().toLocaleTimeString("ko-KR", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+        });
+        setSubtitles(prev => [...prev, {
+            id: data.id,
+            text_ko: koreanText,
+            translated: cleanText,
+            reverseTranslated: koreanText,
+            time,
+            role: "worker",
+        }]);
+    }, [activeAdminId, authReady]);
+
+    const {
+        isRecording,
+        toggle: toggleRecording,
+        mute: muteRecording,
+        unmute: unmuteRecording,
+    } = useCloudSTT({
+        lang,
+        targetLangs: ["ko"],
+        onTranscript: handleWorkerTranscript,
+        live: true,
+    });
+
     const processQueue = () => {
         if (isPlayingRef.current || ttsQueueRef.current.length === 0) return;
         isPlayingRef.current = true;
         const text = ttsQueueRef.current.shift()!;
+        muteRecording();
         playPremiumAudio(text, langRef.current, genderRef.current, () => {
             isPlayingRef.current = false;
+            unmuteRecording();
             processQueue();
         });
     };
@@ -100,13 +191,21 @@ export default function WorkerLivePage() {
             const supabase = createClient();
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
-                const { data: profile } = await supabase.from("profiles").select("preferred_lang, site_id").eq("id", session.user.id).single();
+                const { data: profile } = await supabase
+                    .from("profiles")
+                    .select("preferred_lang, site_id, display_name")
+                    .eq("id", session.user.id)
+                    .single();
                 if (profile?.preferred_lang) {
                     setLang(profile.preferred_lang);
                     langRef.current = profile.preferred_lang;
                 }
                 // profileId + siteId 동시 세팅 → subscription 1회만 생성
-                setAuthReady({ profileId: session.user.id, siteId: profile?.site_id || null });
+                setAuthReady({
+                    profileId: session.user.id,
+                    siteId: profile?.site_id || null,
+                    displayName: profile?.display_name || "Worker",
+                });
             }
         };
         load();
@@ -117,12 +216,29 @@ export default function WorkerLivePage() {
         if (!authReady) return;
         const { profileId, siteId } = authReady;
         const supabase = createClient();
-        const channelName = `live_audience_${siteId || 'global'}`;
+        const channelName = "live_audience_global";
         const channel = supabase.channel(channelName, { config: { presence: { key: profileId } } });
+
+        channel.on("presence", { event: "sync" }, () => {
+            const admins = (Object.values(channel.presenceState())
+                .flat()
+                .filter((presence: any) =>
+                    presence.role === "admin"
+                    && presence.userId
+                    && (!presence.siteId || presence.siteId === siteId)
+                ) as unknown) as Array<{ userId: string; siteId?: string | null }>;
+            const siteAdmin = admins.find(admin => admin.siteId === siteId);
+            setActiveAdminId(siteAdmin?.userId || admins[0]?.userId || null);
+        });
 
         channel.subscribe(async (status) => {
             if (status === 'SUBSCRIBED') {
-                await channel.track({ role: 'worker' });
+                await channel.track({
+                    role: "worker",
+                    siteId,
+                    userId: profileId,
+                    lang: langRef.current,
+                });
             }
         });
 
@@ -141,9 +257,10 @@ export default function WorkerLivePage() {
                 event: "INSERT",
                 schema: "public",
                 table: "live_translations",
-                ...(siteId ? { filter: `site_id=eq.${siteId}` } : {}),
             }, async (payload) => {
                 const row = payload.new as any;
+                if (row.speaker_role === "worker") return;
+                if (row.site_id && row.site_id !== siteId) return;
                 if (seenRowsRef.current.has(row.id)) return;
                 seenRowsRef.current.add(row.id);
                 const cleanTextKo = String(row.text_ko || "").trim().replace(/\s+/g, " ");
@@ -187,7 +304,14 @@ export default function WorkerLivePage() {
                     const res = await fetch("/api/translate", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ text: cleanTextKo, sl: "ko", tl: myLang, pronunciation: false, useGlossary: true }),
+                        body: JSON.stringify({
+                            text: cleanTextKo,
+                            sl: "ko",
+                            tl: myLang,
+                            fast: true,
+                            pronunciation: false,
+                            useGlossary: true,
+                        }),
                     });
                     const data = await res.json();
                     const translatedNow = data.translated || row.text_ko;
@@ -267,7 +391,19 @@ export default function WorkerLivePage() {
                     )}
 
                     {subtitles.map((sub) => (
-                        <div key={sub.id} className="glass rounded-[28px] p-6 border-white/5 animate-float flex flex-col gap-2">
+                        <div
+                            key={sub.id}
+                            className={`glass rounded-[28px] p-6 animate-float flex flex-col gap-2 ${
+                                sub.role === "worker"
+                                    ? "border-emerald-500/30 bg-emerald-500/10 ml-8"
+                                    : "border-white/5 mr-8"
+                            }`}
+                        >
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${
+                                sub.role === "worker" ? "text-emerald-400" : "text-blue-400"
+                            }`}>
+                                {sub.role === "worker" ? "My voice" : "Manager"}
+                            </span>
                             <p className="text-2xl font-black text-white leading-snug">{sub.translated}</p>
                             {lang !== 'ko' && sub.reverseTranslated && (
                                 <p className="text-sm font-bold text-slate-600 mt-1">{sub.reverseTranslated}</p>
@@ -277,8 +413,23 @@ export default function WorkerLivePage() {
                     ))}
                 </div>
 
-                <div className="sticky bottom-0 glass border-t border-white/5 px-6 py-4">
-                    <button onClick={() => router.push("/worker")} className="w-full py-4 glass rounded-2xl border-white/10 text-slate-400 font-black tap-effect text-center">
+                <div className="sticky bottom-0 glass border-t border-white/5 px-6 py-4 flex gap-3">
+                    <button
+                        onClick={toggleRecording}
+                        disabled={!authReady?.siteId || !activeAdminId}
+                        className={`flex-1 py-4 rounded-2xl font-black tap-effect text-center transition-colors ${
+                            isRecording
+                                ? "bg-red-600 text-white"
+                                : "bg-emerald-500 text-slate-950 disabled:bg-slate-800 disabled:text-slate-600"
+                        }`}
+                    >
+                        {isRecording
+                            ? "STOP SPEAKING"
+                            : activeAdminId
+                                ? "SPEAK TO MANAGER"
+                                : "WAITING FOR MANAGER"}
+                    </button>
+                    <button onClick={() => router.push("/worker")} className="px-6 py-4 glass rounded-2xl border-white/10 text-slate-400 font-black tap-effect text-center">
                         {t.back}
                     </button>
                 </div>

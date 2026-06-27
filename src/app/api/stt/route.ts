@@ -109,10 +109,15 @@ async function transcribeWithWhisper(
     const audioBuffer = Buffer.from(audio, 'base64');
     const audioBlob = new Blob([audioBuffer], { type: mimeType || 'audio/webm' });
     formData.append('file', audioBlob, 'audio.webm');
-    formData.append('model', 'whisper-1');
+    // gpt-4o-mini-transcribe: whisper-1 대비 정확도↑·속도↑·비용↓ (동일 transcriptions 엔드포인트)
+    // 호환: language·prompt·temperature·response_format(json) 모두 지원
+    formData.append('model', 'gpt-4o-mini-transcribe');
     formData.append('language', iso);
-    // 자연문 형태 컨텍스트 프롬프트 — 키워드 나열보다 문장 맥락이 Whisper 인식률 더 높음
-    formData.append('prompt', WHISPER_CONTEXT_PROMPT);
+    // Q4: 한국어 컨텍스트 프롬프트는 ko 발화에만 적용.
+    // 외국어 발화에 한국어 프롬프트를 주면 Whisper 출력이 한국어로 편향/오인식됨.
+    if (iso === 'ko') {
+        formData.append('prompt', WHISPER_CONTEXT_PROMPT);
+    }
     // 소음 환경: 온도 0 = 가장 확률 높은 토큰만 선택 → 환각 억제
     formData.append('temperature', '0');
     formData.append('response_format', 'json');
