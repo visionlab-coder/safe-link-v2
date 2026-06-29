@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const expected = JSON.parse(readFileSync("config/handoff-inventory.json", "utf8"));
 
@@ -20,6 +20,11 @@ const sourceFiles = walk("src", (file) => /\.(?:ts|tsx)$/.test(file));
 const sqlFiles = walk("supabase", (file) => file.endsWith(".sql"));
 let trackedMigrations;
 try {
+  const gitRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  }).trim();
+  if (resolve(gitRoot) !== resolve(".")) throw new Error("current directory is not the Git root");
   trackedMigrations = execFileSync("git", ["ls-files", "supabase/migrations/*.sql"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],

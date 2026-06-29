@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 const excludedDirectories = new Set([".git", ".next", ".open-next", "node_modules", "vendor-delivery"]);
 
@@ -19,6 +19,11 @@ function walk(path = ".") {
 let tracked;
 let source = "Git-tracked";
 try {
+  const gitRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  }).trim();
+  if (resolve(gitRoot) !== resolve(".")) throw new Error("current directory is not the Git root");
   tracked = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
     .split("\0")
     .filter(Boolean);
