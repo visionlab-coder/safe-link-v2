@@ -1,7 +1,37 @@
 import type { NextConfig } from "next";
+import { execFileSync } from "node:child_process";
+
+function resolveReleaseSha(): string {
+  const environmentSha = [
+    process.env.SAFE_LINK_RELEASE_SHA,
+    process.env.VERCEL_GIT_COMMIT_SHA,
+    process.env.CF_PAGES_COMMIT_SHA,
+    process.env.GITHUB_SHA,
+  ].find((value) => value?.trim());
+
+  if (environmentSha) return environmentSha.trim();
+
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "unknown";
+  }
+}
+
+const releaseSha = resolveReleaseSha();
+const buildTime = process.env.SAFE_LINK_BUILD_TIME?.trim() || new Date().toISOString();
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
+  // Public, non-secret build identity. Both deployment adapters expose this
+  // through /api/version so parity is checked by source SHA, not bundle hash.
+  env: {
+    NEXT_PUBLIC_SAFE_LINK_RELEASE_SHA: releaseSha,
+    NEXT_PUBLIC_SAFE_LINK_BUILD_TIME: buildTime,
+  },
   images: {
     unoptimized: true,
   },

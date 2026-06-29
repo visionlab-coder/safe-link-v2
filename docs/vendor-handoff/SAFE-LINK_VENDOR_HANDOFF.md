@@ -7,6 +7,10 @@
 
 작성: 2026-06-23 · 대상: 범소프트웨어 모바일 개발팀 · 레퍼런스: 살아있는 웹앱(`safe-link-v2.vercel.app`) + 본 repo
 
+실행 계획: [`SAFE_LINK_2_3_DAY_HANDOFF_TODO.md`](./SAFE_LINK_2_3_DAY_HANDOFF_TODO.md)
+
+미추적 파일 분류: [`SOURCE_HANDOFF_CLASSIFICATION.md`](./SOURCE_HANDOFF_CLASSIFICATION.md)
+
 ---
 
 ## 0. 시스템 개요

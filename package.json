@@ -5,10 +5,15 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:cloudflare": "opennextjs-cloudflare build && node scripts/strip-oversized-cf-assets.mjs",
     "deploy": "opennextjs-cloudflare build && node scripts/strip-oversized-cf-assets.mjs && wrangler deploy",
     "preview": "opennextjs-cloudflare build && wrangler dev",
     "start": "next start",
-    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src next.config.ts open-next.config.ts",
+    "test:release-info": "node --no-warnings --experimental-strip-types scripts/release-info-contract.mjs",
+    "check:secrets": "node scripts/check-repository-secrets.mjs",
+    "check:web": "npm run typecheck && npm run lint && npm run test:release-info && npm run check:secrets && npm run build",
     "flitto:rtt:smoke": "node scripts/flitto-rtt-smoke.mjs",
     "m2m100:start": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-m2m100-onnx-local.ps1"
   },
