@@ -46,11 +46,17 @@ npm run deploy        # opennextjs-cloudflare build && wrangler deploy
 ## 배포 후 검증 (각 URL에서)
 ```bash
 B=<배포URL>
+curl -s $B/api/version                     # 양쪽 releaseSha가 동일해야 함
 curl -s $B/api/check                       # 401 (인증게이트)
 curl -s $B/api/root/engine-config          # {"developer":false,...} (무쿠키 fail-closed)
 curl -s -X OPTIONS $B/api/auth/admin-login -H "Origin: https://evil.x" -H "Access-Control-Request-Method: POST" -i | grep -i allow-origin   # 비어야 함(반영 안 함)
 # 개발자 로그인 후 /root 접속 → 키 변경 → /api/translate 결과 엔진 반영 확인
 ```
+
+Vercel과 Cloudflare의 번들 해시는 빌드 어댑터 차이 때문에 달라질 수 있다.
+동일 버전 여부는 `/api/version`의 `releaseSha`와 핵심 smoke 결과로 판정한다.
+Cloudflare 수동 배포에서는 필요하면 `SAFE_LINK_RELEASE_SHA=<git SHA>`를 빌드
+환경에 주입하며, 미설정 시 빌드가 실행된 Git 작업트리의 `HEAD`를 사용한다.
 
 ## 주의
 - 신규 RTT/온디바이스는 **플래그 게이트**(`NEXT_PUBLIC_REALTIME_STT_ENGINE`, 기본 Google) → 배포해도 기본 동작 불변.

@@ -2,11 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { QRCodeSVG } from 'qrcode.react';
 import { playPremiumAudio, VoiceGender } from '@/utils/tts';
 import { useCloudSTT } from '@/hooks/useCloudSTT';
-
-const supabase = createClient();
 
 const LANGS: Record<string, { label: string; flag: string; stt: string }> = {
   ko: { label: '한국어', flag: '🇰🇷', stt: 'ko-KR' },
@@ -205,7 +204,8 @@ export default function TravelTalk() {
   const [soloMode, setSoloMode]   = useState(false);
   const [soloTurn, setSoloTurn]   = useState<'mine' | 'partner'>('mine');
 
-  const channelRef          = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const supabaseRef         = useRef<ReturnType<typeof createClient> | null>(null);
+  const channelRef          = useRef<RealtimeChannel | null>(null);
   const bottomRef           = useRef<HTMLDivElement>(null);
   const travelTokenRef      = useRef<string>('');
   const travelTokenReadyRef = useRef<Promise<void>>(Promise.resolve());
@@ -221,6 +221,11 @@ export default function TravelTalk() {
   const soloModeRef          = useRef(soloMode);
   const soloTurnRef          = useRef(soloTurn);
 
+  const getSupabase = useCallback(() => {
+    if (!supabaseRef.current) supabaseRef.current = createClient();
+    return supabaseRef.current;
+  }, []);
+
   useEffect(() => { myLangRef.current = myLang; }, [myLang]);
   useEffect(() => { ttsEnabledRef.current = ttsEnabled; }, [ttsEnabled]);
   useEffect(() => { voiceGenderRef.current = voiceGender; }, [voiceGender]);
@@ -233,7 +238,9 @@ export default function TravelTalk() {
   useEffect(() => { soloTurnRef.current = soloTurn; }, [soloTurn]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
   useEffect(() => () => {
-    if (channelRef.current) supabase.removeChannel(channelRef.current);
+    if (channelRef.current && supabaseRef.current) {
+      supabaseRef.current.removeChannel(channelRef.current);
+    }
     if (unmuteTimerRef.current) clearTimeout(unmuteTimerRef.current);
   }, []);
 
@@ -289,6 +296,7 @@ export default function TravelTalk() {
 
   /* ── Supabase Realtime 채널 구독 ── */
   const subscribeChannel = useCallback((code: string, myRole: 'host' | 'guest', lang: string) => {
+    const supabase = getSupabase();
     if (channelRef.current) supabase.removeChannel(channelRef.current);
 
     const ch = supabase.channel(`travel-${code}`, {
@@ -335,7 +343,7 @@ export default function TravelTalk() {
       });
 
     channelRef.current = ch;
-  }, [speakTTS, safeMute, scheduleUnmute]);
+  }, [getSupabase, speakTTS, safeMute, scheduleUnmute]);
 
   /* ── 메시지 전송 ── */
   const sendMessage = useCallback(async (text: string) => {

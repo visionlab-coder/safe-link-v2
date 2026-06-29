@@ -7,6 +7,15 @@
 
 작성: 2026-06-23 · 대상: 범소프트웨어 모바일 개발팀 · 레퍼런스: 살아있는 웹앱(`safe-link-v2.vercel.app`) + 본 repo
 
+실행 계획: [`SAFE_LINK_2_3_DAY_HANDOFF_TODO.md`](./SAFE_LINK_2_3_DAY_HANDOFF_TODO.md)
+
+미추적 파일 분류: [`SOURCE_HANDOFF_CLASSIFICATION.md`](./SOURCE_HANDOFF_CLASSIFICATION.md)
+
+- 환경변수 계약: [`ENVIRONMENT_CONTRACT.md`](./ENVIRONMENT_CONTRACT.md)
+- 권한·화면 계약: [`RBAC_SURFACE_CONTRACT.md`](./RBAC_SURFACE_CONTRACT.md)
+- 소스 인벤토리: [`SOURCE_INVENTORY.md`](./SOURCE_INVENTORY.md)
+- 업체 수령 체크리스트: [`VENDOR_RECEIPT_CHECKLIST.md`](./VENDOR_RECEIPT_CHECKLIST.md)
+
 ---
 
 ## 0. 시스템 개요
@@ -16,7 +25,7 @@
         │ HTTPS (REST) + Supabase Realtime(WSS)
         ▼
 [백엔드 (재사용)]
-  ├─ Next.js API Routes (STT/TTS/번역/TBM/인증/NFC 등 67개)  ← 그대로
+  ├─ Next.js API Routes (STT/TTS/번역/TBM/인증/NFC 등 69개)  ← 그대로
   └─ Supabase (PostgreSQL + Auth + Realtime + RLS)            ← 그대로
         │
 [외부 AI 서비스]  Google Cloud(STT/TTS/Gemini) · OpenAI(Whisper/TTS) · Naver Papago · (선택)Flitto RTT
@@ -29,7 +38,7 @@
 
 ## 1. API 인벤토리 (네이티브가 호출)
 
-> 전체 67개. 소스: `src/app/api/**/route.ts`. 아래는 핵심 + 그룹 요약. **정확한 요청/응답은 각 route.ts 확인.**
+> 전체 69개. 소스: `src/app/api/**/route.ts`. 아래는 핵심 + 그룹 요약. **정확한 요청/응답은 각 route.ts 확인.**
 
 ### 1-A. 핵심 API Top (네이티브 필수)
 
@@ -175,6 +184,11 @@
 - **실시간/캐시**: `PUSHER_*`/`NEXT_PUBLIC_PUSHER_*`, `UPSTASH_REDIS_REST_URL`/`_TOKEN`
 - **모바일/모드**: `MOBILE_ALLOWED_ORIGINS`, `MOBILE_WEBAPP_URL`, `APP_MODE`, `NEXT_PUBLIC_REALTIME_STT_ENGINE`, `M2M100_TRANSLATE_URL`
 - **외부**: `HI_INFO_*`(근로자 신원), `TRAVEL_API_SECRET`
+
+현재 PoC의 공개 Supabase URL·anon key 기본값은
+`src/config/public-runtime.ts` 한 곳에서 관리하며 Preview build에도 주입된다.
+이는 비밀값이 아니지만 범소프트웨어의 staging/production 환경에서는 각 환경변수로
+명시적으로 덮어써야 하며, service-role·JWT secret은 이 파일에 추가하면 안 된다.
 
 ---
 

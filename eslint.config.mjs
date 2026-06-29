@@ -27,6 +27,12 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "scripts/**/*.js",
     "verify_fix.js",
+    // Local backups and generated vendor/reference artifacts are not product source.
+    ".codex-backups/**",
+    "docs/generated/**",
+    // The mobile package has its own toolchain. Native/generated outputs must not
+    // pollute the root Next.js lint gate.
+    "apps/mobile/**",
   ]),
 ]);
 
