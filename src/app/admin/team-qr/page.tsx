@@ -37,7 +37,6 @@ const TRADE_KEYS: TradeType[] = [
 
 export default function TeamQrPage() {
     const router = useRouter();
-    const supabase = createClient();
 
     const [me, setMe] = useState<Me | null>(null);
     const [sites, setSites] = useState<Site[]>([]);
@@ -49,6 +48,10 @@ export default function TeamQrPage() {
     useEffect(() => {
         setBaseUrl(window.location.origin);
         (async () => {
+            // Supabase browser configuration is only required after hydration.
+            // Creating the client during static prerender makes Preview builds
+            // fail before environment validation can be shown at runtime.
+            const supabase = createClient();
             const res = await fetch("/api/auth/me", { credentials: "include", cache: "no-store" });
             if (!res.ok) return;
             const data = (await res.json()) as Me;
@@ -70,7 +73,6 @@ export default function TeamQrPage() {
             const { data: siteRows } = isGlobal ? await q : await q.eq("id", data.profile?.site_id ?? "");
             setSites(siteRows ?? []);
         })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const role = (me?.profile?.role ?? "").toUpperCase();
