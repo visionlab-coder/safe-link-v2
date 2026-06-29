@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "deploy": "opennextjs-cloudflare build && wrangler deploy",
+    "deploy": "opennextjs-cloudflare build && node scripts/strip-oversized-cf-assets.mjs && wrangler deploy",
     "preview": "opennextjs-cloudflare build && wrangler dev",
     "start": "next start",
     "lint": "eslint",
@@ -49,6 +49,6 @@
     "playwright-core": "^1.61.0",
     "tailwindcss": "^4",
     "typescript": "5.8.2",
-    "wrangler": "^3.109.2"
+    "wrangler": "^4.105.0"
   }
 }
