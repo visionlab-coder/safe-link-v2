@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "apiRouteFiles": 69,
+  "trackedMigrationFiles": 53,
+  "realtimeChannelCalls": 11,
+  "createPolicyStatements": 91,
+  "enableRlsStatements": 35
+}

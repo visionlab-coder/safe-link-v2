@@ -11,6 +11,11 @@
 
 미추적 파일 분류: [`SOURCE_HANDOFF_CLASSIFICATION.md`](./SOURCE_HANDOFF_CLASSIFICATION.md)
 
+- 환경변수 계약: [`ENVIRONMENT_CONTRACT.md`](./ENVIRONMENT_CONTRACT.md)
+- 권한·화면 계약: [`RBAC_SURFACE_CONTRACT.md`](./RBAC_SURFACE_CONTRACT.md)
+- 소스 인벤토리: [`SOURCE_INVENTORY.md`](./SOURCE_INVENTORY.md)
+- 업체 수령 체크리스트: [`VENDOR_RECEIPT_CHECKLIST.md`](./VENDOR_RECEIPT_CHECKLIST.md)
+
 ---
 
 ## 0. 시스템 개요
@@ -20,7 +25,7 @@
         │ HTTPS (REST) + Supabase Realtime(WSS)
         ▼
 [백엔드 (재사용)]
-  ├─ Next.js API Routes (STT/TTS/번역/TBM/인증/NFC 등 67개)  ← 그대로
+  ├─ Next.js API Routes (STT/TTS/번역/TBM/인증/NFC 등 69개)  ← 그대로
   └─ Supabase (PostgreSQL + Auth + Realtime + RLS)            ← 그대로
         │
 [외부 AI 서비스]  Google Cloud(STT/TTS/Gemini) · OpenAI(Whisper/TTS) · Naver Papago · (선택)Flitto RTT
@@ -33,7 +38,7 @@
 
 ## 1. API 인벤토리 (네이티브가 호출)
 
-> 전체 67개. 소스: `src/app/api/**/route.ts`. 아래는 핵심 + 그룹 요약. **정확한 요청/응답은 각 route.ts 확인.**
+> 전체 69개. 소스: `src/app/api/**/route.ts`. 아래는 핵심 + 그룹 요약. **정확한 요청/응답은 각 route.ts 확인.**
 
 ### 1-A. 핵심 API Top (네이티브 필수)
 

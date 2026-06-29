@@ -13,7 +13,10 @@
     "lint": "eslint src next.config.ts open-next.config.ts",
     "test:release-info": "node --no-warnings --experimental-strip-types scripts/release-info-contract.mjs",
     "check:secrets": "node scripts/check-repository-secrets.mjs",
-    "check:web": "npm run typecheck && npm run lint && npm run test:release-info && npm run check:secrets && npm run build",
+    "check:env-contract": "node scripts/check-env-contract.mjs",
+    "check:inventory": "node scripts/check-source-inventory.mjs",
+    "check:handoff": "npm run check:env-contract && npm run check:inventory && npm run check:secrets",
+    "check:web": "npm run typecheck && npm run lint && npm run test:release-info && npm run check:handoff && npm run build",
     "flitto:rtt:smoke": "node scripts/flitto-rtt-smoke.mjs",
     "m2m100:start": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-m2m100-onnx-local.ps1"
   },

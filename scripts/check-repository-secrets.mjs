@@ -1,10 +1,31 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 
-const tracked = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" })
-  .split("\0")
-  .filter(Boolean);
+const excludedDirectories = new Set([".git", ".next", ".open-next", "node_modules", "vendor-delivery"]);
+
+function walk(path = ".") {
+  const files = [];
+  for (const item of readdirSync(path, { withFileTypes: true })) {
+    if (item.isDirectory() && excludedDirectories.has(item.name)) continue;
+    const target = join(path, item.name);
+    if (item.isDirectory()) files.push(...walk(target));
+    else files.push(relative(".", target).split(sep).join("/"));
+  }
+  return files;
+}
+
+let tracked;
+let source = "Git-tracked";
+try {
+  tracked = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
+    .split("\0")
+    .filter(Boolean);
+} catch {
+  tracked = walk();
+  source = "archive";
+}
 
 const forbiddenFiles = tracked.filter((file) =>
   /(^|\/)(\.env(?:\..+)?|[^/]+\.(?:pem|key|p12|pfx))$/i.test(file),
@@ -56,4 +77,4 @@ if (forbiddenFiles.length || findings.length) {
   process.exit(1);
 }
 
-console.log(`[repository-secrets] green: ${tracked.length} tracked files scanned`);
+console.log(`[repository-secrets] green: ${tracked.length} ${source} files scanned`);

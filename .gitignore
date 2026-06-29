@@ -62,3 +62,6 @@ next-env.d.ts
 
 # Goal Harness local-only sensitive string list
 .harness-blocklist.local
+
+# Generated vendor email package (rebuild from a verified Git commit)
+/vendor-delivery/
