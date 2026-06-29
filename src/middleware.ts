@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { canAccessSystem, hasAllowedRole, type ProfileRole } from '@/lib/roles'
+import {
+    DEFAULT_SUPABASE_ANON_KEY,
+    DEFAULT_SUPABASE_URL,
+} from '@/config/public-runtime'
 
 // AI API 엔드포인트 — 미인증 외부 호출 차단 대상
 // /api/translate 제외: Travel Talk 비인증 사용자도 호출함 (travel_token 전용 흐름)
@@ -14,8 +18,8 @@ const AI_API_PREFIXES = [
 
 // Workers 가 process.env 를 손상시키는 케이스가 있어 NEXT_PUBLIC 값은 하드코딩.
 // 이 키는 클라이언트 번들에도 그대로 노출된 공개 anon key 라 보안 영향 없음.
-const SUPABASE_URL = "https://wzmzpuxpcpuvuacwmslj.supabase.co"
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXpwdXhwY3B1dnVhY3dtc2xqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2ODk3MTEsImV4cCI6MjA4NjI2NTcxMX0.hkql2QVn_IIRIrb3pbialLHpDiNDzAE2NQNjgxUTUv0"
+const SUPABASE_URL = DEFAULT_SUPABASE_URL
+const SUPABASE_ANON_KEY = DEFAULT_SUPABASE_ANON_KEY
 
 const PROJECT_REF = new URL(SUPABASE_URL).hostname.split('.')[0]
 const COOKIE_NAME = `sb-${PROJECT_REF}-auth-token`

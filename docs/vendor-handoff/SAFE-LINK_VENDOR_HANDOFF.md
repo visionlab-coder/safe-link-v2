@@ -180,6 +180,11 @@
 - **모바일/모드**: `MOBILE_ALLOWED_ORIGINS`, `MOBILE_WEBAPP_URL`, `APP_MODE`, `NEXT_PUBLIC_REALTIME_STT_ENGINE`, `M2M100_TRANSLATE_URL`
 - **외부**: `HI_INFO_*`(근로자 신원), `TRAVEL_API_SECRET`
 
+현재 PoC의 공개 Supabase URL·anon key 기본값은
+`src/config/public-runtime.ts` 한 곳에서 관리하며 Preview build에도 주입된다.
+이는 비밀값이 아니지만 범소프트웨어의 staging/production 환경에서는 각 환경변수로
+명시적으로 덮어써야 하며, service-role·JWT secret은 이 파일에 추가하면 안 된다.
+
 ---
 
 ## 6. 역할 분담 (소스 vs 계정자산)

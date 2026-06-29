@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 import { execFileSync } from "node:child_process";
+import {
+  DEFAULT_SUPABASE_ANON_KEY,
+  DEFAULT_SUPABASE_URL,
+} from "./src/config/public-runtime";
 
 function resolveReleaseSha(): string {
   const environmentSha = [
@@ -31,6 +35,14 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_SAFE_LINK_RELEASE_SHA: releaseSha,
     NEXT_PUBLIC_SAFE_LINK_BUILD_TIME: buildTime,
+    // Preview builds do not inherit production-scoped Vercel/Cloudflare
+    // variables. Use the current public PoC browser configuration as the
+    // explicit fallback; vendor environments should override both values.
+    NEXT_PUBLIC_SUPABASE_URL:
+      process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || DEFAULT_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY:
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+      DEFAULT_SUPABASE_ANON_KEY,
   },
   images: {
     unoptimized: true,
