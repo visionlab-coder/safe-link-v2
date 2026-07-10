@@ -1,5 +1,5 @@
 /**
- * SAFE-LINK AI Watchdog Agent
+ * SQ Link AI Watchdog Agent
  * 분석 에이전트: 모든 현장의 대화를 실시간 스캔하여 위험 요소를 추출합니다.
  */
 
@@ -13,7 +13,7 @@ export type AIAnalysisResult = {
 };
 
 export async function analyzeMessageWithAI(text: string): Promise<AIAnalysisResult> {
-    // TODO: 실제 Google Gemini API 연동 (API Key 필요)
+    // 운영 AI 호출은 Spring AI Gateway가 담당한다.
     // 현재는 MVP 시뮬레이션 로직으로 작동합니다.
 
     const dangerKeywords = ['위험', '사고', '피 나', '다쳤', '응급', '불 났', '추락', '붕괴', '미끄러'];

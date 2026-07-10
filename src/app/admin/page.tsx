@@ -4,13 +4,12 @@ import { useEffect, useState, Suspense } from "react";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
 import { motion } from "framer-motion";
 import { MapPin } from "lucide-react";
 import SiteAgentBriefing from "@/components/agents/SiteAgentBriefing";
-import { playNotificationSound } from "@/utils/notifications";
 import SystemHealthCheck from "@/components/SystemHealthCheck";
 import BrandLogo from "@/components/BrandLogo";
+import { logoutV3 } from "@/lib/v3-auth";
 
 // 관리자 모드: 한국어 / 영어 / 중국어 3개 (그 외 언어는 영어 fallback)
 const adminUI: Record<string, any> = {
@@ -123,6 +122,7 @@ function AdminDashboardContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [currentUser, setCurrentUser] = useState<{
+        id: string;
         name: string;
         email: string;
         role: string;
@@ -156,28 +156,13 @@ function AdminDashboardContent() {
                 let finalLang = data.profile.preferred_lang || "ko";
 
                 // 🚨 URL lang ≠ DB lang 이면 DB 업데이트.
-                // createBrowserClient 의존 제거를 위해 별도 라우트로 처리 가능하지만
-                // 일단 직접 fetch — apikey URL param 사용해 Workers 안정.
                 if (urlLang && urlLang !== data.profile.preferred_lang) {
-                    const url = "https://wzmzpuxpcpuvuacwmslj.supabase.co";
-                    const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXpwdXhwY3B1dnVhY3dtc2xqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2ODk3MTEsImV4cCI6MjA4NjI2NTcxMX0.hkql2QVn_IIRIrb3pbialLHpDiNDzAE2NQNjgxUTUv0";
-                    try {
-                        // 토큰은 쿠키에서 자동 전송 안 됨 → 클라이언트는 lang 변경 무시.
-                        // 서버 라우트 만드는 게 정도지만 — 일단 lang 변경 클릭 후 새로고침 흐름으로 충분.
-                        await fetch(
-                            `${url}/rest/v1/profiles?id=eq.${data.user.id}&apikey=${encodeURIComponent(key)}`,
-                            {
-                                method: "PATCH",
-                                headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
-                                body: JSON.stringify({ preferred_lang: urlLang }),
-                            }
-                        );
-                    } catch { /* lang 변경 실패는 치명적 아님 */ }
                     finalLang = urlLang;
                 }
 
                 if (cancelled) return;
                 setCurrentUser({
+                    id: data.user.id,
                     name: data.profile.display_name || "Manager",
                     email: data.user.email || "",
                     role: data.profile.role || "SAFETY_OFFICER",
@@ -191,34 +176,10 @@ function AdminDashboardContent() {
         return () => { cancelled = true; };
     }, [urlLang]);
 
-    const [newChatCount, setNewChatCount] = useState(0);
-
-    // 🆕 Global Message Monitor (For Unread Notifications on Dashboard)
-    useEffect(() => {
-        const loadMonitor = async () => {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) return;
-
-            const adminChannel = supabase
-                .channel(`admin_global_dash_${session.user.id}`)
-                .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
-                    const msg = payload.new;
-                    if (!msg || msg.from_user === session.user.id) return;
-
-                    setNewChatCount(prev => prev + 1);
-                    playNotificationSound();
-                })
-                .subscribe();
-
-            return () => { supabase.removeChannel(adminChannel); };
-        };
-        loadMonitor();
-    }, []);
+    const [newChatCount] = useState(0);
 
     const handleSignOut = async () => {
-        const supabase = createClient();
-        await supabase.auth.signOut();
+        await logoutV3().catch(() => undefined);
         router.push("/");
     };
 
@@ -468,7 +429,7 @@ function AdminDashboardContent() {
                             </div>
                             <h3 className="text-3xl font-black text-white text-gradient uppercase italic">AI 엔진 · 키 설정</h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
-                                통번역 엔진(Flitto·Google·Gemini)과 API 키를 재배포 없이 즉시 교체·테스트합니다.
+                                통번역 엔진(Google·Papago)과 API 키를 재배포 없이 즉시 교체·테스트합니다.
                             </p>
                             <div className="mt-4 flex items-center gap-2 text-emerald-400 font-black tracking-widest text-sm uppercase">
                                 <span>Engine Switch</span>
@@ -553,7 +514,7 @@ function AdminDashboardContent() {
                             </div>
                             <h3 className="text-3xl font-black text-white text-gradient uppercase italic">Access Center</h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
-                                Issue SAFE-LINK access cards and fallback codes.
+                                Issue SQ Link access cards and fallback codes.
                             </p>
                             <div className="mt-4 flex items-center gap-2 text-purple-400 font-black tracking-widest text-sm uppercase">
                                 <span>Open Access Center</span>
@@ -692,7 +653,7 @@ function AdminDashboardContent() {
                 <footer className="mt-auto flex flex-col items-center gap-4 py-8">
                     <div className="flex items-center gap-2 opacity-10">
                         <BrandLogo compact imageClassName="max-w-[140px]" />
-                        <span className="font-black text-2xl italic text-white uppercase tracking-tighter">Safe-Link Console</span>
+                        <span className="font-black text-2xl italic text-white uppercase tracking-tighter">SQ Link Console</span>
                     </div>
                 </footer>
             </div>

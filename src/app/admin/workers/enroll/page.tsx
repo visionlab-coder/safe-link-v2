@@ -144,7 +144,7 @@ function WorkerEnrollInner() {
       setStep("error");
       return;
     }
-    if (!confirm("이 NFC 카드를 지워 재사용 가능하게 하시겠습니까? 태그에 저장된 SAFE-LINK URL이 삭제됩니다.")) return;
+    if (!confirm("이 NFC 카드를 지워 재사용 가능하게 하시겠습니까? 태그에 저장된 SQ Link URL이 삭제됩니다.")) return;
     setError("");
     setStep("erasing");
     try {
@@ -225,7 +225,7 @@ function WorkerEnrollInner() {
         <div className="bg-gray-800 rounded-xl p-8 max-w-sm w-full text-center border border-gray-700">
           <Nfc className="w-16 h-16 text-green-400 mx-auto mb-4 animate-pulse" />
           <h2 className="text-white text-xl font-bold mb-2">NFC 카드를 태그하세요</h2>
-          <p className="text-gray-400 text-sm">근로자 카드를 이 Android 휴대폰 가까이에 대면 SAFE-LINK 접속 URL이 기록됩니다.</p>
+          <p className="text-gray-400 text-sm">근로자 카드를 이 Android 휴대폰 가까이에 대면 SQ Link 접속 URL이 기록됩니다.</p>
         </div>
       </div>
     );
@@ -237,7 +237,7 @@ function WorkerEnrollInner() {
         <div className="bg-gray-800 rounded-xl p-8 max-w-sm w-full text-center border border-gray-700">
           <Eraser className="w-16 h-16 text-yellow-400 mx-auto mb-4 animate-pulse" />
           <h2 className="text-white text-xl font-bold mb-2">NFC 카드를 태그하세요</h2>
-          <p className="text-gray-400 text-sm">재사용할 카드를 이 Android 휴대폰 가까이에 대면 저장된 SAFE-LINK URL이 삭제됩니다.</p>
+          <p className="text-gray-400 text-sm">재사용할 카드를 이 Android 휴대폰 가까이에 대면 저장된 SQ Link URL이 삭제됩니다.</p>
         </div>
       </div>
     );
@@ -249,7 +249,7 @@ function WorkerEnrollInner() {
         <div className="bg-gray-800 rounded-xl p-8 max-w-sm w-full text-center border border-gray-700">
           <ScanLine className="w-16 h-16 text-blue-400 mx-auto mb-4 animate-pulse" />
           <h2 className="text-white text-xl font-bold mb-2">NFC 카드를 태그하세요</h2>
-          <p className="text-gray-400 text-sm">카드를 이 Android 휴대폰 가까이에 대면 저장된 SAFE-LINK URL을 읽습니다.</p>
+          <p className="text-gray-400 text-sm">카드를 이 Android 휴대폰 가까이에 대면 저장된 SQ Link URL을 읽습니다.</p>
         </div>
       </div>
     );
@@ -265,13 +265,13 @@ function WorkerEnrollInner() {
             근로자 코드: <span className="text-white font-mono">{workerCode}</span>
           </p>
           <p className="text-gray-500 text-xs mt-3">
-            실물 카드에는 근로자 이름을 표시하세요. 태그에는 서명된 SAFE-LINK URL만 저장됩니다.
+            실물 카드에는 근로자 이름을 표시하세요. 태그에는 서명된 SQ Link URL만 저장됩니다.
           </p>
           {stickerUrl && (
             <div className="bg-white p-3 rounded-xl mt-4">
               <Image
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(stickerUrl)}`}
-                alt="근로자 SAFE-LINK QR"
+                alt="근로자 SQ Link QR"
                 width={220}
                 height={220}
                 unoptimized

@@ -1,39 +1,11 @@
 import { NextRequest } from 'next/server';
 export const runtime = "nodejs";
 import { getCookieUser } from "@/utils/auth/cookie-user";
-import { getErrorMessage } from '@/utils/errors';
 import { checkTtsLimit } from "@/utils/rate-limit";
-
-interface GoogleTtsResponse {
-    audioContent?: string;
-}
+import { callV3AiTts } from "@/utils/ai/v3-ai-gateway";
 
 // Google Standard 전용 언어 — OpenAI tts-1-hd로 업그레이드 (Neural2 동급 품질)
 const OPENAI_TTS_LANGS = new Set(['uz', 'ne', 'km', 'my', 'mn', 'kk']);
-
-/** OpenAI tts-1-hd — Standard-only 언어 대체 엔진 */
-async function fetchOpenAiTTS(text: string, gender: string, apiKey: string): Promise<Response | null> {
-    const voice = gender === 'male' ? 'onyx' : 'nova';
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
-    try {
-        const res = await fetch('https://api.openai.com/v1/audio/speech', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-            signal: controller.signal,
-            body: JSON.stringify({ model: 'tts-1-hd', input: text, voice, response_format: 'mp3' }),
-        });
-        clearTimeout(timeout);
-        if (!res.ok) return null;
-        const buffer = await res.arrayBuffer();
-        return new Response(buffer, {
-            headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=3600' },
-        });
-    } catch {
-        clearTimeout(timeout);
-        return null;
-    }
-}
 
 /**
  * [V3.1] Google Cloud TTS (Neural2/WaveNet) + OpenAI tts-1-hd 하이브리드
@@ -41,7 +13,7 @@ async function fetchOpenAiTTS(text: string, gender: string, apiKey: string): Pro
  */
 export async function GET(request: NextRequest) {
     // P5 박제: createServerClient.getUser() → getCookieUser() (raw JWT 파싱)
-    const user = await getCookieUser();
+    const user = await getCookieUser({ allowV3: true });
     if (!user) return new Response("UNAUTHORIZED", { status: 401 });
     if (!(await checkTtsLimit(user.id))) {
         return new Response("RATE_LIMITED", { status: 429 });
@@ -50,85 +22,36 @@ export async function GET(request: NextRequest) {
     const text = request.nextUrl.searchParams.get('text') ?? '';
     const lang = request.nextUrl.searchParams.get('lang') ?? 'ko';
     const gender = request.nextUrl.searchParams.get('gender') ?? 'female';
-    const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();
-    const openaiKey = process.env.OPENAI_API_KEY?.trim();
-
     if (!text) return new Response('Missing text', { status: 400 });
     if (text.length > 1000) return new Response('Text too long (max 1000 characters)', { status: 400 });
-
+    const siteId = user.siteIds?.[0];
+    if (user.source !== "v3" || typeof siteId !== "number") {
+        return new Response("V3_SITE_SESSION_REQUIRED", { status: 403 });
+    }
     const baseLang = lang.split('-')[0].toLowerCase();
-
-    // Standard-only 언어: OpenAI tts-1-hd 우선 (Google Standard보다 자연스러운 억양)
-    if (OPENAI_TTS_LANGS.has(baseLang) && openaiKey) {
-        const openaiResult = await fetchOpenAiTTS(text, gender, openaiKey);
-        if (openaiResult) return openaiResult;
-        // OpenAI 실패 시 Google TTS로 폴백
-        console.warn(`[TTS-OpenAI] ${lang} 실패, Google TTS 폴백`);
-    }
-
-    if (!apiKey) {
-        return fetchLegacyTTS(text, lang);
-    }
-
-    try {
-        const voiceName = getBestCloudVoice(lang, gender);
-        const voiceLangCode = getVoiceLangCode(lang);
-
-        const response = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                input: { text },
-                voice: { languageCode: voiceLangCode, name: voiceName, ssmlGender: gender.toUpperCase() },
-                audioConfig: {
-                    audioEncoding: 'MP3',
-                    speakingRate: 1.0,
-                    pitch: 0
-                }
-            })
+    const upstream = await callV3AiTts(request, {
+        siteId,
+        text,
+        voiceLanguageCode: getVoiceLangCode(lang),
+        voiceName: getBestCloudVoice(lang, gender),
+        gender,
+        preferOpenAi: OPENAI_TTS_LANGS.has(baseLang),
+    });
+    if (!upstream) return new Response("TTS gateway unavailable", { status: 503 });
+    if (!upstream.ok) {
+        return new Response(await upstream.text().catch(() => ""), {
+            status: upstream.status,
+            headers: { "Content-Type": upstream.headers.get("content-type") || "text/plain" },
         });
-
-        if (!response.ok) {
-            const errText = await response.text();
-            console.warn('[TTS-Cloud] Falling back to legacy TTS:', errText.substring(0, 100));
-            return fetchLegacyTTS(text, lang);
-        }
-
-        const data = await response.json() as GoogleTtsResponse;
-        if (!data.audioContent) {
-            throw new Error('Missing audioContent');
-        }
-
-        const binaryString = atob(data.audioContent);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-        }
-
-        return new Response(bytes, {
-            headers: {
-                'Content-Type': 'audio/mpeg',
-                'Cache-Control': 'public, max-age=3600',
-            },
-        });
-    } catch (error: unknown) {
-        console.warn('[TTS-Cloud] Error, falling back:', getErrorMessage(error));
-        return fetchLegacyTTS(text, lang);
     }
-}
-
-/** [Legacy] Unofficial Google Translate TTS as Fallback */
-async function fetchLegacyTTS(text: string, lang: string) {
-    try {
-        const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${lang}&client=tw-ob&ttsspeed=1.0`;
-        const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-        const buffer = await resp.arrayBuffer();
-        return new Response(buffer, { headers: { 'Content-Type': 'audio/mpeg' } });
-    } catch (error: unknown) {
-        console.error('[TTS] Legacy fallback failed:', getErrorMessage(error));
-        return new Response('TTS unavailable', { status: 503 });
-    }
+    const data = await upstream.json() as { audioBase64?: string; contentType?: string };
+    if (!data.audioBase64) return new Response("TTS unavailable", { status: 503 });
+    return new Response(Buffer.from(data.audioBase64, "base64"), {
+        headers: {
+            "Content-Type": data.contentType || "audio/mpeg",
+            "Cache-Control": "public, max-age=3600",
+        },
+    });
 }
 
 /** 앱 내부 코드 → Google TTS languageCode 변환 */

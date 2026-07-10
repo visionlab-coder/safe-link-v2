@@ -1,10 +1,8 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
-import { createClient } from "@/utils/supabase/client";
 import { playPremiumAudio, VoiceGender } from "@/utils/tts";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
 
@@ -60,6 +58,7 @@ export default function WorkerLivePage() {
     const langRef = useRef("ko");
     const genderRef = useRef<VoiceGender>("female");
     const seenRowsRef = useRef<Set<string>>(new Set());
+    const lastTranslationIdRef = useRef(0);
     const lastRenderedRef = useRef<{ text: string; at: number }>({ text: "", at: 0 });
 
     // Keep refs in sync
@@ -92,60 +91,50 @@ export default function WorkerLivePage() {
         };
     }, []);
 
-    const handleWorkerTranscript = useCallback(async (
-        text: string,
-        flittoTranslations?: Record<string, string>,
-    ) => {
+    const handleWorkerTranscript = useCallback(async (text: string) => {
         if (!authReady?.siteId || !activeAdminId) return;
         const cleanText = text.trim().replace(/\s+/g, " ");
         if (!cleanText) return;
 
-        let koreanText = flittoTranslations?.ko?.trim() || "";
-        if (!koreanText) {
-            try {
-                const response = await fetch("/api/translate", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        text: cleanText,
-                        sl: langRef.current,
-                        tl: "ko",
-                        fast: true,
-                        pronunciation: false,
-                        useGlossary: true,
-                    }),
-                });
-                const data = await response.json();
-                koreanText = String(data.translated || "").trim();
-            } catch {
-                koreanText = "";
-            }
+        let koreanText = "";
+        try {
+            const response = await fetch("/api/translate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    text: cleanText,
+                    sl: langRef.current,
+                    tl: "ko",
+                    fast: true,
+                    pronunciation: false,
+                    useGlossary: true,
+                }),
+            });
+            const data = await response.json();
+            koreanText = String(data.translated || "").trim();
+        } catch {
+            koreanText = "";
         }
         if (!koreanText) return;
 
-        const supabase = createClient();
-        const { data, error } = await supabase
-            .from("messages")
-            .insert({
-                site_id: authReady.siteId,
-                from_user: authReady.profileId,
-                to_user: activeAdminId,
-                source_lang: langRef.current,
-                target_lang: "ko",
-                source_text: cleanText,
-                translated_text: koreanText,
-                ai_analysis: {
-                    channel: "live_interpreter",
-                    speaker_name: authReady.displayName,
-                },
-            })
-            .select("id")
-            .single();
+        const saveRes = await fetch("/api/live/worker-responses", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                siteId: authReady.siteId,
+                adminId: activeAdminId,
+                sourceLang: langRef.current,
+                sourceText: cleanText,
+                translatedText: koreanText,
+                speakerName: authReady.displayName,
+            }),
+        });
 
-        if (error) {
-            console.error("[worker/live] response insert failed:", error.message);
+        if (!saveRes.ok) {
+            console.error("[worker/live] response insert failed:", saveRes.status);
             return;
         }
+        const saved = await saveRes.json() as { id: string };
 
         const time = new Date().toLocaleTimeString("ko-KR", {
             hour: "2-digit",
@@ -153,7 +142,7 @@ export default function WorkerLivePage() {
             second: "2-digit",
         });
         setSubtitles(prev => [...prev, {
-            id: data.id,
+            id: saved.id,
             text_ko: koreanText,
             translated: cleanText,
             reverseTranslated: koreanText,
@@ -169,12 +158,11 @@ export default function WorkerLivePage() {
         unmute: unmuteRecording,
     } = useCloudSTT({
         lang,
-        targetLangs: ["ko"],
         onTranscript: handleWorkerTranscript,
         live: true,
     });
 
-    const processQueue = () => {
+    const processQueue = useCallback(() => {
         if (isPlayingRef.current || ttsQueueRef.current.length === 0) return;
         isPlayingRef.current = true;
         const text = ttsQueueRef.current.shift()!;
@@ -184,153 +172,135 @@ export default function WorkerLivePage() {
             unmuteRecording();
             processQueue();
         });
-    };
+    }, [muteRecording, unmuteRecording]);
 
     useEffect(() => {
         const load = async () => {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                const { data: profile } = await supabase
-                    .from("profiles")
-                    .select("preferred_lang, site_id, display_name")
-                    .eq("id", session.user.id)
-                    .single();
-                if (profile?.preferred_lang) {
-                    setLang(profile.preferred_lang);
-                    langRef.current = profile.preferred_lang;
-                }
-                // profileId + siteId 동시 세팅 → subscription 1회만 생성
+            const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+            if (!res.ok) return;
+            const data = await res.json() as {
+                user?: { id: string };
+                profile?: { preferred_lang?: string | null; site_id?: string | null; display_name?: string | null } | null;
+            };
+            if (data.user?.id) {
+                const preferredLang = data.profile?.preferred_lang || "ko";
+                setLang(preferredLang);
+                langRef.current = preferredLang;
                 setAuthReady({
-                    profileId: session.user.id,
-                    siteId: profile?.site_id || null,
-                    displayName: profile?.display_name || "Worker",
+                    profileId: data.user.id,
+                    siteId: data.profile?.site_id || null,
+                    displayName: data.profile?.display_name || "Worker",
                 });
             }
         };
         load();
     }, []);
 
-    // Presence: 근로자가 이 페이지에 있음을 관리자에게 알림
+    // Load the backlog once, then receive new translations over Spring SSE.
     useEffect(() => {
         if (!authReady) return;
-        const { profileId, siteId } = authReady;
-        const supabase = createClient();
-        const channelName = "live_audience_global";
-        const channel = supabase.channel(channelName, { config: { presence: { key: profileId } } });
+        const { siteId } = authReady;
+        let cancelled = false;
+        type TranslationRow = {
+            id: string;
+            text_ko: string;
+            translations?: Record<string, string>;
+            created_by?: string;
+        };
 
-        channel.on("presence", { event: "sync" }, () => {
-            const admins = (Object.values(channel.presenceState())
-                .flat()
-                .filter((presence: any) =>
-                    presence.role === "admin"
-                    && presence.userId
-                    && (!presence.siteId || presence.siteId === siteId)
-                ) as unknown) as Array<{ userId: string; siteId?: string | null }>;
-            const siteAdmin = admins.find(admin => admin.siteId === siteId);
-            setActiveAdminId(siteAdmin?.userId || admins[0]?.userId || null);
-        });
+        const handleTranslation = async (row: TranslationRow) => {
+            if (cancelled || seenRowsRef.current.has(row.id)) return;
+            seenRowsRef.current.add(row.id);
+            lastTranslationIdRef.current = Math.max(lastTranslationIdRef.current, Number(row.id));
+            if (row.created_by) setActiveAdminId(row.created_by);
+            const cleanTextKo = String(row.text_ko || "").trim().replace(/\s+/g, " ");
+            if (!cleanTextKo) return;
+            const now = Date.now();
+            if (lastRenderedRef.current.text === cleanTextKo && now - lastRenderedRef.current.at < 10_000) return;
+            lastRenderedRef.current = { text: cleanTextKo, at: now };
+            setIsConnected(true);
+            const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const myLang = langRef.current;
 
-        channel.subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') {
-                await channel.track({
-                    role: "worker",
-                    siteId,
-                    userId: profileId,
-                    lang: langRef.current,
+            const addSubAndScroll = (sub: Subtitle, ttsText?: string) => {
+                setSubtitles(prev => [...prev, sub]);
+                if (ttsText && audioEnabledRef.current) {
+                    ttsQueueRef.current.push(ttsText);
+                    processQueue();
+                }
+            };
+
+            if (myLang === 'ko') {
+                addSubAndScroll(
+                    { id: row.id, text_ko: cleanTextKo, translated: cleanTextKo, reverseTranslated: "", time },
+                    cleanTextKo
+                );
+                return;
+            }
+
+            const pretranslated = row.translations?.[myLang];
+            if (pretranslated) {
+                addSubAndScroll(
+                    { id: row.id, text_ko: cleanTextKo, translated: pretranslated, reverseTranslated: cleanTextKo, time },
+                    pretranslated
+                );
+                return;
+            }
+
+            try {
+                const res = await fetch("/api/translate", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        text: cleanTextKo,
+                        sl: "ko",
+                        tl: myLang,
+                        fast: true,
+                        pronunciation: false,
+                        useGlossary: true,
+                    }),
                 });
+                const data = await res.json();
+                const translatedNow = data.translated || row.text_ko;
+                addSubAndScroll(
+                    { id: row.id, text_ko: cleanTextKo, translated: translatedNow, reverseTranslated: data.reverse_translated || "", time },
+                    translatedNow
+                );
+            } catch {
+                addSubAndScroll(
+                    { id: row.id, text_ko: cleanTextKo, translated: cleanTextKo, reverseTranslated: "", time }
+                );
+            }
+        };
+
+        const loadMissedTranslations = async () => {
+            const params = new URLSearchParams({ afterId: String(lastTranslationIdRef.current) });
+            if (siteId) params.set("siteId", siteId);
+            const res = await fetch(`/api/live/translations?${params.toString()}`, { cache: "no-store" });
+            if (!res.ok || cancelled) return;
+            const data = await res.json() as { translations?: TranslationRow[] };
+            for (const row of data.translations ?? []) {
+                await handleTranslation(row);
+            }
+        };
+
+        const params = new URLSearchParams({ type: "translations" });
+        if (siteId) params.set("siteId", siteId);
+        const events = new EventSource(`/api/live/events?${params.toString()}`);
+        events.addEventListener("translation", event => {
+            try {
+                void handleTranslation(JSON.parse((event as MessageEvent<string>).data));
+            } catch {
+                // EventSource reconnects automatically; missed rows are loaded on the next mount.
             }
         });
+        void loadMissedTranslations();
 
-        return () => { supabase.removeChannel(channel); };
-    }, [authReady]);
-
-    // Subscribe to live translations
-    useEffect(() => {
-        if (!authReady) return;
-        const { profileId, siteId } = authReady;
-        const supabase = createClient();
-
-        const channel = supabase
-            .channel(`live_translation_feed_${profileId}`)
-            .on("postgres_changes", {
-                event: "INSERT",
-                schema: "public",
-                table: "live_translations",
-            }, async (payload) => {
-                const row = payload.new as any;
-                if (row.speaker_role === "worker") return;
-                if (row.site_id && row.site_id !== siteId) return;
-                if (seenRowsRef.current.has(row.id)) return;
-                seenRowsRef.current.add(row.id);
-                const cleanTextKo = String(row.text_ko || "").trim().replace(/\s+/g, " ");
-                if (!cleanTextKo) return;
-                const now = Date.now();
-                if (lastRenderedRef.current.text === cleanTextKo && now - lastRenderedRef.current.at < 10_000) return;
-                lastRenderedRef.current = { text: cleanTextKo, at: now };
-                setIsConnected(true);
-                const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                const myLang = langRef.current;
-
-                const addSubAndScroll = (sub: Subtitle, ttsText?: string) => {
-                    setSubtitles(prev => [...prev, sub]);
-                    if (ttsText && audioEnabledRef.current) {
-                        ttsQueueRef.current.push(ttsText);
-                        processQueue();
-                    }
-                };
-
-                if (myLang === 'ko') {
-                    addSubAndScroll(
-                        { id: row.id, text_ko: cleanTextKo, translated: cleanTextKo, reverseTranslated: "", time },
-                        cleanTextKo
-                    );
-                    return;
-                }
-
-                // 서버 프리번역이 있으면 즉시 표시 후 발음은 비동기로 추가
-                const pretranslated = row.translations?.[myLang];
-                if (pretranslated) {
-                    addSubAndScroll(
-                        { id: row.id, text_ko: cleanTextKo, translated: pretranslated, reverseTranslated: cleanTextKo, time },
-                        pretranslated
-                    );
-                    // 발음을 백그라운드로 가져와서 업데이트
-                    return;
-                }
-
-                // 발음 스킵(속도), 번역은 full quality — 희귀 언어도 Gemini 건설 문맥 보장
-                try {
-                    const res = await fetch("/api/translate", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            text: cleanTextKo,
-                            sl: "ko",
-                            tl: myLang,
-                            fast: true,
-                            pronunciation: false,
-                            useGlossary: true,
-                        }),
-                    });
-                    const data = await res.json();
-                    const translatedNow = data.translated || row.text_ko;
-                    // 번역문 즉시 표시 (발음 없이)
-                    addSubAndScroll(
-                        { id: row.id, text_ko: cleanTextKo, translated: translatedNow, reverseTranslated: data.reverse_translated || "", time },
-                        translatedNow
-                    );
-                    // 발음은 백그라운드에서 별도 fetch → 완성되면 subtitle 업데이트
-                } catch {
-                    addSubAndScroll(
-                        { id: row.id, text_ko: cleanTextKo, translated: cleanTextKo, reverseTranslated: "", time }
-                    );
-                }
-            })
-            .subscribe();
-
-        return () => { supabase.removeChannel(channel); };
-    }, [authReady]);
+        return () => {
+            cancelled = true;
+            events.close();
+        };
+    }, [authReady, processQueue]);
 
     const t = getT(lang);
 

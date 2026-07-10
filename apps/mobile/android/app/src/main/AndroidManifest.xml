@@ -22,7 +22,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- App Links (딥링크): QR/NFC 스캔으로 열린 SAFE-LINK URL을 브라우저 대신 앱이 처리.
+            <!-- App Links (딥링크): QR/NFC 스캔으로 열린 SQ Link URL을 브라우저 대신 앱이 처리.
                  autoVerify 는 도메인의 /.well-known/assetlinks.json 과 서명 지문 매칭으로 검증됨. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />

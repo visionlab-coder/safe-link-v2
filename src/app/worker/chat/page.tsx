@@ -2,7 +2,6 @@
 import { useEffect, useState, Suspense, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { createClient } from "@/utils/supabase/client";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import RoleGuard from "@/components/RoleGuard";
 
@@ -15,7 +14,6 @@ import { useCloudSTT } from "@/hooks/useCloudSTT";
 import { usePresence } from "@/hooks/usePresence";
 
 type ParsedMessage = { text: string; pron: string; rev: string };
-type RealtimeMessagePayload = { new: Message };
 
 const ui: Record<string, Record<string, string>> = {
     ko: {
@@ -211,7 +209,23 @@ const getUI = (lang: string) => ui[lang] || ui["en"];
 
 
 type AdminProfile = { id: string; display_name: string; role: string; site_id: string | null; };
-type Message = { id: string; from_user: string; to_user: string; source_text: string; translated_text: string; created_at: string; is_read?: boolean; };
+type WorkerChatAdminsResponse = {
+    worker?: { id?: string; preferred_lang?: string | null; site_id?: string | null };
+    admins?: AdminProfile[];
+};
+type Message = {
+    id: string;
+    from_user: string;
+    to_user: string;
+    source_lang?: string;
+    target_lang?: string;
+    source_text: string;
+    translated_text: string;
+    created_at: string;
+    is_read?: boolean;
+};
+type ChatMessagesResponse = { messages?: Message[] };
+type ChatMessageResponse = { message?: Message };
 
 function WorkerChatContent() {
     const router = useRouter();
@@ -267,61 +281,56 @@ function WorkerChatContent() {
         localStorage.setItem('sl_voice_enabled', String(next));
     };
 
+    const markMessagesRead = useCallback(async (peerId: string) => {
+        await fetch("/api/chat/messages", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ peer_id: peerId }),
+        }).catch(() => {});
+    }, []);
+
     const load = useCallback(async () => {
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-        setMyId(session.user.id);
+        const adminsRes = await fetch("/api/worker/chat/admins", { cache: "no-store" });
+        if (!adminsRes.ok) {
+            if (adminsRes.status === 401) router.push("/auth");
+            setAdmins([]);
+            return;
+        }
 
-        // 1) 내 프로필 먼저 — site_id 확인 후 관리자 쿼리 스코프 결정
-        const profileRes = await supabase
-            .from("profiles")
-            .select("preferred_lang, site_id")
-            .eq("id", session.user.id)
-            .single();
+        const payload = (await adminsRes.json()) as WorkerChatAdminsResponse;
+        const userId = payload.worker?.id;
+        if (!userId) return;
+        setMyId(userId);
 
-        const profile = profileRes.data;
-        const mySiteId = profile?.site_id ?? null;
+        const mySiteId = payload.worker?.site_id ?? null;
         if (mySiteId) setSiteId(mySiteId);
 
-        // 2) 관리자 목록: 반드시 자기 현장(site_id)만 — 다른 현장 관리자와 채팅 절대 불가
-        let adminQuery = supabase
-            .from("profiles")
-            .select("id, display_name, role, site_id")
-            .not("role", "ilike", "worker")
-            .not("role", "eq", "ROOT");
-        if (mySiteId) adminQuery = adminQuery.eq("site_id", mySiteId);
-        const adminListRes = await adminQuery;
-
-        let finalLang = profile?.preferred_lang || "ko";
-        if (urlLang && urlLang !== profile?.preferred_lang) {
-            supabase.from("profiles").update({ preferred_lang: urlLang }).eq("id", session.user.id);
+        let finalLang = payload.worker?.preferred_lang || "ko";
+        if (urlLang && urlLang !== payload.worker?.preferred_lang) {
             finalLang = urlLang;
         }
         setLang(finalLang);
 
         // Load friend IDs from local storage
-        const savedFriends = localStorage.getItem(`wrk_friends_${session.user.id}`);
+        const savedFriends = localStorage.getItem(`wrk_friends_${userId}`);
         const currentFriends = new Set<string>(savedFriends ? JSON.parse(savedFriends) : []);
 
         // Handling QR Add Friend
-        if (addFriendId && addFriendId !== session.user.id) {
+        if (addFriendId && addFriendId !== userId) {
             currentFriends.add(addFriendId);
-            localStorage.setItem(`wrk_friends_${session.user.id}`, JSON.stringify(Array.from(currentFriends)));
+            localStorage.setItem(`wrk_friends_${userId}`, JSON.stringify(Array.from(currentFriends)));
             alert(getUI(finalLang).friendAdded);
             window.history.replaceState({}, '', window.location.pathname + (urlLang ? `?lang=${urlLang}` : ''));
         }
         setFriendIds(currentFriends);
 
-        if (adminListRes.data) {
-            const prioritized = [...adminListRes.data].sort((a, b) => {
-                const isFriendA = currentFriends.has(a.id) ? 0 : 1;
-                const isFriendB = currentFriends.has(b.id) ? 0 : 1;
-                return isFriendA - isFriendB;
-            });
-            setAdmins(prioritized);
-        }
-    }, [urlLang, addFriendId]);
+        const prioritized = [...(payload.admins ?? [])].sort((a, b) => {
+            const isFriendA = currentFriends.has(a.id) ? 0 : 1;
+            const isFriendB = currentFriends.has(b.id) ? 0 : 1;
+            return isFriendA - isFriendB;
+        });
+        setAdmins(prioritized);
+    }, [router, urlLang, addFriendId]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -329,97 +338,88 @@ function WorkerChatContent() {
         activeAdminRef.current = activeAdmin;
         if (activeAdmin) {
             setUnreadAdmins(prev => {
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 const { [activeAdmin.id]: _, ...rest } = prev;
                 return rest;
             });
         }
         if (!myId || !activeAdmin) return;
-        const supabase = createClient();
 
-        const fetchMessages = async () => {
-            const { data } = await supabase
-                .from("messages")
-                .select("*")
-                .or(`and(from_user.eq.${myId},to_user.eq.${activeAdmin.id}),and(from_user.eq.${activeAdmin.id},to_user.eq.${myId})`)
-                .order("created_at", { ascending: false })
-                .limit(MSG_PAGE_SIZE);
-            const sorted = data ? [...data].reverse() : [];
+        const fetchMessages = async (scroll = true) => {
+            const res = await fetch(`/api/chat/messages?peer_id=${activeAdmin.id}&limit=${MSG_PAGE_SIZE}`, {
+                cache: "no-store",
+            });
+            if (!res.ok) return;
+
+            const payload = (await res.json()) as ChatMessagesResponse;
+            const sorted = payload.messages ?? [];
+            const newIncoming = sorted.filter((m) =>
+                m.from_user === activeAdmin.id &&
+                m.to_user === myId &&
+                !processedAudioIds.current.has(m.id)
+            );
             setMessages(sorted);
-            setHasMore((data?.length ?? 0) >= MSG_PAGE_SIZE);
+            setHasMore(sorted.length >= MSG_PAGE_SIZE);
             sorted.forEach(m => processedAudioIds.current.add(m.id));
 
-            supabase
-                .from("messages")
-                .update({ is_read: true })
-                .eq("from_user", activeAdmin.id)
-                .eq("to_user", myId)
-                .eq("is_read", false)
-                .then(() => {});
-            setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 200);
-        };
-        fetchMessages();
-
-        const monitorId = `msg_wrk_${siteId ?? myId}_${myId}_${activeAdmin.id}`;
-        const channel = supabase
-            .channel(monitorId)
-            .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload: RealtimeMessagePayload) => {
-                const msg = payload.new as Message & { site_id?: string | null };
-                if (!msg || processedAudioIds.current.has(msg.id)) return;
-                // 다른 현장 메시지 차단 (site_id가 있고 내 현장과 다를 때만 필터, NULL은 통과)
-                if (msg.site_id && siteId && msg.site_id !== siteId) return;
-
-                const isForMe = msg.to_user === myId && msg.from_user === activeAdmin.id;
-
-                if (isForMe) {
-                    processedAudioIds.current.add(msg.id);
-                    setMessages(prev => {
-                        if (prev.find(m => m.id === msg.id)) return prev;
-                        return [...prev, ({ ...msg, is_read: true } as Message)];
-                    });
-
-                    // 읽음 처리
-                    supabase.from("messages").update({ is_read: true }).eq("id", msg.id).then();
-                    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-                    playNotificationSound();
-                    if (typeof navigator !== "undefined" && navigator.vibrate) {
-                        navigator.vibrate([300, 100, 300]);
-                    }
+            void markMessagesRead(activeAdmin.id);
+            if (scroll) {
+                setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 200);
+            }
+            if (!scroll && newIncoming.length > 0) {
+                playNotificationSound();
+                if (typeof navigator !== "undefined" && navigator.vibrate) {
+                    navigator.vibrate([300, 100, 300]);
                 }
-            })
-            .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, (payload) => {
-                const updated = payload.new as Message;
-                setMessages(prev => prev.map(m => m.id === updated.id ? { ...m, is_read: updated.is_read } : m));
-            })
-            .subscribe();
+            }
+        };
+        void fetchMessages();
+        const events = new EventSource(`/api/chat/events?peer_id=${encodeURIComponent(activeAdmin.id)}`);
+        events.addEventListener("message", () => {
+            void fetchMessages(false);
+        });
+        events.onerror = () => {};
 
-        return () => { supabase.removeChannel(channel); };
-    }, [myId, activeAdmin]); // lang 제거: 언어 변경 시 채널 재생성 불필요
+        return () => {
+            events.close();
+        };
+    }, [myId, activeAdmin, siteId, markMessagesRead]); // lang 제거: 언어 변경 시 채널 재생성 불필요
 
     // 🆕 Global Message Monitor (For Unread Notifications)
+    const unreadAdminSeenRef = useRef<Set<string>>(new Set());
     useEffect(() => {
-        if (!myId) return;
-        const supabase = createClient();
-        const globalChannel = supabase
-            .channel(`worker_global_${myId}_${siteId ?? 'all'}`)
-            .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
-                const msg = payload.new as Message & { site_id?: string | null };
-                if (!msg || msg.from_user === myId) return;
-                // 다른 현장 메시지 차단 (site_id 있는 경우만 필터)
-                if (msg.site_id && siteId && msg.site_id !== siteId) return;
-
-                // If message is for me but not from the active admin, mark as unread
-                if (msg.to_user === myId && (!activeAdminRef.current || msg.from_user !== activeAdminRef.current.id)) {
-                    setUnreadAdmins(prev => ({ ...prev, [msg.from_user]: (prev[msg.from_user] || 0) + 1 }));
-                    playNotificationSound();
-                    if (typeof navigator !== "undefined" && navigator.vibrate) {
-                        navigator.vibrate([300, 100, 300]);
-                    }
+        if (!myId || admins.length === 0) return;
+        let cancelled = false;
+        const pollUnread = async () => {
+            for (const admin of admins) {
+                if (cancelled || activeAdminRef.current?.id === admin.id) continue;
+                const res = await fetch(`/api/chat/messages?peer_id=${admin.id}&limit=5`, { cache: "no-store" });
+                if (!res.ok) continue;
+                const payload = (await res.json()) as ChatMessagesResponse;
+                const incoming = (payload.messages ?? []).filter((msg) =>
+                    msg.from_user === admin.id &&
+                    msg.to_user === myId &&
+                    msg.is_read === false &&
+                    !unreadAdminSeenRef.current.has(msg.id)
+                );
+                if (incoming.length === 0) continue;
+                incoming.forEach((msg) => unreadAdminSeenRef.current.add(msg.id));
+                setUnreadAdmins(prev => ({ ...prev, [admin.id]: (prev[admin.id] || 0) + incoming.length }));
+                playNotificationSound();
+                if (typeof navigator !== "undefined" && navigator.vibrate) {
+                    navigator.vibrate([300, 100, 300]);
                 }
-            })
-            .subscribe();
-        return () => { supabase.removeChannel(globalChannel); };
-    }, [myId, siteId]);
+            }
+        };
+        void pollUnread();
+        const events = new EventSource("/api/chat/user-events");
+        events.addEventListener("message", () => {
+            void pollUnread();
+        });
+        return () => {
+            cancelled = true;
+            events.close();
+        };
+    }, [myId, admins]);
 
     const handleSend = async (overrideText?: string | React.MouseEvent) => {
         const messageText = typeof overrideText === 'string' ? overrideText : text;
@@ -441,7 +441,6 @@ function WorkerChatContent() {
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
 
         try {
-            const supabase = createClient();
             let translated = originalText;
             let pron = "";
             let rev = "";
@@ -465,20 +464,22 @@ function WorkerChatContent() {
             }
 
             const payload: Record<string, unknown> = {
-                from_user: myId,
                 to_user: activeAdmin.id,
                 source_lang: lang,
                 target_lang: "ko",
                 source_text: originalText,
                 translated_text: JSON.stringify({ text: translated, pron, rev }),
-                is_read: false,
             };
-            if (siteId) payload.site_id = siteId;
 
-            const { data: inserted, error: msgErr } = await supabase.from("messages").insert(payload).select().single();
-            if (!msgErr && inserted) {
+            const msgRes = await fetch("/api/chat/messages", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            const data = msgRes.ok ? ((await msgRes.json()) as ChatMessageResponse) : {};
+            if (msgRes.ok && data.message) {
                 // 임시 메시지를 실제 DB 메시지로 교체
-                setMessages(prev => prev.map(m => m.id === tempId ? inserted as Message : m));
+                setMessages(prev => prev.map(m => m.id === tempId ? data.message as Message : m));
             } else {
                 // 실패 시 임시 메시지 제거
                 setMessages(prev => prev.filter(m => m.id !== tempId));
@@ -619,13 +620,16 @@ function WorkerChatContent() {
                                             if (loadingOlder || messages.length === 0 || !activeAdmin) return;
                                             setLoadingOlder(true);
                                             try {
-                                                const supabase = createClient();
                                                 const oldest = messages[0];
-                                                const { data } = await supabase.from("messages").select("*")
-                                                    .or(`and(from_user.eq.${myId},to_user.eq.${activeAdmin.id}),and(from_user.eq.${activeAdmin.id},to_user.eq.${myId})`)
-                                                    .lt("created_at", oldest.created_at).order("created_at", { ascending: false }).limit(MSG_PAGE_SIZE);
-                                                if (data && data.length > 0) setMessages(prev => [...[...data].reverse(), ...prev]);
-                                                setHasMore((data?.length ?? 0) >= MSG_PAGE_SIZE);
+                                                const res = await fetch(`/api/chat/messages?peer_id=${activeAdmin.id}&limit=${MSG_PAGE_SIZE}&before=${encodeURIComponent(oldest.created_at)}`, {
+                                                    cache: "no-store",
+                                                });
+                                                if (res.ok) {
+                                                    const payload = (await res.json()) as ChatMessagesResponse;
+                                                    const older = payload.messages ?? [];
+                                                    if (older.length > 0) setMessages(prev => [...older, ...prev]);
+                                                    setHasMore(older.length >= MSG_PAGE_SIZE);
+                                                }
                                             } finally {
                                                 setLoadingOlder(false);
                                             }

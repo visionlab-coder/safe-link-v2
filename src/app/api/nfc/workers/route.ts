@@ -1,126 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
-import { isValidUUID, requireAdmin, requireSameSite } from "@/utils/nfc/require-admin";
-import { TRADES } from "@/utils/nfc/constants";
+import { NextRequest } from "next/server";
+import { proxyV3Api } from "@/utils/auth/v3-proxy";
 
 export const runtime = "nodejs";
 
-const TRADE_CODES = TRADES.map((t) => t.code) as readonly string[];
-
-function sanitizeSearchTerm(raw: string): string {
-  return raw.replace(/[,()*"\\%_]/g, "").slice(0, 64);
-}
-
-const GLOBAL_ROLES = ["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER"];
-
 export async function GET(req: NextRequest) {
-  const guard = await requireAdmin();
-  if (!guard.ok) return guard.response;
-
-  const rawReqSiteId = req.nextUrl.searchParams.get("site_id");
-  const requestedSiteId = rawReqSiteId && isValidUUID(rawReqSiteId) ? rawReqSiteId : null;
-  const q = req.nextUrl.searchParams.get("q")?.trim();
-  const activeOnly = req.nextUrl.searchParams.get("active") !== "0";
-  const limit = Math.min(Number(req.nextUrl.searchParams.get("limit") || 50), 200);
-
-  let enforcedSiteId: string | null = requestedSiteId;
-  if (!GLOBAL_ROLES.includes(guard.ctx.user.role)) {
-    const { data: profile } = await guard.ctx.service
-      .from("profiles")
-      .select("site_id")
-      .eq("id", guard.ctx.user.id)
-      .maybeSingle();
-    if (!profile?.site_id) return NextResponse.json({ error: "profile_site_required" }, { status: 409 });
-    enforcedSiteId = profile.site_id;
-  }
-
-  let query = guard.ctx.service
-    .from("nfc_workers")
-    .select("id, worker_code, full_name, nationality, phone, assigned_site_id, trade, preferred_lang, is_active, consent_signed_at")
-    .order("id", { ascending: false })
-    .limit(limit);
-
-  const siteId = enforcedSiteId;
-  if (siteId) query = query.eq("assigned_site_id", siteId);
-  if (activeOnly) query = query.eq("is_active", true);
-  if (q) {
-    const safe = sanitizeSearchTerm(q);
-    if (safe.length > 0) {
-      query = query.or(`full_name.ilike.%${safe}%,worker_code.ilike.%${safe}%,phone.ilike.%${safe}%`);
-    }
-  }
-
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ error: "query_failed" }, { status: 500 });
-  return NextResponse.json({ workers: data ?? [] });
+  return proxyV3Api(req, `/api/v1/admin/workers${req.nextUrl.search}`);
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await requireAdmin();
-  if (!guard.ok) return guard.response;
-  const { ctx } = guard;
-
-  let body: {
-    full_name?: string;
-    nationality?: string;
-    phone?: string;
-    assigned_site_id?: string;
-    trade?: string;
-    preferred_lang?: string;
-    consent_signed_at?: string;
-    consent_doc_url?: string;
-    name_initials?: string;
-    phone_last4?: string;
-  };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
-  }
-
-  // 🟢 V2 NFC 간편 등록 정책 (하이정보 APM 응답 전까지)
-  // 영문 이니셜 + 전화번호 뒷 4자리 + 사이트만 있으면 등록 가능.
-  // full_name / nationality / trade / preferred_lang 은 기본값으로 채움.
-  const nameInitials = String(body.name_initials || "").trim().replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase() || null;
-  const phoneLast4 = String(body.phone_last4 || "").trim().replace(/\D/g, "").slice(-4) || null;
-  const fullName = String(body.full_name || nameInitials || "").trim();
-  const nationality = String(body.nationality || "KR").trim().toUpperCase();
-  const rawTrade = String(body.trade || "general").trim();
-  const trade = TRADE_CODES.includes(rawTrade) ? rawTrade : "general";
-  const preferredLang = String(body.preferred_lang || "ko").trim().toLowerCase() || "ko";
-
-  // 필수: 영문이름(이니셜) + 전화번호 뒷 4자리. 나머지는 기본값.
-  if (!nameInitials) return NextResponse.json({ error: "name_initials_required" }, { status: 400 });
-  if (!phoneLast4 || phoneLast4.length !== 4) return NextResponse.json({ error: "phone_last4_required" }, { status: 400 });
-  if (!fullName) return NextResponse.json({ error: "full_name_required" }, { status: 400 });
-
-  const consentSignedAt = body.consent_signed_at ? new Date(body.consent_signed_at).toISOString() : null;
-  let assignedSiteId = body.assigned_site_id?.trim() || null;
-
-  if (!assignedSiteId) {
-    assignedSiteId = ctx.user.site_id ?? null;
-  }
-  const denied = requireSameSite(ctx.user, assignedSiteId);
-  if (denied) return denied;
-
-  const { data, error } = await ctx.service
-    .from("nfc_workers")
-    .insert({
-      full_name: fullName,
-      nationality,
-      phone: body.phone?.trim() || null,
-      assigned_site_id: assignedSiteId,
-      trade,
-      preferred_lang: preferredLang,
-      consent_signed_at: consentSignedAt,
-      consent_doc_url: body.consent_doc_url?.trim() || null,
-      name_initials: nameInitials,
-      phone_last4: phoneLast4,
-      is_active: true,
-      created_by: ctx.user.id,
-    })
-    .select("id, worker_code, full_name, nationality, phone, assigned_site_id, trade, preferred_lang, is_active, consent_signed_at")
-    .single();
-
-  if (error || !data) return NextResponse.json({ error: "worker_create_failed", detail: error?.message }, { status: 500 });
-  return NextResponse.json({ worker: data });
+  return proxyV3Api(req, "/api/v1/admin/workers", {
+    method: "POST",
+    body: await req.text(),
+  });
 }

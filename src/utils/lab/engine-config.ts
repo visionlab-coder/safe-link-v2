@@ -3,7 +3,7 @@ import { Redis } from "@upstash/redis";
 import { encrypt, decrypt } from "@/utils/crypto";
 
 /**
- * 🧪 SAFE-LINK Lab — 런타임 통번역 엔진/API키 스위처 (테스트 전용).
+ * 🧪 SQ Link Lab — 런타임 통번역 엔진/API키 스위처 (테스트 전용).
  *
  * 격리 원칙:
  *  - APP_MODE !== "lab" 이면 getLabOverride()는 **항상 null** → 운영 라우트는 기존 env 그대로 사용(무영향).
@@ -11,15 +11,13 @@ import { encrypt, decrypt } from "@/utils/crypto";
  *  - 저장소: Upstash Redis(배포), 미설정 시 in-memory(로컬 dev 단일 인스턴스).
  */
 
-export type TranslateEngine = "m2m100" | "papago" | "google" | "gemini" | "flitto";
+export type TranslateEngine = "m2m100" | "papago" | "google";
 
 export interface LabEngineConfig {
     translateEngine?: TranslateEngine;   // 강제 엔진(미지정 시 기존 우선순위)
     papagoId?: string;
     papagoSecret?: string;
     googleKey?: string;
-    geminiKey?: string;
-    flittoToken?: string;
     updatedAt?: string;
     updatedBy?: string;   // 마지막 변경자 이메일(감사) — 평문 키는 절대 저장 안 함
 }
@@ -30,14 +28,12 @@ export interface LabConfigInput {
     papagoId?: string;
     papagoSecret?: string;
     googleKey?: string;
-    geminiKey?: string;
-    flittoToken?: string;
 }
 
 const REDIS_KEY = "lab:engine-config:v1";
-type SecretField = "papagoId" | "papagoSecret" | "googleKey" | "geminiKey" | "flittoToken";
+type SecretField = "papagoId" | "papagoSecret" | "googleKey";
 const SECRET_FIELDS: SecretField[] = [
-    "papagoId", "papagoSecret", "googleKey", "geminiKey", "flittoToken",
+    "papagoId", "papagoSecret", "googleKey",
 ];
 
 export function isLabMode(): boolean {
@@ -104,8 +100,6 @@ export async function getLabConfigMasked(): Promise<(Omit<LabEngineConfig, never
         papagoId: mask(cfg.papagoId),
         papagoSecret: mask(cfg.papagoSecret),
         googleKey: mask(cfg.googleKey),
-        geminiKey: mask(cfg.geminiKey),
-        flittoToken: mask(cfg.flittoToken),
         updatedAt: cfg.updatedAt,
         updatedBy: cfg.updatedBy,
         _masked: true,

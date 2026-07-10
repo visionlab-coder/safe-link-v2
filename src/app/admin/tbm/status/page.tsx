@@ -4,7 +4,6 @@ import { useEffect, useState, Suspense, useCallback } from "react";
 import { Shield } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
 import ExportMenu from "@/components/ExportMenu";
 import { exportData, type ExportFormat } from "@/utils/export-files";
@@ -240,9 +239,7 @@ function TBMStatusPageContent() {
     const handleExport = async (mode: 'print' | 'sheets' | 'drive' = 'print') => {
         if (!latestTBM) return;
 
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        const providerToken = (session as any)?.provider_token;
+        const providerToken = "";
 
         if (mode === 'print') {
             const tbmDate = new Date(latestTBM.created_at);
@@ -289,7 +286,7 @@ function TBMStatusPageContent() {
                 <body>
                     <div class="doc-header">
                         <h1>안 전 보 건 일 지</h1>
-                        <div class="subtitle">Toolbox Meeting (TBM) Record — Safe-Link System</div>
+                        <div class="subtitle">Toolbox Meeting (TBM) Record — SQ Link System</div>
                     </div>
 
                     <div class="info-grid">
@@ -347,7 +344,7 @@ function TBMStatusPageContent() {
                     </table>
 
                     <div class="footer">
-                        <div class="system">Safe-Link V2 자동 생성 문서 | ${new Date().toLocaleString("ko-KR")}</div>
+                        <div class="system">SQ Link V2 자동 생성 문서 | ${new Date().toLocaleString("ko-KR")}</div>
                         <div style="display:flex;gap:24px;">
                             <div class="stamp-area">
                                 <div class="line"></div>
@@ -405,46 +402,39 @@ function TBMStatusPageContent() {
     const load = useCallback(async (dateStr?: string) => {
         setLoading(true);
         const targetDate = dateStr || selectedDate;
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
         let adminSiteId: string | null = null;
-        if (session) {
-            const { data: adminProfile } = await supabase.from("profiles").select("preferred_lang, site_id").eq("id", session.user.id).single();
-            let finalLang = adminProfile?.preferred_lang || "ko";
-
-            if (urlLang && urlLang !== adminProfile?.preferred_lang) {
-                await supabase.from("profiles").update({ preferred_lang: urlLang }).eq("id", session.user.id);
-                finalLang = urlLang;
-            }
-            setAdminLang(finalLang);
-            adminSiteId = adminProfile?.site_id || null;
+        const meRes = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+        if (meRes.ok) {
+            const me = await meRes.json() as {
+                profile?: { preferred_lang?: string | null; site_id?: string | null } | null;
+            };
+            setAdminLang(urlLang || me.profile?.preferred_lang || "ko");
+            adminSiteId = me.profile?.site_id || null;
         }
 
         // 선택한 날짜의 TBM 목록 조회
-        const dayStart = `${targetDate}T00:00:00+09:00`;
-        const dayEnd = `${targetDate}T23:59:59+09:00`;
-        let tbmQuery = supabase.from("tbm_notices").select("*")
-            .gte("created_at", dayStart)
-            .lte("created_at", dayEnd)
-            .order("created_at", { ascending: false });
-        if (adminSiteId) tbmQuery = tbmQuery.eq("site_id", adminSiteId);
-        const { data: tbmRows } = await tbmQuery;
-        const allTbms = tbmRows || [];
+        const tbmParams = new URLSearchParams({ date: targetDate, limit: "100" });
+        if (adminSiteId) tbmParams.set("site_id", adminSiteId);
+        const tbmRes = await fetch(`/api/tbm/notices?${tbmParams.toString()}`, { cache: "no-store", credentials: "include" });
+        const tbmJson = tbmRes.ok ? await tbmRes.json() as { tbms?: any[] } : { tbms: [] };
+        const allTbms = tbmJson.tbms || [];
         setTbmList(allTbms);
 
         // 가장 최근 TBM을 기본 선택
         const tbm = allTbms[0] || null;
         setLatestTBM(tbm);
 
-        let workerQuery = supabase.from("profiles").select("id, display_name, preferred_lang, nationality").eq("role", "WORKER");
-        if (adminSiteId) workerQuery = workerQuery.eq("site_id", adminSiteId);
-        const { data: workerProfiles } = await workerQuery;
+        const workerParams = new URLSearchParams();
+        if (adminSiteId) workerParams.set("site_id", adminSiteId);
+        const workerRes = await fetch(`/api/tbm/workers?${workerParams.toString()}`, { cache: "no-store", credentials: "include" });
+        const workerJson = workerRes.ok ? await workerRes.json() as { workers?: any[] } : { workers: [] };
+        const workerProfiles = workerJson.workers || [];
         if (!tbm || !workerProfiles) {
             setWorkers(workerProfiles?.map(w => ({ ...w, signed: false })) || []);
             setLoading(false);
             return;
         }
-        const ackRes = await fetch(`/api/tbm/ack?tbmId=${encodeURIComponent(tbm.id)}`);
+        const ackRes = await fetch(`/api/tbm/ack?tbmId=${encodeURIComponent(tbm.id)}`, { cache: "no-store", credentials: "include" });
         const ackJson = ackRes.ok ? await ackRes.json() : { acks: [] };
         const ackMap = new Map((ackJson.acks as any[]).map((a: any) => [a.worker_id, { at: a.ack_at, sig: a.signature_data }]));
         const statusList: WorkerStatus[] = workerProfiles.map(w => ({
@@ -464,18 +454,19 @@ function TBMStatusPageContent() {
     const selectTBM = useCallback(async (tbm: any) => {
         setLatestTBM(tbm);
         setLoading(true);
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
         let adminSiteId: string | null = null;
-        if (session) {
-            const { data: p } = await supabase.from("profiles").select("site_id").eq("id", session.user.id).single();
-            adminSiteId = p?.site_id || null;
+        const meRes = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+        if (meRes.ok) {
+            const me = await meRes.json() as { profile?: { site_id?: string | null } | null };
+            adminSiteId = me.profile?.site_id || null;
         }
-        let workerQuery = supabase.from("profiles").select("id, display_name, preferred_lang, nationality").eq("role", "WORKER");
-        if (adminSiteId) workerQuery = workerQuery.eq("site_id", adminSiteId);
-        const { data: workerProfiles } = await workerQuery;
+        const workerParams = new URLSearchParams();
+        if (adminSiteId) workerParams.set("site_id", adminSiteId);
+        const workerRes = await fetch(`/api/tbm/workers?${workerParams.toString()}`, { cache: "no-store", credentials: "include" });
+        const workerJson = workerRes.ok ? await workerRes.json() as { workers?: any[] } : { workers: [] };
+        const workerProfiles = workerJson.workers || [];
         if (!workerProfiles) { setLoading(false); return; }
-        const ackRes = await fetch(`/api/tbm/ack?tbmId=${encodeURIComponent(tbm.id)}`);
+        const ackRes = await fetch(`/api/tbm/ack?tbmId=${encodeURIComponent(tbm.id)}`, { cache: "no-store", credentials: "include" });
         const ackJson = ackRes.ok ? await ackRes.json() : { acks: [] };
         const ackMap = new Map((ackJson.acks as any[]).map((a: any) => [a.worker_id, { at: a.ack_at, sig: a.signature_data }]));
         const statusList: WorkerStatus[] = workerProfiles.map(w => ({
@@ -526,7 +517,7 @@ function TBMStatusPageContent() {
                         </button>
                         <div className="flex flex-col">
                             <div className="flex items-center gap-2">
-                                <span className="text-xl font-black tracking-tight text-white uppercase italic">Safe-Link</span>
+                                <span className="text-xl font-black tracking-tight text-white uppercase italic">SQ Link</span>
                                 <span className="px-2 py-0.5 bg-blue-500 text-[10px] font-black rounded text-white tracking-widest uppercase">Admin</span>
                             </div>
                         </div>

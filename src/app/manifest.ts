@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "SAFE-LINK by SEOWON",
-    short_name: "SAFE-LINK",
+    name: "SQ Link by SEOWON",
+    short_name: "SQ Link",
     description: "SEOWON construction field safety communication platform",
     start_url: "/",
     scope: "/",

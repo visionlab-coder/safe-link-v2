@@ -1,12 +1,65 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { handleMobilePreflight } from "@/utils/auth/mobile-cors";
 import { checkAdminSignupLimit } from "@/utils/rate-limit";
 
 export const runtime = "nodejs";
 
-// Company email domains allowed to self-register as admins.
-// Anyone outside these domains is rejected server-side before a Supabase account is created.
-const ALLOWED_DOMAINS = new Set(["seowonenc.co.kr"]);
+const SAFE_LINK_V3_API_BASE_URL =
+  process.env.NEXT_PUBLIC_SAFE_LINK_API_BASE_URL || "http://localhost:8080";
+
+const ALLOWED_ADMIN_SIGNUP_DOMAINS = new Set(["seowonenc.co.kr"]);
+
+const FORBIDDEN_ADMIN_SIGNUP_FIELDS = new Set([
+  "role",
+  "roles",
+  "site",
+  "sites",
+  "siteid",
+  "siteids",
+  "accountstatus",
+  "isadmin",
+  "admin",
+  "permission",
+  "permissions",
+  "claims",
+]);
+
+function hasForbiddenField(body: Record<string, unknown>): boolean {
+  return Object.keys(body).some((key) =>
+    FORBIDDEN_ADMIN_SIGNUP_FIELDS.has(key.replace(/[_-]/g, "").toLowerCase()),
+  );
+}
+
+function readCookieValue(cookieHeader: string, name: string): string | null {
+  const prefix = `${name}=`;
+  return cookieHeader
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(prefix))
+    ?.slice(prefix.length) ?? null;
+}
+
+function mergeSetCookie(cookieHeader: string, setCookie: string | null): string {
+  if (!setCookie) return cookieHeader;
+  const firstPair = setCookie.split(";")[0]?.trim();
+  if (!firstPair || !firstPair.includes("=")) return cookieHeader;
+  const name = firstPair.split("=")[0];
+  const parts = cookieHeader
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => !part.startsWith(`${name}=`));
+  parts.push(firstPair);
+  return parts.join("; ");
+}
+
+function backendUnavailableResponse(): NextResponse {
+  return NextResponse.json({ error: "v3_backend_unreachable" }, { status: 503 });
+}
+
+export async function OPTIONS(req: NextRequest) {
+  return handleMobilePreflight(req) ?? new NextResponse(null, { status: 405 });
+}
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const ip =
@@ -14,66 +67,116 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     req.headers.get("x-real-ip") ??
     "unknown";
 
-  if (!(await checkAdminSignupLimit(ip))) {
-    return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
-  }
-
-  let body: { email?: unknown; password?: unknown };
+  let body: Record<string, unknown>;
   try {
-    body = await req.json();
+    const parsed = await req.json();
+    body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
   } catch {
     return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
   }
 
-  const email = String(body.email ?? "").toLowerCase().trim();
+  if (hasForbiddenField(body)) {
+    return NextResponse.json({ error: "admin_signup_role_fields_not_allowed" }, { status: 400 });
+  }
+
+  const email = String(body.email ?? "").trim().toLowerCase();
   const password = String(body.password ?? "");
+  const displayName = String(body.display_name ?? "").trim();
+  const preferredLang = /^[a-z]{2,5}$/i.test(String(body.preferred_lang ?? ""))
+    ? String(body.preferred_lang).toLowerCase()
+    : "ko";
 
   if (!email || !password) {
     return NextResponse.json({ error: "email_password_required" }, { status: 400 });
-  }
-  if (password.length < 8) {
-    return NextResponse.json({ error: "PASSWORD_TOO_SHORT" }, { status: 400 });
   }
 
   const emailParts = email.split("@");
   if (emailParts.length !== 2 || !emailParts[0] || !emailParts[1]) {
     return NextResponse.json({ error: "INVALID_EMAIL" }, { status: 400 });
   }
-  const domain = emailParts[1];
-  if (!ALLOWED_DOMAINS.has(domain)) {
+  if (!ALLOWED_ADMIN_SIGNUP_DOMAINS.has(emailParts[1])) {
     return NextResponse.json({ error: "DOMAIN_NOT_ALLOWED" }, { status: 403 });
   }
 
-  const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!serviceUrl || !serviceKey) {
-    return NextResponse.json({ error: "SERVER_CONFIG_ERROR" }, { status: 500 });
+  if (!(await checkAdminSignupLimit(ip, email))) {
+    return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
   }
 
-  const service = createServiceClient(serviceUrl, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  let cookie = req.headers.get("cookie") ?? "";
+  let csrf = req.headers.get("x-xsrf-token") ?? readCookieValue(cookie, "XSRF-TOKEN");
 
-  const { error } = await service.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-  });
-
-  if (error) {
-    const msg = error.message.toLowerCase();
-    // Return the same status code regardless of whether the email already exists.
-    // A 409 would let an attacker confirm whether a given email is registered
-    // (email enumeration oracle). The error body still distinguishes the cases
-    // for legitimate frontend use, but scanners checking status codes get no signal.
-    const errorCode =
-      msg.includes("already registered") ||
-      msg.includes("already exists") ||
-      (error as { code?: string }).code === "email_exists"
-        ? "ALREADY_REGISTERED"
-        : "SIGNUP_FAILED";
-    return NextResponse.json({ error: errorCode }, { status: 400 });
+  if (!csrf) {
+    try {
+      const csrfResponse = await fetch(`${SAFE_LINK_V3_API_BASE_URL}/api/v1/auth/csrf`, {
+        headers: cookie ? { cookie } : undefined,
+        cache: "no-store",
+      });
+      const csrfBody = (await csrfResponse.json().catch(() => ({}))) as { token?: string };
+      csrf = csrfBody.token ?? null;
+      cookie = mergeSetCookie(cookie, csrfResponse.headers.get("set-cookie"));
+    } catch {
+      return backendUnavailableResponse();
+    }
   }
 
-  return NextResponse.json({ ok: true });
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${SAFE_LINK_V3_API_BASE_URL}/api/v1/auth/admin-signup`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Forwarded-For": ip,
+        ...(cookie ? { cookie } : {}),
+        ...(csrf ? { "X-XSRF-TOKEN": csrf } : {}),
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        preferred_lang: preferredLang,
+        ...(displayName ? { display_name: displayName } : {}),
+      }),
+      cache: "no-store",
+    });
+  } catch {
+    return backendUnavailableResponse();
+  }
+
+  const upstreamText = await upstream.text();
+  const setCookie = upstream.headers.get("set-cookie");
+
+  if (!upstream.ok) {
+    let upstreamError: string | null = null;
+    try {
+      const parsed = JSON.parse(upstreamText) as { error?: unknown };
+      upstreamError = typeof parsed.error === "string" ? parsed.error : null;
+    } catch {
+      upstreamError = null;
+    }
+
+    const response = NextResponse.json(
+      {
+        error:
+          upstreamError ??
+          (upstream.status === 403
+            ? "admin_signup_forbidden_by_security_filter"
+            : `v3_admin_signup_failed_${upstream.status}`),
+      },
+      { status: upstream.status },
+    );
+    if (setCookie) response.headers.append("set-cookie", setCookie);
+    return response;
+  }
+
+  const response = new NextResponse(upstreamText, {
+    status: upstream.status,
+    headers: {
+      "Content-Type": upstream.headers.get("content-type") ?? "application/json",
+    },
+  });
+
+  if (setCookie) {
+    response.headers.append("set-cookie", setCookie);
+  }
+
+  return response;
 }

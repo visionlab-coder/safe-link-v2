@@ -2,12 +2,14 @@
 
 import { useEffect, useState, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
 import Image from "next/image";
 import { languages } from "@/constants";
 import { HardHat, ShieldCheck, Info, CheckCircle2, XCircle, ArrowLeft } from "lucide-react";
 import { getT } from "./translations";
 import BrandLogo from "@/components/BrandLogo";
+import { getDefaultRouteForProfileRole, type ProfileRole } from "@/lib/roles";
+import { adminSignupV3, getV3CurrentUser, loginV3, logoutV3, quickLoginWorkerV3 } from "@/lib/v3-auth";
+import type { V3Role } from "@/lib/v3-role-contract";
 
 /** 원시 API 에러를 사용자 친화적 한국어로 변환. 절대 내부 에러 메시지를 그대로 노출하지 않음. */
 function sanitizeAuthError(msg: string): string {
@@ -19,16 +21,34 @@ function sanitizeAuthError(msg: string): string {
   if (m.includes("api key") || m.includes("apikey") || m.includes("unauthorized") || m.includes("authentication")) {
     return "서버 연결 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
   }
-  if (m.includes("invalid login") || m.includes("invalid credentials") || m.includes("wrong password")) {
+  if (m.includes("invalid login") || m.includes("invalid credentials") || m.includes("wrong password") || m.includes("v3_login_failed_401")) {
     return "이메일 또는 비밀번호가 올바르지 않습니다.";
   }
-  if (m.includes("already registered") || m.includes("already exists") || m.includes("duplicate")) {
+  if (m.includes("already registered") || m.includes("already exists") || m.includes("duplicate") || m.includes("email_already_registered")) {
     return "이미 등록된 계정입니다. 로그인을 시도해주세요.";
+  }
+  if (m.includes("password_min_length") || m.includes("password_too_short")) {
+    return "비밀번호는 8자 이상으로 입력해주세요.";
+  }
+  if (m.includes("domain_not_allowed")) {
+    return "회사 이메일(@seowonenc.co.kr)만 회원가입이 가능합니다.";
+  }
+  if (m.includes("admin_signup_role_fields_not_allowed")) {
+    return "권한 정보는 가입 화면에서 직접 지정할 수 없습니다.";
+  }
+  if (m.includes("admin_signup_forbidden_by_security_filter") || m.includes("v3_admin_signup_failed_403")) {
+    return "관리자 회원가입이 서버 보안 검증에서 차단되었습니다. 서버를 최신 상태로 재시작한 뒤 다시 시도해주세요.";
+  }
+  if (m.includes("v3_backend_unreachable") || m.includes("v3_admin_signup_failed_503")) {
+    return "백엔드 서버 연결 오류입니다. Spring Boot 서버가 실행 중인지 확인해주세요.";
+  }
+  if (m.includes("account_not_active")) {
+    return "승인 대기 중인 계정입니다. 관리자 승인 후 로그인할 수 있습니다.";
   }
   if (m.includes("not confirmed") || m.includes("email") && m.includes("confirm")) {
     return "이메일 인증이 필요합니다. 메일함을 확인해주세요.";
   }
-  if (m.includes("rate limit") || m.includes("too many")) {
+  if (m.includes("rate limit") || m.includes("rate_limited") || m.includes("too many")) {
     return "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.";
   }
   if (m.includes("network") || m.includes("fetch") || m.includes("connection")) {
@@ -38,6 +58,12 @@ function sanitizeAuthError(msg: string): string {
 }
 
 type Mode = "lang" | "role" | "worker" | "admin";
+
+const V3_ROLE_PRIORITY: V3Role[] = ["ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER", "WORKER", "VIEWER"];
+
+function pickDefaultV3Role(roles: V3Role[]): V3Role | null {
+  return V3_ROLE_PRIORITY.find((role) => roles.includes(role)) ?? null;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Animated background orbs
@@ -98,7 +124,6 @@ const fieldBox: React.CSSProperties = {
 function AuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const supabase = createClient();
 
   const urlLang = searchParams.get("lang");
   const [lang, setLang] = useState<string>(urlLang || "");
@@ -135,27 +160,15 @@ function AuthContent() {
   }, [urlLang, searchParams]);
 
   useEffect(() => {
-    // P6 박제: createBrowserClient 의존 제거. /api/auth/me 단일화.
-    // Workers 환경에서 supabase.auth.getSession() / from('profiles').select() 가
-    // 간헐적으로 실패하는 케이스 우회.
     const checkUser = async () => {
-      try {
-        const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          user?: { email?: string | null };
-          profile?: { role?: string | null } | null;
-        };
-        if (data.user) {
-          setExistingUser({
-            email: data.user.email || "",
-            role: data.profile?.role || null,
-          });
-        }
-      } catch { /* unauthenticated → 무시 */ }
+      const user = await getV3CurrentUser().catch(() => null);
+      if (!user) return;
+      setExistingUser({
+        email: user.email || "",
+        role: pickDefaultV3Role(user.roles),
+      });
     };
     checkUser();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 자동 로그인 제거 — 기존 세션이 있어도 사용자가 직접 선택하며 진입해야 함
@@ -173,10 +186,7 @@ function AuthContent() {
       router.push(`/auth/setup?lang=${activeLang}${targetRole ? `&role=${targetRole}` : ""}${siteId ? `&site_id=${siteId}` : ""}`);
       return;
     }
-    if (role === "ROOT" || role === "HQ_OFFICER") router.push(`/system?lang=${activeLang}`);
-    else if (role === "HQ_ADMIN") router.push(`/control?lang=${activeLang}`);
-    else if (role === "SAFETY_OFFICER" || role === "SITE_ADMIN") router.push(`/admin?lang=${activeLang}`);
-    else router.push(`/worker?lang=${activeLang}`);
+    router.push(`${getDefaultRouteForProfileRole(role as ProfileRole)}?lang=${activeLang}`);
   }, [router, searchParams]);
 
   const handleLangSelect = (code: string) => {
@@ -195,40 +205,33 @@ function AuthContent() {
     const activeLang = lang || "ko";
 
     try {
-      const res = await fetch("/api/auth/worker-quick-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          name_initials: initials.trim(),
-          phone_last4: phoneLast4,
-          preferred_lang: activeLang,
-          ...(siteId ? { site_id: siteId } : {}),
-        }),
+      const result = await quickLoginWorkerV3({
+        nameInitials: initials.trim(),
+        phoneLast4,
+        preferredLang: activeLang,
+        siteId,
       });
 
-      if (res.status === 429) {
+      if (!result.ok && result.status === 429) {
         alert(sanitizeAuthError("rate limit"));
         setLoading(false);
         return;
       }
 
-      if (res.status === 409) {
-        const body = await res.json().catch(() => ({})) as { sites?: Array<{ site_id: string; name: string; site_code: string | null }> };
-        setMultipleSites(body.sites ?? []);
+      if (!result.ok && result.status === 409) {
+        setMultipleSites("sites" in result ? result.sites : []);
         setLoading(false);
         return;
       }
 
-      if (res.status === 404) {
+      if (!result.ok && result.status === 404) {
         alert("입력한 이니셜과 뒷 4자리에 일치하는 근로자가 없습니다. 관리자에게 NFC 등록을 요청해주세요.");
         setLoading(false);
         return;
       }
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        alert(sanitizeAuthError(body.error ?? "unknown"));
+      if (!result.ok) {
+        alert(sanitizeAuthError("error" in result ? result.error : "unknown"));
         setLoading(false);
         return;
       }
@@ -256,66 +259,42 @@ function AuthContent() {
     if (!adminEmail || !password) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/admin-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email: adminEmail, password }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        alert(sanitizeAuthError(body.error ?? "unknown"));
-        setLoading(false);
-        return;
-      }
+      const user = await loginV3(adminEmail, password);
       sessionStorage.setItem("safe-link-session-active", "true");
-      router.push(`/admin?lang=${lang || "ko"}`);
-    } catch {
-      alert("로그인 중 오류가 발생했습니다. 다시 시도해주세요.");
+      redirectByRoleString(pickDefaultV3Role(user.roles), lang || "ko");
+    } catch (err) {
+      alert(sanitizeAuthError(err instanceof Error ? err.message : "unknown"));
       setLoading(false);
     }
   };
 
   const handleAdminSignup = async () => {
     if (!adminEmail || !password || !passConfirm) return;
-    if (password !== passConfirm) { alert(t.noMatch); return; }
-    setLoading(true);
-    const activeLang = lang || "ko";
-
-    try {
-      const res = await fetch("/api/auth/admin-signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: adminEmail, password }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({})) as { error?: string };
-        if (data.error === "DOMAIN_NOT_ALLOWED") {
-          alert("회사 이메일(@seowonenc.co.kr)만 회원가입이 가능합니다.");
-        } else if (data.error === "ALREADY_REGISTERED") {
-          alert("이미 등록된 이메일입니다. 로그인을 시도해주세요.");
-        } else if (data.error === "RATE_LIMITED") {
-          alert(sanitizeAuthError("rate limit"));
-        } else {
-          alert(sanitizeAuthError(data.error ?? "unknown"));
-        }
-        setLoading(false);
-        return;
-      }
-    } catch {
-      alert(sanitizeAuthError("network"));
-      setLoading(false);
+    if (password !== passConfirm) {
+      alert(t.noMatch);
       return;
     }
 
-    const { error: loginErr } = await supabase.auth.signInWithPassword({ email: adminEmail, password });
-    if (loginErr) { alert(sanitizeAuthError(loginErr.message)); setLoading(false); return; }
-    sessionStorage.setItem("safe-link-session-active", "true");
-    const targetRole = searchParams.get("role");
-    const rawSiteId = searchParams.get("site_id");
-    const siteId = rawSiteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawSiteId) ? rawSiteId : null;
-    router.push(`/auth/setup?lang=${activeLang}${targetRole ? `&role=${targetRole}` : ""}${siteId ? `&site_id=${siteId}` : ""}`);
-    setLoading(false);
+    setLoading(true);
+    const activeLang = lang || "ko";
+    try {
+      const signup = await adminSignupV3({
+        email: adminEmail,
+        password,
+        preferredLang: activeLang,
+      });
+      if (signup.approvalRequired || signup.accountStatus === "PENDING") {
+        alert("관리자 가입 신청이 접수되었습니다. 승인 후 로그인할 수 있습니다.");
+        setAdminSignupMode(false);
+        setPassConfirm("");
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
+    } catch (err) {
+      alert(sanitizeAuthError(err instanceof Error ? err.message : "unknown"));
+      setLoading(false);
+    }
   };
 
   const selectedLangObj = languages.find(l => l.code === lang);
@@ -456,7 +435,7 @@ function AuthContent() {
                         style={{ background: "linear-gradient(135deg,#F59E0B,#FCD34D)" }}>
                         이 계정으로 계속
                       </button>
-                      <button onClick={async () => { await supabase.auth.signOut(); setExistingUser(null); }}
+                      <button onClick={async () => { await logoutV3().catch(() => undefined); setExistingUser(null); }}
                         className="flex-1 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200 rounded-xl transition-all active:scale-95"
                         style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
                         다른 계정
@@ -628,7 +607,6 @@ function AuthContent() {
                     className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
                 </div>
 
-                {/* Signup extra fields */}
                 {adminSignupMode && (
                   <>
                     <div className="relative" style={{
@@ -667,7 +645,6 @@ function AuthContent() {
                   {loading ? <Spinner /> : adminSignupMode ? t.doSignup : t.doLogin}
                 </button>
 
-                {/* Toggle signup/login */}
                 <button onClick={() => { setAdminSignupMode(v => !v); setPassConfirm(""); setBackupEmail(""); }}
                   className="text-xs font-semibold text-center text-blue-400 hover:text-blue-300 transition-colors">
                   {adminSignupMode ? t.adminLoginLink : t.adminSignupLink}

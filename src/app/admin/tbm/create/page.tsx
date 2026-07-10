@@ -4,7 +4,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
 import { Suspense } from "react";
 import { normalizeKo, normalizeKoAsync } from "@/utils/normalize";
@@ -91,6 +90,35 @@ const adminUI: Record<string, any> = {
 
 const getUI = (lang: string) => adminUI[lang] || adminUI["en"];
 
+type BroadcastResult = {
+    type: "success" | "error";
+    message: string;
+};
+
+function getBroadcastErrorMessage(lang: string, error?: string, detail?: string) {
+    if (lang === "ko") {
+        if (error === "site_id_required" || error === "admin_site_required") {
+            return "TBM을 전파할 현장이 연결되어 있지 않습니다. 관리자 프로필에서 현장을 설정한 뒤 다시 시도하세요.";
+        }
+        if (error === "cross_site_access_denied") {
+            return "다른 현장으로는 TBM을 전파할 수 없습니다. 관리자와 근로자의 현장이 같은지 확인하세요.";
+        }
+        if (error === "site_id_invalid") return "현장 ID 형식이 올바르지 않습니다.";
+        if (error === "content_required") return "전파할 TBM 내용을 입력하세요.";
+        return `TBM 저장에 실패했습니다.${detail ? ` (${detail})` : ""}`;
+    }
+
+    if (error === "site_id_required" || error === "admin_site_required") {
+        return "No site is linked to this admin account. Set the admin site and try again.";
+    }
+    if (error === "cross_site_access_denied") {
+        return "TBM cannot be broadcast to another site. Check that the admin and workers are assigned to the same site.";
+    }
+    if (error === "site_id_invalid") return "The site ID is invalid.";
+    if (error === "content_required") return "Enter TBM content to broadcast.";
+    return `Failed to save TBM.${detail ? ` (${detail})` : ""}`;
+}
+
 function AdminTBMCreateContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -102,6 +130,7 @@ function AdminTBMCreateContent() {
     const [userId, setUserId] = useState<string | null>(null);
     const [hiddenNoticeIds, setHiddenNoticeIds] = useState<string[]>([]);
     const [normalizeResult, setNormalizeResult] = useState<{ normalized: string; changes: { from: string; to: string }[] } | null>(null);
+    const [broadcastResult, setBroadcastResult] = useState<BroadcastResult | null>(null);
     const [adminLang, setAdminLang] = useState("ko");
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const voiceGenderRef = useRef<'male' | 'female'>('female');
@@ -119,33 +148,25 @@ function AdminTBMCreateContent() {
     const [briefingDraft, setBriefingDraft] = useState("");
 
     const loadProfile = useCallback(async () => {
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-            const { data: profile } = await supabase.from("profiles").select("preferred_lang, site_id").eq("id", session.user.id).single();
-            let finalLang = profile?.preferred_lang || "ko";
-
-            if (urlLang && urlLang !== profile?.preferred_lang) {
-                await supabase.from("profiles").update({ preferred_lang: urlLang }).eq("id", session.user.id);
-                finalLang = urlLang;
-            }
-            setAdminLang(finalLang);
-            setAdminSiteId(profile?.site_id || null);
-            setUserId(session.user.id);
-        }
+        const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+        if (!res.ok) return;
+        const data = await res.json() as {
+            user?: { id: string };
+            profile?: { preferred_lang?: string | null; site_id?: string | null } | null;
+        };
+        if (!data.user) return;
+        setAdminLang(urlLang || data.profile?.preferred_lang || "ko");
+        setAdminSiteId(data.profile?.site_id || null);
+        setUserId(data.user.id);
     }, [urlLang]);
 
     const fetchHistory = useCallback(async () => {
-        const supabase = createClient();
-        let query = supabase
-            .from("tbm_notices")
-            .select("*")
-            .order("created_at", { ascending: false })
-            .limit(10);
-        // 본사 관리자(site_id 없음)는 전체, 현장 관리자는 자기 현장만
-        if (adminSiteId) query = query.eq("site_id", adminSiteId);
-        const { data } = await query;
-        if (data) setHistory(data);
+        const params = new URLSearchParams({ limit: "10" });
+        if (adminSiteId) params.set("site_id", adminSiteId);
+        const res = await fetch(`/api/tbm/notices?${params.toString()}`, { cache: "no-store", credentials: "include" });
+        if (!res.ok) return;
+        const data = await res.json() as { tbms?: any[] };
+        if (data.tbms) setHistory(data.tbms);
     }, [adminSiteId]);
 
     useEffect(() => {
@@ -267,22 +288,39 @@ function AdminTBMCreateContent() {
     const handleSendTBM = async () => {
         if (!tbmText.trim()) return;
         setIsSending(true);
+        setBroadcastResult(null);
+        setNormalizeResult(null);
         try {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) return;
-            const { data: profile } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
             const { normalized, changes } = await normalizeKoAsync(tbmText.trim());
-            setNormalizeResult({ normalized, changes });
-            const payload: any = { content_ko: normalized, created_by: session.user.id };
-            if ((profile as any)?.site_id) payload.site_id = (profile as any).site_id;
-            const { error } = await supabase.from("tbm_notices").insert(payload);
-            if (!error) {
-                setTbmText("");
-                fetchHistory();
+
+            const res = await fetch("/api/tbm/broadcast", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    content_ko: normalized,
+                    site_id: adminSiteId ?? undefined,
+                }),
+            });
+            const result = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
+
+            if (!res.ok) {
+                setBroadcastResult({
+                    type: "error",
+                    message: getBroadcastErrorMessage(adminLang, result.error, result.detail),
+                });
+                return;
             }
+
+            setNormalizeResult({ normalized, changes });
+            setBroadcastResult({ type: "success", message: t.pushSuccess });
+            setTbmText("");
+            await fetchHistory();
         } catch (e) {
             console.error(e);
+            setBroadcastResult({
+                type: "error",
+                message: getBroadcastErrorMessage(adminLang),
+            });
         } finally {
             setIsSending(false);
         }
@@ -302,7 +340,7 @@ function AdminTBMCreateContent() {
                         </button>
                         <div className="flex flex-col">
                             <div className="flex items-center gap-2">
-                                <span className="text-xl font-black tracking-tight text-white uppercase italic">Safe-Link</span>
+                                <span className="text-xl font-black tracking-tight text-white uppercase italic">SQ Link</span>
                                 <span className="px-2 py-0.5 bg-blue-500 text-[10px] font-black rounded text-white tracking-widest uppercase">Admin</span>
                             </div>
                         </div>
@@ -466,6 +504,18 @@ function AdminTBMCreateContent() {
                                             </div>
                                         ))}
                                     </div>
+                                </div>
+                            )}
+
+                            {broadcastResult && (
+                                <div
+                                    className={`p-4 rounded-[24px] border text-sm font-bold leading-relaxed ${
+                                        broadcastResult.type === "success"
+                                            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                                            : "border-red-500/30 bg-red-500/10 text-red-200"
+                                    }`}
+                                >
+                                    {broadcastResult.message}
                                 </div>
                             )}
 

@@ -1,6 +1,6 @@
 "use client";
 
-// 🧪 SAFE-LINK Lab — 통번역 엔진/API키 런타임 스위처 (테스트 전용).
+// 🧪 SQ Link Lab — 통번역 엔진/API키 런타임 스위처 (테스트 전용).
 // APP_MODE=lab 환경에서만 동작. 운영 배포에는 APP_MODE 미설정 → 비활성.
 
 import { useEffect, useState } from "react";
@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 type Masked = {
     translateEngine?: string;
     papagoId?: string; papagoSecret?: string;
-    googleKey?: string; geminiKey?: string; flittoToken?: string;
+    googleKey?: string;
     updatedAt?: string;
 };
 
@@ -17,16 +17,12 @@ const ENGINES = [
     { v: "m2m100", label: "M2M100 (오픈소스·로컬)" },
     { v: "papago", label: "Papago (네이버)" },
     { v: "google", label: "Google Translate" },
-    { v: "gemini", label: "Gemini (건설문맥)" },
-    { v: "flitto", label: "Flitto" },
 ];
 
 const KEY_FIELDS: { k: keyof Masked; label: string }[] = [
     { k: "papagoId", label: "Papago Client ID" },
     { k: "papagoSecret", label: "Papago Client Secret" },
     { k: "googleKey", label: "Google Cloud API Key" },
-    { k: "geminiKey", label: "Gemini API Key" },
-    { k: "flittoToken", label: "Flitto Token" },
 ];
 
 export default function LabPage() {
@@ -79,7 +75,7 @@ export default function LabPage() {
         <main style={{ maxWidth: 640, margin: "0 auto", padding: 24, fontFamily: "system-ui" }}>
             <h1 style={{ fontSize: 20, fontWeight: 700 }}>🔐 접근 권한 없음</h1>
             <p style={{ color: "#c0392b", marginTop: 12 }}>
-                AI 엔진·API키 설정은 <b>SAFE-LINK 루트 관리자</b>(MASTER)만 접근할 수 있습니다.
+                AI 엔진·API키 설정은 <b>SQ Link 루트 관리자</b>(MASTER)만 접근할 수 있습니다.
                 권한이 필요하면 시스템 관리자에게 문의하세요.
             </p>
         </main>
@@ -87,7 +83,7 @@ export default function LabPage() {
 
     return (
         <main style={{ maxWidth: 640, margin: "0 auto", padding: 24, fontFamily: "system-ui" }}>
-            <h1 style={{ fontSize: 20, fontWeight: 700 }}>🧪 SAFE-LINK Lab — 통번역 스위처</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700 }}>🧪 SQ Link Lab — 통번역 스위처</h1>
             <p style={{ fontSize: 13, color: "#666", marginTop: 4 }}>
                 키 변경 시 <b>재배포 없이 즉시 적용</b>. 운영과 분리된 테스트 전용. 마지막 변경: {current?.updatedAt ?? "—"}
             </p>

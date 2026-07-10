@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { ArrowLeft, Download, Hammer, RefreshCw } from "lucide-react";
 import RoleGuard from "@/components/RoleGuard";
-import { createClient } from "@/utils/supabase/client";
 import { TRADE_LABEL, type TradeType } from "@/lib/roles";
 
 // 🆕 2026-06-09 — 사이트+공종 QR 생성 페이지
@@ -15,7 +14,7 @@ import { TRADE_LABEL, type TradeType } from "@/lib/roles";
 //   2. TEAM_LEADER → 본인 site_id + trade 자동 박힘 (변경 불가)
 //   3. SAFETY_OFFICER/SITE_ADMIN → 본인 site_id 고정 + trade dropdown 선택 가능
 //   4. HQ_ADMIN/ROOT/SUPER_ADMIN → site + trade 둘 다 dropdown
-//   5. URL: /qr/site?site_id={uuid}&trade={code}&lang=ko
+//   5. URL: /qr/site?site_id={spring-site-id}&trade={code}&lang=ko
 //   6. QR 이미지 다운로드 / URL 복사 / Native NFC 발급 (Web NFC 지원 시)
 
 type Site = { id: string; name: string; site_code?: string | null };
@@ -37,7 +36,6 @@ const TRADE_KEYS: TradeType[] = [
 
 export default function TeamQrPage() {
     const router = useRouter();
-    const supabase = createClient();
 
     const [me, setMe] = useState<Me | null>(null);
     const [sites, setSites] = useState<Site[]>([]);
@@ -57,20 +55,25 @@ export default function TeamQrPage() {
             const role = (data.profile?.role ?? "").toUpperCase();
             const isGlobal = ["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER"].includes(role);
 
-            // 본인 site_id 고정 (글로벌 admin 외)
-            if (data.profile?.site_id) setSelectedSiteId(data.profile.site_id);
-
             // 본인 trade 고정 (TEAM_LEADER)
             if (data.profile?.trade && TRADE_KEYS.includes(data.profile.trade as TradeType)) {
                 setSelectedTrade(data.profile.trade as TradeType);
             }
 
-            // 사이트 목록 — 글로벌 admin 은 전체, 그 외는 본인 사이트만
-            const q = supabase.from("sites").select("id, name, site_code").order("name");
-            const { data: siteRows } = isGlobal ? await q : await q.eq("id", data.profile?.site_id ?? "");
-            setSites(siteRows ?? []);
+            const sitesRes = await fetch("/api/sites/options", { credentials: "include", cache: "no-store" });
+            const siteData = sitesRes.ok
+                ? await sitesRes.json() as { sites?: Site[] }
+                : { sites: [] };
+            const siteRows = siteData.sites ?? [];
+            setSites(siteRows);
+
+            const profileSiteId = data.profile?.site_id ?? "";
+            if (!isGlobal && profileSiteId) {
+                setSelectedSiteId(profileSiteId);
+            } else {
+                setSelectedSiteId(profileSiteId || siteRows[0]?.id || "");
+            }
         })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const role = (me?.profile?.role ?? "").toUpperCase();

@@ -4,7 +4,6 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { createClient } from "@/utils/supabase/client";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import RoleGuard from "@/components/RoleGuard";
 import { Suspense } from "react";
@@ -189,54 +188,38 @@ function WorkerTBMDetailContent() {
     };
 
     const loadTBM = useCallback(async () => {
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) { setLoading(false); return; }
+        const meRes = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+        if (!meRes.ok) { setLoading(false); return; }
+        const me = (await meRes.json()) as {
+            user?: { id: string };
+            profile?: { preferred_lang?: string | null; site_id?: string | null; display_name?: string | null } | null;
+        };
+        if (!me.user) { setLoading(false); return; }
 
-        const { data: profile } = await supabase
-            .from("profiles")
-            .select("preferred_lang, site_id, display_name")
-            .eq("id", session.user.id)
-            .single();
-
-        let lang = profile?.preferred_lang || "ko";
-
-        if (urlLang && urlLang !== profile?.preferred_lang) {
-            await supabase.from("profiles").update({ preferred_lang: urlLang }).eq("id", session.user.id);
-            lang = urlLang;
-        }
+        let lang = me.profile?.preferred_lang || "ko";
+        if (urlLang) lang = urlLang;
 
         setPreferredLang(lang);
 
         let tbmData: any = null;
+        const tbmParams = new URLSearchParams();
         if (tbmId && tbmId !== "today") {
-            const { data } = await supabase
-                .from("tbm_notices")
-                .select("*")
-                .eq("id", tbmId)
-                .single();
-            tbmData = data;
+            tbmParams.set("id", tbmId);
         } else {
-            // 현장별 TBM 필터링: site_id 있으면 해당 현장만, 없으면 전체
-            const siteId = profile?.site_id;
-            let query = supabase
-                .from("tbm_notices")
-                .select("*")
-                .order("created_at", { ascending: false })
-                .limit(1);
-            if (siteId) query = query.eq("site_id", siteId);
-            const { data } = await query;
-            tbmData = data?.[0] || null;
+            tbmParams.set("limit", "1");
         }
+        const tbmRes = await fetch(`/api/tbm/today?${tbmParams.toString()}`, { cache: "no-store", credentials: "include" });
+        const tbmJson = tbmRes.ok ? await tbmRes.json() as { tbms?: any[] } : { tbms: [] };
+        tbmData = tbmJson.tbms?.[0] || null;
 
         setTbm(tbmData);
 
         // #3 오프라인 캐시: 성공 시 저장. 데이터 없고 '오프라인'일 때만 캐시 폴백(온라인-무TBM 시 stale 금지).
         if (tbmData) {
-            saveTbmCache(session.user.id, tbmData);
+            saveTbmCache(me.user.id, tbmData);
             setFromCache(false);
         } else if (isOffline()) {
-            const cached = loadTbmCache(session.user.id);
+            const cached = loadTbmCache(me.user.id);
             if (cached) {
                 tbmData = cached;
                 setTbm(cached);
@@ -245,13 +228,9 @@ function WorkerTBMDetailContent() {
         }
 
         if (tbmData) {
-            const { data: ackData } = await supabase
-                .from("tbm_ack")
-                .select("id")
-                .eq("tbm_id", tbmData.id)
-                .eq("worker_id", session.user.id)
-                .single();
-            if (ackData) setIsSigned(true);
+            const ackRes = await fetch(`/api/tbm/sign?tbmId=${encodeURIComponent(tbmData.id)}`, { cache: "no-store", credentials: "include" });
+            const ackData = ackRes.ok ? await ackRes.json() as { signed?: boolean } : null;
+            setIsSigned(Boolean(ackData?.signed));
 
             if (tbmData.content_ko && lang !== "ko" && !isOffline()) {
                 setTranslating(true);
@@ -290,26 +269,7 @@ function WorkerTBMDetailContent() {
 
     useEffect(() => { loadTBM(); }, [loadTBM]);
 
-    const [hasNewTBM, setHasNewTBM] = useState(false);
-
-    // 새 TBM 발송 시 자동 갱신 및 소리 알림
-    useEffect(() => {
-        const supabase = createClient();
-        const channel = supabase
-            .channel('tbm_detail_realtime')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tbm_notices' }, () => {
-                console.log('[TBM] New TBM received, alerting and reloading...');
-                setHasNewTBM(true);
-                playNotificationSound();
-                loadTBM();
-
-                // 3초 후 플래시 배너 닫기
-                setTimeout(() => setHasNewTBM(false), 3000);
-            })
-            .subscribe();
-        return () => { supabase.removeChannel(channel); };
-    }, [loadTBM]);
-
+    const [hasNewTBM] = useState(false);
 
     const handlePlayAudio = () => {
         if (!transData.text) return;
@@ -364,8 +324,7 @@ function WorkerTBMDetailContent() {
                 return;
             }
 
-            // /api/tbm/sign — createBrowserClient 의존 제거. 서버측 raw fetch + 쿠키 파싱.
-            // Workers 환경에서 클라이언트 supabase 호출이 간헐 실패하던 문제 해결.
+            // /api/tbm/sign — v3 Spring 세션 기반 API로 서명 저장.
             const res = await fetch("/api/tbm/sign", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -417,7 +376,7 @@ function WorkerTBMDetailContent() {
                         </button>
                         <div className="flex flex-col">
                             <div className="flex items-center gap-2">
-                                <span className="text-xl font-black tracking-tight text-white uppercase italic">Safe-Link</span>
+                                <span className="text-xl font-black tracking-tight text-white uppercase italic">SQ Link</span>
                                 <span className="px-2 py-0.5 bg-red-500 text-[10px] font-black rounded text-white animate-pulse">LIVE</span>
                             </div>
                             <span className="text-xs text-slate-500 font-bold tracking-widest uppercase truncate max-w-[150px]">

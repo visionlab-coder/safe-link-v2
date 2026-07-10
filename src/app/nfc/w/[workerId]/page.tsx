@@ -28,7 +28,7 @@ export default function WorkerStickerLanding() {
     <>
       <Head>
         <meta name="robots" content="noindex, nofollow" />
-        <title>SAFE-LINK NFC</title>
+        <title>SQ Link NFC</title>
       </Head>
       <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6">
         <div className="bg-gray-800 rounded-2xl p-8 max-w-sm w-full text-center shadow-xl">
@@ -47,7 +47,7 @@ export default function WorkerStickerLanding() {
                 이 스티커는 TBM 참석 확인용입니다.<br />
                 관리자 화면에 가까이 대주세요.
               </p>
-              <p className="text-gray-500 text-xs mt-4">SAFE-LINK · 서원토건</p>
+              <p className="text-gray-500 text-xs mt-4">SQ Link · 서원토건</p>
             </>
           )}
           {status === "invalid" && (

@@ -19,7 +19,7 @@
   ├─ Next.js API Routes (STT/TTS/번역/TBM/인증/NFC 등 67개)  ← 그대로
   └─ Supabase (PostgreSQL + Auth + Realtime + RLS)            ← 그대로
         │
-[외부 AI 서비스]  Google Cloud(STT/TTS/Gemini) · OpenAI(Whisper/TTS) · Naver Papago · (선택)Flitto RTT
+[외부 AI 서비스]  Google Cloud(STT/TTS/Gemini) · OpenAI(Whisper/TTS) · Naver Papago
 ```
 
 - **재사용 (새로 안 만듦)**: Supabase DB/스키마/RLS, 모든 API 라우트, 번역·STT·TTS 파이프라인 로직, 건설 용어/발음/존댓말 로직, 역할/권한 모델, 디자인 시스템.
@@ -133,7 +133,7 @@
 ### 3-C. 라이브 통역 (난이도 상 ⭐ 최난) 
 - 관리자(`admin/live`): 마이크 → VAD 청크 → `/api/stt` → 근로자 언어들 **병렬 사전번역** → Realtime 자막 브로드캐스트.
 - 근로자(`worker/live`): 자막 수신 → **TTS 큐 재생** → 역방향 발화(STT→번역→messages).
-- 핵심: `src/hooks/useCloudSTT.ts`(VAD/청크/mute), `useFlittoRTT.ts`(WSS 스트리밍), `src/utils/tts.ts`(playPremiumAudio).
+- 핵심: `src/hooks/useCloudSTT.ts`(VAD/청크/mute), `src/utils/tts.ts`(playPremiumAudio).
 - 네이티브 주의: 오디오 스트리밍(MediaRecorder 등가), VAD(RMS 0.015, 침묵 2s, 청크 10s/라이브 6s), TTS 큐 순차재생, 자기발화 mute, 자동재생 언락.
 
 ### 3-D. 1:1 대화 (난이도 중상)
@@ -168,7 +168,7 @@
 > 네이티브 클라이언트는 대부분 **백엔드 API 경유**라 서버 env가 핵심. 클라이언트엔 공개값(NEXT_PUBLIC_*)만.
 
 - **AI 엔진(서버)**: `GOOGLE_CLOUD_API_KEY`, `OPENAI_API_KEY`, `GEMINI_TRANSLATE_MODEL`
-- **번역(서버)**: `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `DEEPL_API_URL`, `FLITTO_RTT_TOKEN`, `FLITTO_RTT_URL`, `NEXT_PUBLIC_FLITTO_TARGET_LANGS`
+- **번역(서버)**: `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `DEEPL_API_URL`
 - **Supabase**: `NEXT_PUBLIC_SUPABASE_URL`(공개), `NEXT_PUBLIC_SUPABASE_ANON_KEY`(공개), `SUPABASE_SERVICE_ROLE_KEY`(서버), `SUPABASE_JWT_SECRET`/`_PREV`(서버)
 - **NFC/보안(서버)**: `NFC_HMAC_SECRET`, `NFC_STICKER_SECRET`, `SAFE_LINK_AES_KEY`, `SAFE_LINK_HASH_SALT`
 - **권한**: `MASTER_EMAILS`, `HQ_OFFICER_EMAILS`
@@ -208,7 +208,7 @@
 |---|---|
 | 인증 | `src/app/auth/page.tsx`, `src/app/api/auth/*`, `src/utils/auth/*`, `src/middleware.ts` |
 | TBM | `src/app/admin/tbm/*`, `src/app/worker/tbm/[id]/page.tsx`, `src/app/api/tbm/*`, `src/app/api/nfc/tbm-session/*` |
-| 라이브 통역 | `src/app/admin/live/page.tsx`, `src/app/worker/live/page.tsx`, `src/hooks/useCloudSTT.ts`, `src/hooks/useFlittoRTT.ts`, `src/utils/tts.ts` |
+| 라이브 통역 | `src/app/admin/live/page.tsx`, `src/app/worker/live/page.tsx`, `src/hooks/useCloudSTT.ts`, `src/utils/tts.ts` |
 | 1:1 채팅 | `src/app/worker/chat/page.tsx`, `src/app/admin/chat/page.tsx`, `src/hooks/usePresence.ts` |
 | 번역/언어 | `src/app/api/translate/route.ts`, `src/utils/politeness.ts`, `src/utils/hangulize*.ts`, `src/constants/glossary.ts`, `src/constants/index.ts`, `src/constants/quality-config.ts` |
 | STT/TTS | `src/app/api/stt/route.ts`, `src/app/api/tts/route.ts`, `src/constants/construction-terms.ts` |

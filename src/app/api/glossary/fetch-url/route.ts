@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { getV3SessionUser } from "@/utils/auth/v3-session-user";
 import { promises as dns, lookup as dnsLookupCb, type LookupOptions } from "dns";
 import * as http from "node:http";
 import * as https from "node:https";
@@ -96,7 +96,7 @@ function fetchWithIpPinning(target: URL, signal: AbortSignal): Promise<{ status:
       path: target.pathname + target.search,
       method: "GET",
       headers: {
-        "user-agent": "SAFE-LINK glossary importer/1.0",
+        "user-agent": "SQ Link glossary importer/1.0",
         "accept": "text/html,text/plain,application/xhtml+xml;q=0.9,*/*;q=0.5",
         "host": target.host,
       },
@@ -136,19 +136,12 @@ function htmlToText(html: string) {
 }
 
 export async function POST(request: NextRequest) {
-  // Admin-only endpoint — reject unauthenticated or non-admin requests
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getV3SessionUser();
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  const ADMIN_ROLES = new Set(["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER", "SAFETY_OFFICER", "SITE_ADMIN"]);
-  if (!profile || !ADMIN_ROLES.has(String(profile.role ?? "").toUpperCase())) {
+  const ADMIN_ROLES = new Set(["ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER"]);
+  if (!user.roles.some((role) => ADMIN_ROLES.has(role))) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 

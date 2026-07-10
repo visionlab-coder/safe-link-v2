@@ -1,10 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Nfc, Plus, ChevronRight, Clock, CheckCircle } from "lucide-react";
-import { createClient } from "@/utils/supabase/client";
 
 interface Session {
   id: string;
@@ -29,7 +28,7 @@ export default function TbmLiveIndexPage() {
   const [creating, setCreating] = useState(false);
   const [newTitle, setNewTitle] = useState("");
 
-  const fetchSessions = async () => {
+  const fetchSessions = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
     if (siteId) params.set("site_id", siteId);
@@ -39,22 +38,19 @@ export default function TbmLiveIndexPage() {
       setSessions(data.sessions ?? []);
     }
     setLoading(false);
-  };
+  }, [siteId]);
 
   useEffect(() => {
-    // 현재 사용자의 site_id 자동 조회
     const loadSite = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase.from("profiles").select("site_id").eq("id", user.id).maybeSingle();
-        if (profile?.site_id) setSiteId(String(profile.site_id));
-      }
+      const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+      if (!res.ok) return;
+      const data = await res.json() as { profile?: { site_id?: string | null } | null };
+      if (data.profile?.site_id) setSiteId(String(data.profile.site_id));
     };
-    loadSite();
+    loadSite().catch(() => undefined);
   }, []);
 
-  useEffect(() => { fetchSessions(); }, [siteId]);
+  useEffect(() => { void fetchSessions(); }, [fetchSessions]);
 
   const handleCreate = async () => {
     if (!siteId) { alert("현장 ID가 없습니다. 프로필을 확인하세요."); return; }

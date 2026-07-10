@@ -259,7 +259,7 @@ export default function OnDeviceSpeechPage() {
         <main className="min-h-screen bg-[#07100d] px-4 py-8 text-slate-100 sm:px-8">
             <div className="mx-auto max-w-5xl">
                 <header className="border-b border-emerald-900/70 pb-5">
-                    <p className="text-xs font-semibold text-emerald-400">SAFE-LINK AI LAB</p>
+                    <p className="text-xs font-semibold text-emerald-400">SQ Link AI LAB</p>
                     <h1 className="mt-2 text-2xl font-bold sm:text-3xl">온디바이스 STT / TTS 검증</h1>
                     <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
                         음성 데이터의 서버 전송 없이 브라우저 내부에서 인식하고 합성합니다.
@@ -347,7 +347,7 @@ export default function OnDeviceSpeechPage() {
                                 <audio controls src={audioUrl} className="w-full" />
                                 <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-400">
                                     <span>{ttsStats?.duration.toFixed(2)}초 · {ttsStats?.processingMs.toLocaleString()}ms · {ttsStats?.backend.toUpperCase()}</span>
-                                    <a href={audioUrl} download="safe-link-supertonic.wav" className="font-bold text-sky-300">WAV 다운로드</a>
+                                    <a href={audioUrl} download="sq-link-supertonic.wav" className="font-bold text-sky-300">WAV 다운로드</a>
                                 </div>
                             </div>
                         )}

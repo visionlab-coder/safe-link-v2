@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getV3CurrentUser } from "@/lib/v3-auth";
+import type { V3Role } from "@/lib/v3-role-contract";
 import {
     getDefaultRouteForProfileRole,
     hasAllowedRole,
@@ -11,12 +13,16 @@ import {
 
 // RoleGuard — 클라이언트 인증/권한 가드.
 //
-// /api/auth/me 단일 엔드포인트로 인증 상태와 역할 확인.
-// createBrowserClient(@supabase/ssr) 의존 제거 → Workers / Vercel 어디서나 안정.
+// Spring Boot V3 세션을 우선 확인하고 /api/auth/me 호환 응답을 fallback으로 사용한다.
 //
 // 미들웨어가 이미 서버측에서 인증+역할 검증을 통과시킨 상태에서 실행되므로
-// 이 가드는 사실상 2차 방어 + 클라이언트 라우팅용. /api/auth/me 가 401 이면
-// 만료/세션 손상으로 보고 /auth 로 안내.
+const V3_ROLE_PRIORITY: V3Role[] = ["ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER", "WORKER", "VIEWER"];
+
+function pickV3RouteRole(roles: V3Role[], allowedRole: AllowedRole): V3Role | null {
+    return roles.find((role) => hasAllowedRole(role, allowedRole)) ??
+        V3_ROLE_PRIORITY.find((role) => roles.includes(role)) ??
+        null;
+}
 
 export default function RoleGuard({
     children,
@@ -47,6 +53,22 @@ export default function RoleGuard({
             }
 
             try {
+                const v3User = await getV3CurrentUser().catch(() => null);
+                if (v3User) {
+                    if (typeof sessionStorage !== "undefined") {
+                        sessionStorage.setItem("safe-link-session-active", "true");
+                    }
+
+                    const routeRole = pickV3RouteRole(v3User.roles, allowedRole);
+                    if (!routeRole || !hasAllowedRole(routeRole, allowedRole)) {
+                        router.replace(routeRole ? getDefaultRouteForProfileRole(routeRole) : "/auth/setup");
+                        return;
+                    }
+
+                    setIsAuthorized(true);
+                    return;
+                }
+
                 const res = await fetch("/api/auth/me", {
                     cache: "no-store",
                     credentials: "include",
@@ -102,7 +124,6 @@ export default function RoleGuard({
         return () => {
             cancelled = true;
         };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router, allowedRole]);
 
     if (!isAuthorized) {

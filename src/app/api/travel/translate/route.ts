@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const runtime = "nodejs";
 import { verifyTravelToken } from '@/lib/travel-auth';
 import { formalizeKo, formalizeJa } from '@/utils/politeness';
+import { callInternalAiTranslate } from '@/utils/ai/v3-ai-gateway';
 
 // 파파고 지원 언어 (Travel Talk 5개 언어 모두 포함)
 const PAPAGO_LANG_MAP: Record<string, string> = {
@@ -22,64 +23,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'text_too_long' }, { status: 400 });
   }
 
-  const naverIdKey  = process.env.NAVER_CLIENT_ID?.trim();
-  const naverSecret = process.env.NAVER_CLIENT_SECRET?.trim();
-  const googleKey   = process.env.GOOGLE_CLOUD_API_KEY?.trim();
-
-  const papagoFrom = PAPAGO_LANG_MAP[from];
-  const papagoTo   = PAPAGO_LANG_MAP[to];
-  const canUsePapago = naverIdKey && naverSecret && papagoFrom && papagoTo;
-
-  // 1순위: 파파고 (한-일 포함 Travel 5개 언어 전체 지원, 여행 회화체 품질 우수)
-  if (canUsePapago) {
-    try {
-      const res = await fetch('https://papago.apigw.ntruss.com/nmt/v1/translation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'X-NCP-APIGW-API-KEY-ID': naverIdKey!,
-          'X-NCP-APIGW-API-KEY': naverSecret!,
-        },
-        body: new URLSearchParams({ source: papagoFrom, target: papagoTo, text }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const translated: string = data.message?.result?.translatedText || '';
-        if (translated) {
-            const final = to === 'ko' ? formalizeKo(translated)
-                      : to === 'ja' ? formalizeJa(translated)
-                      : translated;
-          console.log(`[translate] papago ${from}→${to} ${Date.now()-t0}ms`);
-          return NextResponse.json({ translated: final, engine: 'papago' });
-        }
-      }
-    } catch (err) {
-      console.error('[travel/translate] papago error:', err);
-    }
-  }
-
-  // 2순위: Google Translate 폴백
   try {
-    const res = await fetch(
-      `https://translation.googleapis.com/language/translate/v2?key=${googleKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q: text, source: from, target: to, format: 'text' }),
-      }
-    );
-    if (!res.ok) throw new Error(`Google API ${res.status}`);
-    const data = await res.json();
-    const translated: string = data?.data?.translations?.[0]?.translatedText || '';
-    if (!translated) throw new Error('Empty translation response');
-    const final = to === 'ko' ? formalizeKo(translated)
-                : to === 'ja' ? formalizeJa(translated)
-                : translated;
-    console.log(`[translate] google ${from}→${to} ${Date.now()-t0}ms`);
-    return NextResponse.json({ translated: final, engine: 'google' });
+    const result = await callInternalAiTranslate({
+      provider: 'auto',
+      sourceLanguage: PAPAGO_LANG_MAP[from] || from,
+      targetLanguage: PAPAGO_LANG_MAP[to] || to,
+      text,
+    });
+    if (!result?.text) throw new Error('Empty translation response');
+    const final = to === 'ko' ? formalizeKo(result.text)
+                : to === 'ja' ? formalizeJa(result.text)
+                : result.text;
+    console.log(`[travel/translate] ${result.vendor} ${from}→${to} ${Date.now()-t0}ms`);
+    return NextResponse.json({ translated: final, engine: result.vendor });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[travel/translate] google error:', msg);
+    console.error('[travel/translate] gateway error:', msg);
     return NextResponse.json({ error: 'Translation failed' }, { status: 500 });
   }
 }

@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 단일 앱 셸: 배포된 SAFE-LINK 웹앱 전체를 first-party WebView로 호스팅.
+ * 단일 앱 셸: 배포된 SQ Link 웹앱 전체를 first-party WebView로 호스팅.
  * 웹앱의 라이브 통역·1:1 대화가 WebView 안에서 getUserMedia(마이크)를 호출하므로,
  * 실행 시 런타임 권한을 미리 요청한다. Capacitor 브릿지 WebChromeClient는 앱이
  * 해당 Android 권한을 보유한 경우 WebView의 미디어 권한 요청을 grant 한다.

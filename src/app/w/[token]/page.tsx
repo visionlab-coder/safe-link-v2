@@ -68,7 +68,7 @@ export default function WorkerNfcScanPage() {
         {!loading && result && result.status !== "success" && <ErrorCard result={result as Exclude<ApiResult, { status: "success" }>} />}
 
         <p className="text-[10px] text-slate-700 font-black tracking-[0.4em] uppercase">
-          SAFE-LINK · POWERED BY HI-INFO
+          SQ Link · POWERED BY HI-INFO
         </p>
       </div>
     </main>

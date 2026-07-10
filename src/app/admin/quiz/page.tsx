@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
-import { createClient } from "@/utils/supabase/client";
 import ExportMenu from "@/components/ExportMenu";
 import { exportData, type ExportFormat } from "@/utils/export-files";
 
@@ -46,26 +45,10 @@ function AdminQuizContent() {
   const [quizSource, setQuizSource] = useState<"tbm" | "fallback" | null>(null);
 
   const loadSessions = useCallback(async () => {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("site_id")
-      .eq("id", session.user.id)
-      .single();
-
-    let query = supabase
-      .from("nfc_tbm_sessions")
-      .select("id, title, started_at, status, tbm_notices(content_ko, title)")
-      .order("started_at", { ascending: false })
-      .limit(10);
-
-    if (profile?.site_id) query = query.eq("site_id", profile.site_id);
-
-    const { data } = await query;
-    setTbmSessions((data as unknown as TbmSession[]) ?? []);
+    const res = await fetch("/api/quiz/tbm-sessions", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json() as { sessions?: TbmSession[] };
+    setTbmSessions(data.sessions ?? []);
   }, []);
 
   useEffect(() => { loadSessions(); }, [loadSessions]);
@@ -142,57 +125,32 @@ function AdminQuizContent() {
     }
   };
 
-  // Realtime live responses
+  // Server-managed live responses
   useEffect(() => {
     if (phase !== "live" || !quizSessionId) return;
-    const supabase = createClient();
-
-    supabase
-      .from("tbm_quiz_responses")
-      .select("id, worker_id, lang, status, submitted_at")
-      .eq("quiz_session_id", quizSessionId)
-      .then(({ data }) => setLiveResponses((data as LiveResponse[]) ?? []));
-
-    // 일괄 자동출제(daily) 후 questions 상태가 비어있으면 세션에서 로드
-    if (questions.length === 0) {
-      supabase
-        .from("tbm_quiz_sessions")
-        .select("questions")
-        .eq("id", quizSessionId)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data?.questions) {
-            const qs: GeneratedQuestion[] = (data.questions as Omit<GeneratedQuestion, "included">[]).map(
-              (q) => ({ ...q, included: true })
-            );
-            setQuestions(qs);
-          }
-        });
-    }
-
-    const channel = supabase
-      .channel("tbm_quiz_live")
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "tbm_quiz_responses",
-        filter: `quiz_session_id=eq.${quizSessionId}`,
-      }, (payload) => {
-        const updated = payload.new as LiveResponse;
-        setLiveResponses(prev => {
-          const idx = prev.findIndex(r => r.id === updated.id);
-          if (idx >= 0) {
-            const next = [...prev];
-            next[idx] = updated;
-            return next;
-          }
-          return [...prev, updated];
-        });
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [phase, quizSessionId]);
+    let cancelled = false;
+    const loadLive = async () => {
+      const res = await fetch(`/api/quiz/responses?quizSessionId=${encodeURIComponent(quizSessionId)}`, { cache: "no-store" });
+      if (!cancelled && res.ok) {
+        const data = await res.json() as { responses?: LiveResponse[] };
+        setLiveResponses(data.responses ?? []);
+      }
+      if (!cancelled && questions.length === 0 && selectedSession?.id) {
+        const listRes = await fetch(`/api/quiz/generate?tbmSessionId=${encodeURIComponent(selectedSession.id)}`, { cache: "no-store" });
+        if (listRes.ok) {
+          const listData = await listRes.json() as { quizSessions?: Array<{ questions?: Omit<GeneratedQuestion, "included">[] }> };
+          const loaded = listData.quizSessions?.[0]?.questions;
+          if (loaded) setQuestions(loaded.map((q) => ({ ...q, included: true })));
+        }
+      }
+    };
+    loadLive();
+    const timer = window.setInterval(loadLive, 2500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [phase, quizSessionId, questions.length, selectedSession?.id]);
 
   const answeredCount = liveResponses.filter(r => r.status === "answered").length;
   const totalSent = liveResponses.length;

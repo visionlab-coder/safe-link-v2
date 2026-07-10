@@ -2,7 +2,6 @@
 import { useEffect, useState, Suspense, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { createClient } from "@/utils/supabase/client";
 import RoleGuard from "@/components/RoleGuard";
 import { normalizeKoAsync } from "@/utils/normalize";
 import { motion, AnimatePresence } from "framer-motion";
@@ -64,7 +63,15 @@ function flagIsoForWorker(w: { nationality?: string | null; preferred_lang?: str
 }
 
 
-type WorkerProfile = { id: string; display_name: string; preferred_lang: string; nationality?: string | null; };
+type WorkerProfile = { id: string; display_name: string; preferred_lang: string; nationality?: string | null; site_id?: string | null; };
+type AuthMeResponse = {
+    user?: { id?: string; email?: string | null };
+    profile?: { preferred_lang?: string | null; site_id?: string | null; role?: string | null } | null;
+};
+type AdminChatWorkersResponse = {
+    site_id?: string | null;
+    workers?: WorkerProfile[];
+};
 type Message = {
     id: string;
     from_user: string;
@@ -76,6 +83,8 @@ type Message = {
     created_at: string;
     is_read?: boolean;
 };
+type ChatMessagesResponse = { messages?: Message[] };
+type ChatMessageResponse = { message?: Message };
 
 /** translated_text 컬럼을 파싱. 항상 안전하게 객체를 반환 */
 const parseMsg = (raw: string | null | undefined): ParsedMessage => {
@@ -99,7 +108,6 @@ function AdminChatContent() {
     const urlLang = searchParams.get("lang");
 
     const [adminLang, setAdminLang] = useState("ko");
-    const [siteId, setSiteId] = useState<string | null>(null);
     const [workers, setWorkers] = useState<WorkerProfile[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [activeWorker, setActiveWorker] = useState<WorkerProfile | null>(null);
@@ -112,6 +120,8 @@ function AdminChatContent() {
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const voiceGenderRef = useRef<'male' | 'female'>('female');
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const isComposingRef = useRef(false);
     const MSG_PAGE_SIZE = 50;
     const [hasMore, setHasMore] = useState(false);
     const [loadingOlder, setLoadingOlder] = useState(false);
@@ -124,96 +134,75 @@ function AdminChatContent() {
     };
 
     const load = useCallback(async () => {
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-        setMyId(session.user.id);
+        const meRes = await fetch("/api/auth/me", { cache: "no-store" });
+        if (!meRes.ok) {
+            if (meRes.status === 401) router.push("/auth");
+            return;
+        }
 
-        // 1) 프로필 먼저 — site_id + role로 근로자 쿼리 스코프 결정
-        const profileRes = await supabase
-            .from("profiles")
-            .select("preferred_lang, site_id, role")
-            .eq("id", session.user.id)
-            .single();
+        const me = (await meRes.json()) as AuthMeResponse;
+        const userId = me.user?.id;
+        if (!userId) return;
+        setMyId(userId);
 
-        const mySiteId = profileRes.data?.site_id ?? null;
-        if (mySiteId) setSiteId(mySiteId);
-        let finalLang = profileRes.data?.preferred_lang || "ko";
-        if (urlLang && urlLang !== profileRes.data?.preferred_lang) {
-            supabase.from("profiles").update({ preferred_lang: urlLang }).eq("id", session.user.id);
+        const profile = me.profile ?? null;
+        let finalLang = profile?.preferred_lang || "ko";
+        if (urlLang && urlLang !== profile?.preferred_lang) {
             finalLang = urlLang;
         }
         setAdminLang(finalLang);
 
-        // 2) ROOT/SUPER_ADMIN/HQ_ADMIN/HQ_OFFICER는 전체 현장 근로자 조회
-        //    그 외(SAFETY_OFFICER, SITE_ADMIN 등)는 자기 현장만 — SaaS 현장 격리 필수
-        const GLOBAL_ROLES = ["ROOT", "SUPER_ADMIN", "HQ_ADMIN", "HQ_OFFICER"];
-        const isGlobal = GLOBAL_ROLES.includes((profileRes.data?.role ?? "").toUpperCase());
-        let workersQuery = supabase
-            .from("profiles")
-            .select("id, display_name, preferred_lang, role, nationality")
-            .eq("role", "WORKER");
-        if (!isGlobal && mySiteId) workersQuery = workersQuery.eq("site_id", mySiteId);
-        const workersRes = await workersQuery;
-        if (workersRes.data) setWorkers(workersRes.data);
+        const workersRes = await fetch("/api/admin/chat/workers", { cache: "no-store" });
+        if (workersRes.ok) {
+            const payload = (await workersRes.json()) as AdminChatWorkersResponse;
+            setWorkers(payload.workers ?? []);
+        } else {
+            setWorkers([]);
+        }
+    }, [router, urlLang]);
 
-        // 🆕 새로운 근로자 가입 시 사이드바 실시간 업데이트 (site_id 스코프)
-        const profileSubscription = supabase
-            .channel(`sidebar_updates_${mySiteId ?? session.user.id}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload: { eventType: string; new: Partial<WorkerProfile> & { role?: string; site_id?: string | null } }) => {
-                // 다른 현장 근로자 가입은 무시 (site_id 있는 경우에만 필터)
-                if (payload.new.site_id && mySiteId && payload.new.site_id !== mySiteId) return;
-                if (payload.eventType === 'INSERT' && payload.new.role === 'WORKER' && payload.new.id && payload.new.display_name && payload.new.preferred_lang) {
-                    setWorkers(prev => [...prev, payload.new as WorkerProfile]);
-                }
-            })
-            .subscribe();
+    const markMessagesRead = useCallback(async (peerId: string) => {
+        await fetch("/api/chat/messages", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ peer_id: peerId }),
+        }).catch(() => {});
+    }, []);
 
-        return () => { supabase.removeChannel(profileSubscription); };
-    }, [urlLang]);
-
-    const fetchMessages = useCallback(async () => {
+    const fetchMessages = useCallback(async (options: { scroll?: boolean } = {}) => {
         if (!activeWorker || !myId) return;
-        const supabase = createClient();
-        // 최신 50건만 로드 (ascending: false → 최신순 → reverse로 시간순 표시)
-        const { data } = await supabase
-            .from("messages")
-            .select("*")
-            .or(`and(from_user.eq.${myId},to_user.eq.${activeWorker.id}),and(from_user.eq.${activeWorker.id},to_user.eq.${myId})`)
-            .order("created_at", { ascending: false })
-            .limit(MSG_PAGE_SIZE);
-        const sorted = data ? [...data].reverse() : [];
-        setMessages(sorted);
-        setHasMore((data?.length ?? 0) >= MSG_PAGE_SIZE);
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
 
-        supabase
-            .from("messages")
-            .update({ is_read: true })
-            .eq("from_user", activeWorker.id)
-            .eq("to_user", myId)
-            .eq("is_read", false)
-            .then(() => {});
-    }, [activeWorker, myId]);
+        const res = await fetch(`/api/chat/messages?peer_id=${activeWorker.id}&limit=${MSG_PAGE_SIZE}`, {
+            cache: "no-store",
+        });
+        if (!res.ok) return;
+
+        const payload = (await res.json()) as ChatMessagesResponse;
+        const sorted = payload.messages ?? [];
+        setMessages(sorted);
+        setHasMore(sorted.length >= MSG_PAGE_SIZE);
+        if (options.scroll !== false) {
+            setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+        }
+        void markMessagesRead(activeWorker.id);
+    }, [activeWorker, myId, markMessagesRead]);
 
     const loadOlderMessages = useCallback(async () => {
         if (loadingOlder || !activeWorker || !myId || messages.length === 0) return;
         setLoadingOlder(true);
         try {
-            const supabase = createClient();
             const oldest = messages[0];
-            const { data } = await supabase
-                .from("messages")
-                .select("*")
-                .or(`and(from_user.eq.${myId},to_user.eq.${activeWorker.id}),and(from_user.eq.${activeWorker.id},to_user.eq.${myId})`)
-                .lt("created_at", oldest.created_at)
-                .order("created_at", { ascending: false })
-                .limit(MSG_PAGE_SIZE);
-            if (data && data.length > 0) {
-                const sorted = [...data].reverse();
-                setMessages(prev => [...sorted, ...prev]);
+            const res = await fetch(`/api/chat/messages?peer_id=${activeWorker.id}&limit=${MSG_PAGE_SIZE}&before=${encodeURIComponent(oldest.created_at)}`, {
+                cache: "no-store",
+            });
+            if (res.ok) {
+                const payload = (await res.json()) as ChatMessagesResponse;
+                const older = payload.messages ?? [];
+                if (older.length > 0) {
+                    setMessages(prev => [...older, ...prev]);
+                }
+                setHasMore(older.length >= MSG_PAGE_SIZE);
             }
-            setHasMore((data?.length ?? 0) >= MSG_PAGE_SIZE);
         } finally {
             setLoadingOlder(false);
         }
@@ -226,11 +215,16 @@ function AdminChatContent() {
         triedJitTranslate.current.clear();
         if (activeWorker) {
             setUnreadWorkers(prev => {
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 const { [activeWorker.id]: _, ...rest } = prev;
                 return rest;
             });
-            fetchMessages();
+            void fetchMessages();
+            const events = new EventSource(`/api/chat/events?peer_id=${encodeURIComponent(activeWorker.id)}`);
+            events.addEventListener("message", () => {
+                void fetchMessages({ scroll: false });
+            });
+            events.onerror = () => {};
+            return () => events.close();
         }
     }, [activeWorker, fetchMessages]);
 
@@ -288,9 +282,14 @@ function AdminChatContent() {
             const updateMap = new Map(valid.map(r => [r.id, r.translated_text]));
             setMessages(prev => prev.map(m => updateMap.has(m.id) ? { ...m, translated_text: updateMap.get(m.id)! } : m));
 
-            // DB 업데이트도 병렬
-            const supabase = createClient();
-            await Promise.all(valid.map(r => supabase.from("messages").update({ translated_text: r.translated_text }).eq("id", r.id)));
+            const peerId = activeWorkerRef.current?.id;
+            if (peerId) {
+                await fetch("/api/chat/messages", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ peer_id: peerId, translations: valid }),
+                }).catch(() => undefined);
+            }
         };
         translateUntranslated();
     }, [messages, myId]);
@@ -307,52 +306,45 @@ function AdminChatContent() {
 
     // 🆕 글로벌 메시지 리스너 (알림 및 읽지 않음 표시용)
     const [unreadWorkers, setUnreadWorkers] = useState<Record<string, number>>({});
+    const unreadWorkerSeenRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
-        if (!myId) return;
-        const supabase = createClient();
-
-        const channel = supabase
-            .channel(`global_admin_monitor_${siteId ?? myId}`)
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-                const msg = payload.new as Message & { site_id?: string | null };
-                if (!msg || msg.from_user === myId) return;
-                // 다른 현장 메시지 차단 (site_id가 있고 내 현장과 다를 때만 필터, NULL은 통과)
-                if (msg.site_id && siteId && msg.site_id !== siteId) return;
-
-                // 1. 현재 대화 중인 근로자의 메시지라면 메시지 목록 업데이트
-                if (activeWorkerRef.current && msg.from_user === activeWorkerRef.current.id) {
-                    setMessages(prev => {
-                        if (prev.find(m => m.id === msg.id)) return prev;
-                        return [...prev, ({ ...msg, is_read: true } as Message)];
-                    });
-
-                    // Mark as read in DB
-                    supabase.from("messages").update({ is_read: true }).eq("id", msg.id).then();
-                    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-                } else {
-                    // 2. 다른 근로자의 메시지라면 사이드바에 알림 표시
-                    setUnreadWorkers(prev => ({ ...prev, [msg.from_user]: (prev[msg.from_user] || 0) + 1 }));
-                }
-
-                // 3. AI 분석 수행
-                void analyzeMessageWithAI(msg.source_text);
-
-                // 4. 무조건 알림음 + 진동 발생
+        if (!myId || workers.length === 0) return;
+        let cancelled = false;
+        const pollUnread = async () => {
+            for (const worker of workers) {
+                if (cancelled || activeWorkerRef.current?.id === worker.id) continue;
+                const res = await fetch(`/api/chat/messages?peer_id=${worker.id}&limit=5`, { cache: "no-store" });
+                if (!res.ok) continue;
+                const payload = (await res.json()) as ChatMessagesResponse;
+                const incoming = (payload.messages ?? []).filter((msg) =>
+                    msg.from_user === worker.id &&
+                    msg.to_user === myId &&
+                    msg.is_read === false &&
+                    !unreadWorkerSeenRef.current.has(msg.id)
+                );
+                if (incoming.length === 0) continue;
+                incoming.forEach((msg) => {
+                    unreadWorkerSeenRef.current.add(msg.id);
+                    void analyzeMessageWithAI(msg.source_text);
+                });
+                setUnreadWorkers(prev => ({ ...prev, [worker.id]: (prev[worker.id] || 0) + incoming.length }));
                 playNotificationSound();
                 if (typeof navigator !== "undefined" && navigator.vibrate) {
                     navigator.vibrate([300, 100, 300]);
                 }
-            })
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
-                const updated = payload.new as Message;
-                // '1' 표시 업데이트를 위해 읽음 상태 변경 시 메시지 목록 갱신
-                setMessages(prev => prev.map(m => m.id === updated.id ? { ...m, is_read: updated.is_read } : m));
-            })
-            .subscribe();
-
-        return () => { supabase.removeChannel(channel); };
-    }, [myId, siteId]); // siteId 추가: 현장 확인 후 채널 재생성
+            }
+        };
+        void pollUnread();
+        const events = new EventSource("/api/chat/user-events");
+        events.addEventListener("message", () => {
+            void pollUnread();
+        });
+        return () => {
+            cancelled = true;
+            events.close();
+        };
+    }, [myId, workers]);
 
     const playAudio = (text: string, langCode: string) => {
         // 프리미엄 AI 음성을 위해 Proxy(클라우드) 엔진 우선 사용
@@ -376,15 +368,31 @@ function AdminChatContent() {
         silenceDuration: 1200, // 1.2s 침묵 = 대화형 자연 휴지
     });
 
-    const handleSend = async (overrideText?: string | React.MouseEvent) => {
-        const messageText = typeof overrideText === 'string' ? overrideText : text;
+    const clearComposer = useCallback(() => {
+        setText("");
+        if (textareaRef.current) textareaRef.current.value = "";
+        requestAnimationFrame(() => {
+            setText("");
+            if (textareaRef.current) textareaRef.current.value = "";
+        });
+    }, []);
+
+    const handleSend = async (overrideText?: string) => {
+        if (isComposingRef.current) {
+            textareaRef.current?.blur();
+            await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        }
+
+        const messageText = typeof overrideText === 'string'
+            ? overrideText
+            : textareaRef.current?.value ?? text;
         if (!messageText.trim() || !activeWorker || !myId || isSending) return;
 
         const originalText = messageText.trim();
         const tempId = `temp-${Date.now()}`;
 
         // 🚀 즉시 표시 (번역 전)
-        setText("");
+        clearComposer();
         setIsSending(true);
         setMessages(prev => [...prev, {
             id: tempId, from_user: myId, to_user: activeWorker.id,
@@ -419,21 +427,22 @@ function AdminChatContent() {
                 }
             }
 
-            const supabase = createClient();
             const payload: Record<string, unknown> = {
-                from_user: myId,
                 to_user: activeWorker.id,
                 source_lang: "ko",
                 target_lang: activeWorker.preferred_lang,
                 source_text: originalText,
                 translated_text: JSON.stringify({ norm: normalized, text: translated, pron, rev }),
-                is_read: false,
             };
-            if (siteId) payload.site_id = siteId;
 
-            const { data: inserted, error } = await supabase.from("messages").insert(payload).select().single();
-            if (!error && inserted) {
-                setMessages(prev => prev.map(m => m.id === tempId ? inserted as Message : m));
+            const msgRes = await fetch("/api/chat/messages", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            const data = msgRes.ok ? ((await msgRes.json()) as ChatMessageResponse) : {};
+            if (msgRes.ok && data.message) {
+                setMessages(prev => prev.map(m => m.id === tempId ? data.message as Message : m));
             } else {
                 setMessages(prev => prev.filter(m => m.id !== tempId));
             }
@@ -513,8 +522,8 @@ function AdminChatContent() {
     return (
         <RoleGuard allowedRole="admin">
             {/* White/Bright Theme applied to root */}
-            <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col selection:bg-blue-200">
-                <header className="sticky top-0 z-50 bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex items-center justify-between shadow-sm">
+            <div className="h-dvh min-h-0 overflow-hidden bg-slate-50 text-slate-900 font-sans flex flex-col selection:bg-blue-200">
+                <header className="sticky top-0 z-50 shrink-0 bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex items-center justify-between shadow-sm">
                     <div className="flex items-center gap-4">
                         <button onClick={() => { if (activeWorker) setActiveWorker(null); else router.back(); }} className="p-2 -ml-2 rounded-full hover:bg-slate-100 transition-colors tap-effect text-slate-500 relative">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -560,21 +569,13 @@ function AdminChatContent() {
                                         if (!activeWorker) return;
                                         setWorkerNfcLoading(true);
                                         try {
-                                            const supabase = createClient();
-                                            const { data: nfcWorker } = await supabase
-                                                .from("nfc_workers")
-                                                .select("id")
-                                                .eq("auth_user_id", activeWorker.id)
-                                                .maybeSingle();
-                                            if (nfcWorker?.id) {
-                                                const res = await fetch("/api/nfc/sticker/issue", {
-                                                    method: "POST",
-                                                    headers: { "Content-Type": "application/json" },
-                                                    body: JSON.stringify({ worker_id: nfcWorker.id, revoke_previous: false }),
-                                                });
-                                                const data = await res.json() as { url?: string };
-                                                if (res.ok && data.url) setWorkerNfcUrl(data.url);
-                                            }
+                                            const res = await fetch("/api/nfc/sticker/issue", {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ worker_id: activeWorker.id, revoke_previous: false }),
+                                            });
+                                            const data = await res.json() as { url?: string };
+                                            if (res.ok && data.url) setWorkerNfcUrl(data.url);
                                         } finally {
                                             setWorkerNfcLoading(false);
                                         }
@@ -596,10 +597,10 @@ function AdminChatContent() {
                     </div>
                 </header>
 
-                <main className="flex-1 flex w-full max-w-6xl mx-auto h-[calc(100vh-76px)] overflow-hidden bg-white shadow-xl md:my-4 md:h-[calc(100vh-100px)] md:rounded-[40px] border border-slate-100">
+                <main className="flex-1 min-h-0 flex w-full max-w-6xl mx-auto overflow-hidden bg-white shadow-xl md:my-4 md:rounded-[40px] border border-slate-100">
 
                     {/* Worker Sidebar */}
-                    <div className={`${activeWorker ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col border-r border-slate-100 bg-slate-50/50 p-4 h-full overflow-y-auto`}>
+                    <div className={`${activeWorker ? 'hidden md:flex' : 'flex'} min-h-0 w-full md:w-80 flex-col border-r border-slate-100 bg-slate-50/50 p-4 h-full overflow-y-auto`}>
                         <div className="mb-6 z-10 sticky top-0 bg-slate-50/90 backdrop-blur-md pb-4 pt-2 border-b border-slate-100">
                             <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-4">{t.title}</h2>
                             <div className="relative mb-4 h-28 w-full overflow-hidden rounded-2xl border border-slate-200">
@@ -726,8 +727,8 @@ function AdminChatContent() {
                     </AnimatePresence>
 
                     {/* Chat Area */}
-                    <div className={`${!activeWorker ? 'hidden' : 'flex'} flex-col flex-1 bg-[#f8fafc] h-full relative`}>
-                        <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col gap-6" style={{ backgroundImage: 'radial-gradient(circle at center, #e2e8f0 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
+                    <div className={`${!activeWorker ? 'hidden' : 'flex'} min-w-0 min-h-0 flex-col flex-1 bg-[#f8fafc] h-full relative`}>
+                        <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-6 md:p-8 md:pb-8 flex flex-col gap-6" style={{ backgroundImage: 'radial-gradient(circle at center, #e2e8f0 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
                             {hasMore && (
                                 <button onClick={loadOlderMessages} disabled={loadingOlder} className="self-center px-4 py-2 text-xs font-black text-slate-400 hover:text-slate-600 bg-white/80 rounded-full border border-slate-200 tap-effect uppercase tracking-widest disabled:opacity-50">
                                     {loadingOlder ? '...' : adminLang === 'ko' ? '이전 메시지 불러오기' : adminLang === 'zh' ? '加载更多消息' : 'Load older messages'}
@@ -743,8 +744,8 @@ function AdminChatContent() {
                                             key={m.id || i}
                                             initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                             animate={{ opacity: 1, y: 0, scale: 1 }}
-                                            className={`flex flex-col max-w-[85%] md:max-w-[70%] ${isAdmin ? 'self-end items-end' : 'self-start items-start'} landscape:max-w-[95%]`}
-                                        >
+                                        className={`flex min-w-0 flex-col max-w-[85%] md:max-w-[70%] ${isAdmin ? 'self-end items-end' : 'self-start items-start'} landscape:max-w-[95%]`}
+                                    >
                                             <div className={`flex items-center gap-2 mb-1 ${isAdmin ? 'mr-2' : 'ml-2'}`}>
                                                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                                                     {isAdmin ? t.admin : activeWorker?.display_name}
@@ -760,14 +761,14 @@ function AdminChatContent() {
                                                 </button>
                                             </div>
 
-                                            <div className={`p-5 rounded-3xl shadow-md border flex flex-col gap-3 ${isAdmin ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
+                                            <div className={`max-w-full min-w-0 overflow-hidden p-4 md:p-5 rounded-3xl shadow-md border flex flex-col gap-3 ${isAdmin ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
 
                                                 {isAdmin ? (
                                                     // ── 관리자 메시지: 원문(한국어) → 한글발음 → 번역(외국어) → 역번역 ──
                                                     <>
                                                         {/* 1. 한국어 원문 (맨 위, 가장 크게) */}
                                                         <div className="flex flex-col gap-1">
-                                                            <p className="font-black text-xl md:text-2xl landscape:text-4xl whitespace-pre-wrap leading-snug drop-shadow-sm">
+                                                            <p className="font-black text-lg md:text-2xl whitespace-pre-wrap break-words leading-snug drop-shadow-sm">
                                                                 {m.source_text}
                                                             </p>
                                                             {m.is_read === false && (
@@ -782,20 +783,20 @@ function AdminChatContent() {
                                                                 return pron ? (
                                                                     <div className="flex items-start gap-1.5">
                                                                         <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">{t.pron}</span>
-                                                                        <span className="font-bold text-base opacity-90">{pron}</span>
+                                                                        <span className="min-w-0 break-words font-bold text-base opacity-90">{pron}</span>
                                                                     </div>
                                                                 ) : null;
                                                             })()}
                                                             {/* 3. 번역 (외국어) */}
                                                             <div className="flex items-start gap-1.5">
                                                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">{t.trans}</span>
-                                                                <span className="font-bold text-lg landscape:text-2xl">{parsed.text}</span>
+                                                                <span className="min-w-0 break-words font-bold text-base md:text-lg">{parsed.text}</span>
                                                             </div>
                                                             {/* 4. 역번역 */}
                                                             {parsed.rev && (
                                                                 <div className="flex items-start gap-1.5">
                                                                     <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">{t.rev}</span>
-                                                                    <span className="font-bold text-base opacity-80">{parsed.rev}</span>
+                                                                    <span className="min-w-0 break-words font-bold text-base opacity-80">{parsed.rev}</span>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -804,14 +805,14 @@ function AdminChatContent() {
                                                     // ── 근로자 메시지: 한국어 번역문(메인) + 하단에 원문(외국어) ──
                                                     <>
                                                         <div className="flex flex-col gap-1">
-                                                            <p className="font-black text-xl md:text-2xl landscape:text-4xl whitespace-pre-wrap leading-snug drop-shadow-sm">
+                                                            <p className="font-black text-lg md:text-2xl whitespace-pre-wrap break-words leading-snug drop-shadow-sm">
                                                                 {parsed.text || m.source_text}
                                                             </p>
                                                         </div>
                                                         {m.source_text !== parsed.text && m.source_lang !== 'ko' && (
                                                             <div className="pt-3 border-t border-slate-100 flex items-start gap-1.5">
                                                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-500 shrink-0 mt-0.5 font-black">原文</span>
-                                                                <span className="font-bold text-lg landscape:text-2xl text-slate-500">{m.source_text}</span>
+                                                                <span className="min-w-0 break-words font-bold text-base md:text-lg text-slate-500">{m.source_text}</span>
                                                             </div>
                                                         )}
                                                     </>
@@ -828,35 +829,45 @@ function AdminChatContent() {
                         </div>
 
                         {/* Input Area */}
-                        <div className="p-4 md:p-6 bg-white border-t border-slate-200 shrink-0 z-10 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] flex gap-2 items-center">
+                        <div className="p-3 md:p-6 bg-white border-t border-slate-200 shrink-0 z-10 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] flex gap-2 md:gap-3 items-end">
 
                             <button
                                 onClick={toggleRecording}
-                                className={`p-5 rounded-full shadow-md shrink-0 transition-all tap-effect flex items-center justify-center border-2 ${isRecording ? 'bg-red-500 border-red-500 text-white animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-blue-500'}`}
+                                className={`h-12 w-12 md:h-16 md:w-16 rounded-full shadow-md shrink-0 transition-all tap-effect flex items-center justify-center border-2 ${isRecording ? 'bg-red-500 border-red-500 text-white animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-blue-500'}`}
                             >
-                                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} /></svg>
+                                <svg className="w-6 h-6 md:w-7 md:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} /></svg>
                             </button>
 
-                            <div className="relative flex flex-1 items-center bg-slate-50 border-2 border-slate-200 rounded-[36px] overflow-hidden focus-within:border-blue-500 focus-within:bg-white transition-all shadow-inner">
+                            <div className="relative flex min-w-0 flex-1 items-center bg-slate-50 border-2 border-slate-200 rounded-[28px] md:rounded-[36px] overflow-hidden focus-within:border-blue-500 focus-within:bg-white transition-all shadow-inner">
                                 <textarea
+                                    ref={textareaRef}
                                     value={text}
                                     onChange={(e) => setText(e.target.value)}
+                                    onCompositionStart={() => { isComposingRef.current = true; }}
+                                    onCompositionEnd={(e) => {
+                                        isComposingRef.current = false;
+                                        setText(e.currentTarget.value);
+                                    }}
                                     placeholder={isRecording ? t.listening : t.chatPlaceholder}
-                                    className="w-full bg-transparent p-5 pl-8 text-slate-800 text-lg landscape:text-2xl font-black outline-none resize-none max-h-32 min-h-[64px] placeholder-slate-400"
+                                    className="w-full min-w-0 bg-transparent px-4 py-3 md:p-5 md:pl-8 text-slate-800 text-base md:text-lg font-black outline-none resize-none max-h-32 min-h-[52px] md:min-h-[64px] leading-snug placeholder-slate-400"
                                     rows={1}
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            if (e.nativeEvent.isComposing || isComposingRef.current) return;
+                                            e.preventDefault();
+                                            void handleSend();
+                                        }
                                     }}
                                 />
                                 <button
-                                    onClick={handleSend}
+                                    onClick={() => void handleSend()}
                                     disabled={!text.trim() || isSending}
-                                    className="mr-3 bg-blue-600 text-white p-4 rounded-full transition-all disabled:opacity-40 disabled:bg-slate-300 tap-effect shadow-md flex items-center justify-center"
+                                    className="mr-2 md:mr-3 h-11 w-11 md:h-14 md:w-14 shrink-0 bg-blue-600 text-white rounded-full transition-all disabled:opacity-40 disabled:bg-slate-300 tap-effect shadow-md flex items-center justify-center"
                                 >
                                     {isSending ? (
-                                        <div className="w-7 h-7 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        <div className="w-6 h-6 md:w-7 md:h-7 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                     ) : (
-                                        <svg className="w-7 h-7 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
+                                        <svg className="w-6 h-6 md:w-7 md:h-7 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
                                     )}
                                 </button>
                             </div>

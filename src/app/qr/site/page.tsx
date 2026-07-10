@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AlertCircle, CheckCircle, Loader2, UserCheck } from "lucide-react";
-import { createClient } from "@/utils/supabase/client";
+import { logoutV3 } from "@/lib/v3-auth";
 import {
   findQrLanguageByCode,
   getQrEntryText,
@@ -24,7 +24,7 @@ type EntryResult = {
 const ERROR_MESSAGES: Record<QrLanguageCode, Record<string, string>> = {
   ko: {
     site_not_found: "현장을 찾을 수 없습니다. 관리자에게 현장 QR을 다시 요청하세요.",
-    site_access_disabled: "이 현장은 현재 SAFE-LINK 근로자 입장이 중지되어 있습니다.",
+    site_access_disabled: "이 현장은 현재 SQ Link 근로자 입장이 중지되어 있습니다.",
     initials_required: "이름 이니셜을 입력하세요.",
     phone_last4_required: "휴대전화 뒤 4자리를 입력하세요.",
     worker_not_found: "입력한 정보와 일치하는 근로자를 찾을 수 없습니다.",
@@ -91,7 +91,6 @@ function SiteQrEntryInner() {
   // 🆕 팀 QR — URL 에 trade 박혀 있으면 자동 배속
   const trade = searchParams.get("trade") ?? "";
   const initialLang = findQrLanguageByCode(searchParams.get("lang") ?? "ko").lang;
-  const supabase = createClient();
   const [selectedLang, setSelectedLang] = useState<QrLanguageCode>(initialLang);
   const [siteName, setSiteName] = useState("");
   const [siteCode, setSiteCode] = useState("");
@@ -174,7 +173,7 @@ function SiteQrEntryInner() {
         });
       } catch { /* DB 업데이트 실패해도 로그아웃 진행 */ }
     }
-    await supabase.auth.signOut();
+    await logoutV3().catch(() => undefined);
     ["safe-link-session-active", "safe-link-worker-active", "safe-link-initials", "safe-link-phone4"].forEach(
       (k) => sessionStorage.removeItem(k)
     );
@@ -212,7 +211,7 @@ function SiteQrEntryInner() {
 
       if (data.access?.action === "checked_out") {
         // 재스캔으로 퇴근 처리됨 — 세션 종료 및 저장 데이터 클리어
-        await supabase.auth.signOut();
+        await logoutV3().catch(() => undefined);
         ["safe-link-session-active", "safe-link-worker-active", "safe-link-initials", "safe-link-phone4"].forEach(
           (k) => sessionStorage.removeItem(k)
         );
@@ -242,7 +241,7 @@ function SiteQrEntryInner() {
       <main className="flex min-h-screen flex-col items-center justify-center gap-5 bg-gray-950 px-6">
         <CheckCircle className="h-16 w-16 text-emerald-400" />
         <div className="text-center">
-          <h1 className="text-xl font-bold text-white">SAFE-LINK 활성 중 / Active</h1>
+          <h1 className="text-xl font-bold text-white">SQ Link 활성 중 / Active</h1>
           <p className="mt-2 text-sm leading-6 text-gray-400">이미 입장됨 · Already checked in</p>
         </div>
         <button

@@ -2,9 +2,9 @@
 import { useEffect, useState, Suspense } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
 import HQCommandSwarm from "@/components/agents/HQCommandSwarm";
 import SwarmVisualizer from "@/components/agents/SwarmVisualizer";
+import { logoutV3 } from "@/lib/v3-auth";
 
 function ControlDashboardContent() {
     const router = useRouter();
@@ -12,20 +12,17 @@ function ControlDashboardContent() {
 
     useEffect(() => {
         const load = async () => {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                const { data: profile } = await supabase
-                    .from("profiles")
-                    .select("role, preferred_lang, display_name")
-                    .eq("id", session.user.id)
-                    .single();
-
+            const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+            if (res.ok) {
+                const data = (await res.json()) as {
+                    user?: { email: string | null };
+                    profile?: { role?: string; preferred_lang?: string | null; display_name?: string | null } | null;
+                };
                 setCurrentUser({
-                    name: profile?.display_name || "Manager",
-                    email: session.user.email || "",
-                    role: profile?.role || "HQ_ADMIN",
-                    prefLang: profile?.preferred_lang || "ko",
+                    name: data.profile?.display_name || "Manager",
+                    email: data.user?.email || "",
+                    role: data.profile?.role || "HQ_ADMIN",
+                    prefLang: data.profile?.preferred_lang || "ko",
                 });
             }
         };
@@ -33,8 +30,7 @@ function ControlDashboardContent() {
     }, []);
 
     const handleSignOut = async () => {
-        const supabase = createClient();
-        await supabase.auth.signOut();
+        await logoutV3().catch(() => undefined);
         router.push("/");
     };
 
@@ -46,7 +42,7 @@ function ControlDashboardContent() {
                 <header className="flex justify-between items-start animate-float">
                     <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2 mb-1">
-                            <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase text-gradient bg-gradient-to-r from-indigo-400 to-purple-500">Safe-Link</h1>
+                            <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase text-gradient bg-gradient-to-r from-indigo-400 to-purple-500">SQ Link</h1>
                             <div className="flex items-center gap-1 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full">
                                 <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                                 <span className="text-[10px] text-indigo-400 font-black tracking-widest leading-none">HQ CONTROL</span>

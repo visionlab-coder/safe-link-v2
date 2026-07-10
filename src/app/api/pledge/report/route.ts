@@ -1,65 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin, requireSameSite } from "@/utils/nfc/require-admin";
-import { buildLegalReportEnvelope, recordReportExport } from "@/utils/reports/integrity";
+import { NextRequest } from "next/server";
+import { proxyV3Api } from "@/utils/auth/v3-proxy";
 
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  const guard = await requireAdmin();
-  if (!guard.ok) return guard.response;
-
-  const tbmSessionId = req.nextUrl.searchParams.get("tbmSessionId");
-  if (!tbmSessionId) return NextResponse.json({ error: "tbmSessionId_required" }, { status: 400 });
-
-  const { service } = guard.ctx;
-  const [sessionResult, attendanceResult, pledgeResult] = await Promise.all([
-    service.from("nfc_tbm_sessions").select("id, site_id, title, status, started_at").eq("id", tbmSessionId).maybeSingle(),
-    service.from("nfc_tbm_attendance").select("worker_id, is_certified, certified_at").eq("session_id", tbmSessionId),
-    service
-      .from("claim13_pledges")
-      .select("id, worker_id, site_id, pledge_content_hash, nfc_uid, approved_at, hash_chain_event_id, created_at")
-      .eq("tbm_session_id", tbmSessionId)
-      .order("created_at", { ascending: true }),
-  ]);
-
-  if (sessionResult.error || !sessionResult.data) return NextResponse.json({ error: "session_not_found" }, { status: 404 });
-  const denied = requireSameSite(guard.ctx.user, sessionResult.data.site_id);
-  if (denied) return denied;
-  if (attendanceResult.error) return NextResponse.json({ error: "attendance_query_failed" }, { status: 500 });
-  if (pledgeResult.error) return NextResponse.json({ error: "pledge_query_failed" }, { status: 500 });
-
-  const pledges = pledgeResult.data ?? [];
-  const signedCount = pledges.filter((pledge) => Boolean(pledge.approved_at)).length;
-  const expectedWorkerIds = new Set((attendanceResult.data ?? []).map((row) => String(row.worker_id)));
-  const unsignedCount = Math.max(expectedWorkerIds.size - signedCount, 0);
-
-  const payload = {
-    session: sessionResult.data,
-    signedCount,
-    unsignedCount,
-    pledges,
-    legalTbmChecklist: {
-      requiredFields: [
-        "작업내용",
-        "주요 위험요인",
-        "위험성 감소대책",
-        "근로자 준수사항",
-        "관리감독자 확인",
-      ],
-      note:
-        "TBM 서명 보고서는 참석·서명 증빙이며, 위험성평가/TBM 법적 방어력을 위해 세션 metadata 또는 TBM 본문에 위 항목을 포함해야 합니다.",
-    },
-  };
-
-  const report = buildLegalReportEnvelope({
-    reportType: "tbm_signature_report",
-    generatedBy: guard.ctx.user.id,
-    scope: { siteId: String(sessionResult.data.site_id), tbmSessionId },
-    sourceTables: ["nfc_tbm_sessions", "nfc_tbm_attendance", "claim13_pledges"],
-    payload,
-  });
-
-  await recordReportExport({ service, envelope: report });
-
-  return NextResponse.json({ ...payload, report });
+  return proxyV3Api(req, `/api/v1/pledges/report${req.nextUrl.search}`);
 }

@@ -4,7 +4,6 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
 import { normalizeKoAsync, clearGlossaryCache } from "@/utils/normalize";
 import { motion, AnimatePresence } from "framer-motion";
 import ExportMenu from "@/components/ExportMenu";
@@ -94,17 +93,13 @@ export default function GlossaryPage() {
 
     const fetchTerms = async () => {
         setLoading(true);
-        const supabase = createClient();
-        const { data, error } = await supabase
-            .from("construction_glossary")
-            .select("id, slang, standard, category, is_active")
-            .order("category", { ascending: true })
-            .order("slang", { ascending: true });
+        const response = await fetch("/api/glossary", { cache: "no-store" });
+        const data = response.ok ? await response.json() as { terms?: GlossaryTerm[] } : null;
 
-        if (data && !error) {
-            setTerms(data);
+        if (response.ok && data?.terms) {
+            setTerms(data.terms);
         } else {
-            console.error("Failed to fetch terms", error);
+            console.error("Failed to fetch terms");
         }
         setLoading(false);
     };
@@ -118,37 +113,37 @@ export default function GlossaryPage() {
         if (!newSlang.trim() || !newStandard.trim()) return;
 
         setIsSubmitting(true);
-        const supabase = createClient();
-
-        // Upsert logic based on slang being unique
-        const { error } = await supabase
-            .from("construction_glossary")
-            .upsert({
+        const response = await fetch("/api/glossary", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
                 slang: newSlang.trim(),
                 standard: newStandard.trim(),
                 category: newCategory,
                 is_active: true
-            }, { onConflict: 'slang' });
+            }),
+        });
 
-        if (!error) {
+        if (response.ok) {
             setNewSlang("");
             setNewStandard("");
             clearGlossaryCache(); // Refresh normalization cache
             await fetchTerms();
         } else {
-            alert("Error adding term: " + error.message);
+            const result = await response.json().catch(() => ({})) as { error?: string };
+            alert("Error adding term: " + (result.error ?? response.statusText));
         }
         setIsSubmitting(false);
     };
 
     const handleToggleActive = async (id: number, currentActive: boolean) => {
-        const supabase = createClient();
-        const { error } = await supabase
-            .from("construction_glossary")
-            .update({ is_active: !currentActive })
-            .eq("id", id);
+        const response = await fetch(`/api/glossary/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ is_active: !currentActive }),
+        });
 
-        if (!error) {
+        if (response.ok) {
             clearGlossaryCache();
             setTerms(terms.map(t => t.id === id ? { ...t, is_active: !currentActive } : t));
         }
@@ -156,13 +151,9 @@ export default function GlossaryPage() {
 
     const handleDelete = async (id: number) => {
         if (!confirm("정말 이 단어를 완전히 삭제하시겠습니까? 관련 번역 데이터도 삭제될 수 있습니다.")) return;
-        const supabase = createClient();
-        const { error } = await supabase
-            .from("construction_glossary")
-            .delete()
-            .eq("id", id);
+        const response = await fetch(`/api/glossary/${id}`, { method: "DELETE" });
 
-        if (!error) {
+        if (response.ok) {
             clearGlossaryCache();
             setTerms(terms.filter(t => t.id !== id));
         }
@@ -188,10 +179,6 @@ export default function GlossaryPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const parseExcelFile = useCallback(async (file: File) => {
-        // TODO: CVE-2023-30533 — migrate to ExcelJS for reading user-uploaded files
-        // xlsx 0.18.x is vulnerable to prototype pollution when parsing untrusted Excel files.
-        // This call reads a user-supplied buffer, which is the affected path.
-        // Migration: replace xlsx.read() with ExcelJS Workbook.xlsx.load() from the 'exceljs' package.
         const xlsx = await import("xlsx");
         const buffer = await file.arrayBuffer();
         const wb = xlsx.read(buffer, { type: "array" });
@@ -231,14 +218,15 @@ export default function GlossaryPage() {
         if (parsed.length === 0) { setPreview([]); return; }
 
         // DB에서 기존 은어 목록 조회 → 중복 표시
-        const supabase = createClient();
         const slugs = parsed.filter(r => r.slang).map(r => r.slang);
-        const { data: existing } = await supabase
-            .from("construction_glossary")
-            .select("slang")
-            .in("slang", slugs);
+        const params = new URLSearchParams();
+        slugs.forEach((slug) => params.append("slang", slug));
+        const response = slugs.length > 0
+            ? await fetch(`/api/glossary?${params.toString()}`, { cache: "no-store" })
+            : null;
+        const payload = response?.ok ? await response.json() as { terms?: Array<{ slang: string }> } : null;
 
-        const existingSet = new Set((existing ?? []).map((e: { slang: string }) => e.slang));
+        const existingSet = new Set((payload?.terms ?? []).map((e) => e.slang));
 
         // 엑셀 내부 중복도 체크 (같은 은어가 여러 행에 있을 때 첫 번째만 유효)
         const seenInFile = new Set<string>();
@@ -262,19 +250,20 @@ export default function GlossaryPage() {
             return;
         }
 
-        const supabase = createClient();
         const slangs = Array.from(new Set(parsed.filter(row => row.slang).map(row => row.slang)));
-        const { data: existing, error } = await supabase
-            .from("construction_glossary")
-            .select("slang")
-            .in("slang", slangs);
+        const params = new URLSearchParams();
+        slangs.forEach((slug) => params.append("slang", slug));
+        const response = slangs.length > 0
+            ? await fetch(`/api/glossary?${params.toString()}`, { cache: "no-store" })
+            : null;
 
-        if (error) {
-            setImportError("기존 용어 확인 실패: " + error.message);
+        if (response && !response.ok) {
+            setImportError("기존 용어 확인 실패: " + response.statusText);
             return;
         }
+        const payload = response?.ok ? await response.json() as { terms?: Array<{ slang: string }> } : null;
 
-        const existingSet = new Set((existing ?? []).map((row: { slang: string }) => row.slang));
+        const existingSet = new Set((payload?.terms ?? []).map((row) => row.slang));
         const seenInInput = new Set<string>();
         const withDup = parsed.map(row => {
             const duplicate = Boolean(row.slang && (existingSet.has(row.slang) || seenInInput.has(row.slang)));
@@ -404,7 +393,7 @@ export default function GlossaryPage() {
                 },
                 body: JSON.stringify({
                     properties: {
-                        title: `SafeLink_Glossary_${new Date().toISOString().split('T')[0]}`,
+                        title: `SQLink_Glossary_${new Date().toISOString().split('T')[0]}`,
                     },
                     sheets: [
                         {
@@ -437,7 +426,7 @@ export default function GlossaryPage() {
     const uploadToGoogleDrive = async (token: string, csvContent: string) => {
         try {
             const metadata = {
-                name: `SafeLink_Glossary_${new Date().toISOString().split('T')[0]}.csv`,
+                name: `SQLink_Glossary_${new Date().toISOString().split('T')[0]}.csv`,
                 mimeType: 'text/csv',
             };
 
@@ -470,7 +459,7 @@ export default function GlossaryPage() {
         await exportData(format, {
             title: "현장 용어집 리포트",
             subtitle: `총 ${terms.length}개 / ${new Date().toLocaleString("ko-KR")}`,
-            filename: `safelink_glossary_${new Date().toISOString().slice(0, 10)}`,
+            filename: `sqlink_glossary_${new Date().toISOString().slice(0, 10)}`,
             summary: [
                 { label: "전체 용어", value: terms.length },
                 { label: "활성", value: terms.filter(term => term.is_active).length },
@@ -490,9 +479,7 @@ export default function GlossaryPage() {
     const handleExport = async (mode: 'print' | 'sheets' | 'drive' = 'print') => {
         if (terms.length === 0) return;
 
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        const providerToken = (session as any)?.provider_token;
+        const providerToken = "";
 
         if (mode === 'print') {
             const printContent = `
@@ -508,7 +495,7 @@ export default function GlossaryPage() {
                     </style>
                 </head>
                 <body>
-                    <h1>Safe-Link 현장 용어 사전 (Glossary)</h1>
+                    <h1>SQ Link 현장 용어 사전 (Glossary)</h1>
                     <p><strong>생성일:</strong> ${new Date().toLocaleString()}</p>
                     <table>
                         <thead>

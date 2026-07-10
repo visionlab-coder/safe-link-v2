@@ -1,5 +1,5 @@
 {
-  "name": "safe-link-v2",
+  "name": "sq-link",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,13 +9,10 @@
     "preview": "opennextjs-cloudflare build && wrangler dev",
     "start": "next start",
     "lint": "eslint",
-    "flitto:rtt:smoke": "node scripts/flitto-rtt-smoke.mjs",
     "m2m100:start": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-m2m100-onnx-local.ps1"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
-    "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.97.0",
     "@types/react-signature-canvas": "^1.0.7",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
@@ -28,14 +25,12 @@
     "mammoth": "^1.12.0",
     "next": "^15.5.13",
     "onnxruntime-web": "^1.27.0",
-    "pusher": "^5.3.3",
-    "pusher-js": "^8.5.0",
     "qrcode.react": "^4.2.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-signature-canvas": "^1.1.0-alpha.2",
     "tiny-pinyin": "^1.3.2",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@opennextjs/cloudflare": "^1",
@@ -50,5 +45,8 @@
     "tailwindcss": "^4",
     "typescript": "5.8.2",
     "wrangler": "^4.105.0"
+  },
+  "overrides": {
+    "postcss": "8.5.16"
   }
 }

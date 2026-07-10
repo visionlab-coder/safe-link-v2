@@ -1,12 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createClient } from '@/utils/supabase/client';
 import { QRCodeSVG } from 'qrcode.react';
 import { playPremiumAudio, VoiceGender } from '@/utils/tts';
 import { useCloudSTT } from '@/hooks/useCloudSTT';
-
-const supabase = createClient();
 
 const LANGS: Record<string, { label: string; flag: string; stt: string }> = {
   ko: { label: '한국어', flag: '🇰🇷', stt: 'ko-KR' },
@@ -27,6 +24,10 @@ interface Message {
   targetLang: string;    // receiver's lang
   time: string;
 }
+
+type LocalChannel = {
+  send: (args: { type: string; event: string; payload: unknown }) => Promise<void>;
+};
 
 type ChatMode = 'conversation' | 'simultaneous';
 type Phase = 'home' | 'waiting' | 'join' | 'chat' | 'solo-setup';
@@ -205,7 +206,9 @@ export default function TravelTalk() {
   const [soloMode, setSoloMode]   = useState(false);
   const [soloTurn, setSoloTurn]   = useState<'mine' | 'partner'>('mine');
 
-  const channelRef          = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const channelRef          = useRef<LocalChannel | null>(null);
+  const eventSourceRef      = useRef<EventSource | null>(null);
+  const clientIdRef         = useRef(`travel_${Math.random().toString(36).slice(2)}_${Date.now()}`);
   const bottomRef           = useRef<HTMLDivElement>(null);
   const travelTokenRef      = useRef<string>('');
   const travelTokenReadyRef = useRef<Promise<void>>(Promise.resolve());
@@ -233,8 +236,8 @@ export default function TravelTalk() {
   useEffect(() => { soloTurnRef.current = soloTurn; }, [soloTurn]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
   useEffect(() => () => {
-    if (channelRef.current) supabase.removeChannel(channelRef.current);
     if (unmuteTimerRef.current) clearTimeout(unmuteTimerRef.current);
+    eventSourceRef.current?.close();
   }, []);
 
   useEffect(() => {
@@ -287,55 +290,81 @@ export default function TravelTalk() {
     });
   }, [safeMute, scheduleUnmute]);
 
-  /* ── Supabase Realtime 채널 구독 ── */
+  /* ── Spring SSE 채널: 2폰 입장·메시지·발화 상태 동기화 ── */
   const subscribeChannel = useCallback((code: string, myRole: 'host' | 'guest', lang: string) => {
-    if (channelRef.current) supabase.removeChannel(channelRef.current);
+    eventSourceRef.current?.close();
+    void (async () => {
+      await travelTokenReadyRef.current;
+      const token = travelTokenRef.current;
+      if (!token) return;
 
-    const ch = supabase.channel(`travel-${code}`, {
-      config: {
-        presence:  { key: myRole },
-        broadcast: { self: false },
-      },
-    });
-
-    const handlePresenceChange = () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const state: Record<string, any[]> = ch.presenceState();
-      const partnerRole = myRole === 'host' ? 'guest' : 'host';
-      if (Object.keys(state).includes(partnerRole)) {
-        const pd = state[partnerRole]?.[0];
-        if (pd?.lang) setPartnerLang(pd.lang);
-        setPartner(true);
-        setPhase('chat');
-      } else {
-        setPartner(false);
-      }
-    };
-
-    ch.on('presence', { event: 'sync'  }, handlePresenceChange)
-      .on('presence', { event: 'join'  }, handlePresenceChange)
-      .on('presence', { event: 'leave' }, handlePresenceChange)
-      .on('broadcast', { event: 'new-message' }, ({ payload }: { payload: Message }) => {
-        setPartnerSpeaking(false);
-        setMessages(prev => [...prev, { ...payload, mine: false }]);
-        speakTTS(payload.translated, myLangRef.current);
-      })
-      .on('broadcast', { event: 'speaking-start' }, () => {
-        setPartnerSpeaking(true);
-        if (modeRef.current === 'conversation') {
-          safeMute();
-          scheduleUnmute(8000);
+      const events = new EventSource(`/api/travel/events?room=${encodeURIComponent(code)}`);
+      eventSourceRef.current = events;
+      const readEvent = (event: Event) => {
+        try {
+          return JSON.parse((event as MessageEvent<string>).data) as {
+            senderId?: string;
+            payload?: Record<string, unknown>;
+          };
+        } catch {
+          return null;
         }
-      })
-      .on('broadcast', { event: 'speaking-end' }, () => {
+      };
+      events.addEventListener('partner-joined', event => {
+        const data = readEvent(event);
+        if (!data || data.senderId === clientIdRef.current) return;
+        const partnerLanguage = String(data.payload?.lang || '');
+        if (partnerLanguage) setPartnerLang(partnerLanguage);
+        setPartner(true);
+        if (myRole === 'host') setPhase('chat');
+      });
+      events.addEventListener('new-message', event => {
+        const data = readEvent(event);
+        if (!data || data.senderId === clientIdRef.current) return;
+        const incoming = data.payload as unknown as Message;
+        if (!incoming?.original) return;
+        const received = { ...incoming, mine: false };
+        setPartner(true);
+        setPartnerLang(received.lang);
+        setMessages(prev => {
+          const next = [...prev, received];
+          return next.length > 200 ? next.slice(-200) : next;
+        });
+        if (received.translated) speakTTS(received.translated, received.targetLang);
+      });
+      events.addEventListener('speaking-start', event => {
+        const data = readEvent(event);
+        if (!data || data.senderId === clientIdRef.current) return;
+        partnerSpeakingRef.current = true;
+        setPartnerSpeaking(true);
+      });
+      events.addEventListener('speaking-end', event => {
+        const data = readEvent(event);
+        if (!data || data.senderId === clientIdRef.current) return;
+        partnerSpeakingRef.current = false;
         setPartnerSpeaking(false);
-      })
-      .subscribe(async (status: string) => {
-        if (status === 'SUBSCRIBED') await ch.track({ role: myRole, lang });
       });
 
-    channelRef.current = ch;
-  }, [speakTTS, safeMute, scheduleUnmute]);
+      channelRef.current = {
+        send: async ({ event, payload }) => {
+          await fetch('/api/travel/signal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-travel-token': token },
+            body: JSON.stringify({ room: code, event, senderId: clientIdRef.current, payload }),
+          });
+        },
+      };
+
+      if (myRole === 'guest') {
+        const joined = await fetch('/api/travel/join', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ room: code, lang, senderId: clientIdRef.current }),
+        });
+        if (joined.ok) setPartner(true);
+      }
+    })();
+  }, [speakTTS]);
 
   /* ── 메시지 전송 ── */
   const sendMessage = useCallback(async (text: string) => {
@@ -523,7 +552,7 @@ export default function TravelTalk() {
           }}
         />
         <div style={{ textAlign: 'center', marginBottom: 52 }}>
-          <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 16 }}>SAFE-LINK</p>
+          <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 16 }}>SQ Link</p>
           <h1 style={{ fontSize: 40, fontWeight: 200, letterSpacing: -2, margin: 0, lineHeight: 1.1 }}>Travel Talk</h1>
           <p style={{ fontSize: 12, color: '#4a4a5a', marginTop: 10, letterSpacing: 2 }}>言葉の壁を越えて · 언어의 벽을 넘어서</p>
         </div>
@@ -581,7 +610,7 @@ export default function TravelTalk() {
   if (phase === 'solo-setup') return (
     <div style={{ ...PAGE, alignItems: 'center' }}>
       <div style={{ width: '100%', maxWidth: 420, padding: '0 28px', textAlign: 'center' }}>
-        <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 40 }}>SAFE-LINK · TRAVEL TALK</p>
+        <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 40 }}>SQ Link · TRAVEL TALK</p>
 
         <div style={{ marginBottom: 40, lineHeight: 2.6 }}>
           <p style={{ fontSize: 16, color: '#ede8e3', fontWeight: 300 }}>상대방 언어를 선택하세요</p>
@@ -617,7 +646,7 @@ export default function TravelTalk() {
   if (phase === 'join') return (
     <div style={{ ...PAGE, alignItems: 'center' }}>
       <div style={{ width: '100%', maxWidth: 420, padding: '0 28px', textAlign: 'center' }}>
-        <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 40 }}>SAFE-LINK · TRAVEL TALK</p>
+        <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 40 }}>SQ Link · TRAVEL TALK</p>
         <div style={{ marginBottom: 40, lineHeight: 2.6 }}>
           <p style={{ fontSize: 16, color: '#ede8e3', fontWeight: 300 }}>언어를 선택해주세요</p>
           <p style={{ fontSize: 14, color: '#888' }}>言語を選択してください</p>
@@ -649,7 +678,7 @@ export default function TravelTalk() {
     return (
       <div style={{ ...PAGE, alignItems: 'center' }}>
         <div style={{ textAlign: 'center', padding: 36, maxWidth: 380 }}>
-          <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 16 }}>SAFE-LINK · TRAVEL TALK</p>
+          <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 16 }}>SQ Link · TRAVEL TALK</p>
 
           <div style={{ marginBottom: 20, padding: '14px 18px', background: 'rgba(192,57,43,0.07)', border: '1px solid rgba(192,57,43,0.2)', borderRadius: 16 }}>
             <p style={{ fontSize: 14, color: '#e74c3c', fontWeight: 700, marginBottom: 10 }}>📷 이 화면을 상대방에게 보여주세요</p>

@@ -3,7 +3,6 @@ import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
-import { createClient } from "@/utils/supabase/client";
 import SignatureCanvas from "react-signature-canvas";
 import { PenLine, CheckCircle, RotateCcw, ArrowLeft, Loader } from "lucide-react";
 
@@ -31,31 +30,35 @@ export default function WorkerPledgePage() {
   const [empty, setEmpty] = useState(true);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) { router.push("/auth/login"); return; }
+    let cancelled = false;
+    (async () => {
+      const meRes = await fetch("/api/auth/me", { cache: "no-store" });
+      if (!meRes.ok) {
+        router.push("/auth/login");
+        return;
+      }
+      const me = await meRes.json() as {
+        profile?: { preferred_lang?: string | null; site_id?: string | null };
+      };
+      if (cancelled) return;
+      setLang(me.profile?.preferred_lang ?? "ko");
+      setSiteId(me.profile?.site_id ?? "");
 
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("preferred_lang, site_id")
-        .eq("id", session.user.id)
-        .maybeSingle();
-
-      const workerLang = (prof as { preferred_lang?: string; site_id?: string } | null)?.preferred_lang ?? "ko";
-      const wSiteId = (prof as { preferred_lang?: string; site_id?: string } | null)?.site_id ?? "";
-      setLang(workerLang);
-      setSiteId(wSiteId);
-
-      const { data: notice } = await supabase
-        .from("tbm_notices")
-        .select("content_ko")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      setTbmContent((notice as { content_ko?: string } | null)?.content_ko ?? "");
-      setLoading(false);
+      const tbmRes = await fetch("/api/tbm/today?limit=1", { cache: "no-store" });
+      const tbmPayload = tbmRes.ok
+        ? await tbmRes.json() as { tbms?: Array<{ content_ko?: string | null; source_text?: string | null; normalized_text?: string | null }> }
+        : null;
+      if (!cancelled) {
+        const notice = tbmPayload?.tbms?.[0];
+        setTbmContent(notice?.content_ko ?? notice?.normalized_text ?? notice?.source_text ?? "");
+        setLoading(false);
+      }
+    })().catch(() => {
+      if (!cancelled) setLoading(false);
     });
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   const t = getT(lang);

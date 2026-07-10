@@ -41,12 +41,6 @@ export const WHISPER_TIMEOUT_MS = 8_000;
 export const GOOGLE_STT_TIMEOUT_MS = 5_000;
 
 /**
- * Gemini STT 교정 타임아웃 (ms) — 한국어 건설현장 용어 보정
- * live/non-live 모두 적용. gemini-2.5-flash 기준 실제 응답 500ms~1.5s.
- */
-export const GEMINI_STT_CORRECTION_TIMEOUT_MS = 3_000;
-
-/**
  * 일반 STT 신뢰도 하한 (non-live 모드)
  * 이 값 이하의 결과는 소음/불명확 발화로 폐기.
  * ⚠️ 0.5 미만: 소음 오인식 과다 수락 / 0.75 초과: 유효 발화 과다 폐기
@@ -59,14 +53,6 @@ export const STT_MIN_CONFIDENCE = 0.6;
  * ⚠️ 0.6 미만: 다른 국적 발화 오수락 위험 / 0.75 초과: 유효 발화 절반 이상 폐기
  */
 export const STT_MIN_CONFIDENCE_LIVE = 0.65;
-
-/**
- * Gemini STT 교정 생략 신뢰도 — Google STT 평균 신뢰도가 이 이상이면 Gemini 교정 건너뜀
- * 명확한 발화(≥0.92)는 오인식 가능성이 낮아 Gemini 교정 불필요 → 1~3s 절약
- * ⚠️ 0.95 초과: 소음 환경에서 교정 너무 자주 생략 / 0.90 미만: 교정 효과 감소 미미
- */
-export const STT_HIGH_CONFIDENCE_SKIP_GEMINI = 0.92;
-
 
 // ═══════════════════════════════════════════════════════════════
 // 번역 (Translation)
@@ -83,18 +69,6 @@ export const PAPAGO_TIMEOUT_MS = 5_000;
  */
 export const GOOGLE_TRANSLATE_TIMEOUT_MS = 5_000;
 
-/**
- * Gemini 건설현장 번역 타임아웃 (ms) — 비Papago 언어(uz/km/my/ne/bn/kk/ar/hi/mn/tl) 전용
- * Gemini는 Papago보다 느리므로 여유 있게 설정.
- */
-export const GEMINI_TRANSLATE_TIMEOUT_MS = 8_000;
-
-/**
- * Gemini 발음 생성 타임아웃 (ms) — 중국어·일본어·태국어·비라틴 언어
- */
-export const GEMINI_PRONUNCIATION_TIMEOUT_MS = 7_000;
-
-
 // ═══════════════════════════════════════════════════════════════
 // CHANGE LOG — 이 아래에 변경 사유를 기록하세요
 // ═══════════════════════════════════════════════════════════════
@@ -104,6 +78,5 @@ export const GEMINI_PRONUNCIATION_TIMEOUT_MS = 7_000;
 // 2026-05-13  STT_MIN_CONFIDENCE_LIVE 완화: 0.75 → 0.65 (유효 발화 폐기 과다 문제)
 // 2026-05-16  GOOGLE_STT_TIMEOUT_MS: 3000 → 5000 (latest_long 모델 응답시간 1~3s 대응)
 // 2026-05-16  live 모드 STT: default→latest_long enhanced (건설현장 발화 인식률 개선)
-// 2026-05-16  live 모드 STT: Gemini 교정 활성화 (non-live와 동일 품질 보정 적용)
-// 2026-05-16  STT_HIGH_CONFIDENCE_SKIP_GEMINI 신설: 0.92 (명확 발화 Gemini 생략 → 1~3s 절약)
+// 2026-07-10  미구성 LLM 교정/번역 경로 제거, Google STT 용어집 정규화와 Spring AI Gateway로 통일
 // 2026-05-16  TTS playProxyAudio: 순차 다운로드 → 전체 동시 prefetch (다음 청크 버퍼링 선행)

@@ -1,5 +1,5 @@
 /**
- * SAFE-LINK Premium TTS Utility - "Voice Actor" Quality
+ * SQ Link Premium TTS Utility - "Voice Actor" Quality
  * Priority: 1. Browser "Natural/Online" Neural Voices (Real Voice Actor quality)
  *           2. Internal API Proxy fallback (/api/tts) - Bypasses CORS browser blocks
  */

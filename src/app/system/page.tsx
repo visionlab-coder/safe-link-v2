@@ -1,12 +1,12 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import SystemHealthCheck from "@/components/SystemHealthCheck";
-import { createClient } from "@/utils/supabase/client";
 import { canAccessSystem, type ProfileRole } from "@/lib/roles";
+import { logoutV3 } from "@/lib/v3-auth";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Shield,
@@ -36,6 +36,7 @@ import {
     Globe,
     Clock,
     CheckCircle2,
+    Menu,
 } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────
@@ -95,6 +96,31 @@ type GlobalConfig = {
     maintenanceMode: boolean;
 };
 
+type PendingAdminRole = "HQ_ADMIN" | "SITE_ADMIN" | "SAFETY_MANAGER" | "VIEWER";
+
+type PendingAdminAccount = {
+    id: number;
+    email: string | null;
+    displayName: string | null;
+    preferredLanguage: string | null;
+    accountStatus: string;
+};
+
+type PendingAdminDraft = {
+    role: PendingAdminRole;
+    siteId: string;
+};
+
+type SiteOption = {
+    id: string;
+    name: string;
+    site_code?: string | null;
+};
+
+const ADMIN_APPROVAL_ROLES: PendingAdminRole[] = ["SITE_ADMIN", "SAFETY_MANAGER", "VIEWER", "HQ_ADMIN"];
+const SITE_SCOPED_ADMIN_ROLES = new Set<PendingAdminRole>(["SITE_ADMIN", "SAFETY_MANAGER", "VIEWER"]);
+const DEFAULT_PENDING_ADMIN_DRAFT: PendingAdminDraft = { role: "SITE_ADMIN", siteId: "" };
+
 const systemUI: Record<string, any> = {
     ko: {
         title: "통합 시스템",
@@ -108,6 +134,29 @@ const systemUI: Record<string, any> = {
             workers: "총 근로자",
             tbms: "오늘 TBM",
             alerts: "작업중지 알람",
+        },
+        pendingAdmins: {
+            title: "승인 대기 관리자",
+            waiting: "승인 대기",
+            refresh: "새로고침",
+            empty: "승인 대기 계정이 없습니다",
+            role: "역할",
+            site: "현장",
+            noSite: "현장 선택",
+            globalScope: "전역 권한",
+            approve: "승인",
+            approving: "승인 중",
+            loadFailed: "승인 대기 계정을 불러오지 못했습니다",
+            approveFailed: "승인 실패",
+            siteRequired: "현장 권한 역할은 현장을 먼저 선택해야 합니다",
+            pendingLoginBlocked: "승인 전 로그인 불가",
+            emailMissing: "email 없음",
+            roles: {
+                HQ_ADMIN: "본사 관리자",
+                SITE_ADMIN: "현장 관리자",
+                SAFETY_MANAGER: "안전 관리자",
+                VIEWER: "조회 전용",
+            },
         },
         sidebar: {
             dashboard: "전국 현황",
@@ -165,6 +214,29 @@ const systemUI: Record<string, any> = {
             workers: "Total Workers",
             tbms: "Today's TBMs",
             alerts: "Stop-Work Alerts",
+        },
+        pendingAdmins: {
+            title: "Pending Admins",
+            waiting: "Pending",
+            refresh: "Refresh",
+            empty: "No pending admin accounts",
+            role: "Role",
+            site: "Site",
+            noSite: "Select site",
+            globalScope: "Global Scope",
+            approve: "Approve",
+            approving: "Approving",
+            loadFailed: "Failed to load pending accounts",
+            approveFailed: "Approval failed",
+            siteRequired: "Select a site before approving a site-scoped role",
+            pendingLoginBlocked: "Login blocked until approval",
+            emailMissing: "No email",
+            roles: {
+                HQ_ADMIN: "HQ Admin",
+                SITE_ADMIN: "Site Admin",
+                SAFETY_MANAGER: "Safety Manager",
+                VIEWER: "Viewer",
+            },
         },
         sidebar: {
             dashboard: "Overview",
@@ -251,23 +323,112 @@ export default function SystemAdminPage() {
     const [configSaved, setConfigSaved] = useState(false);
     const [aiCapsActive, setAiCapsActive] = useState([true, true, true, false]);
     const [aiActionStatus, setAiActionStatus] = useState<string | null>(null);
+    const [pendingAdmins, setPendingAdmins] = useState<PendingAdminAccount[]>([]);
+    const [pendingAdminsLoading, setPendingAdminsLoading] = useState(false);
+    const [pendingAdminsError, setPendingAdminsError] = useState<string | null>(null);
+    const [approvalDrafts, setApprovalDrafts] = useState<Record<number, PendingAdminDraft>>({});
+    const [siteOptions, setSiteOptions] = useState<SiteOption[]>([]);
+    const [approvingAdminId, setApprovingAdminId] = useState<number | null>(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const t = systemUI[lang];
+
+    const loadSiteOptions = useCallback(async () => {
+        try {
+            const res = await fetch("/api/sites/options", { cache: "no-store", credentials: "include" });
+            if (!res.ok) {
+                setSiteOptions([]);
+                return;
+            }
+            const data = (await res.json()) as { sites?: SiteOption[] };
+            setSiteOptions(Array.isArray(data.sites) ? data.sites : []);
+        } catch {
+            setSiteOptions([]);
+        }
+    }, []);
+
+    const loadPendingAdmins = useCallback(async () => {
+        setPendingAdminsLoading(true);
+        setPendingAdminsError(null);
+        try {
+            const res = await fetch("/api/admin/accounts/pending", { cache: "no-store", credentials: "include" });
+            if (!res.ok) {
+                throw new Error(`pending_admins_${res.status}`);
+            }
+            const data = (await res.json()) as { accounts?: PendingAdminAccount[] };
+            const accounts = Array.isArray(data.accounts) ? data.accounts : [];
+            setPendingAdmins(accounts);
+            setApprovalDrafts((current) => {
+                const next: Record<number, PendingAdminDraft> = {};
+                accounts.forEach((account) => {
+                    next[account.id] = current[account.id] ?? { ...DEFAULT_PENDING_ADMIN_DRAFT };
+                });
+                return next;
+            });
+        } catch {
+            setPendingAdmins([]);
+            setPendingAdminsError(systemUI[lang].pendingAdmins.loadFailed);
+        } finally {
+            setPendingAdminsLoading(false);
+        }
+    }, [lang]);
+
+    const updateApprovalDraft = (accountId: number, patch: Partial<PendingAdminDraft>) => {
+        setApprovalDrafts((current) => ({
+            ...current,
+            [accountId]: {
+                ...(current[accountId] ?? DEFAULT_PENDING_ADMIN_DRAFT),
+                ...patch,
+            },
+        }));
+    };
+
+    const approvePendingAdmin = async (account: PendingAdminAccount) => {
+        const draft = approvalDrafts[account.id] ?? DEFAULT_PENDING_ADMIN_DRAFT;
+        const siteRequired = SITE_SCOPED_ADMIN_ROLES.has(draft.role);
+        if (siteRequired && !draft.siteId) {
+            alert(t.pendingAdmins.siteRequired);
+            return;
+        }
+
+        setApprovingAdminId(account.id);
+        try {
+            const res = await fetch(`/api/admin/accounts/${account.id}/approve`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({
+                    target_role: draft.role,
+                    target_site_id: siteRequired ? Number(draft.siteId) : null,
+                }),
+            });
+            if (!res.ok) {
+                const body = (await res.json().catch(() => ({}))) as { error?: string };
+                throw new Error(body.error ?? `admin_approval_failed_${res.status}`);
+            }
+            await loadPendingAdmins();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "admin_approval_failed";
+            alert(`${t.pendingAdmins.approveFailed}: ${message}`);
+        } finally {
+            setApprovingAdminId(null);
+        }
+    };
 
     // defense-in-depth: 클라이언트 사이드 권한 2차 검증
     useEffect(() => {
         const verifyAccess = async () => {
-            const supabase = createClient();
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
-            if (authError || !user) {
+            const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+            if (!res.ok) {
                 window.location.replace("/auth");
                 return;
             }
-            const { data: profile } = await supabase
-                .from("profiles")
-                .select("role")
-                .eq("id", user.id)
-                .single();
-            if (!profile || !canAccessSystem(profile.role as ProfileRole)) {
+            const data = (await res.json()) as {
+                profile?: { role?: string } | null;
+                v3?: { roles?: string[] };
+            };
+            const roles = data.v3?.roles ?? (data.profile?.role ? [data.profile.role] : []);
+            if (!roles.some((role) => canAccessSystem(role as ProfileRole))) {
                 window.location.replace("/");
                 return;
             }
@@ -275,6 +436,12 @@ export default function SystemAdminPage() {
         };
         verifyAccess();
     }, []);
+
+    useEffect(() => {
+        if (!isVerified) return;
+        void loadSiteOptions();
+        void loadPendingAdmins();
+    }, [isVerified, loadPendingAdmins, loadSiteOptions]);
 
     // 시뮬레이션 모드일 때 사용할 데이터
     const displaySites = isSimulation ? SIM_SITES : sites;
@@ -284,11 +451,20 @@ export default function SystemAdminPage() {
 
     useEffect(() => {
         const init = async () => {
-            const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-                setCurrentUser(profile);
+            const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+            if (res.ok) {
+                const data = (await res.json()) as {
+                    user?: { id: string; email: string | null };
+                    profile?: { role?: string; display_name?: string | null } | null;
+                };
+                if (data.user && data.profile) {
+                    setCurrentUser({
+                        id: data.user.id,
+                        email: data.user.email,
+                        display_name: data.profile.display_name,
+                        role: data.profile.role,
+                    });
+                }
             }
             await fetchSites();
         };
@@ -297,105 +473,31 @@ export default function SystemAdminPage() {
 
     const fetchSites = async () => {
         setLoading(true);
-        const supabase = createClient();
-
-        // 🔧 KST 기준 오늘. created_at 필터가 +09:00 윈도우라 UTC 날짜를 쓰면
-        // 한국시간 00:00~09:00 사이에 당일 TBM/알림 집계가 누락됨(tbm/status와 동일 버그).
-        const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
-        const dayStart = `${today}T00:00:00+09:00`;
-        const dayEnd = `${today}T23:59:59+09:00`;
-
-        const [
-            { data: sitesData },
-            { data: allProfilesData },
-            { data: tbmData },
-            { data: alertsData },
-            { data: lastAlertData },
-        ] = await Promise.all([
-            supabase.from("sites").select("*"),
-            supabase.from("profiles").select("site_id, role"),
-            supabase.from("tbm_notices").select("site_id").gte("created_at", dayStart).lte("created_at", dayEnd),
-            supabase.from("stop_work_alerts").select("site_id").eq("resolved", false),
-            supabase.from("stop_work_alerts").select("created_at").order("created_at", { ascending: false }).limit(1),
-        ]);
-
-        const workersData = allProfilesData?.filter(p => p.role === "WORKER") ?? [];
-        const officerData = allProfilesData?.filter(p => p.role === "SAFETY_OFFICER") ?? [];
-        const adminData = allProfilesData?.filter(p => p.role === "HQ_ADMIN" || p.role === "HQ_OFFICER") ?? [];
-
-        setSafetyOfficerCount(officerData.length);
-        setHqAdminCount(adminData.length);
-
-        const lastAlertTs = lastAlertData?.[0]?.created_at;
-        if (lastAlertTs) {
-            const diffMs = Date.now() - new Date(lastAlertTs).getTime();
-            setAccidentFreeDays(Math.floor(diffMs / (1000 * 60 * 60 * 24)));
-        } else if (sitesData && sitesData.length > 0) {
-            const earliest = sitesData.reduce((a, b) =>
-                new Date(a.created_at) < new Date(b.created_at) ? a : b
-            );
-            const diffMs = Date.now() - new Date(earliest.created_at).getTime();
-            setAccidentFreeDays(Math.floor(diffMs / (1000 * 60 * 60 * 24)));
-        } else {
-            setAccidentFreeDays(0);
-        }
-
-        if (sitesData) {
-            const processed: Site[] = sitesData.map(site => ({
-                ...site,
-                worker_count: workersData?.filter(w => w.site_id === site.id).length ?? 0,
-                tbm_today: tbmData?.filter(t => t.site_id === site.id).length ?? 0,
-                alert_count: alertsData?.filter(a => a.site_id === site.id).length ?? 0,
-            }));
-            setSites(processed);
+        const res = await fetch("/api/system/summary", { cache: "no-store", credentials: "include" });
+        if (res.ok) {
+            const data = await res.json() as {
+                sites?: Site[];
+                safetyOfficerCount?: number;
+                hqAdminCount?: number;
+                accidentFreeDays?: number;
+            };
+            setSites(data.sites ?? []);
+            setSafetyOfficerCount(data.safetyOfficerCount ?? 0);
+            setHqAdminCount(data.hqAdminCount ?? 0);
+            setAccidentFreeDays(data.accidentFreeDays ?? 0);
         }
         setLoading(false);
     };
 
-    const fetchSecurityLogs = async () => {
+    const fetchSecurityLogs = useCallback(async () => {
         setLogsLoading(true);
-        const supabase = createClient();
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-
-        const [{ data: recentProfiles }, { data: recentAlerts }] = await Promise.all([
-            supabase.from('profiles').select('id, display_name, role, updated_at').gte('updated_at', sevenDaysAgo).order('updated_at', { ascending: false }).limit(20),
-            supabase.from('stop_work_alerts').select('id, site_id, created_at, resolved').gte('created_at', sevenDaysAgo).order('created_at', { ascending: false }).limit(10),
-        ]);
-
-        const entries: LogEntry[] = [];
-
-        entries.push({
-            id: 'session-now',
-            timestamp: new Date().toISOString(),
-            event: '[SYSTEM] 통합관제 접근 — 세션 시작',
-            actor: currentUser?.display_name || 'SUPER_ADMIN',
-            severity: 'info',
-        });
-
-        recentProfiles?.forEach(p => {
-            entries.push({
-                id: `profile-${p.id}`,
-                timestamp: p.updated_at,
-                event: `[AUTH] 권한 변경 → ${p.role}`,
-                actor: p.display_name || p.id.slice(0, 8),
-                severity: (p.role === 'SUPER_ADMIN' || p.role === 'ROOT') ? 'warn' : 'info',
-            });
-        });
-
-        recentAlerts?.forEach(a => {
-            entries.push({
-                id: `alert-${a.id}`,
-                timestamp: a.created_at,
-                event: a.resolved ? '[SAFETY] 작업중지 해제' : '[SAFETY] 작업중지 알람 발생',
-                actor: `현장 ${a.site_id?.slice(0, 8) || '?'}`,
-                severity: a.resolved ? 'info' : 'critical',
-            });
-        });
-
-        entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        setSecurityLogs(entries);
+        const res = await fetch("/api/system/security-logs", { cache: "no-store", credentials: "include" });
+        if (res.ok) {
+            const data = await res.json() as { logs?: LogEntry[] };
+            setSecurityLogs(data.logs ?? []);
+        }
         setLogsLoading(false);
-    };
+    }, []);
 
     const handleSaveConfig = () => {
         localStorage.setItem('safe-link-system-config', JSON.stringify(globalConfig));
@@ -412,16 +514,14 @@ export default function SystemAdminPage() {
     }, []);
 
     // fetch logs on first visit to logs tab
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         if (activeTab === 'logs' && securityLogs.length === 0) {
-            fetchSecurityLogs();
+            void fetchSecurityLogs();
         }
-    }, [activeTab]);
+    }, [activeTab, fetchSecurityLogs, securityLogs.length]);
 
     const handleSignOut = async () => {
-        const supabase = createClient();
-        await supabase.auth.signOut();
+        await logoutV3().catch(() => undefined);
         window.location.href = "/auth";
     };
 
@@ -439,21 +539,20 @@ export default function SystemAdminPage() {
 
     const handleSaveSite = async () => {
         if (!siteForm.name) return;
-        const supabase = createClient();
         setLoading(true);
-
-        if (editingSite) {
-            const { error } = await supabase
-                .from("sites")
-                .update({ name: siteForm.name, address: siteForm.address })
-                .eq("id", editingSite.id);
-            if (error) alert(error.message);
-        } else {
-            const newCode = `ST-${Date.now().toString().slice(-6)}`;
-            const { error } = await supabase
-                .from("sites")
-                .insert([{ name: siteForm.name, address: siteForm.address, code: newCode }]);
-            if (error) alert(error.message);
+        const res = await fetch("/api/system/sites", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+                id: editingSite?.id ?? null,
+                name: siteForm.name,
+                address: siteForm.address,
+            }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({})) as { error?: string };
+            alert(err.error ?? "site_save_failed");
         }
 
         setIsModalOpen(false);
@@ -464,10 +563,15 @@ export default function SystemAdminPage() {
         e.stopPropagation();
         if (!confirm(t.site.deleteConfirm)) return;
 
-        const supabase = createClient();
         setLoading(true);
-        const { error } = await supabase.from("sites").delete().eq("id", id);
-        if (error) alert(error.message);
+        const res = await fetch(`/api/system/sites/${encodeURIComponent(id)}`, {
+            method: "DELETE",
+            credentials: "include",
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({})) as { error?: string };
+            alert(err.error ?? "site_delete_failed");
+        }
         await fetchSites();
     };
 
@@ -491,16 +595,61 @@ export default function SystemAdminPage() {
                     <div className="absolute bottom-[0%] right-[0%] w-[50%] h-[50%] bg-purple-900/10 blur-[150px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
                 </div>
 
+                <button
+                    type="button"
+                    aria-label="시스템 메뉴 열기"
+                    onClick={() => setIsSidebarOpen(true)}
+                    className={`fixed left-4 top-4 z-40 md:hidden w-11 h-11 rounded-2xl border border-white/10 bg-slate-950/80 backdrop-blur-xl text-white items-center justify-center shadow-xl shadow-black/30 ${isSidebarOpen ? "hidden" : "flex"}`}
+                >
+                    <Menu className="w-5 h-5" />
+                </button>
+
+                {isSidebarCollapsed && (
+                    <button
+                        type="button"
+                        aria-label="시스템 메뉴 열기"
+                        onClick={() => setIsSidebarCollapsed(false)}
+                        className="fixed left-4 top-4 z-40 hidden md:flex w-11 h-11 rounded-2xl border border-white/10 bg-slate-950/80 backdrop-blur-xl text-white items-center justify-center shadow-xl shadow-black/30"
+                    >
+                        <Menu className="w-5 h-5" />
+                    </button>
+                )}
+
+                {isSidebarOpen && (
+                    <button
+                        type="button"
+                        aria-label="시스템 메뉴 닫기"
+                        onClick={() => setIsSidebarOpen(false)}
+                        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+                    />
+                )}
+
                 {/* Sidebar */}
-                <aside className="fixed left-0 top-0 bottom-0 w-64 bg-slate-950/50 backdrop-blur-xl border-r border-white/5 z-50 flex flex-col p-6">
+                <aside className={`fixed left-0 top-0 bottom-0 w-64 bg-slate-950/90 md:bg-slate-950/50 backdrop-blur-xl border-r border-white/5 z-50 flex flex-col p-6 transition-transform duration-300 ease-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} ${isSidebarCollapsed ? "md:-translate-x-full" : "md:translate-x-0"}`}>
                     <div className="flex items-center gap-3 mb-10 px-2">
                         <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
                             <Shield className="w-6 h-6 text-white" />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                             <h1 className="text-xl font-black tracking-tighter italic uppercase text-gradient">{t.title}</h1>
                             <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase">{t.rootAccess}</p>
                         </div>
+                        <button
+                            type="button"
+                            aria-label="시스템 메뉴 닫기"
+                            onClick={() => setIsSidebarOpen(false)}
+                            className="ml-auto md:hidden w-9 h-9 rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 flex items-center justify-center transition-all"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                        <button
+                            type="button"
+                            aria-label="시스템 메뉴 접기"
+                            onClick={() => setIsSidebarCollapsed(true)}
+                            className="ml-auto hidden md:flex w-9 h-9 rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 items-center justify-center transition-all"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
                     </div>
 
                     <nav className="flex flex-col gap-2 flex-1">
@@ -514,7 +663,10 @@ export default function SystemAdminPage() {
                         ].map((item) => (
                             <button
                                 key={item.id}
-                                onClick={() => setActiveTab(item.id)}
+                                onClick={() => {
+                                    setActiveTab(item.id);
+                                    setIsSidebarOpen(false);
+                                }}
                                 className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all font-bold ${activeTab === item.id
                                     ? "bg-white/10 text-blue-400 shadow-inner border border-white/5"
                                     : "text-slate-500 hover:text-white hover:bg-white/5"
@@ -569,7 +721,7 @@ export default function SystemAdminPage() {
                 </aside>
 
                 {/* Main Content */}
-                <main className="md:ml-64 p-4 md:p-12 min-h-screen">
+                <main className={`min-h-screen px-4 pb-4 pt-20 md:p-12 transition-[margin,padding] duration-300 ${isSidebarCollapsed ? "md:ml-0 md:pl-20" : "md:ml-64"}`}>
                     <header className="flex justify-between items-end mb-12">
                         <motion.div
                             initial={{ opacity: 0, x: -20 }}
@@ -629,7 +781,7 @@ export default function SystemAdminPage() {
 
                     {/* 시뮬레이션 배너 */}
                     <div className="relative mb-8 h-44 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
-                        <Image src="/images/safelink-pages/system-security-center.png" alt="SAFE-LINK system security center" fill className="object-cover" priority />
+                        <Image src="/images/safelink-pages/system-security-center.png" alt="SQ Link system security center" fill className="object-cover" priority />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                     </div>
 
@@ -842,6 +994,115 @@ export default function SystemAdminPage() {
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+
+                                {/* 관리자 승인 대기 */}
+                                <div className="bg-slate-900/40 border border-white/5 rounded-[40px] p-6 sm:p-8 flex flex-col gap-5">
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                                                <Shield className="w-5 h-5 text-amber-400" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h3 className="text-lg font-black tracking-tight">{t.pendingAdmins.title}</h3>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                                    {pendingAdmins.length} {t.pendingAdmins.waiting} · {t.pendingAdmins.pendingLoginBlocked}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={loadPendingAdmins}
+                                            disabled={pendingAdminsLoading}
+                                            className="self-start sm:self-auto h-10 px-4 rounded-2xl border border-white/10 bg-white/5 text-xs font-black text-slate-300 hover:bg-white/10 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                                        >
+                                            <RefreshCw className={`w-4 h-4 ${pendingAdminsLoading ? "animate-spin" : ""}`} />
+                                            {t.pendingAdmins.refresh}
+                                        </button>
+                                    </div>
+
+                                    {pendingAdminsError && (
+                                        <div className="rounded-2xl border border-red-500/20 bg-red-950/20 px-4 py-3 text-xs font-bold text-red-300">
+                                            {pendingAdminsError}
+                                        </div>
+                                    )}
+
+                                    {pendingAdminsLoading ? (
+                                        <div className="flex flex-col gap-3">
+                                            {[1, 2].map((item) => (
+                                                <div key={item} className="h-20 rounded-2xl bg-white/5 animate-pulse" />
+                                            ))}
+                                        </div>
+                                    ) : pendingAdmins.length === 0 ? (
+                                        <div className="rounded-2xl border border-white/5 bg-slate-950/40 px-4 py-6 text-center text-sm font-bold text-slate-500">
+                                            {t.pendingAdmins.empty}
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col gap-3">
+                                            {pendingAdmins.map((account) => {
+                                                const draft = approvalDrafts[account.id] ?? DEFAULT_PENDING_ADMIN_DRAFT;
+                                                const siteRequired = SITE_SCOPED_ADMIN_ROLES.has(draft.role);
+                                                return (
+                                                    <div key={account.id} className="flex flex-col gap-4 rounded-2xl border border-white/5 bg-slate-950/40 p-4 lg:flex-row lg:items-center lg:justify-between">
+                                                        <div className="min-w-0">
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <p className="text-sm font-black text-white truncate">
+                                                                    {account.displayName || account.email || `#${account.id}`}
+                                                                </p>
+                                                                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-300">
+                                                                    {account.accountStatus}
+                                                                </span>
+                                                            </div>
+                                                            <p className="mt-1 text-xs font-bold text-slate-500 truncate">{account.email || t.pendingAdmins.emailMissing}</p>
+                                                            <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-600">
+                                                                ID {account.id} · {account.preferredLanguage || "ko"}
+                                                            </p>
+                                                        </div>
+
+                                                        <div className="grid grid-cols-1 sm:grid-cols-[minmax(150px,180px)_minmax(180px,240px)_auto] gap-2 lg:flex lg:items-center">
+                                                            <label className="sr-only" htmlFor={`pending-role-${account.id}`}>{t.pendingAdmins.role}</label>
+                                                            <select
+                                                                id={`pending-role-${account.id}`}
+                                                                value={draft.role}
+                                                                onChange={(event) => updateApprovalDraft(account.id, { role: event.target.value as PendingAdminRole })}
+                                                                className="h-11 rounded-2xl border border-white/10 bg-slate-950 px-3 text-xs font-bold text-slate-200 outline-none focus:border-blue-500"
+                                                            >
+                                                                {ADMIN_APPROVAL_ROLES.map((role) => (
+                                                                    <option key={role} value={role}>{t.pendingAdmins.roles[role]}</option>
+                                                                ))}
+                                                            </select>
+
+                                                            <label className="sr-only" htmlFor={`pending-site-${account.id}`}>{t.pendingAdmins.site}</label>
+                                                            <select
+                                                                id={`pending-site-${account.id}`}
+                                                                value={siteRequired ? draft.siteId : ""}
+                                                                onChange={(event) => updateApprovalDraft(account.id, { siteId: event.target.value })}
+                                                                disabled={!siteRequired}
+                                                                className="h-11 rounded-2xl border border-white/10 bg-slate-950 px-3 text-xs font-bold text-slate-200 outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                                            >
+                                                                <option value="">{siteRequired ? t.pendingAdmins.noSite : t.pendingAdmins.globalScope}</option>
+                                                                {siteOptions.map((site) => (
+                                                                    <option key={site.id} value={site.id}>
+                                                                        {site.name}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => approvePendingAdmin(account)}
+                                                                disabled={approvingAdminId === account.id || (siteRequired && !draft.siteId)}
+                                                                className="h-11 rounded-2xl bg-blue-600 px-4 text-xs font-black text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 transition-all flex items-center justify-center gap-2"
+                                                            >
+                                                                <CheckCircle2 className="w-4 h-4" />
+                                                                {approvingAdminId === account.id ? t.pendingAdmins.approving : t.pendingAdmins.approve}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* 전국 현장 현황 바 차트 */}
@@ -1059,7 +1320,7 @@ export default function SystemAdminPage() {
                                     </div>
 
                                     <div className="bg-black/40 rounded-3xl p-6 font-mono text-sm text-blue-300 h-96 overflow-y-auto flex flex-col gap-2 border border-white/5">
-                                        <p className="opacity-50">[SYSTEM] Initializing Safe-Link Global Agent...</p>
+                                        <p className="opacity-50">[SYSTEM] Initializing SQ Link Global Agent...</p>
                                         <p className="text-blue-400 font-bold">[AGENT] Scanning {sites.length} sites across South Korea...</p>
                                         <p className="text-white">[AGENT] Total {totalWorkers} workers verified across all sites.</p>
                                         <p className="text-emerald-400">[AGENT] Today&apos;s TBM sessions: {totalTbmToday} completed.</p>
@@ -1362,7 +1623,7 @@ export default function SystemAdminPage() {
                                     <div className="flex justify-between items-start mb-8">
                                         <div>
                                             <h3 className="text-2xl font-black italic tracking-tight">{editingSite ? t.site.editTitle : t.site.addTitle}</h3>
-                                            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">SAFE-LINK FIELD MANAGEMENT</p>
+                                            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">SQ Link FIELD MANAGEMENT</p>
                                         </div>
                                         <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/5 rounded-full transition-colors">
                                             <X className="w-6 h-6 text-slate-500" />

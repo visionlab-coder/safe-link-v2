@@ -7,7 +7,7 @@
  *  - 일제강점기 일본어 잔재어 (200선) 중 건설/제조 현장 용어
  *  - 현장 실무 용례 수집
  *
- * 이 파일은 Supabase `construction_glossary` 테이블의 Seed 데이터와 동기화됩니다.
+ * 이 파일은 PostgreSQL `construction_glossary` 테이블의 Seed 데이터와 동기화됩니다.
  * DB 우선 적용 원칙: 앱 구동 시 DB에서 fetch → 실패 시 이 파일을 fallback으로 사용
  */
 export const CONSTRUCTION_GLOSSARY: Record<string, string> = {

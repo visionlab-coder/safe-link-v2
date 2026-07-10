@@ -53,6 +53,7 @@ curl -s -X OPTIONS $B/api/auth/admin-login -H "Origin: https://evil.x" -H "Acces
 ```
 
 ## 주의
-- 신규 RTT/온디바이스는 **플래그 게이트**(`NEXT_PUBLIC_REALTIME_STT_ENGINE`, 기본 Google) → 배포해도 기본 동작 불변.
-- 현 배포본은 구버전(예: `/api/flitto/rtt-token` 404). 배포 시 빌드 전체 교체되므로 에러메시지·모바일 CORS 등 동작 변화 동반 → 현장 영향 점검 후 진행.
+- 실시간 STT는 `NEXT_PUBLIC_REALTIME_STT_ENGINE=google` 기준으로 운영한다. 배포 시 기본 동작은 Google STT + 서버 번역 경로다.
+- Spring Boot 실제 vendor 호출에는 `SAFE_LINK_AI_VENDOR_ENABLED=true`가 필요하다. `GOOGLE_CLOUD_API_KEY`는 STT/TTS/Translate용이고, Gemini는 별도 `GEMINI_API_KEY` 또는 `GOOGLE_API_KEY`를 사용한다.
+- 현 배포본과 비교해 배포 시 빌드 전체가 교체되므로 에러메시지·모바일 CORS 등 동작 변화 동반 → 현장 영향 점검 후 진행.
 - 모바일 상용앱은 벤더(범데이터소프트) 이관 — 본 배포는 웹 PoC 대상.

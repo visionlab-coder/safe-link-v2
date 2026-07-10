@@ -7,7 +7,6 @@ import { ChevronRight, Plus, QrCode, RefreshCw, Search, UserX, Users, X } from "
 import RoleGuard from "@/components/RoleGuard";
 import ExportMenu from "@/components/ExportMenu";
 import { exportData, type ExportFormat } from "@/utils/export-files";
-import { createClient } from "@/utils/supabase/client";
 
 interface Worker {
   id: string;
@@ -61,19 +60,13 @@ export default function AdminWorkersPage() {
   }, [fetchWorkers]);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) return;
-      supabase
-        .from("profiles")
-        .select("site_id")
-        .eq("id", session.user.id)
-        .maybeSingle()
-        .then(({ data }) => {
-          const siteId = (data as { site_id?: string } | null)?.site_id;
-          if (siteId) setAdminSiteId(siteId);
-        });
-    });
+    fetch("/api/auth/me", { cache: "no-store", credentials: "include" })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { profile?: { site_id?: string | null } | null } | null) => {
+        const siteId = data?.profile?.site_id;
+        if (siteId) setAdminSiteId(siteId);
+      })
+      .catch(() => undefined);
   }, []);
 
   const handleSearch = (event: React.FormEvent) => {
@@ -221,7 +214,7 @@ export default function AdminWorkersPage() {
                   <button
                     onClick={() => handleOpenQr(worker)}
                     className="bg-purple-800 hover:bg-purple-700 text-purple-100 text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
-                    title="NFC 사용이 어려울 때 쓰는 근로자 SAFE-LINK QR"
+                    title="NFC 사용이 어려울 때 쓰는 근로자 SQ Link QR"
                   >
                     <QrCode className="w-3.5 h-3.5" />
                     QR
@@ -264,7 +257,7 @@ export default function AdminWorkersPage() {
               </button>
             </div>
             <p className="text-xs text-purple-400 font-bold uppercase tracking-widest mb-4">
-              근로자 SAFE-LINK QR
+              근로자 SQ Link QR
             </p>
             {qrModal.loading && (
               <div className="flex items-center justify-center py-12">
@@ -279,7 +272,7 @@ export default function AdminWorkersPage() {
                 <div className="bg-white p-4 rounded-xl">
                   <Image
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrModal.token.qrUrl)}`}
-                    alt="근로자 SAFE-LINK QR"
+                    alt="근로자 SQ Link QR"
                     width={240}
                     height={240}
                     unoptimized

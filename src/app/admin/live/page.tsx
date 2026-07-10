@@ -1,31 +1,12 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
-import { createClient } from "@/utils/supabase/client";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
 import ExportMenu from "@/components/ExportMenu";
 import { exportData, type ExportFormat } from "@/utils/export-files";
 import { playPremiumAudio } from "@/utils/tts";
-
-const FLITTO_TARGET_LANGS = new Set(["ko", "en", "ja", "zh-CN", "zh-TW", "ru", "vi", "fr", "it", "ar", "es"]);
-
-function toFlittoLanguage(lang: string): string {
-    if (lang === "zh") return "zh-CN";
-    if (lang === "jp") return "ja";
-    return lang;
-}
-
-function getFlittoTranslation(
-    translations: Record<string, string> | undefined,
-    language: string,
-): string | undefined {
-    if (!translations) return undefined;
-    const flittoLanguage = toFlittoLanguage(language);
-    return translations[flittoLanguage] || translations[language];
-}
 
 function AdminLiveContent() {
     const router = useRouter();
@@ -38,83 +19,44 @@ function AdminLiveContent() {
         sourceText?: string;
     }>>([]);
     const [siteId, setSiteId] = useState<string | null>(null);
-    const [listenerCount, setListenerCount] = useState(0);
+    const [listenerCount] = useState(0);
     const scrollRef = useRef<HTMLDivElement>(null);
     const [adminId, setAdminId] = useState("");
     const lastSentRef = useRef<{ text: string; at: number }>({ text: "", at: 0 });
+    const lastWorkerResponseIdRef = useRef(0);
+    const seenWorkerResponseIdsRef = useRef<Set<string>>(new Set());
     // 현장 근로자 언어 목록 — 사전 번역 대상 (ref로 관리해 useCallback 재생성 방지)
     const siteWorkerLangsRef = useRef<string[]>([]);
-    const [siteWorkerLangs, setSiteWorkerLangs] = useState<string[]>([]);
 
     useEffect(() => {
         const load = async () => {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                setAdminId(session.user.id);
-                const { data: profile } = await supabase.from("profiles").select("site_id").eq("id", session.user.id).single();
-                setSiteId(profile?.site_id || null);
-            }
+            const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+            if (!res.ok) return;
+            const data = await res.json() as { user?: { id: string }; profile?: { site_id?: string | null } | null };
+            if (data.user?.id) setAdminId(data.user.id);
+            setSiteId(data.profile?.site_id || null);
         };
         load();
     }, []);
 
     // siteId 확정 후 현장 근로자 언어 목록 수집 (사전 번역에 사용)
     useEffect(() => {
-        const supabase = createClient();
-        let query = supabase
-            .from("profiles")
-            .select("preferred_lang")
-            .eq("role", "WORKER")
-            .not("preferred_lang", "is", null)
-        if (siteId) query = query.eq("site_id", siteId);
-        query.then(({ data }) => {
-                const langs = [...new Set(
-                    (data || [])
-                        .map((p: any) => p.preferred_lang as string)
-                        .filter(l => l && l !== "ko")
-                )];
-                siteWorkerLangsRef.current = langs;
-                setSiteWorkerLangs(langs);
-            });
+        const loadLangs = async () => {
+            const suffix = siteId ? `?site_id=${encodeURIComponent(siteId)}` : "";
+            const res = await fetch(`/api/tbm/workers${suffix}`, { cache: "no-store" });
+            if (!res.ok) return;
+            const data = await res.json() as { workers?: Array<{ preferred_lang?: string | null }> };
+            const langs = [...new Set(
+                (data.workers || [])
+                    .map((p) => p.preferred_lang)
+                    .filter((lang): lang is string => Boolean(lang && lang !== "ko"))
+            )];
+            siteWorkerLangsRef.current = langs;
+        };
+        loadLangs();
     }, [siteId]);
 
-    // Track listeners via Supabase presence — site-based fixed channel so workers can join
-    useEffect(() => {
-        if (!adminId) return;
-        const supabase = createClient();
-        const channelName = "live_audience_global";
-        const channel = supabase.channel(channelName, { config: { presence: { key: adminId } } });
-
-        channel
-            .on('presence', { event: 'sync' }, () => {
-                const state = channel.presenceState();
-                const workers = Object.values(state).flat().filter((p: any) =>
-                    (p as any).role === "worker"
-                    && (!siteId || (p as any).siteId === siteId)
-                ) as Array<{ lang?: string }>;
-                const activeLangs = [...new Set(
-                    workers.map(worker => worker.lang).filter((lang): lang is string => Boolean(lang && lang !== "ko"))
-                )];
-                setListenerCount(workers.length);
-                if (activeLangs.length > 0) {
-                    siteWorkerLangsRef.current = activeLangs;
-                    setSiteWorkerLangs(activeLangs);
-                }
-            })
-            .subscribe(async (status) => {
-                if (status === 'SUBSCRIBED') {
-                    await channel.track({ role: "admin", siteId, userId: adminId });
-                }
-            });
-
-        return () => { supabase.removeChannel(channel); };
-    }, [adminId, siteId]);
-
-    const handleTranscript = useCallback(async (
-        text: string,
-        flittoTranslations?: Record<string, string>,
-    ) => {
+    const handleTranscript = useCallback(async (text: string) => {
         const cleanText = text.trim().replace(/\s+/g, " ");
         if (!sessionId || !cleanText) return;
 
@@ -134,11 +76,6 @@ function AdminLiveContent() {
         if (langs.length > 0) {
             await Promise.all(
                 langs.map(async (lang) => {
-                    const flittoTranslation = getFlittoTranslation(flittoTranslations, lang);
-                    if (flittoTranslation) {
-                        translations[lang] = flittoTranslation;
-                        return;
-                    }
                     try {
                         const res = await fetch("/api/translate", {
                             method: "POST",
@@ -161,25 +98,26 @@ function AdminLiveContent() {
             );
         }
 
-        const supabase = createClient();
-        const payload: any = {
-            session_id: sessionId,
-            text_ko: cleanText,
-            created_by: adminId,
-            ...(Object.keys(translations).length > 0 && { translations }),
-        };
-        if (siteId) payload.site_id = siteId;
-        const { error } = await supabase.from("live_translations").insert(payload);
-        if (error) {
-            console.error("[admin/live] live_translations insert failed:", error.message);
-            setTranscripts(prev => [...prev, { text: `[저장 실패] ${error.message}`, time }]);
+        const saveRes = await fetch("/api/live/translations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                sessionId,
+                siteId,
+                text_ko: cleanText,
+                translations,
+            }),
+        });
+        if (!saveRes.ok) {
+            const err = await saveRes.json().catch(() => ({})) as { error?: string };
+            setTranscripts(prev => [...prev, { text: `[저장 실패] ${err.error ?? saveRes.status}`, time }]);
             return;
         }
 
         setTimeout(() => {
             scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
         }, 100);
-    }, [sessionId, siteId, adminId]);
+    }, [sessionId, siteId]);
 
     const {
         isRecording,
@@ -192,58 +130,58 @@ function AdminLiveContent() {
         chunkInterval: 6000,   // 6s — 교육 발화는 문장이 길므로 완전한 문장 단위 전송
         silenceDuration: 2500, // 2.5s — 자연 휴지 허용, 문장 경계에서 자동 분할
         live: true,
-        targetLangs: siteWorkerLangs
-            .map(toFlittoLanguage)
-            .filter(lang => FLITTO_TARGET_LANGS.has(lang)),
     });
 
     useEffect(() => {
         if (!adminId) return;
-        const supabase = createClient();
-        const channel = supabase
-            .channel(`live_worker_responses_${adminId}`)
-            .on("postgres_changes", {
-                event: "INSERT",
-                schema: "public",
-                table: "messages",
-            }, (payload) => {
-                const row = payload.new as {
-                    id?: string;
-                    site_id?: string | null;
-                    source_text?: string;
-                    translated_text?: string;
-                    to_user?: string;
-                    ai_analysis?: {
-                        channel?: string;
-                        speaker_name?: string;
-                    } | null;
-                };
-                if (row.to_user !== adminId) return;
-                if (row.ai_analysis?.channel !== "live_interpreter") return;
-                if (siteId && row.site_id !== siteId) return;
+        let cancelled = false;
 
-                const sourceText = String(row.source_text || "").trim();
-                const translated = String(row.translated_text || sourceText).trim();
-                if (!translated) return;
+        const handleResponse = (row: { id: string; sourceText: string; translatedText: string }) => {
+            if (cancelled || seenWorkerResponseIdsRef.current.has(row.id)) return;
+            seenWorkerResponseIdsRef.current.add(row.id);
+            lastWorkerResponseIdRef.current = Math.max(lastWorkerResponseIdRef.current, Number(row.id));
+            const translated = String(row.translatedText || row.sourceText || "").trim();
+            if (!translated) return;
+            const time = new Date().toLocaleTimeString("ko-KR", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+            });
+            setTranscripts(prev => [...prev, {
+                text: translated,
+                sourceText: row.sourceText,
+                time,
+                role: "worker",
+            }]);
+            muteRecording();
+            playPremiumAudio(translated, "ko", "female", unmuteRecording);
+        };
 
-                const time = new Date().toLocaleTimeString("ko-KR", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit",
-                });
-                setTranscripts(prev => [...prev, {
-                    text: translated,
-                    sourceText,
-                    time,
-                    role: "worker",
-                }]);
+        const loadMissedResponses = async () => {
+            const params = new URLSearchParams({ afterId: String(lastWorkerResponseIdRef.current) });
+            if (siteId) params.set("siteId", siteId);
+            const res = await fetch(`/api/live/worker-responses?${params.toString()}`, { cache: "no-store" });
+            if (!res.ok || cancelled) return;
+            const data = await res.json() as { responses?: Array<{ id: string; sourceText: string; translatedText: string }> };
+            (data.responses ?? []).forEach(handleResponse);
+        };
 
-                muteRecording();
-                playPremiumAudio(translated, "ko", "female", unmuteRecording);
-            })
-            .subscribe();
+        const params = new URLSearchParams({ type: "worker-responses" });
+        if (siteId) params.set("siteId", siteId);
+        const events = new EventSource(`/api/live/events?${params.toString()}`);
+        events.addEventListener("worker-response", event => {
+            try {
+                handleResponse(JSON.parse((event as MessageEvent<string>).data));
+            } catch {
+                // EventSource reconnects automatically; missed rows are loaded on the next mount.
+            }
+        });
+        void loadMissedResponses();
 
-        return () => { supabase.removeChannel(channel); };
+        return () => {
+            cancelled = true;
+            events.close();
+        };
     }, [adminId, siteId, muteRecording, unmuteRecording]);
 
     const handleStartBroadcast = () => {

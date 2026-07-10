@@ -68,9 +68,9 @@ const notoSansDevanagari = Noto_Sans_Devanagari({
 });
 
 export const metadata: Metadata = {
-  title: "SAFE-LINK by SEOWON | Field Safety OS",
+  title: "SQ Link by SEOWON | Field Safety OS",
   description: "SEOWON construction field safety communication platform",
-  applicationName: "SAFE-LINK",
+  applicationName: "SQ Link",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -81,7 +81,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "SAFE-LINK",
+    title: "SQ Link",
     statusBarStyle: "black-translucent",
   },
 };

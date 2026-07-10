@@ -77,26 +77,3 @@ export function buildLegalReportEnvelope<T>(args: BuildLegalReportArgs<T>) {
     },
   };
 }
-
-export async function recordReportExport(args: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  service: any;
-  envelope: ReturnType<typeof buildLegalReportEnvelope>;
-}) {
-  try {
-    await args.service.from("legal_report_exports").insert({
-      report_id: args.envelope.report_id,
-      report_type: args.envelope.report_type,
-      site_id: args.envelope.data_scope.siteId,
-      data_scope: args.envelope.data_scope,
-      source_tables: args.envelope.source_tables,
-      report_hash_alg: args.envelope.report_hash_alg,
-      report_hash: args.envelope.report_hash,
-      generated_by: args.envelope.generated_by,
-      generated_at: args.envelope.generated_at,
-    });
-  } catch {
-    // Report generation must not fail just because the optional audit table has
-    // not been migrated yet.
-  }
-}

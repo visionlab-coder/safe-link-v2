@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { CalendarDays, CheckCircle2, ClipboardList, RefreshCw, XCircle } from "lucide-react";
-import { createClient } from "@/utils/supabase/client";
 import ExportMenu from "@/components/ExportMenu";
 import { exportData, type ExportFormat } from "@/utils/export-files";
 
@@ -68,19 +67,18 @@ export default function AdminNfcDailyLogsPage() {
   }, [adminSiteId, workDate]);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) return;
-      supabase
-        .from("profiles")
-        .select("site_id")
-        .eq("id", session.user.id)
-        .maybeSingle()
-        .then(({ data }) => {
-          const siteId = (data as { site_id?: string } | null)?.site_id;
-          if (siteId) setAdminSiteId(siteId);
-        });
-    });
+    let cancelled = false;
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { profile?: { site_id?: string | null } } | null) => {
+        if (!cancelled && data?.profile?.site_id) {
+          setAdminSiteId(data.profile.site_id);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {

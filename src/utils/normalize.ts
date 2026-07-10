@@ -1,5 +1,4 @@
 import { CONSTRUCTION_GLOSSARY } from "@/constants/glossary";
-import { createClient } from "@/utils/supabase/client";
 
 export interface NormalizeResult {
     original: string;
@@ -14,23 +13,21 @@ let _dbGlossaryCache: Record<string, string> | null = null;
 
 /**
  * fetchGlossaryFromDB
- * Supabase의 전역 construction_glossary 테이블에서 사전을 가져옵니다.
- * 서버사이드(API Route): 서비스 롤 클라이언트로 RLS 우회
- * 클라이언트사이드: anon 클라이언트 사용 (SELECT RLS 필요)
+ * Spring Boot의 전역 construction_glossary 테이블에서 사전을 가져옵니다.
  * 실패 시 로컬 상수(CONSTRUCTION_GLOSSARY)를 fallback으로 사용합니다.
  */
 export async function fetchGlossaryFromDB(): Promise<Record<string, string>> {
     if (_dbGlossaryCache) return _dbGlossaryCache;
 
     try {
-        const supabase = createClient();
-        const { data, error } = await supabase
-            .from("construction_glossary")
-            .select("slang, standard")
-            .eq("is_active", true);
+        const response = await fetch("/api/glossary?active=true", { cache: "no-store" });
+        const payload = response.ok
+            ? await response.json() as { terms?: Array<{ slang: string; standard: string }> }
+            : null;
+        const data = payload?.terms ?? [];
 
-        if (error || !data || data.length === 0) {
-            console.warn("[normalize] DB 사전 불러오기 실패, 로컬 fallback 사용", error?.message);
+        if (!response.ok || data.length === 0) {
+            console.warn("[normalize] DB 사전 불러오기 실패, 로컬 fallback 사용");
             _dbGlossaryCache = CONSTRUCTION_GLOSSARY;
         } else {
             const dbDict: Record<string, string> = { ...CONSTRUCTION_GLOSSARY };

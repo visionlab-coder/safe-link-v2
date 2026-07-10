@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { AlertCircle, CheckCircle, Globe2, Loader2 } from "lucide-react";
-import { createClient } from "@/utils/supabase/client";
+import { logoutV3 } from "@/lib/v3-auth";
 import {
   findQrLanguageByCode,
   findQrLanguageByCountry,
@@ -45,7 +45,7 @@ const ERROR_MESSAGES: Record<QrLanguageCode, Record<string, string>> = {
     site_not_found: "현장을 찾을 수 없습니다. 관리자에게 확인하세요.",
     worker_not_found: "근로자 정보를 찾을 수 없습니다.",
     worker_site_mismatch: "이 QR의 현장과 근로자의 현재 현장이 일치하지 않습니다.",
-    site_access_disabled: "이 현장은 현재 SAFE-LINK 근로자 입장이 중지되어 있습니다.",
+    site_access_disabled: "이 현장은 현재 SQ Link 근로자 입장이 중지되어 있습니다.",
     nationality_invalid: "국가를 다시 선택하세요.",
     checkin_failed: "입장 처리 중 오류가 발생했습니다. 다시 시도하세요.",
     preference_update_failed: "언어 저장 중 오류가 발생했습니다. 다시 시도하세요.",
@@ -105,7 +105,6 @@ function errorMessage(lang: QrLanguageCode, code: string) {
 
 export default function QrLandingPage() {
   const { token } = useParams<{ token: string }>();
-  const supabase = createClient();
   const [phase, setPhase] = useState<"loading" | "select" | "entering" | "blocked" | "error" | "logout_confirm">("loading");
   const [info, setInfo] = useState<InfoResult | null>(null);
   const [selectedLang, setSelectedLang] = useState<QrLanguageCode>("ko");
@@ -207,7 +206,7 @@ export default function QrLandingPage() {
   }
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    await logoutV3().catch(() => undefined);
     sessionStorage.removeItem("safe-link-session-active");
     sessionStorage.removeItem("safe-link-worker-active");
     setPhase("blocked");
@@ -218,7 +217,7 @@ export default function QrLandingPage() {
       <main className="flex min-h-screen flex-col items-center justify-center gap-5 bg-gray-950 px-6">
         <CheckCircle className="h-16 w-16 text-emerald-400" />
         <div className="text-center">
-          <h1 className="text-xl font-bold text-white">SAFE-LINK 활성 중 / Active</h1>
+          <h1 className="text-xl font-bold text-white">SQ Link 활성 중 / Active</h1>
           <p className="mt-2 text-sm leading-6 text-gray-400">이미 입장됨 · Already checked in</p>
         </div>
         <button

@@ -1,3 +1,5 @@
+import { normalizeToV3Role, type V3Role } from "./v3-role-contract";
+
 export type SetupRoleKey =
   | "site_manager"
   | "safety_officer"
@@ -7,25 +9,12 @@ export type SetupRoleKey =
   | "root"
   | "hq_officer";
 
-/** profiles.role 컬럼에 저장되는 실제 역할 값
- *  - WORKER: 외국인 근로자 (현장 작업자)
- *  - TEAM_LEADER: 공종별 팀장 (철근반/거푸집반/콘크리트반/마감반 등) — 본인 팀만 관리
- *  - SAFETY_OFFICER: 현장 안전관리자
- *  - SITE_ADMIN: 현장 공무 담당자 (계약·기성·서류 관리)
- *  - HQ_ADMIN: 본사 관리자
- *  - HQ_OFFICER: 본사 현장 안전관리 담당관
- *  - ROOT: 기존 최상위 권한 (레거시)
- *  - SUPER_ADMIN: 최상위 권한 (CTO/대표 직속, /system 진입 가능)
- */
+type LegacyProfileRole = "SAFETY_OFFICER" | "TEAM_LEADER" | "HQ_OFFICER" | "SUPER_ADMIN";
+
+/** V3 canonical role plus legacy aliases accepted only during migration. */
 export type ProfileRole =
-  | "HQ_ADMIN"
-  | "SAFETY_OFFICER"
-  | "TEAM_LEADER"
-  | "SITE_ADMIN"
-  | "WORKER"
-  | "ROOT"
-  | "HQ_OFFICER"
-  | "SUPER_ADMIN";
+  | V3Role
+  | LegacyProfileRole;
 
 export type AllowedRole = "admin" | "worker" | "hq" | "system";
 
@@ -45,8 +34,10 @@ export type TradeType =
 
 /** 역할별 권한 등급 (높을수록 상위 권한) */
 export const ROLE_HIERARCHY: Record<ProfileRole, number> = {
+  VIEWER: 0,
   WORKER: 1,
   TEAM_LEADER: 2,
+  SAFETY_MANAGER: 2,
   SAFETY_OFFICER: 2,
   SITE_ADMIN: 2,
   HQ_OFFICER: 2,
@@ -56,22 +47,24 @@ export const ROLE_HIERARCHY: Record<ProfileRole, number> = {
 };
 
 export const SETUP_ROLE_TO_PROFILE_ROLE: Record<SetupRoleKey, ProfileRole> = {
-  site_manager: "HQ_ADMIN",
-  safety_officer: "SAFETY_OFFICER",
-  team_leader: "TEAM_LEADER",
+  site_manager: "SITE_ADMIN",
+  safety_officer: "SAFETY_MANAGER",
+  team_leader: "SAFETY_MANAGER",
   gongmu: "SITE_ADMIN",
   worker: "WORKER",
   root: "ROOT",
-  hq_officer: "HQ_OFFICER",
+  hq_officer: "HQ_ADMIN",
 };
 
 export const PROFILE_ROLE_DEFAULT_ROUTE: Record<ProfileRole, string> = {
   HQ_ADMIN: "/control",
+  SITE_ADMIN: "/admin",
+  SAFETY_MANAGER: "/admin",
+  WORKER: "/worker",
+  VIEWER: "/worker",
+  ROOT: "/system",
   SAFETY_OFFICER: "/admin",
   TEAM_LEADER: "/admin",
-  SITE_ADMIN: "/admin",
-  WORKER: "/worker",
-  ROOT: "/system",
   HQ_OFFICER: "/system",
   SUPER_ADMIN: "/system",
 };
@@ -81,49 +74,49 @@ export function getProfileRoleFromSetupRole(role: SetupRoleKey): ProfileRole {
 }
 
 export function getDefaultRouteForProfileRole(role: ProfileRole): string {
+  const v3Role = normalizeToV3Role(role);
+  if (v3Role) return PROFILE_ROLE_DEFAULT_ROUTE[v3Role];
   return PROFILE_ROLE_DEFAULT_ROUTE[role];
 }
 
 /** SUPER_ADMIN 여부 확인 */
 export function isSuperAdmin(role: ProfileRole): boolean {
-  return role === "SUPER_ADMIN";
+  return normalizeToV3Role(role) === "ROOT";
 }
 
-/** /system 진입 가능 여부 — SUPER_ADMIN·ROOT·HQ_OFFICER 허용 */
+/** /system 진입 가능 여부 — V3에서는 ROOT만 허용한다. */
 export function canAccessSystem(role: ProfileRole): boolean {
-  return role === "SUPER_ADMIN" || role === "ROOT" || role === "HQ_OFFICER";
+  return normalizeToV3Role(role) === "ROOT";
 }
 
 /** ROLE_HIERARCHY 기반 최소 권한 충족 여부 */
 export function hasMinRole(role: ProfileRole, minRole: ProfileRole): boolean {
-  return ROLE_HIERARCHY[role] >= ROLE_HIERARCHY[minRole];
+  const normalizedRole = normalizeToV3Role(role) ?? role;
+  const normalizedMinRole = normalizeToV3Role(minRole) ?? minRole;
+  return ROLE_HIERARCHY[normalizedRole] >= ROLE_HIERARCHY[normalizedMinRole];
 }
 
 export function hasAllowedRole(role: ProfileRole, allowedRole: AllowedRole): boolean {
-  if (role === "ROOT" || role === "SUPER_ADMIN") {
+  const v3Role = normalizeToV3Role(role);
+  if (!v3Role) return false;
+
+  if (v3Role === "ROOT") {
     return true;
   }
 
   if (allowedRole === "system") {
-    return role === "HQ_OFFICER";
+    return false;
   }
 
   if (allowedRole === "admin") {
-    // TEAM_LEADER 도 /admin 진입 허용 — 본인 팀 워커만 보임 (UI 측 site_id + trade 필터)
-    return (
-      role === "HQ_ADMIN" ||
-      role === "SAFETY_OFFICER" ||
-      role === "TEAM_LEADER" ||
-      role === "SITE_ADMIN" ||
-      role === "HQ_OFFICER"
-    );
+    return v3Role === "HQ_ADMIN" || v3Role === "SITE_ADMIN" || v3Role === "SAFETY_MANAGER";
   }
 
   if (allowedRole === "hq") {
-    return role === "HQ_ADMIN";
+    return v3Role === "HQ_ADMIN";
   }
 
-  return role === "WORKER";
+  return v3Role === "WORKER";
 }
 
 /** TEAM_LEADER 여부 — admin 페이지에서 본인 팀(trade) 필터 적용에 사용 */

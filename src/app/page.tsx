@@ -70,7 +70,6 @@ function LandingPageInner() {
       setShowRoles(true);
     }
   // selectedLang ?섏〈 ?쒓굅 ??珥덇린媛?"ko"濡?由щ떎?대젆?? ?몄뼱???댄썑 ?좏깮
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qrRole, qrSiteId, router]);
 
   const startText = startBtnText[selectedLang] || "Start";
@@ -120,7 +119,7 @@ function LandingPageInner() {
         <div className="relative mb-10 h-44 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
           <Image
             src="/images/safelink-pages/landing-poc-hero.png"
-            alt="SAFE-LINK field safety platform"
+            alt="SQ Link field safety platform"
             fill
             className="object-cover"
             priority
@@ -246,7 +245,7 @@ function LandingPageInner() {
 
           <div className="flex flex-col items-center gap-1 opacity-30">
             <p className="text-[10px] text-slate-500 tracking-[0.5em] uppercase font-black">
-              Powered by SAFE-LINK Engine
+              Powered by SQ Link Engine
             </p>
             <p className="text-[8px] text-slate-700 font-bold uppercase tracking-widest">
               짤 2026 NEXT-GEN FIELD COMMUNICATION
@@ -271,6 +270,5 @@ export default function LandingPage() {
     </Suspense>
   );
 }
-
 
 

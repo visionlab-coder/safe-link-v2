@@ -1,145 +1,99 @@
-# SAFE-LINK V2
+# SQ Link V3
 
-SAFE-LINK V2 is a field communication web app for construction sites. It is built to deliver TBM (Tool Box Meeting) safety briefings from managers to foreign workers in each worker's native language, collect acknowledgment and signature records, and support 1:1 translated communication on site.
+SQ Link는 건설 현장의 TBM 안전교육, 근로자 확인/서명, 실시간 통역, 번역 채팅을 제공하는 현장 커뮤니케이션 애플리케이션이다.
 
-## Current Product Scope
+## 현재 상태
 
-This repository is currently focused on the PoC/beta path for the following core loop:
+- 기존 Next.js 화면 디자인, 주요 URL, 관리자/근로자 기능 흐름을 유지했다.
+- 인증, 권한, 현장 격리, 트랜잭션, 감사 로그, AI quota, 실시간 이벤트는 Spring Boot가 처리한다.
+- 데이터는 PostgreSQL/Flyway, 세션과 rate limit/quota는 Redis, 서명/첨부 메타데이터는 Object Storage 구조를 사용한다.
+- 실시간 통역 기본 경로는 Google STT + Papago + Google Translate fallback이다.
+- STT, TTS, Vision, 번역 공급자 호출은 Spring Boot 내부 AI Gateway에서 처리한다.
+- Chat, Live Interpreter, Travel Talk의 실시간 갱신은 Spring SSE를 사용한다.
+- Supabase Auth/RLS/Realtime/Service Role, Pusher, Gemini는 현재 V3 런타임 기준으로 사용하지 않는다.
+- Cloudflare/OpenNext 설정과 과거 migration/PoC 문서는 배포 전환 참고 자료로만 남아 있다.
 
-1. Admin signs in and creates a TBM notice
-2. The TBM is normalized from field slang into standard Korean
-3. Workers receive the TBM and read or listen in their preferred language
-4. Workers acknowledge and sign the TBM
-5. Admin monitors signed vs unsigned workers
-6. Admin and worker can continue with translated 1:1 chat
+코드 리팩토링 범위는 로컬 기준으로 완료했다. 운영 배포, 기존 운영 데이터 이관, OpenAI quota 활성화, Google Cloud Vision API 활성화, 운영 Secret/도메인/중앙 로그 구성은 코드 외 운영 조건이다.
 
-The swarm, HQ intelligence, and extended assistant layers in this repository should be treated as future-facing or demo-supporting features unless explicitly marked otherwise.
+## 기술 스택
 
-## Authoritative Documents
+- Frontend: Next.js + React + TypeScript + Tailwind CSS + Motion
+- Backend: Spring Boot + Spring Security + REST API + SSE + Spring Actuator
+- Database: PostgreSQL + Flyway
+- Session / Cache / Rate Limit: Redis
+- Storage: S3 / Cloudflare R2 / MinIO 호환 Object Storage
+- AI Gateway: Google STT/TTS/Translate + Naver Papago + OpenAI
+- Testing: JUnit + Spring Boot Test + Next.js production build
 
-- `SAFE-LINK_MASTER_SPEC_v1.0.md`
-  Current product and architecture baseline for the PoC
-- `SITE.md`
-  Route-level and feature-level implementation snapshot
-- `SAFE-LINK_AGENT_SPEC_v2.0.md`
-  Future vision for multi-agent expansion, not the current delivery baseline
-- `docs/POC_REHEARSAL_CHECKLIST.md`
-  End-to-end PoC pass/fail rehearsal checklist
-- `docs/TRANSLATION_VALIDATION_MATRIX.md`
-  Language validation sheet for field-safe TBM delivery
-- `docs/POC_DB_PRECHECK_GUIDE.md`
-  DB precheck and minimal-repair guide for PoC rehearsal
-- `docs/PRODUCTION_HARDENING_CHECKLIST.md`
-  File-by-file production hardening plan before commercialization
-- `docs/RLS_AUDIT_2026-04-30.md`
-  RLS audit findings and core policy hardening draft
+## 주요 기능
 
-## Stack
+1. 관리자 로그인, 승인 대기 가입, 역할/현장 권한 관리
+2. 근로자 quick login, QR/NFC 현장 입장
+3. TBM 작성, 배포, 확인, 서명, 현황 조회
+4. 관리자-근로자 번역 채팅과 읽음 처리
+5. 실시간 통역과 Travel Talk 2폰 대화
+6. AI 번역/STT/TTS/Vision quota 및 사용량 기록
+7. 보고서 발급/해시 검증
+8. Actuator 기반 API/DB/Redis/Storage/AI 상태 확인
 
-- Next.js App Router
-- Tailwind CSS
-- Supabase Auth / Postgres / Realtime
-- Cloudflare Workers via OpenNext for deployment
-- Google Cloud, OpenAI, and Naver Papago based speech/translation pipeline depending on route and fallback path
+## 로컬 실행
 
-## Key Routes
-
-- `/auth`
-  Sign-in and role entry flow
-- `/auth/setup`
-  Profile and site setup flow
-- `/admin`
-  Admin dashboard
-- `/admin/tbm/create`
-  TBM authoring and broadcast
-- `/admin/tbm/status`
-  TBM acknowledgment monitoring
-- `/admin/chat`
-  Admin-to-worker translated chat
-- `/worker`
-  Worker dashboard
-- `/worker/tbm/[id]`
-  Worker TBM review and signature
-- `/worker/chat`
-  Worker-to-admin translated chat
-- `/control`
-  HQ control view
-
-Additional feature routes exist for live interpretation, quiz, QR, vision, travel, and system administration.
-
-## Local Development
-
-Requirements:
+요구사항:
 
 - Node.js 20+
-- npm
-- Supabase project with required tables
+- Java 21
+- PostgreSQL
+- Redis
+- 선택 사항: S3/R2/MinIO 호환 Object Storage
 
-Install and run:
+Frontend:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`.
-
-## Required Environment Variables
-
-Browser and server:
+Backend:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+cd backend
+./gradlew bootRun
 ```
 
-Server-side integrations used by current routes:
+기본 주소:
 
-```bash
-GOOGLE_CLOUD_API_KEY=
-OPENAI_API_KEY=
-NAVER_CLIENT_ID=
-NAVER_CLIENT_SECRET=
-```
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:8080`
+- Health: `http://localhost:8080/actuator/health`
 
-Not every route requires every key, but the current translation and speech flows rely on these integrations across primary and fallback paths.
+환경변수와 실행 명령은 `docs/v3/SAFE_LINK_V3_DEVELOPER_COMMANDS.md`와 `backend/README.md`를 따른다. API key나 DB 비밀번호를 문서와 저장소에 기록하지 않는다.
 
-## Deployment
-
-This repository is configured for Cloudflare deployment through OpenNext.
-
-Relevant scripts:
+## 검증
 
 ```bash
 npm run build
-npm run preview
-npm run deploy
+npm audit
+
+cd backend
+./gradlew test bootJar --no-daemon
 ```
 
-Relevant config files:
+2026-07-10 기준 Next.js production build, Spring Boot test/bootJar, 전체 npm audit를 통과했다. Google TTS -> STT, Papago 번역, Live/Chat/Travel SSE, 보고서 발급/검증 smoke test도 통과했다.
 
-- `wrangler.toml`
-- `open-next.config.ts`
-- `next.config.ts`
+## 기준 문서
 
-Do not follow Vercel-first deployment instructions for this repository unless you are intentionally creating a separate Vercel deployment path.
+- `docs/v3/SAFE_LINK_V3_IMPLEMENTATION_STATUS.md`: 실제 구현 상태와 코드 외 잔여 조건
+- `docs/v3/SAFE_LINK_V3_PHASE1_COMPLETION_REPORT.md`: 검증 결과와 완료 판단
+- `docs/v3/SAFE_LINK_COMMERCIAL_STABILIZATION_CRITERIA.md`: 상용 안정화 기준
+- `docs/v3/SAFE_LINK_V3_DEVELOPER_COMMANDS.md`: 개발/검증 명령과 금지 패턴
+- `docs/v3/SEOWON_CONSTRUCTION_BRIEFING.md`: 대표 및 팀 브리핑 요약
 
-## Current PoC Readiness
+## 운영 전 별도 작업
 
-The repository is closest to a strong PoC / beta candidate, not a fully production-hardened release.
-
-Strong areas:
-
-- Admin/worker split
-- TBM create/read/sign flow
-- 1:1 translated chat
-- Speech and translation integrations
-- Supabase-backed persistence
-
-Still needs cleanup before a stable field PoC:
-
-- Document consistency
-- Route/API contract alignment in specs
-- Translation quality validation by target language
-- Deployment/ops documentation cleanup
-- One full rehearsal log for the end-to-end TBM cycle
+- 운영 PostgreSQL/Redis/Object Storage 준비와 기존 데이터 이관
+- OpenAI 결제/사용 한도 활성화
+- Google Cloud Vision API 활성화
+- HTTPS, production cookie, CORS, 도메인 설정
+- Secret Manager, 중앙 로그, 백업, 모니터링/알림, CI/CD 구성
+- 실제 고객 계정과 기기를 이용한 전체 UAT
+- 배포 방식 확정 후 Cloudflare/OpenNext/과거 환경변수 정리

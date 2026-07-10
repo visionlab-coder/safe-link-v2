@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
-import { createClient } from "@/utils/supabase/client";
 import ExportMenu from "@/components/ExportMenu";
 import { exportData, type ExportFormat } from "@/utils/export-files";
 import { BarChart3, ArrowLeft, RefreshCw, Shield, Users, AlertTriangle, PenLine, Link, Mic } from "lucide-react";
@@ -130,23 +129,19 @@ export default function AdminEsgPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) return;
-      const { data: prof } = await supabase.from("profiles").select("role, site_id").eq("id", session.user.id).maybeSingle();
-      const isHq = ["HQ_ADMIN", "ROOT", "HQ_OFFICER", "SUPER_ADMIN"].includes((prof as { role?: string } | null)?.role ?? "");
-
-      let siteRows: Site[] = [];
-      if (isHq) {
-        const { data } = await supabase.from("sites").select("id, name, code").order("name");
-        siteRows = (data ?? []) as Site[];
-      } else if ((prof as { site_id?: string } | null)?.site_id) {
-        const { data } = await supabase.from("sites").select("id, name, code").eq("id", (prof as { site_id: string }).site_id).limit(1);
-        siteRows = (data ?? []) as Site[];
+    Promise.all([
+      fetch("/api/auth/me", { cache: "no-store", credentials: "include" }),
+      fetch("/api/sites/options", { cache: "no-store", credentials: "include" }),
+    ]).then(async ([meRes, sitesRes]) => {
+      if (!meRes.ok || !sitesRes.ok) {
+        setLoadingSites(false);
+        return;
       }
-
+      const me = await meRes.json() as { profile?: { site_id?: string | null } | null };
+      const siteData = await sitesRes.json() as { sites?: Site[] };
+      const siteRows = siteData.sites ?? [];
       setSites(siteRows);
-      setSelectedSiteId((prof as { site_id?: string } | null)?.site_id ?? siteRows[0]?.id ?? "");
+      setSelectedSiteId(me.profile?.site_id ?? siteRows[0]?.id ?? "");
       setLoadingSites(false);
     });
   }, []);

@@ -1,6 +1,6 @@
 import "server-only";
 /**
- * SAFE-LINK — 근로자 스티커 HMAC 서명 (특허 핵심 보안 레이어)
+ * SQ Link — 근로자 스티커 HMAC 서명 (특허 핵심 보안 레이어)
  *
  * 페이로드:  `${worker_id}|${sig_version}|${issued_epoch}`
  * 서명:      base64url( HMAC-SHA256( NFC_STICKER_SECRET, payload ) )

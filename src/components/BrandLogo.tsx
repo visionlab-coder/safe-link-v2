@@ -31,7 +31,7 @@ export default function BrandLogo({
       {showProduct && (
         <div className="hidden sm:flex flex-col border-l border-white/10 pl-3 leading-none">
           <span className="text-[10px] font-black uppercase tracking-[0.34em] text-blue-300/80">
-            SAFE-LINK
+            SQ Link
           </span>
           <span className="mt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">
             Field Safety OS

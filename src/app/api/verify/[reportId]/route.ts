@@ -20,8 +20,7 @@ export async function GET(
   const { reportId } = await params;
   const providedHash = req.nextUrl.searchParams.get("h");
 
-  // UUID 검증 (오용 방지)
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reportId)) {
+  if (!/^[a-zA-Z0-9_-]{1,120}$/.test(reportId)) {
     return NextResponse.json({ ok: false, error: "invalid_report_id" }, { status: 400 });
   }
 
@@ -38,7 +37,7 @@ export async function GET(
         integrity: result.integrity,
         // 사용자가 직접 비교할 수 있도록 안내
         notice:
-          "이 보고서는 SAFE-LINK 시스템에서 발급되었습니다. " +
+          "이 보고서는 SQ Link 시스템에서 발급되었습니다. " +
           "SHA-256 해시와 인지 해시가 모두 일치하면 보고서가 변조되지 않은 것입니다.",
       },
       {

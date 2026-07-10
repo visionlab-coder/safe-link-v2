@@ -1,6 +1,6 @@
 "use client";
 
-// 🔐 SAFE-LINK 개발자 콘솔 (/root) — "나만"(DEVELOPER_EMAILS) 전용.
+// 🔐 SQ Link 개발자 콘솔 (/root) — "나만"(DEVELOPER_EMAILS) 전용.
 // 마스터 관리자와 별개. API 키 런타임 교체 → 재배포 없이 즉시 적용. 프로덕션 상시 동작.
 
 import { useEffect, useState } from "react";
@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 type Masked = {
     translateEngine?: string;
     papagoId?: string; papagoSecret?: string;
-    googleKey?: string; geminiKey?: string; flittoToken?: string;
+    googleKey?: string;
     updatedAt?: string; updatedBy?: string;
 };
 type Audit = { at: string; by: string; engine?: string; fields: string[] };
@@ -18,16 +18,12 @@ const ENGINES = [
     { v: "m2m100", label: "M2M100 (오픈소스·로컬)" },
     { v: "papago", label: "Papago (네이버)" },
     { v: "google", label: "Google Translate" },
-    { v: "gemini", label: "Gemini (건설문맥)" },
-    { v: "flitto", label: "Flitto" },
 ];
 
 const KEY_FIELDS: { k: keyof Masked; label: string }[] = [
     { k: "papagoId", label: "Papago Client ID" },
     { k: "papagoSecret", label: "Papago Client Secret" },
     { k: "googleKey", label: "Google Cloud API Key" },
-    { k: "geminiKey", label: "Gemini API Key" },
-    { k: "flittoToken", label: "Flitto Token" },
 ];
 
 const C = {
@@ -94,7 +90,7 @@ export default function RootDevConsole() {
         <>
             <h1 style={{ fontSize: 20, fontWeight: 700 }}>🔐 접근 권한 없음</h1>
             <p style={{ color: C.red, marginTop: 12, lineHeight: 1.6 }}>
-                개발자 콘솔은 <b>SAFE-LINK 개발자(DEVELOPER_EMAILS)</b>만 접근할 수 있습니다.
+                개발자 콘솔은 <b>SQ Link 개발자(DEVELOPER_EMAILS)</b>만 접근할 수 있습니다.
                 마스터 관리자 권한으로도 이 페이지는 열 수 없습니다.
             </p>
         </>

@@ -13,13 +13,8 @@ export function masked(value?: string) {
     };
 }
 
-export function getGeminiKey() {
-    return (
-        process.env.GEMINI_API_KEY ||
-        process.env.GOOGLE_AI_API_KEY ||
-        process.env.GOOGLE_CLOUD_API_KEY ||
-        ""
-    ).trim();
+export function getOpenAiKey() {
+    return (process.env.OPENAI_API_KEY || "").trim();
 }
 
 export function normalizeLang(code: string) {

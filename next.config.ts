@@ -13,15 +13,13 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     // ⚠️ dev 모드는 Next HMR이 eval을 사용 → 'unsafe-eval' 없으면 클라이언트 JS 차단(하이드레이션 실패=클릭 전멸).
-    //    프로덕션은 eval 미사용 → 엄격 CSP 유지(보안). dev에서만 unsafe-eval + localhost/Flitto WS 허용.
+    //    프로덕션은 eval 미사용 → 엄격 CSP 유지(보안). dev에서만 unsafe-eval + localhost 허용.
     const isDev = process.env.NODE_ENV !== "production";
     const scriptSrc = `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`;
     const connectSrc = [
       "connect-src 'self'",
-      "https://*.supabase.co wss://*.supabase.co",
       "https://generativelanguage.googleapis.com https://sheets.googleapis.com https://www.googleapis.com",
       "https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.xethub.hf.co",
-      "wss://ai-realtime-dev.flit.to",  // Flitto RTT (실시간 STT/번역) — 플래그 ON 시 브라우저가 직접 연결
       isDev ? "ws://localhost:* http://localhost:*" : "",
     ].filter(Boolean).join(" ");
     return [

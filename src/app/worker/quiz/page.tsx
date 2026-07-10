@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
-import { createClient } from "@/utils/supabase/client";
 import { CheckCircle, XCircle, Brain, ChevronRight } from "lucide-react";
 
 const i18n: Record<string, Record<string, string>> = {
@@ -88,17 +87,10 @@ export default function WorkerQuizPage() {
 
   useEffect(() => {
     const load = async () => {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push("/auth/login"); return; }
-
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("preferred_lang")
-        .eq("id", session.user.id)
-        .maybeSingle();
-
-      const workerLang = (prof as { preferred_lang?: string } | null)?.preferred_lang ?? "ko";
+      const meRes = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+      if (!meRes.ok) { router.push("/auth/login"); return; }
+      const me = await meRes.json() as { profile?: { preferred_lang?: string | null } | null };
+      const workerLang = me.profile?.preferred_lang ?? "ko";
       setLang(workerLang);
 
       // auth_user_id → nfc_workers.id → tbm_quiz_responses 조회 (ID 불일치 방지)

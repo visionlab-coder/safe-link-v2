@@ -50,7 +50,7 @@ export default async function VerifyReportPage({
       <div className="max-w-2xl mx-auto">
         <div className="mb-8">
           <p className="text-xs font-black tracking-widest text-blue-400 uppercase">
-            SAFE-LINK · 보고서 무결성 검증
+            SQ Link · 보고서 무결성 검증
           </p>
           <h1 className="text-3xl font-black mt-2">
             {allOk ? "✅ 검증 성공" : sha === false || perc === false ? "🚨 변조 감지" : "⚠️ 부분 검증"}
@@ -108,7 +108,7 @@ export default async function VerifyReportPage({
         </div>
 
         <div className="text-xs text-slate-500 text-center">
-          본 검증은 SAFE-LINK V2 시스템이 자동 산출한 결과입니다.
+          본 검증은 SQ Link V2 시스템이 자동 산출한 결과입니다.
           <br />
           특허 청구항 11 무결성 검증 메커니즘에 따라 보고서 변조 여부를 판단합니다.
         </div>

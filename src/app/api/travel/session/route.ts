@@ -1,16 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 export const runtime = "nodejs";
 import { generateTravelToken } from '@/lib/travel-auth';
-
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1분
-const RATE_LIMIT_MAX = 5;
-
-interface RateLimitEntry {
-    count: number;
-    resetAt: number;
-}
-
-const rateLimitMap = new Map<string, RateLimitEntry>();
+import { checkTravelSessionLimit } from '@/utils/rate-limit';
 
 function getClientIp(req: NextRequest): string {
     return (
@@ -22,21 +13,21 @@ function getClientIp(req: NextRequest): string {
 
 export async function POST(req: NextRequest) {
     const ip = getClientIp(req);
-    const now = Date.now();
-    const entry = rateLimitMap.get(ip);
-
-    if (entry && now < entry.resetAt) {
-        if (entry.count >= RATE_LIMIT_MAX) {
-            return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
-        }
-        entry.count += 1;
-    } else {
-        rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    if (!(await checkTravelSessionLimit(ip))) {
+        return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
     }
 
     try {
         const token = generateTravelToken();
-        return NextResponse.json({ token });
+        const response = NextResponse.json({ token });
+        response.cookies.set("SAFE_LINK_TRAVEL", token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            path: "/api/travel",
+            maxAge: 24 * 60 * 60,
+        });
+        return response;
     } catch {
         return NextResponse.json({ error: 'Session creation failed' }, { status: 500 });
     }

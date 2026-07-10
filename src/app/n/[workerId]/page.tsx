@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Globe2, Loader2, ShieldCheck } from "lucide-react";
-import { createClient } from "@/utils/supabase/client";
+import { logoutV3 } from "@/lib/v3-auth";
 
 type CountryOption = {
   code: string;
@@ -62,7 +62,6 @@ const COUNTRIES: CountryOption[] = [
 function NfcWorkerEntryInner() {
   const { workerId } = useParams<{ workerId: string }>();
   const searchParams = useSearchParams();
-  const supabase = createClient();
 
   const [phase, setPhase] = useState<"checking" | "select" | "saving" | "active_options" | "checked_out">("checking");
   const [selected, setSelected] = useState<CountryOption>(COUNTRIES[0]);
@@ -83,7 +82,7 @@ function NfcWorkerEntryInner() {
 
   const getDeviceLocation = async (): Promise<DeviceLocation> => {
     if (!navigator.geolocation) {
-      throw new Error("Location is required to use SAFE-LINK at the worksite.");
+      throw new Error("Location is required to use SQ Link at the worksite.");
     }
 
     return new Promise((resolve, reject) => {
@@ -122,17 +121,10 @@ function NfcWorkerEntryInner() {
     if (!res.ok) throw new Error(nfcErrorMessage(data.error || data.detail || "NFC access failed."));
 
     if (data.access?.action === "checked_out" || data.access?.active === false) {
-      await supabase.auth.signOut();
+      await logoutV3().catch(() => undefined);
       window.sessionStorage.removeItem("safe-link-session-active");
       setPhase("checked_out");
       return;
-    }
-
-    // Session is now established server-side via Set-Cookie headers —
-    // no token_hash exchange needed on the client (patch C-4/C-6).
-    // We call getSession to pick up the cookie the server just wrote.
-    if (data.session_established) {
-      await supabase.auth.getSession();
     }
 
     if (data.access?.action === "checkout_required") {
@@ -155,7 +147,7 @@ function NfcWorkerEntryInner() {
   };
 
   const checkout = async () => {
-    if (!window.confirm("퇴근 처리 후 오늘은 SAFE-LINK 모든 기능이 중지됩니다. 계속하시겠습니까?")) {
+    if (!window.confirm("퇴근 처리 후 오늘은 SQ Link 모든 기능이 중지됩니다. 계속하시겠습니까?")) {
       return;
     }
     const nationality = activePreference?.nationality ?? selected.code;
@@ -237,7 +229,7 @@ function NfcWorkerEntryInner() {
           <ShieldCheck className="w-12 h-12 mx-auto text-green-400 mb-4" />
           <h1 className="text-xl font-bold mb-2">Checked out</h1>
           <p className="text-sm text-gray-400">
-            SAFE-LINK access is inactive for today. Tap the NFC card again tomorrow morning at the worksite to activate it.
+            SQ Link access is inactive for today. Tap the NFC card again tomorrow morning at the worksite to activate it.
           </p>
         </section>
       </main>
@@ -251,7 +243,7 @@ function NfcWorkerEntryInner() {
           <ShieldCheck className="w-12 h-12 text-blue-400 mb-4" />
           <h1 className="text-xl font-bold mb-2">Already checked in</h1>
           <p className="text-sm text-gray-400 mb-5">
-            You are active for today. Choose SAFE-LINK access or finish work and upload today&apos;s safety log.
+            You are active for today. Choose SQ Link access or finish work and upload today&apos;s safety log.
           </p>
           {error && (
             <div className="bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-red-300 text-sm mb-4">
@@ -275,7 +267,7 @@ function NfcWorkerEntryInner() {
               onClick={continueToSafeLink}
               className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-colors"
             >
-              Open SAFE-LINK
+              Open SQ Link
             </button>
             <button
               type="button"
@@ -298,7 +290,7 @@ function NfcWorkerEntryInner() {
             <ShieldCheck className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-xl font-bold">SAFE-LINK</h1>
+            <h1 className="text-xl font-bold">SQ Link</h1>
             <p className="text-sm text-gray-400">Worker NFC access</p>
           </div>
         </div>
@@ -307,7 +299,7 @@ function NfcWorkerEntryInner() {
           <div className="flex items-start gap-3">
             <Globe2 className="w-5 h-5 text-blue-400 mt-0.5 shrink-0" />
             <p className="text-sm text-gray-300">
-              Select your country to check in to SAFE-LINK.
+              Select your country to check in to SQ Link.
             </p>
           </div>
         </div>
@@ -360,7 +352,7 @@ function NfcWorkerEntryInner() {
               Logging in...
             </>
           ) : (
-            "Continue to SAFE-LINK"
+            "Continue to SQ Link"
           )}
         </button>
 

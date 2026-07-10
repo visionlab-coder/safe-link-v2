@@ -1,36 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 export const runtime = "nodejs";
-import { createServiceClient } from '@/utils/supabase/service';
 import { getCookieUser } from '@/utils/auth/cookie-user';
 import { verifyTravelToken } from '@/lib/travel-auth';
 import { checkTranslateLimit } from '@/utils/rate-limit';
 import { CONSTRUCTION_GLOSSARY } from '@/constants/glossary';
 import { getErrorMessage } from '@/utils/errors';
 import { getLabOverride } from '@/utils/lab/engine-config';
-import { resolveRequestAccessToken } from '@/utils/auth/access-token-core';
-import { verifyAccessToken } from '@/utils/auth/verify-access-token';
 import { withMobileCors, handleMobilePreflight } from '@/utils/auth/mobile-cors';
 import { hangulize } from '@/utils/hangulize';
 import { stripEmoji } from '@/utils/strip-emoji';
 import pinyin from 'tiny-pinyin';
 import { preProcessWithGlossary } from '@/utils/construction-glossary';
 import { formalizeKo } from '@/utils/politeness';
-import {
-    PAPAGO_TIMEOUT_MS,
-    GOOGLE_TRANSLATE_TIMEOUT_MS,
-    GEMINI_TRANSLATE_TIMEOUT_MS,
-    GEMINI_PRONUNCIATION_TIMEOUT_MS,
-} from '@/constants/quality-config';
+import { callInternalAiTranslate, callV3AiVendor } from '@/utils/ai/v3-ai-gateway';
+import { SAFE_LINK_V3_API_BASE_URL } from '@/utils/auth/v3-proxy';
 
 interface CloudTranslateResponse {
     data?: { translations?: Array<{ translatedText?: string }> };
     error?: { message?: string };
-}
-
-interface GeminiResponse {
-    candidates?: Array<{
-        content?: { parts?: Array<{ text?: string }> };
-    }>;
 }
 
 interface LocalM2M100Response {
@@ -49,10 +36,15 @@ interface MultilingualGlossaryTerm {
     language: string;
 }
 
+type V3AiVendorContext = {
+    request: NextRequest;
+    siteId: number;
+};
+
 /**
  * 하이브리드 번역 API
  * 1단계: Google Cloud Translation API (0.3초, 고품질 번역)
- * 2단계: Gemini 2.5 Flash (발음 + 역번역) — 1단계와 병렬 실행
+ * 2단계: Spring AI Gateway의 문맥 보정 + 역번역/발음 — 1단계와 병렬 실행
  */
 async function handleTranslate(request: NextRequest): Promise<NextResponse> {
     // 인증: travel_token(Travel Talk) | 📱 모바일 Bearer JWT | 웹 cookie
@@ -60,6 +52,7 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
     const authHeader = request.headers.get('authorization');
     const isMobile = request.headers.get('x-safe-link-client') === 'mobile';
     let rateLimitKey: string;
+    let v3AiVendorContext: V3AiVendorContext | null = null;
     if (authHeader?.startsWith('Bearer ') && !isMobile) {
         const token = authHeader.slice(7);
         if (!verifyTravelToken(token)) {
@@ -68,20 +61,18 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
         // travel token은 IP 기반 제한
         rateLimitKey = `ip:${request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown"}`;
     } else if (isMobile) {
-        // 📱 모바일 Bearer(Supabase JWT) — 서명검증 (S-005)
-        const resolved = resolveRequestAccessToken({ authorization: authHeader, rawCookie: null });
-        const verified = resolved ? await verifyAccessToken(resolved.accessToken) : null;
-        if (!verified) {
-            return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-        }
-        rateLimitKey = `uid:${verified.sub}`;
+        return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     } else {
         // P5 박제: createServerClient.getUser() → getCookieUser() (raw JWT 파싱)
-        const user = await getCookieUser();
+        const user = await getCookieUser({ allowV3: true });
         if (!user) {
             return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
         }
         rateLimitKey = `uid:${user.id}`;
+        const firstSiteId = user.siteIds?.[0];
+        if (user.source === "v3" && typeof firstSiteId === "number") {
+            v3AiVendorContext = { request, siteId: firstSiteId };
+        }
     }
 
     if (!(await checkTranslateLimit(rateLimitKey))) {
@@ -90,7 +81,7 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
 
     // 🧪 Lab 런타임 오버라이드: 운영(APP_MODE!=lab)에선 항상 null → 아래 모든 분기는 기존 env 그대로.
     const lab = await getLabOverride();
-    const apiKey = lab?.googleKey || process.env.GOOGLE_CLOUD_API_KEY?.trim();
+    const internalGatewayConfigured = Boolean(process.env.TRAVEL_API_SECRET?.trim());
 
     try {
         const { text, sl, tl, fast, pronunciation: includePronunciation = true } = await request.json();
@@ -157,48 +148,43 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
             }
         }
 
-        if (!apiKey) {
+        if (!internalGatewayConfigured && !v3AiVendorContext) {
             return NextResponse.json({
-                error: "M2M100 unavailable and GOOGLE_CLOUD_API_KEY is missing",
+                error: "Translation gateway is not configured",
             }, { status: 503 });
         }
 
         // === 1. Naver Papago (아시아권 언어 고품질 번역) ===
-        const NAVER_ID = lab?.papagoId || process.env.NAVER_CLIENT_ID?.trim();
-        const NAVER_SECRET = lab?.papagoSecret || process.env.NAVER_CLIENT_SECRET?.trim();
-
         // 파파고 지원 언어 목록
         const papagoLangs = ['ko', 'en', 'zh-CN', 'vi', 'id', 'th', 'ru', 'ja', 'fr', 'es'];
         // 🧪 Lab 강제 엔진: forced 지정 시 해당 엔진만 사용(운영은 forced=undefined → 기존 우선순위)
         const usePapago = (forced ? forced === "papago" : true)
-            && NAVER_ID && NAVER_SECRET && papagoLangs.includes(sourceLang) && papagoLangs.includes(targetLang);
+            && papagoLangs.includes(sourceLang) && papagoLangs.includes(targetLang);
 
         let translatedText = "";
         let engine = "google";
 
         if (usePapago) {
             try {
-                const papagoCtrl = new AbortController();
-                const papagoTimeout = setTimeout(() => papagoCtrl.abort(), PAPAGO_TIMEOUT_MS);
-                const papagoRes = await fetch('https://papago.apigw.ntruss.com/nmt/v1/translation', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                        'X-NCP-APIGW-API-KEY-ID': NAVER_ID!,
-                        'X-NCP-APIGW-API-KEY': NAVER_SECRET!,
-                    },
-                    body: new URLSearchParams({
-                        source: sourceLang,
-                        target: targetLang,
+                if (v3AiVendorContext) {
+                    const papagoData = await callV3AiVendor(v3AiVendorContext.request, {
+                        siteId: v3AiVendorContext.siteId,
+                        feature: "translate",
+                        provider: "papago",
+                        sourceLanguage: sourceLang,
+                        targetLanguage: targetLang,
                         text: processedText,
-                    }),
-                    signal: papagoCtrl.signal,
-                });
-                clearTimeout(papagoTimeout);
-
-                if (papagoRes.ok) {
-                    const papagoData = await papagoRes.json();
-                    translatedText = papagoData.message?.result?.translatedText || "";
+                    });
+                    translatedText = papagoData?.text || "";
+                    if (translatedText) engine = "papago";
+                } else {
+                    const papagoData = await callInternalAiTranslate({
+                        provider: "papago",
+                        sourceLanguage: sourceLang,
+                        targetLanguage: targetLang,
+                        text: processedText,
+                    });
+                    translatedText = papagoData?.text || "";
                     if (translatedText) engine = "papago";
                 }
             } catch (err) {
@@ -206,53 +192,74 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
             }
         }
 
-        // === 1.5. Gemini 건설현장 번역 (비Papago 언어 + Papago 실패 시) ===
-        // Google 단독으로는 건설 안전 문맥 없이 직역 → 오역/오해 위험
-        // LOW-2 fix: Papago 장애 시에도 Gemini 건설 컨텍스트 번역 시도
-        if (!translatedText && forced !== "google") {
-            const geminiTranslated = await geminiConstructionTranslate(processedText, sl, tl, apiKey);
-            if (geminiTranslated) {
-                translatedText = geminiTranslated;
-                engine = "gemini";
+        // === 1.5. 비Papago 언어의 건설현장 문맥 번역 ===
+        if (!translatedText && forced !== "google" && v3AiVendorContext) {
+            const contextualTranslation = await contextualConstructionTranslate(processedText, sl, tl, v3AiVendorContext);
+            if (contextualTranslation) {
+                translatedText = contextualTranslation;
+                engine = "openai-context";
             }
         }
 
         // === 2. Google Cloud Translation (기본 및 폴백) ===
         if (!translatedText) {
-            const googleCtrl = new AbortController();
-            const googleTimeout = setTimeout(() => googleCtrl.abort(), GOOGLE_TRANSLATE_TIMEOUT_MS);
-            const cloudTranslate = (q: string, source: string, target: string) =>
-                fetch(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ q, source, target, format: 'text' }),
-                    signal: googleCtrl.signal,
-                }).then(r => r.json() as Promise<CloudTranslateResponse>);
+            const cloudTranslate = async (q: string, source: string, target: string) => {
+                if (v3AiVendorContext) {
+                    const translated = await callV3AiVendor(v3AiVendorContext.request, {
+                        siteId: v3AiVendorContext.siteId,
+                        feature: "translate",
+                        provider: "google",
+                        sourceLanguage: source,
+                        targetLanguage: target,
+                        text: q,
+                    });
+                    return { data: { translations: [{ translatedText: translated?.text || "" }] } } as CloudTranslateResponse;
+                }
+                const translated = await callInternalAiTranslate({
+                    provider: "google",
+                    sourceLanguage: source,
+                    targetLanguage: target,
+                    text: q,
+                });
+                return { data: { translations: [{ translatedText: translated?.text || "" }] } } as CloudTranslateResponse;
+            };
 
             try {
                 const translated = await cloudTranslate(processedText, sourceLang, targetLang);
-                clearTimeout(googleTimeout);
                 translatedText = translated.data?.translations?.[0]?.translatedText || "";
             } catch (err) {
-                clearTimeout(googleTimeout);
                 console.error("[Translation API] Google Translate error:", err);
             }
         }
 
         if (!translatedText) {
-            return await geminiFullFallback(apiKey, processedText, sl, tl);
+            return await aiFullFallback(processedText, sl, tl, v3AiVendorContext);
         }
 
         // === 3. 역번역 및 발음 처리 (Google로 통일하여 속도 확보) ===
-        const cloudTranslateFast = (q: string, source: string, target: string) =>
-            fetch(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ q, source, target, format: 'text' }),
-            }).then(r => r.json() as Promise<CloudTranslateResponse>);
+        const cloudTranslateFast = async (q: string, source: string, target: string) => {
+            if (v3AiVendorContext) {
+                const translated = await callV3AiVendor(v3AiVendorContext.request, {
+                    siteId: v3AiVendorContext.siteId,
+                    feature: "translate",
+                    provider: "google",
+                    sourceLanguage: source,
+                    targetLanguage: target,
+                    text: q,
+                });
+                return { data: { translations: [{ translatedText: translated?.text || "" }] } } as CloudTranslateResponse;
+            }
+            const translated = await callInternalAiTranslate({
+                provider: "google",
+                sourceLanguage: source,
+                targetLanguage: target,
+                text: q,
+            });
+            return { data: { translations: [{ translatedText: translated?.text || "" }] } } as CloudTranslateResponse;
+        };
 
         // 2단계: 역번역 + 발음 생성을 완전 병렬 실행
-        // fast=true: Gemini 발음 생성 스킵 → 번역 즉시 반환 (실시간 통역 폴백 경로 고속화)
+        // fast=true: AI 발음 생성 스킵 → 번역 즉시 반환 (실시간 통역 폴백 경로 고속화)
         const shouldGeneratePronunciation = includePronunciation !== false && !fast;
         const pronTarget = tl === 'ko' ? processedText : translatedText;
         const pronLang = tl === 'ko' ? sl : tl;
@@ -273,16 +280,16 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
                 ? cloudTranslateFast(pronTarget, (tl === 'ko' ? sourceLang : targetLang), 'en')
                 : Promise.resolve(null),
             (shouldGeneratePronunciation && isChinese)
-                ? generateChinesePronunciation(apiKey, pronTarget)
+                ? generateChinesePronunciation(pronTarget, v3AiVendorContext)
                 : Promise.resolve(""),
             (shouldGeneratePronunciation && isJapanese)
-                ? generateJapanesePronunciation(apiKey, pronTarget)
+                ? generateJapanesePronunciation(pronTarget, v3AiVendorContext)
                 : Promise.resolve(""),
             (shouldGeneratePronunciation && isThai)
-                ? generateThaiPronunciation(apiKey, pronTarget)
+                ? generateThaiPronunciation(pronTarget, v3AiVendorContext)
                 : Promise.resolve(""),
             (shouldGeneratePronunciation && isNonLatinOther)
-                ? generateNonLatinPronunciation(apiKey, pronTarget, pronLang)
+                ? generateNonLatinPronunciation(pronTarget, pronLang, v3AiVendorContext)
                 : Promise.resolve(""),
         ]);
 
@@ -346,7 +353,7 @@ export async function POST(request: NextRequest) {
 }
 
 
-/** 서버사이드 glossary fetch — 서비스 롤 클라이언트로 RLS 우회 */
+/** 서버사이드 번역 fallback */
 const M2M100_LANG_MAP: Record<string, string> = {
     ko: "ko", en: "en", zh: "zh", vi: "vi", th: "th", uz: "uz",
     ph: "tl", tl: "tl", km: "km", id: "id", mn: "mn", my: "my",
@@ -421,35 +428,22 @@ async function fetchMultilingualGlossary(): Promise<MultilingualGlossaryTerm[]> 
     }
 
     try {
-        const sb = createServiceClient();
-        const { data, error } = await sb
-            .from("site_term_translations")
-            .select("glossary_id, pivot_en, lang_code, local_slang, construction_glossary(standard)");
-        if (error || !data) return _multilingualGlossaryCache ?? [];
-
-        const rows = data as unknown as Array<{
-            glossary_id: number;
-            pivot_en: string;
-            lang_code: string;
-            local_slang: string;
-            construction_glossary: { standard?: string } | Array<{ standard?: string }> | null;
-        }>;
-        _multilingualGlossaryCache = rows.flatMap((row) => {
-            const relation = Array.isArray(row.construction_glossary)
-                ? row.construction_glossary[0]
-                : row.construction_glossary;
-            const standard = relation?.standard?.trim() || "";
-            const standardCore = standard.split(/[,(]/)[0].trim();
-            const pivotMatch = row.pivot_en?.match(/\(([^)]+)\)/);
-            const pivotEnglish = (pivotMatch?.[1] || row.pivot_en || "").trim();
-            if (!standardCore || !pivotEnglish || !row.local_slang?.trim()) return [];
+        const response = await fetch(`${SAFE_LINK_V3_API_BASE_URL}/api/v1/glossary/translations`, {
+            cache: "no-store",
+        });
+        if (!response.ok) return _multilingualGlossaryCache ?? [];
+        const payload = await response.json() as { terms?: MultilingualGlossaryTerm[] };
+        _multilingualGlossaryCache = (payload.terms ?? []).flatMap((term) => {
+            const standardCore = term.standardCore?.trim();
+            const pivotEnglish = term.pivotEnglish?.match(/\(([^)]+)\)/)?.[1] || term.pivotEnglish;
+            if (!standardCore || !pivotEnglish?.trim() || !term.localTerm?.trim()) return [];
             return [{
-                glossaryId: row.glossary_id,
-                standard,
+                glossaryId: term.glossaryId,
+                standard: term.standard,
                 standardCore,
-                pivotEnglish,
-                localTerm: row.local_slang.trim(),
-                language: normalizeGlossaryLanguage(row.lang_code),
+                pivotEnglish: pivotEnglish.trim(),
+                localTerm: term.localTerm.trim(),
+                language: normalizeGlossaryLanguage(term.language),
             }];
         });
         _multilingualGlossaryCacheAt = Date.now();
@@ -570,12 +564,14 @@ async function fetchGlossaryServer(): Promise<Record<string, string>> {
         return _serverGlossaryCache;
     }
     try {
-        const sb = createServiceClient();
-        const { data, error } = await sb
-            .from('construction_glossary')
-            .select('slang, standard')
-            .eq('is_active', true);
-        if (error || !data?.length) {
+        const response = await fetch(`${SAFE_LINK_V3_API_BASE_URL}/api/v1/glossary?active=true`, {
+            cache: "no-store",
+        });
+        const payload = response.ok
+            ? await response.json() as { terms?: Array<{ slang: string; standard: string }> }
+            : null;
+        const data = payload?.terms ?? [];
+        if (!response.ok || data.length === 0) {
             _serverGlossaryCache = CONSTRUCTION_GLOSSARY;
         } else {
             const dict: Record<string, string> = { ...CONSTRUCTION_GLOSSARY };
@@ -590,8 +586,8 @@ async function fetchGlossaryServer(): Promise<Record<string, string>> {
     return _serverGlossaryCache;
 }
 
-/** 중국어 → 한글 발음 생성 (Gemini 2.5 Flash, 국립국어원 표준 기반) */
-async function generateChinesePronunciation(apiKey: string, chineseText: string): Promise<string> {
+/** 중국어 → 한글 발음 생성 (Spring AI Gateway, 국립국어원 표준 기반) */
+async function generateChinesePronunciation(chineseText: string, v3Context: V3AiVendorContext | null = null): Promise<string> {
     if (!chineseText || chineseText.length > 2000) return "";
     try {
         const prompt = `다음 중국어 텍스트를 **한국어 한글로 읽는 발음**으로 변환해주세요.
@@ -608,39 +604,30 @@ async function generateChinesePronunciation(apiKey: string, chineseText: string)
 
 발음:`;
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), GEMINI_PRONUNCIATION_TIMEOUT_MS);
+        if (v3Context) {
+            const result = await callV3AiVendor(v3Context.request, {
+                siteId: v3Context.siteId,
+                feature: "translate",
+                provider: "openai-prompt",
+                sourceLanguage: "zh-CN",
+                targetLanguage: "ko",
+                text: chineseText,
+                prompt,
+                maxOutputTokens: 1024,
+                temperature: 0.2,
+            });
+            const koreanOnly = (result?.text || "").replace(/[^\uAC00-\uD7A3\s]/g, "").trim();
+            return koreanOnly.length >= 1 ? koreanOnly : "";
+        }
 
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-                signal: controller.signal,
-                body: JSON.stringify({
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                    generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
-                }),
-            }
-        );
-
-        clearTimeout(timeout);
-        if (!response.ok) return "";
-
-        const data = await response.json() as GeminiResponse;
-        const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        // 한글·공백·구두점만 허용 (혹시 라틴/한자 섞여있으면 거부)
-        if (!result) return "";
-        // 한글·공백·구두점만 추출 (괄호 안 원문 표기 등 비한글 제거)
-        const koreanOnly = result.replace(/[^\uAC00-\uD7A3\s]/g, "").trim();
-        return koreanOnly.length >= 1 ? koreanOnly : "";
+        return "";
     } catch {
         return "";
     }
 }
 
-/** 일본어 → 한글 발음 생성 (Gemini 2.5 Flash, 국립국어원 표준 기반) */
-async function generateJapanesePronunciation(apiKey: string, japaneseText: string): Promise<string> {
+/** 일본어 → 한글 발음 생성 (Spring AI Gateway, 국립국어원 표준 기반) */
+async function generateJapanesePronunciation(japaneseText: string, v3Context: V3AiVendorContext | null = null): Promise<string> {
     if (!japaneseText || japaneseText.length > 2000) return "";
     try {
         const prompt = `다음 일본어 텍스트를 **한국어 한글로 읽는 발음**으로 변환해주세요.
@@ -656,37 +643,30 @@ async function generateJapanesePronunciation(apiKey: string, japaneseText: strin
 
 발음:`;
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), GEMINI_PRONUNCIATION_TIMEOUT_MS);
+        if (v3Context) {
+            const result = await callV3AiVendor(v3Context.request, {
+                siteId: v3Context.siteId,
+                feature: "translate",
+                provider: "openai-prompt",
+                sourceLanguage: "ja",
+                targetLanguage: "ko",
+                text: japaneseText,
+                prompt,
+                maxOutputTokens: 1024,
+                temperature: 0.2,
+            });
+            const koreanOnly = (result?.text || "").replace(/[^\uAC00-\uD7A3\s]/g, "").trim();
+            return koreanOnly.length >= 1 ? koreanOnly : "";
+        }
 
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-                signal: controller.signal,
-                body: JSON.stringify({
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                    generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
-                }),
-            }
-        );
-
-        clearTimeout(timeout);
-        if (!response.ok) return "";
-
-        const data = await response.json() as GeminiResponse;
-        const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (!result) return "";
-        const koreanOnly = result.replace(/[^\uAC00-\uD7A3\s]/g, "").trim();
-        return koreanOnly.length >= 1 ? koreanOnly : "";
+        return "";
     } catch {
         return "";
     }
 }
 
-/** 태국어 → 한글 발음 생성 (Gemini 2.5 Flash, 국립국어원 표준 기반) */
-async function generateThaiPronunciation(apiKey: string, thaiText: string): Promise<string> {
+/** 태국어 → 한글 발음 생성 (Spring AI Gateway, 국립국어원 표준 기반) */
+async function generateThaiPronunciation(thaiText: string, v3Context: V3AiVendorContext | null = null): Promise<string> {
     if (!thaiText || thaiText.length > 2000) return "";
     try {
         const prompt = `다음 태국어 텍스트를 **한국어 한글로 읽는 발음**으로 변환해주세요.
@@ -702,37 +682,30 @@ async function generateThaiPronunciation(apiKey: string, thaiText: string): Prom
 
 발음:`;
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), GEMINI_PRONUNCIATION_TIMEOUT_MS);
+        if (v3Context) {
+            const result = await callV3AiVendor(v3Context.request, {
+                siteId: v3Context.siteId,
+                feature: "translate",
+                provider: "openai-prompt",
+                sourceLanguage: "th",
+                targetLanguage: "ko",
+                text: thaiText,
+                prompt,
+                maxOutputTokens: 1024,
+                temperature: 0.2,
+            });
+            const koreanOnly = (result?.text || "").replace(/[^\uAC00-\uD7A3\s]/g, "").trim();
+            return koreanOnly.length >= 1 ? koreanOnly : "";
+        }
 
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-                signal: controller.signal,
-                body: JSON.stringify({
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                    generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
-                }),
-            }
-        );
-
-        clearTimeout(timeout);
-        if (!response.ok) return "";
-
-        const data = await response.json() as GeminiResponse;
-        const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (!result) return "";
-        const koreanOnly = result.replace(/[^\uAC00-\uD7A3\s]/g, "").trim();
-        return koreanOnly.length >= 1 ? koreanOnly : "";
+        return "";
     } catch {
         return "";
     }
 }
 
 /** 비라틴 언어(러시아·몽골·미얀마·크메르·네팔·벵골·카자흐·아랍·힌디) → 한글 발음 */
-async function generateNonLatinPronunciation(apiKey: string, text: string, lang: string): Promise<string> {
+async function generateNonLatinPronunciation(text: string, lang: string, v3Context: V3AiVendorContext | null = null): Promise<string> {
     if (!text || text.length > 2000) return "";
 
     const langExamples: Record<string, string> = {
@@ -762,37 +735,30 @@ async function generateNonLatinPronunciation(apiKey: string, text: string, lang:
 
 발음:`;
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), GEMINI_PRONUNCIATION_TIMEOUT_MS);
+        if (v3Context) {
+            const result = await callV3AiVendor(v3Context.request, {
+                siteId: v3Context.siteId,
+                feature: "translate",
+                provider: "openai-prompt",
+                sourceLanguage: lang,
+                targetLanguage: "ko",
+                text,
+                prompt,
+                maxOutputTokens: 1024,
+                temperature: 0.2,
+            });
+            const koreanOnly = (result?.text || "").replace(/[^\uAC00-\uD7A3\s]/g, "").trim();
+            return koreanOnly.length >= 1 ? koreanOnly : "";
+        }
 
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-                signal: controller.signal,
-                body: JSON.stringify({
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                    generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
-                }),
-            }
-        );
-
-        clearTimeout(timeout);
-        if (!response.ok) return "";
-
-        const data = await response.json() as GeminiResponse;
-        const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (!result) return "";
-        const koreanOnly = result.replace(/[^\uAC00-\uD7A3\s]/g, "").trim();
-        return koreanOnly.length >= 1 ? koreanOnly : "";
+        return "";
     } catch {
         return "";
     }
 }
 
-/** 건설현장 문맥 Gemini 번역 (비Papago 언어: uz, km, my, ne, bn, kk, ar, hi, mn, tl/ph) */
-async function geminiConstructionTranslate(text: string, sl: string, tl: string, apiKey: string): Promise<string> {
+/** 비Papago 언어의 건설현장 문맥 번역 */
+async function contextualConstructionTranslate(text: string, sl: string, tl: string, v3Context: V3AiVendorContext): Promise<string> {
     if (!text || text.length > 3000) return "";
 
     const langNames: Record<string, string> = {
@@ -819,62 +785,39 @@ async function geminiConstructionTranslate(text: string, sl: string, tl: string,
 
 번역 (${targetName}):`;
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), GEMINI_TRANSLATE_TIMEOUT_MS);
-
-    try {
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-                signal: controller.signal,
-                body: JSON.stringify({
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                    generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
-                }),
-            }
-        );
-        clearTimeout(timeout);
-        if (!response.ok) return "";
-        const data = await response.json() as GeminiResponse;
-        return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-    } catch {
-        clearTimeout(timeout);
-        return "";
-    }
+    const result = await callV3AiVendor(v3Context.request, {
+        siteId: v3Context.siteId,
+        feature: "translate",
+        provider: "openai-prompt",
+        sourceLanguage: sl,
+        targetLanguage: tl,
+        text,
+        prompt,
+        maxOutputTokens: 1024,
+        temperature: 0.1,
+    });
+    return result?.text?.trim() || "";
 }
 
-async function geminiFullFallback(apiKey: string, text: string, sl: string, tl: string) {
+async function aiFullFallback(text: string, sl: string, tl: string, v3Context: V3AiVendorContext | null = null) {
     try {
         const prompt = `Translate accurately. Source: ${sl}, Target: ${tl}.
 Return ONLY JSON: {"translated":"...","pronunciation":"Korean Hangul pronunciation","reverse_translated":"..."}
 Text: ${JSON.stringify(text)}`;
 
-        // BUG-3 fix: 타임아웃 없이 무한 hang 가능 → AbortController 추가
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10_000);
-
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                signal: controller.signal,
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: { temperature: 0.2 },
-                }),
-            }
-        );
-        clearTimeout(timeout);
-
-        if (!response.ok) {
-            return NextResponse.json({ translated: text, pronunciation: "", reverse_translated: text, is_fallback: true });
-        }
-
-        const data = await response.json() as GeminiResponse;
-        const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!v3Context) throw new Error("V3 AI context required");
+        const result = await callV3AiVendor(v3Context.request, {
+            siteId: v3Context.siteId,
+            feature: "translate",
+            provider: "openai-prompt",
+            sourceLanguage: sl,
+            targetLanguage: tl,
+            text,
+            prompt,
+            maxOutputTokens: 1024,
+            temperature: 0.2,
+        });
+        const textContent = result?.text || "";
         if (!textContent) throw new Error("Empty response");
 
         const jsonMatch = textContent.match(/```json\s*([\s\S]*?)```/) || textContent.match(/(\{[\s\S]*\})/);

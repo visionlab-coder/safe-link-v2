@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCookieUser } from "@/utils/auth/cookie-user";
+import { callV3AiVendor } from "@/utils/ai/v3-ai-gateway";
 
 export const runtime = "nodejs";
-
-interface GeminiResponse {
-    candidates?: Array<{
-        content?: { parts?: Array<{ text?: string }> };
-    }>;
-}
 
 /**
  * 외국인 이름을 영문(로마자)으로 변환
@@ -15,13 +10,8 @@ interface GeminiResponse {
  */
 export async function POST(request: NextRequest) {
     // P5 박제
-    const user = await getCookieUser();
+    const user = await getCookieUser({ allowV3: true });
     if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-
-    const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();
-    if (!apiKey) {
-        return NextResponse.json({ error: "Missing GOOGLE_CLOUD_API_KEY" }, { status: 500 });
-    }
 
     let name: string;
     let lang: string;
@@ -62,29 +52,20 @@ Rules:
 - Capitalize each word
 - No punctuation except hyphens within syllables if standard`;
 
-    try {
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: { temperature: 0.1, maxOutputTokens: 64 }
-                })
-            }
-        );
+    const siteId = user.siteIds?.[0];
+    if (typeof siteId !== "number") return NextResponse.json({ error: "site_required" }, { status: 403 });
 
-        if (!response.ok) {
-            return NextResponse.json({ romanized: null });
-        }
-
-        const data = await response.json() as GeminiResponse;
-        const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-        const romanized = raw.replace(/^["']|["']$/g, "").trim();
-
-        return NextResponse.json({ romanized: romanized || null });
-    } catch {
-        return NextResponse.json({ romanized: null });
-    }
+    const result = await callV3AiVendor(request, {
+        feature: "romanize",
+        siteId,
+        provider: "openai-prompt",
+        sourceLanguage: safeLang,
+        targetLanguage: "en",
+        text: safeName,
+        prompt,
+        maxOutputTokens: 64,
+        temperature: 0.1,
+    });
+    const romanized = (result?.text || "").replace(/^["']|["']$/g, "").trim();
+    return NextResponse.json({ romanized: romanized || null });
 }

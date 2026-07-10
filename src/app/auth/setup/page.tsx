@@ -1,23 +1,23 @@
 "use client";
 
-import { useEffect, useState, Suspense, useMemo } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
+import { AnimatePresence, motion } from "framer-motion";
 import { languages } from "@/constants";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   getDefaultRouteForProfileRole,
   getProfileRoleFromSetupRole,
+  type ProfileRole,
   type SetupRoleKey,
 } from "@/lib/roles";
+import { getV3CurrentUser, setupProfileV3 } from "@/lib/v3-auth";
+import type { V3Role } from "@/lib/v3-role-contract";
 
 type RoleKey = SetupRoleKey | "";
 type ColorKey = "blue" | "amber" | "green" | "purple" | "indigo";
 type Step = 1 | 2 | 3;
+type SiteOption = { id: string; name: string; site_code?: string | null };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Translation Dictionary
-// ─────────────────────────────────────────────────────────────────────────────
 const T: Record<string, Record<string, string>> = {
   ko: {
     pgTitle: "기본 정보 등록", editTitle: "프로필 설정",
@@ -135,11 +135,8 @@ const T: Record<string, Record<string, string>> = {
     startBtn: "เริ่มใช้งาน SAFE-LINK",
   },
 };
-const getT = (lang: string) => T[lang] || T["en"];
+const getT = (lang: string) => T[lang] || T.en;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Trade Quick-Select — Korean canonical + per-language labels
-// ─────────────────────────────────────────────────────────────────────────────
 const TRADES: { ko: string; label: Record<string, string> }[] = [
   { ko: "형틀목공", label: { ko:"형틀목공", en:"Formwork", vi:"Cốp pha", zh:"模板工", th:"ช่างแบบ", uz:"Qolip ustasi", tl:"Formwork", km:"ជ័រជ", id:"Bekisting", mn:"Хэвлэгч", my:"ကြမ်းငွေ့", ne:"ढाँचा", bn:"ফর্মওয়ার্ক", kk:"Қалып", ru:"Опалубщик", ja:"型枠大工", fr:"Coffrage", es:"Encofrado", ar:"قوالب", hi:"फॉर्मवर्क" }},
   { ko: "철근", label: { ko:"철근", en:"Rebar", vi:"Cốt thép", zh:"钢筋", th:"เหล็กเส้น", uz:"Armatura", tl:"Rebar", km:"ដែក", id:"Besi Beton", mn:"Арматур", my:"သံချောင်း", ne:"छड", bn:"রড", kk:"Арматура", ru:"Арматурщик", ja:"鉄筋", fr:"Ferrailleur", es:"Ferralla", ar:"حديد", hi:"सरिया" }},
@@ -150,9 +147,27 @@ const TRADES: { ko: string; label: Record<string, string> }[] = [
   { ko: "설비", label: { ko:"설비", en:"Mechanical", vi:"Cơ điện", zh:"机电", th:"งานระบบ", uz:"Jihozlar", tl:"Mekaniko", km:"ប្រព័ន្ធ", id:"Mekanikal", mn:"Сантехник", my:"စက်ပစ္စည်း", ne:"मेकानिकल", bn:"মেকানিক্যাল", kk:"Жабдық", ru:"Слесарь", ja:"設備", fr:"Équipement", es:"Instalaciones", ar:"أنظمة", hi:"मैकेनिकल" }},
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Background orbs (same design as auth page)
-// ─────────────────────────────────────────────────────────────────────────────
+const V3_ROLE_PRIORITY: V3Role[] = ["ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER", "WORKER", "VIEWER"];
+
+function pickDefaultV3Role(roles: V3Role[]): V3Role | null {
+  return V3_ROLE_PRIORITY.find((role) => roles.includes(role)) ?? null;
+}
+
+function isSetupRoleKey(value: string | null): value is SetupRoleKey {
+  return value === "site_manager" ||
+    value === "safety_officer" ||
+    value === "team_leader" ||
+    value === "gongmu" ||
+    value === "worker" ||
+    value === "root" ||
+    value === "hq_officer";
+}
+
+function getInitialSetupRole(value: string | null): RoleKey {
+  if (value === "admin") return "safety_officer";
+  return isSetupRoleKey(value) ? value : "worker";
+}
+
 function BgOrbs() {
   return (
     <>
@@ -183,7 +198,6 @@ function BgOrbs() {
   );
 }
 
-// Shared panel styles
 const glassCard: React.CSSProperties = {
   background:"rgba(12,13,22,0.88)",
   border:"1px solid rgba(255,255,255,0.07)",
@@ -201,9 +215,6 @@ const fieldBox: React.CSSProperties = {
   borderRadius:10,
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Compact step indicator
-// ─────────────────────────────────────────────────────────────────────────────
 function StepIndicator({ step, t }: { step: Step; t: Record<string, string> }) {
   const steps = [
     { num: 1 as Step, label: t.step1Title },
@@ -211,28 +222,36 @@ function StepIndicator({ step, t }: { step: Step; t: Record<string, string> }) {
     { num: 3 as Step, label: t.step3Title },
   ];
   return (
-    <div className="flex items-center gap-0 mb-6">
+    <div className="mb-6 flex items-center gap-0">
       {steps.map((s, idx) => (
         <div key={s.num} className={`flex items-center ${idx < 2 ? "flex-1" : ""}`}>
           <div className="flex flex-col items-center gap-1">
-            <div className="flex items-center justify-center font-black text-xs flex-shrink-0 transition-all duration-300"
+            <div
+              className="flex flex-shrink-0 items-center justify-center text-xs font-black transition-all duration-300"
               style={{
-                width: 28, height: 28, borderRadius: "50%",
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
                 background: step > s.num ? "#10B981" : step === s.num ? "#3B82F6" : "rgba(255,255,255,0.05)",
                 border: `1px solid ${step > s.num ? "#10B981" : step === s.num ? "#3B82F6" : "rgba(255,255,255,0.1)"}`,
                 color: step >= s.num ? "#fff" : "#475569",
                 boxShadow: step === s.num ? "0 0 14px rgba(59,130,246,0.45)" : "none",
-              }}>
+              }}
+            >
               {step > s.num ? "✓" : s.num}
             </div>
-            <span className="text-[8px] font-bold text-center leading-tight max-w-[60px] truncate transition-colors"
-              style={{ color: step === s.num ? "#93C5FD" : step > s.num ? "#10B981" : "#334155" }}>
+            <span
+              className="max-w-[60px] truncate text-center text-[8px] font-bold leading-tight transition-colors"
+              style={{ color: step === s.num ? "#93C5FD" : step > s.num ? "#10B981" : "#334155" }}
+            >
               {s.label}
             </span>
           </div>
           {idx < 2 && (
-            <div className="flex-1 h-px mx-1.5 mb-3.5 transition-all duration-300"
-              style={{ background: step > s.num ? "#10B981" : "rgba(255,255,255,0.06)" }} />
+            <div
+              className="mb-3.5 mx-1.5 h-px flex-1 transition-all duration-300"
+              style={{ background: step > s.num ? "#10B981" : "rgba(255,255,255,0.06)" }}
+            />
           )}
         </div>
       ))}
@@ -240,112 +259,83 @@ function StepIndicator({ step, t }: { step: Step; t: Record<string, string> }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Setup Content
-// ─────────────────────────────────────────────────────────────────────────────
 function SetupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const supabase = useMemo(() => createClient(), []);
 
   const urlLang = searchParams.get("lang") || "ko";
   const t = getT(urlLang);
+  const initSiteId = searchParams.get("site_id") || "";
 
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
-  const [role, setRole] = useState<RoleKey>("");
+  const [role, setRole] = useState<RoleKey>(getInitialSetupRole(searchParams.get("role")));
   const [language, setLanguage] = useState(urlLang);
   const [name, setName] = useState("");
   const [romanizing, setRomanizing] = useState(false);
   const [phone, setPhone] = useState("");
   const [trade, setTrade] = useState("");
   const [title, setTitle] = useState("");
-  const [siteCode, setSiteCode] = useState("");
-  const [initSiteId] = useState(searchParams.get("site_id") || "");
+  const [siteCode, setSiteCode] = useState(initSiteId);
   const [selectedSiteId, setSelectedSiteId] = useState("");
-  const [siteList, setSiteList] = useState<{ id: string; name: string }[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [adminExists, setAdminExists] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [siteList, setSiteList] = useState<SiteOption[]>([]);
+  const [adminExists] = useState(false);
+  const [isEditMode] = useState(false);
   const [isMasterEmail, setIsMasterEmail] = useState(false);
   const [isHQAuthorized, setIsHQAuthorized] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
-  // 마스터/HQ 이메일 여부는 서버 API를 통해 확인 — NEXT_PUBLIC_ 환경변수 클라이언트 노출 금지 (H-11)
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push("/auth"); return; }
-      setUserId(user.id);
-
-      // 서버에서 역할 확인 — 이메일 목록 자체는 클라이언트에 반환되지 않음
-      let isMaster = false;
-      let isHQ = false;
-      try {
-        const res = await fetch("/api/auth/check-role");
-        if (res.ok) {
-          const data = await res.json() as { role: "root" | "hq_officer" | null };
-          isMaster = data.role === "root";
-          isHQ = data.role === "hq_officer";
-        }
-      } catch { /* 네트워크 오류 시 기본값(false) 유지 */ }
-      setIsMasterEmail(isMaster);
-      setIsHQAuthorized(isHQ);
-
-      const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-      if (profile) {
-        setIsEditMode(true);
-        setName(profile.display_name || "");
-        setLanguage(profile.preferred_lang || "ko");
-        setPhone(profile.phone_number || "");
-        setTrade(profile.trade || "");
-        setTitle(profile.title || "");
-        setSiteCode(profile.site_code || "");
-        const dbToRole: Record<string, RoleKey> = {
-          HQ_ADMIN: "site_manager", SAFETY_OFFICER: "safety_officer",
-          SITE_ADMIN: "gongmu", WORKER: "worker", ROOT: "root", HQ_OFFICER: "hq_officer",
-        };
-        if (isMaster) setRole("root");
-        else if (isHQ) setRole("hq_officer");
-        else setRole(dbToRole[profile.role] || "");
-      } else {
-        if (isMaster) setRole("root");
-        else if (isHQ) setRole("hq_officer");
-        else {
-          const urlRole = searchParams.get("role");
-          if (urlRole === "admin") setRole("safety_officer");
-          else setRole("worker");
-        }
+      const user = await getV3CurrentUser().catch(() => null);
+      if (!user) {
+        router.push("/auth");
+        return;
       }
 
-      const { count } = await supabase
-        .from("profiles").select("id", { count: "exact", head: true })
-        .eq("role", "HQ_ADMIN").neq("id", user.id);
-      setAdminExists((count ?? 0) > 0);
+      if (user.displayName) setName((current) => current || user.displayName);
+      const hasRoot = user.roles.includes("ROOT");
+      const hasHq = user.roles.includes("HQ_ADMIN");
+      setIsMasterEmail(hasRoot);
+      setIsHQAuthorized(hasHq);
 
-      // 현장 목록 로드 (드롭다운 선택용)
-      const { data: sitesData } = await supabase
-        .from("sites")
-        .select("id, name")
-        .order("name", { ascending: true });
-      if (sitesData) setSiteList(sitesData);
+      if (hasRoot) setRole("root");
+      else if (hasHq) setRole("hq_officer");
+      else setRole(getInitialSetupRole(searchParams.get("role")));
     };
     init();
-  }, [router, searchParams, supabase]);
+  }, [router, searchParams]);
 
-  const isNonLatin = (n: string) =>
-    !/^[a-zA-Z\s\-'.]+$/.test(n.trim()) && !/\(.+\)/.test(n.trim());
+  useEffect(() => {
+    const loadSites = async () => {
+      try {
+        const res = await fetch("/api/sites/options", { cache: "no-store", credentials: "include" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { sites?: SiteOption[] };
+        if (Array.isArray(data.sites)) setSiteList(data.sites);
+      } catch {
+        setSiteList([]);
+      }
+    };
+    loadSites();
+  }, []);
 
-  const fetchRomanized = async (n: string): Promise<string | null> => {
+  const isNonLatin = useCallback((value: string) =>
+    !/^[a-zA-Z\s\-'.]+$/.test(value.trim()) && !/\(.+\)/.test(value.trim()), []);
+
+  const fetchRomanized = useCallback(async (value: string): Promise<string | null> => {
     try {
       const res = await fetch("/api/romanize", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: n.trim(), lang: language }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: value.trim(), lang: language }),
       });
       const data = await res.json() as { romanized: string | null };
-      return data.romanized && data.romanized !== n.trim() ? data.romanized : null;
-    } catch { return null; }
-  };
+      return data.romanized && data.romanized !== value.trim() ? data.romanized : null;
+    } catch {
+      return null;
+    }
+  }, [language]);
 
   const handleNameBlur = async () => {
     const trimmed = name.trim();
@@ -353,44 +343,30 @@ function SetupContent() {
     setRomanizing(true);
     try {
       const romanized = await fetchRomanized(trimmed);
-      if (romanized) {
-        // 자동 적용 — 관리자가 이름을 읽을 수 있도록 필수
-        setName(`${trimmed} (${romanized})`);
-      }
-    } finally { setRomanizing(false); }
-  };
-
-  const getCurrentLocation = async () => {
-    if (!navigator.geolocation) return null;
-    try {
-      return await new Promise<{ latitude: number; longitude: number; accuracy: number } | null>((resolve) => {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => resolve({
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-          }),
-          () => resolve(null),
-          { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
-        );
-      });
-    } catch {
-      return null;
+      if (romanized) setName(`${trimmed} (${romanized})`);
+    } finally {
+      setRomanizing(false);
     }
   };
 
-  const canProceedStep1 = () => !!(name.trim() && role);
+  const isAdminSiteRole = role === "site_manager" || role === "safety_officer" || role === "gongmu";
+  const canProceedStep1 = () => Boolean(name.trim() && role);
   const canProceedStep2 = () => {
     if (role === "worker" && (!trade || !siteCode)) return false;
-    if ((role === "site_manager" || role === "safety_officer" || role === "gongmu") && (!title || !selectedSiteId)) return false;
+    if (isAdminSiteRole) {
+      if (!title) return false;
+      return siteList.length > 0 ? Boolean(selectedSiteId) : Boolean(siteCode);
+    }
     if ((role === "root" || role === "hq_officer") && !title) return false;
     return true;
   };
 
-  const handleSave = async () => {
-    if (!role || !name.trim()) { alert(t.err); return; }
+  const handleSave = useCallback(async () => {
+    if (!role || !name.trim()) {
+      alert(t.err);
+      return;
+    }
 
-    // 비라틴 이름에 영문 표기 없으면 저장 전 강제 변환
     let finalName = name.trim();
     if (isNonLatin(finalName)) {
       setRomanizing(true);
@@ -407,83 +383,79 @@ function SetupContent() {
       setRole(isMasterEmail ? "root" : "hq_officer");
       return;
     }
-    if (role === "site_manager" && adminExists && !isEditMode) { alert(t.adminLimit); return; }
-    if (role === "worker" && (!trade || !phone)) { alert(t.err); return; }
-    if ((role === "site_manager" || role === "safety_officer" || role === "gongmu" || role === "root" || role === "hq_officer") && !title) { alert(t.err); return; }
-
-    const isAdminRole = role === "site_manager" || role === "safety_officer" || role === "gongmu";
-    // 드롭다운에서 선택된 site_id 우선 사용, 없으면 URL 파라미터 사용
-    const resolvedSiteId = selectedSiteId || initSiteId || null;
-
-    setLoading(true);
-    // C-3 fix: role/system_role은 서버 API 경유 (REVOKE UPDATE로 클라이언트 직접 쓰기 차단됨)
-    const setupRes = await fetch("/api/auth/setup-profile", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        setupRole: role,
-        display_name: finalName,
-        preferred_lang: language,
-        phone_number: phone.trim(),
-        trade: trade.trim(),
-        title: title.trim(),
-        site_code: siteCode.trim(),
-        site_id: resolvedSiteId,
-      }),
-    });
-    if (!setupRes.ok) {
-      const errData = await setupRes.json().catch(() => null) as { error?: string } | null;
-      setLoading(false);
-      alert(errData?.error || "프로필 저장에 실패했습니다.");
+    if (role === "site_manager" && adminExists && !isEditMode) {
+      alert(t.adminLimit);
+      return;
+    }
+    if (role === "worker" && (!trade || !phone)) {
+      alert(t.err);
+      return;
+    }
+    if ((isAdminSiteRole || role === "root" || role === "hq_officer") && !title) {
+      alert(t.err);
       return;
     }
 
-    // 드롭다운으로 이미 site_id가 확정된 경우 resolve 호출 불필요
-    if (isAdminRole && !selectedSiteId && siteCode.trim()) { // 드롭다운 미사용 fallback
-      try {
-        const location = await getCurrentLocation();
-        const res = await fetch("/api/sites/resolve", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: siteCode.trim(), location, geofence_radius_m: 300 }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => null) as { error?: string } | null;
-          throw new Error(data?.error || "현장코드 생성에 실패했습니다.");
-        }
-        const data = await res.json() as { id: string };
-        const { error: siteUpdateError } = await supabase
-          .from("profiles")
-          .update({ site_id: data.id })
-          .eq("id", userId);
-        if (siteUpdateError) throw siteUpdateError;
-      } catch (siteError) {
-        setLoading(false);
-        alert(siteError instanceof Error ? siteError.message : "현장코드 생성에 실패했습니다.");
-        return;
+    setLoading(true);
+    try {
+      const resolvedSiteId = selectedSiteId || (/^\d+$/.test(initSiteId) ? initSiteId : "");
+      const user = await setupProfileV3({
+        setupRole: role,
+        displayName: finalName,
+        preferredLang: language,
+        phoneNumber: phone.trim() || undefined,
+        trade: trade.trim() || undefined,
+        title: title.trim() || undefined,
+        siteCode: siteCode.trim() || undefined,
+        siteId: resolvedSiteId || undefined,
+      });
+
+      if (rememberMe) {
+        localStorage.setItem("safe-link-remember", "true");
+        localStorage.setItem("safe-link-lang", language);
+      } else {
+        localStorage.setItem("safe-link-remember", "false");
       }
-    }
+      sessionStorage.setItem("safe-link-session-active", "true");
 
-    setLoading(false);
-
-    if (rememberMe) {
-      localStorage.setItem("safe-link-remember", "true");
-      localStorage.setItem("safe-link-lang", language);
-    } else {
-      localStorage.setItem("safe-link-remember", "false");
+      const serverRole = pickDefaultV3Role(user.roles);
+      const redirectPath = serverRole
+        ? getDefaultRouteForProfileRole(serverRole as ProfileRole)
+        : getDefaultRouteForProfileRole(getProfileRoleFromSetupRole(role));
+      window.location.href = `${redirectPath}?lang=${language}`;
+    } catch {
+      alert("프로필 저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      setLoading(false);
     }
-    sessionStorage.setItem("safe-link-session-active", "true");
-    const redirectPath = getDefaultRouteForProfileRole(getProfileRoleFromSetupRole(role as SetupRoleKey));
-    window.location.href = `${redirectPath}?lang=${language}`;
-  };
+  }, [
+    adminExists,
+    fetchRomanized,
+    initSiteId,
+    isAdminSiteRole,
+    isEditMode,
+    isHQAuthorized,
+    isMasterEmail,
+    isNonLatin,
+    language,
+    name,
+    phone,
+    rememberMe,
+    role,
+    selectedSiteId,
+    siteCode,
+    t.adminLimit,
+    t.err,
+    title,
+    trade,
+  ]);
 
   const roles: { key: RoleKey; emoji: string; color: ColorKey; glow: string }[] = [
     ...(isMasterEmail ? [{ key: "root" as RoleKey, emoji: "💎", color: "purple" as ColorKey, glow: "rgba(168,85,247,0.35)" }] : []),
     ...(isHQAuthorized ? [{ key: "hq_officer" as RoleKey, emoji: "🏢", color: "indigo" as ColorKey, glow: "rgba(99,102,241,0.35)" }] : []),
-    { key: "site_manager" as RoleKey, emoji: "🏗️", color: "blue" as ColorKey, glow: "rgba(59,130,246,0.35)" },
-    { key: "safety_officer" as RoleKey, emoji: "🦺", color: "amber" as ColorKey, glow: "rgba(245,158,11,0.35)" },
-    { key: "gongmu" as RoleKey, emoji: "📋", color: "indigo" as ColorKey, glow: "rgba(99,102,241,0.35)" },
-    { key: "worker" as RoleKey, emoji: "👷", color: "green" as ColorKey, glow: "rgba(34,197,94,0.35)" },
+    { key: "site_manager", emoji: "🏗️", color: "blue", glow: "rgba(59,130,246,0.35)" },
+    { key: "safety_officer", emoji: "🦺", color: "amber", glow: "rgba(245,158,11,0.35)" },
+    { key: "gongmu", emoji: "📋", color: "indigo", glow: "rgba(99,102,241,0.35)" },
+    { key: "worker", emoji: "👷", color: "green", glow: "rgba(34,197,94,0.35)" },
   ];
 
   const colorMap: Record<ColorKey, { border: string; bg: string; text: string; activeBg: string }> = {
@@ -494,42 +466,38 @@ function SetupContent() {
     indigo: { border:"rgba(99,102,241,0.5)",  bg:"rgba(99,102,241,0.08)",  activeBg:"rgba(99,102,241,0.15)",  text:"#A5B4FC" },
   };
 
-  // ── RENDER ─────────────────────────────────────────────────────────────────
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-5 overflow-hidden relative" style={{ background:"#050508" }}>
+    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden p-5" style={{ background:"#050508" }}>
       <BgOrbs />
-      <div className="w-full max-w-[380px] relative z-10">
-
-        {/* Brand */}
-        <div className="text-center mb-5">
-          <h1 className="text-[28px] font-black text-white tracking-tighter leading-none">
+      <div className="relative z-10 w-full max-w-[380px]">
+        <div className="mb-5 text-center">
+          <h1 className="text-[28px] font-black leading-none tracking-tighter text-white">
             SAFE<span style={{ color:"#60A5FA" }}>-LINK</span>
           </h1>
-          <p className="text-[9px] text-slate-700 tracking-[0.4em] uppercase mt-1">
+          <p className="mt-1 text-[9px] uppercase tracking-[0.4em] text-slate-700">
             {isEditMode ? t.editTitle : t.pgTitle}
           </p>
         </div>
 
-        {/* Card */}
         <div style={glassCard} className="overflow-hidden">
           <div style={accentLine} />
           <div className="p-6">
-
             <StepIndicator step={step} t={t} />
 
             <AnimatePresence mode="wait">
-
-              {/* ── STEP 1: Role + Name + Language ── */}
               {step === 1 && (
-                <motion.div key="step1" initial={{ opacity:0, x:20 }} animate={{ opacity:1, x:0 }}
-                  exit={{ opacity:0, x:-20 }} transition={{ duration:0.22 }} className="flex flex-col gap-4">
-
-                  {/* Role label */}
+                <motion.div
+                  key="step1"
+                  initial={{ opacity:0, x:20 }}
+                  animate={{ opacity:1, x:0 }}
+                  exit={{ opacity:0, x:-20 }}
+                  transition={{ duration:0.22 }}
+                  className="flex flex-col gap-4"
+                >
                   <label className="text-[10px] font-black uppercase tracking-widest" style={{ color:"#475569" }}>
                     {t.roleTitle}
                   </label>
 
-                  {/* Role grid — 2 columns compact */}
                   <div className="grid grid-cols-2 gap-2">
                     {roles.map(({ key, emoji, color, glow }) => {
                       const isLocked = key === "site_manager" && adminExists && role !== "site_manager";
@@ -538,28 +506,37 @@ function SetupContent() {
                       const isDisabled = isLocked || (isEditMode && !isSelected && key !== "root") || isForbidden;
                       const c = colorMap[color];
                       return (
-                        <button key={key}
-                          onClick={() => { if (isLocked) { alert(t.adminLimit); return; } if (isEditMode && key !== "root") return; setRole(key); }}
+                        <button
+                          key={key}
+                          onClick={() => {
+                            if (isLocked) {
+                              alert(t.adminLimit);
+                              return;
+                            }
+                            if (isEditMode && key !== "root") return;
+                            setRole(key);
+                          }}
                           disabled={isDisabled}
-                          className="p-3 rounded-xl font-bold text-left transition-all duration-200 active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed"
+                          className="rounded-xl p-3 text-left font-bold transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-20"
                           style={{
                             background: isSelected ? c.activeBg : c.bg,
                             border:`1px solid ${isSelected ? c.border : "rgba(255,255,255,0.06)"}`,
                             boxShadow: isSelected ? `0 0 18px ${glow}` : "none",
-                          }}>
-                          <div className="flex items-center justify-between mb-0.5">
+                          }}
+                        >
+                          <div className="mb-0.5 flex items-center justify-between">
                             <span className="text-base">{emoji}</span>
                             {isSelected && (
                               <span className="flex items-center gap-1 text-[8px] font-black uppercase" style={{ color: c.text }}>
-                                <span className="w-1 h-1 rounded-full bg-current animate-pulse" />ON
+                                <span className="h-1 w-1 animate-pulse rounded-full bg-current" />ON
                               </span>
                             )}
                             {isLocked && <span className="text-[8px] font-black uppercase" style={{ color:"#334155" }}>{t.alreadySet}</span>}
                           </div>
-                          <span className="text-[11px] font-black block" style={{ color: isSelected ? c.text : "#64748B" }}>
+                          <span className="block text-[11px] font-black" style={{ color: isSelected ? c.text : "#64748B" }}>
                             {t[key as string] || key}
                           </span>
-                          <p className="text-[9px] mt-0.5 leading-tight" style={{ color:"#334155" }}>
+                          <p className="mt-0.5 text-[9px] leading-tight" style={{ color:"#334155" }}>
                             {t[`${key as string}_desc`]}
                           </p>
                         </button>
@@ -567,80 +544,106 @@ function SetupContent() {
                     })}
                   </div>
 
-                  {/* Name input */}
                   <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block" style={{ color:"#475569" }}>{t.nameTitle}</label>
+                    <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest" style={{ color:"#475569" }}>
+                      {t.nameTitle}
+                    </label>
                     <div style={fieldBox}>
-                      <input type="text" placeholder={t.nameTitle} value={name}
-                        onChange={e => setName(e.target.value)}
+                      <input
+                        type="text"
+                        placeholder={t.nameTitle}
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
                         onBlur={handleNameBlur}
-                        className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
+                        className="w-full bg-transparent px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-700"
+                      />
                     </div>
                     {romanizing && (
-                      <p className="text-[10px] mt-1.5 ml-1 animate-pulse flex items-center gap-1" style={{ color:"#60A5FA" }}>
-                        <span className="inline-block w-2 h-2 rounded-full bg-blue-400 animate-ping" />
+                      <p className="ml-1 mt-1.5 flex animate-pulse items-center gap-1 text-[10px]" style={{ color:"#60A5FA" }}>
+                        <span className="inline-block h-2 w-2 animate-ping rounded-full bg-blue-400" />
                         영문 이름 자동 변환 중...
                       </p>
                     )}
                   </div>
 
-                  {/* Language select */}
                   <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block" style={{ color:"#475569" }}>{t.langTitle}</label>
+                    <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest" style={{ color:"#475569" }}>
+                      {t.langTitle}
+                    </label>
                     <div style={fieldBox}>
-                      <select value={language} onChange={e => setLanguage(e.target.value)}
-                        className="w-full bg-transparent text-white text-sm outline-none px-4 py-3.5 appearance-none"
-                        style={{ color:"#F1F5F9" }}>
-                        {languages.map(l => <option key={l.code} value={l.code} style={{ background:"#0d0e18" }}>{l.name}</option>)}
+                      <select
+                        value={language}
+                        onChange={(event) => setLanguage(event.target.value)}
+                        className="w-full appearance-none bg-transparent px-4 py-3.5 text-sm text-white outline-none"
+                        style={{ color:"#F1F5F9" }}
+                      >
+                        {languages.map((lang) => (
+                          <option key={lang.code} value={lang.code} style={{ background:"#0d0e18" }}>
+                            {lang.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
 
-                  <button onClick={() => { if (!canProceedStep1()) { alert(t.err); return; } setStep(2); }}
+                  <button
+                    onClick={() => {
+                      if (!canProceedStep1()) {
+                        alert(t.err);
+                        return;
+                      }
+                      setStep(2);
+                    }}
                     disabled={!canProceedStep1()}
-                    className="w-full py-3.5 font-black text-sm text-white rounded-xl transition-all active:scale-95 disabled:opacity-40"
-                    style={{ background:"linear-gradient(135deg,#2563EB,#3B82F6)", boxShadow:"0 4px 20px rgba(59,130,246,0.22)" }}>
+                    className="w-full rounded-xl py-3.5 text-sm font-black text-white transition-all active:scale-95 disabled:opacity-40"
+                    style={{ background:"linear-gradient(135deg,#2563EB,#3B82F6)", boxShadow:"0 4px 20px rgba(59,130,246,0.22)" }}
+                  >
                     {t.next}
                   </button>
                 </motion.div>
               )}
 
-              {/* ── STEP 2: Site + Trade/Position ── */}
               {step === 2 && (
-                <motion.div key="step2" initial={{ opacity:0, x:20 }} animate={{ opacity:1, x:0 }}
-                  exit={{ opacity:0, x:-20 }} transition={{ duration:0.22 }} className="flex flex-col gap-4">
-
-                  {/* Site name */}
+                <motion.div
+                  key="step2"
+                  initial={{ opacity:0, x:20 }}
+                  animate={{ opacity:1, x:0 }}
+                  exit={{ opacity:0, x:-20 }}
+                  transition={{ duration:0.22 }}
+                  className="flex flex-col gap-4"
+                >
                   <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block" style={{ color:"#475569" }}>
-                      {(role === "site_manager" || role === "safety_officer" || role === "gongmu")
+                    <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest" style={{ color:"#475569" }}>
+                      {isAdminSiteRole && siteList.length > 0
                         ? (language === "ko" ? "현장 선택 *" : "Select Site *")
                         : t.siteTitle}
                     </label>
-                    {(role === "site_manager" || role === "safety_officer" || role === "gongmu") ? (
+                    {isAdminSiteRole && siteList.length > 0 ? (
                       <>
                         <div style={fieldBox}>
                           <select
                             value={selectedSiteId}
-                            onChange={e => {
-                              const id = e.target.value;
+                            onChange={(event) => {
+                              const id = event.target.value;
                               setSelectedSiteId(id);
-                              const found = siteList.find(s => s.id === id);
+                              const found = siteList.find((site) => site.id === id);
                               setSiteCode(found?.name ?? "");
                             }}
-                            className="w-full bg-transparent text-white text-sm outline-none px-4 py-3.5 appearance-none"
+                            className="w-full appearance-none bg-transparent px-4 py-3.5 text-sm text-white outline-none"
                             style={{ color: selectedSiteId ? "#F1F5F9" : "#475569" }}
                           >
                             <option value="" style={{ background:"#0d0e18" }}>
                               {language === "ko" ? "현장을 선택하세요" : "Select a site"}
                             </option>
-                            {siteList.map(s => (
-                              <option key={s.id} value={s.id} style={{ background:"#0d0e18" }}>{s.name}</option>
+                            {siteList.map((site) => (
+                              <option key={site.id} value={site.id} style={{ background:"#0d0e18" }}>
+                                {site.name}
+                              </option>
                             ))}
                           </select>
                         </div>
                         {selectedSiteId && (
-                          <p className="text-[10px] mt-1.5 ml-1" style={{ color:"#22C55E" }}>
+                          <p className="ml-1 mt-1.5 text-[10px]" style={{ color:"#22C55E" }}>
                             ✓ {language === "ko" ? "현장이 선택되었습니다" : "Site selected"}
                           </p>
                         )}
@@ -651,47 +654,58 @@ function SetupContent() {
                           type="text"
                           placeholder={t.siteTitle}
                           value={siteCode}
-                          onChange={e => setSiteCode(e.target.value)}
-                          className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5"
+                          onChange={(event) => setSiteCode(event.target.value)}
+                          className="w-full bg-transparent px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-700"
                         />
                       </div>
                     )}
                   </div>
 
-                  {/* Worker: phone + trade / Admin: position */}
                   {role === "worker" ? (
                     <>
                       <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block" style={{ color:"#475569" }}>
+                        <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest" style={{ color:"#475569" }}>
                           {language === "ko" ? "휴대폰 번호" : "Phone Number"}
                         </label>
                         <div style={fieldBox}>
-                          <input type="tel" placeholder="010-0000-0000" value={phone}
-                            onChange={e => setPhone(e.target.value)}
-                            className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
+                          <input
+                            type="tel"
+                            placeholder="010-0000-0000"
+                            value={phone}
+                            onChange={(event) => setPhone(event.target.value)}
+                            className="w-full bg-transparent px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-700"
+                          />
                         </div>
                       </div>
                       <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block" style={{ color:"#475569" }}>{t.tradeTitle}</label>
+                        <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest" style={{ color:"#475569" }}>
+                          {t.tradeTitle}
+                        </label>
                         <div style={fieldBox}>
-                          <input type="text" placeholder={t.tradeTitle} value={trade}
-                            onChange={e => setTrade(e.target.value)}
-                            className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
+                          <input
+                            type="text"
+                            placeholder={t.tradeTitle}
+                            value={trade}
+                            onChange={(event) => setTrade(event.target.value)}
+                            className="w-full bg-transparent px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-700"
+                          />
                         </div>
-                        {/* Quick-select trades — translated per language */}
-                        <div className="flex flex-wrap gap-1.5 mt-2.5">
+                        <div className="mt-2.5 flex flex-wrap gap-1.5">
                           {TRADES.map(({ ko, label }) => {
                             const displayLabel = label[language] || label.en || ko;
                             const chipValue = language !== "ko" ? `${displayLabel} (${ko})` : ko;
                             const isSelected = trade === chipValue || trade === ko || trade.endsWith(`(${ko})`);
                             return (
-                              <button key={ko} onClick={() => setTrade(chipValue)}
-                                className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all duration-200"
+                              <button
+                                key={ko}
+                                onClick={() => setTrade(chipValue)}
+                                className="rounded-lg px-2.5 py-1 text-[10px] font-bold transition-all duration-200"
                                 style={{
                                   background: isSelected ? "#2563EB" : "rgba(255,255,255,0.04)",
                                   border:`1px solid ${isSelected ? "#3B82F6" : "rgba(255,255,255,0.07)"}`,
                                   color: isSelected ? "#fff" : "#64748B",
-                                }}>
+                                }}
+                              >
                                 {displayLabel}
                               </button>
                             );
@@ -701,82 +715,100 @@ function SetupContent() {
                     </>
                   ) : (
                     <div>
-                      <label className="text-[10px] font-black uppercase tracking-widest mb-1.5 block" style={{ color:"#475569" }}>{t.posTitle}</label>
+                      <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest" style={{ color:"#475569" }}>
+                        {t.posTitle}
+                      </label>
                       <div style={fieldBox}>
-                        <input type="text" placeholder={t.posTitle} value={title}
-                          onChange={e => setTitle(e.target.value)}
-                          className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
+                        <input
+                          type="text"
+                          placeholder={t.posTitle}
+                          value={title}
+                          onChange={(event) => setTitle(event.target.value)}
+                          className="w-full bg-transparent px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-700"
+                        />
                       </div>
                     </div>
                   )}
 
-                  <div className="flex gap-2.5 mt-1">
-                    <button onClick={() => setStep(1)}
-                      className="py-3.5 px-5 font-black text-sm rounded-xl transition-all active:scale-95"
-                      style={{ background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", color:"#94A3B8" }}>
+                  <div className="mt-1 flex gap-2.5">
+                    <button
+                      onClick={() => setStep(1)}
+                      className="rounded-xl px-5 py-3.5 text-sm font-black transition-all active:scale-95"
+                      style={{ background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", color:"#94A3B8" }}
+                    >
                       {t.prev}
                     </button>
-                    <button onClick={() => { if (!canProceedStep2()) { alert(t.err); return; } setStep(3); }}
+                    <button
+                      onClick={() => {
+                        if (!canProceedStep2()) {
+                          alert(t.err);
+                          return;
+                        }
+                        setStep(3);
+                      }}
                       disabled={!canProceedStep2()}
-                      className="flex-1 py-3.5 font-black text-sm text-white rounded-xl transition-all active:scale-95 disabled:opacity-40"
-                      style={{ background:"linear-gradient(135deg,#2563EB,#3B82F6)", boxShadow:"0 4px 20px rgba(59,130,246,0.22)" }}>
+                      className="flex-1 rounded-xl py-3.5 text-sm font-black text-white transition-all active:scale-95 disabled:opacity-40"
+                      style={{ background:"linear-gradient(135deg,#2563EB,#3B82F6)", boxShadow:"0 4px 20px rgba(59,130,246,0.22)" }}
+                    >
                       {t.next}
                     </button>
                   </div>
                 </motion.div>
               )}
 
-              {/* ── STEP 3: Auto-Login + Complete ── */}
               {step === 3 && (
-                <motion.div key="step3" initial={{ opacity:0, x:20 }} animate={{ opacity:1, x:0 }}
-                  exit={{ opacity:0, x:-20 }} transition={{ duration:0.22 }} className="flex flex-col gap-4">
-
-                  {/* Profile summary card */}
-                  <div className="p-4 rounded-xl flex items-center gap-3"
-                    style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)" }}>
-                    <div className="flex items-center justify-center text-2xl w-11 h-11 rounded-xl flex-shrink-0"
-                      style={{ background:"rgba(59,130,246,0.1)", border:"1px solid rgba(59,130,246,0.2)" }}>
+                <motion.div
+                  key="step3"
+                  initial={{ opacity:0, x:20 }}
+                  animate={{ opacity:1, x:0 }}
+                  exit={{ opacity:0, x:-20 }}
+                  transition={{ duration:0.22 }}
+                  className="flex flex-col gap-4"
+                >
+                  <div className="flex items-center gap-3 rounded-xl p-4" style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)" }}>
+                    <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-2xl" style={{ background:"rgba(59,130,246,0.1)", border:"1px solid rgba(59,130,246,0.2)" }}>
                       {role === "worker" ? "👷" : role === "safety_officer" ? "🦺" : role === "site_manager" ? "🏗️" : role === "root" ? "💎" : "🏢"}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-black text-white text-sm truncate">{name || "—"}</p>
-                      <p className="text-[11px] mt-0.5 truncate" style={{ color:"#64748B" }}>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-black text-white">{name || "—"}</p>
+                      <p className="mt-0.5 truncate text-[11px]" style={{ color:"#64748B" }}>
                         {t[role as string] || role} · {siteCode || "—"}
                       </p>
                       {role === "worker" && trade && (
-                        <span className="inline-block mt-1 px-2 py-0.5 rounded-lg text-[10px] font-bold"
-                          style={{ background:"rgba(59,130,246,0.12)", color:"#93C5FD", border:"1px solid rgba(59,130,246,0.2)" }}>
+                        <span className="mt-1 inline-block rounded-lg px-2 py-0.5 text-[10px] font-bold" style={{ background:"rgba(59,130,246,0.12)", color:"#93C5FD", border:"1px solid rgba(59,130,246,0.2)" }}>
                           {trade}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Auto-login toggle — key feature */}
-                  <label className="flex items-center gap-3.5 p-4 rounded-xl cursor-pointer select-none transition-all duration-200"
+                  <label
+                    className="flex cursor-pointer select-none items-center gap-3.5 rounded-xl p-4 transition-all duration-200"
                     style={{ background:"rgba(59,130,246,0.06)", border:`2px solid ${rememberMe ? "rgba(59,130,246,0.3)" : "rgba(255,255,255,0.07)"}` }}
-                    onClick={() => setRememberMe(v => !v)}>
-                    {/* iOS-style toggle */}
+                    onClick={() => setRememberMe((value) => !value)}
+                  >
                     <div className="relative flex-shrink-0" style={{ width:48, height:26 }}>
-                      <div className="w-full h-full rounded-full transition-all duration-300"
-                        style={{ background: rememberMe ? "#3B82F6" : "rgba(255,255,255,0.1)" }} />
-                      <div className="absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-lg transition-all duration-300"
-                        style={{ left: rememberMe ? 24 : 2 }} />
+                      <div className="h-full w-full rounded-full transition-all duration-300" style={{ background: rememberMe ? "#3B82F6" : "rgba(255,255,255,0.1)" }} />
+                      <div className="absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-lg transition-all duration-300" style={{ left: rememberMe ? 24 : 2 }} />
                     </div>
                     <div className="flex-1">
-                      <span className="text-sm text-white font-black block">{t.rememberMe}</span>
-                      <span className="text-[10px] block mt-0.5" style={{ color:"#475569" }}>{t.rememberDesc}</span>
+                      <span className="block text-sm font-black text-white">{t.rememberMe}</span>
+                      <span className="mt-0.5 block text-[10px]" style={{ color:"#475569" }}>{t.rememberDesc}</span>
                     </div>
                     {rememberMe && (
-                      <motion.span initial={{ scale:0 }} animate={{ scale:1 }} className="text-lg flex-shrink-0"
-                        style={{ color:"#10B981" }}>✓</motion.span>
+                      <motion.span initial={{ scale:0 }} animate={{ scale:1 }} className="flex-shrink-0 text-lg" style={{ color:"#10B981" }}>
+                        ✓
+                      </motion.span>
                     )}
                   </label>
 
                   {rememberMe && (
-                    <motion.p initial={{ opacity:0, y:-4 }} animate={{ opacity:1, y:0 }}
-                      className="text-[10px] flex items-center gap-1.5 -mt-1 ml-1"
-                      style={{ color:"#059669" }}>
+                    <motion.p
+                      initial={{ opacity:0, y:-4 }}
+                      animate={{ opacity:1, y:0 }}
+                      className="-mt-1 ml-1 flex items-center gap-1.5 text-[10px]"
+                      style={{ color:"#059669" }}
+                    >
                       <span>✓</span>
                       {language === "ko" ? "자동 로그인이 활성화되었습니다." :
                        language === "vi" ? "Đăng nhập tự động đã được kích hoạt." :
@@ -785,25 +817,29 @@ function SetupContent() {
                     </motion.p>
                   )}
 
-                  <div className="flex gap-2.5 mt-1">
-                    <button onClick={() => setStep(2)}
-                      className="py-3.5 px-5 font-black text-sm rounded-xl transition-all active:scale-95"
-                      style={{ background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", color:"#94A3B8" }}>
+                  <div className="mt-1 flex gap-2.5">
+                    <button
+                      onClick={() => setStep(2)}
+                      className="rounded-xl px-5 py-3.5 text-sm font-black transition-all active:scale-95"
+                      style={{ background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", color:"#94A3B8" }}
+                    >
                       {t.prev}
                     </button>
-                    <button onClick={handleSave} disabled={loading}
-                      className="flex-1 py-3.5 font-black text-sm text-white rounded-xl transition-all active:scale-95 disabled:opacity-40"
-                      style={{ background:"linear-gradient(135deg,#2563EB,#3B82F6)", boxShadow:"0 4px 24px rgba(59,130,246,0.28)" }}>
+                    <button
+                      onClick={handleSave}
+                      disabled={loading}
+                      className="flex-1 rounded-xl py-3.5 text-sm font-black text-white transition-all active:scale-95 disabled:opacity-40"
+                      style={{ background:"linear-gradient(135deg,#2563EB,#3B82F6)", boxShadow:"0 4px 24px rgba(59,130,246,0.28)" }}
+                    >
                       {loading ? (
                         <span className="flex items-center justify-center gap-2">
-                          <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
+                          <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                         </span>
                       ) : t.save}
                     </button>
                   </div>
                 </motion.div>
               )}
-
             </AnimatePresence>
           </div>
         </div>
@@ -812,12 +848,11 @@ function SetupContent() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 export default function SetupProfilePage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center" style={{ background:"#050508" }}>
-        <div className="w-6 h-6 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+      <div className="flex min-h-screen items-center justify-center" style={{ background:"#050508" }}>
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500/30 border-t-blue-500" />
       </div>
     }>
       <SetupContent />

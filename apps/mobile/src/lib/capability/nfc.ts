@@ -1,6 +1,6 @@
 // 📡 M-009 — NFC 스캔 capability 어댑터 (Web NFC / NDEFReader).
 // Web NFC는 Android Chrome 한정 + HTTPS 필요. iOS/desktop → unsupported(네이티브 후속).
-// 읽기 전용. SAFE-LINK NFC 스티커(URL payload)에서 worker/site 토큰 추출.
+// 읽기 전용. SQ Link NFC 스티커(URL payload)에서 worker/site 토큰 추출.
 
 interface NDEFRecordLike {
     recordType: string;

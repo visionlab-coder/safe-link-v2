@@ -3,7 +3,6 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
-import { createClient } from "@/utils/supabase/client";
 
 interface VisionItem {
     name_ko: string;
@@ -57,12 +56,10 @@ export default function WorkerVisionPage() {
 
     useEffect(() => {
         const loadLang = async () => {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                const { data } = await supabase.from("profiles").select("preferred_lang").eq("id", session.user.id).single();
-                if (data?.preferred_lang) setLang(data.preferred_lang);
-            }
+            const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+            if (!res.ok) return;
+            const data = await res.json() as { profile?: { preferred_lang?: string | null } | null };
+            if (data.profile?.preferred_lang) setLang(data.profile.preferred_lang);
         };
         loadLang();
     }, []);
@@ -148,7 +145,7 @@ export default function WorkerVisionPage() {
                 {/* Image Preview */}
                 {imagePreview && (
                     <div className="relative rounded-[32px] overflow-hidden border border-white/10">
-                        <img src={imagePreview} alt="Captured" className="w-full max-h-[400px] object-cover" />
+                        <Image src={imagePreview} alt="Captured" width={1200} height={800} unoptimized className="w-full max-h-[400px] object-cover" />
                         {isAnalyzing && (
                             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center">
                                 <div className="flex flex-col items-center gap-4">

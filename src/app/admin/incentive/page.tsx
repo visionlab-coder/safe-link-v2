@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
-import { createClient } from "@/utils/supabase/client";
 import { Award, CheckCircle, ChevronRight, ArrowLeft, RefreshCw } from "lucide-react";
 import ExportMenu from "@/components/ExportMenu";
 import { exportData, type ExportFormat } from "@/utils/export-files";
@@ -50,36 +49,26 @@ export default function AdminIncentivePage() {
   const [adminSiteId, setAdminSiteId] = useState("");
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) return;
-      supabase.from("profiles").select("site_id").eq("id", session.user.id).maybeSingle().then(({ data }) => {
-        if ((data as { site_id?: string } | null)?.site_id) setAdminSiteId((data as { site_id: string }).site_id);
-      });
+    fetch("/api/auth/me", { cache: "no-store", credentials: "include" }).then(async (res) => {
+      if (!res.ok) return;
+      const data = await res.json() as { profile?: { site_id?: string | null } | null };
+      if (data.profile?.site_id) setAdminSiteId(data.profile.site_id);
     });
   }, []);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("tbm_quiz_sessions")
-      .select("id, tbm_session_id, status, sent_at, created_at")
-      .order("created_at", { ascending: false })
-      .limit(20);
-    setSessions((data ?? []) as QuizSession[]);
+    const res = await fetch("/api/quiz/sessions", { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json() as { sessions?: QuizSession[] };
+      setSessions(data.sessions ?? []);
+    }
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase
-      .from("tbm_quiz_sessions")
-      .select("id, tbm_session_id, status, sent_at, created_at")
-      .order("created_at", { ascending: false })
-      .limit(20)
-      .then(({ data }) => { setSessions((data ?? []) as QuizSession[]); setLoading(false); });
-  }, []);
+    loadSessions();
+  }, [loadSessions]);
 
   const loadResponses = useCallback(async (session: QuizSession) => {
     setLoadingResps(true);
@@ -87,14 +76,11 @@ export default function AdminIncentivePage() {
     setResponses([]);
     setGrants([]);
 
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("tbm_quiz_responses")
-      .select("id, worker_id, lang, score_pct, status, answered_at, nfc_workers(full_name, worker_code)")
-      .eq("quiz_session_id", session.id)
-      .order("score_pct", { ascending: false });
-
-    setResponses((data ?? []) as unknown as QuizResponse[]);
+    const res = await fetch(`/api/quiz/responses?quizSessionId=${encodeURIComponent(session.id)}`, { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json() as { responses?: QuizResponse[] };
+      setResponses(data.responses ?? []);
+    }
 
     const grantRes = await fetch(`/api/incentive/grant?quizSessionId=${session.id}`);
     if (grantRes.ok) {

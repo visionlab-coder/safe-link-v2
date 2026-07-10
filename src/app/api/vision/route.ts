@@ -1,103 +1,68 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 import { getCookieUser } from "@/utils/auth/cookie-user";
+import { callV3AiVision } from "@/utils/ai/v3-ai-gateway";
+
 export const runtime = "nodejs";
 
-interface GeminiVisionResponse {
-    candidates?: Array<{
-        content?: { parts?: Array<{ text?: string }> };
-    }>;
-}
-
 export async function POST(request: NextRequest) {
-    // P5 박제
-    const user = await getCookieUser();
-    if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  const user = await getCookieUser({ allowV3: true });
+  if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  const siteId = user.siteIds?.[0];
+  if (user.source !== "v3" || typeof siteId !== "number") {
+    return NextResponse.json({ error: "V3_SITE_SESSION_REQUIRED" }, { status: 403 });
+  }
 
-    const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();
-    if (!apiKey) {
-        return NextResponse.json({ error: "Missing API Key" }, { status: 500 });
+  try {
+    const { image, lang, mimeType } = await request.json() as {
+      image?: string;
+      lang?: string;
+      mimeType?: string;
+    };
+    if (!image) return NextResponse.json({ error: "No image data" }, { status: 400 });
+    if (typeof image !== "string" || image.length > 5 * 1024 * 1024 * (4 / 3)) {
+      return NextResponse.json({ error: "Image too large (max 5MB)" }, { status: 413 });
     }
 
-    try {
-        const { image, lang } = await request.json();
+    const targetLang = lang || "ko";
+    const langNames: Record<string, string> = {
+      ko: "한국어", en: "English", zh: "中文", vi: "Tiếng Việt",
+      th: "ภาษาไทย", uz: "O'zbek", ph: "Filipino", ru: "Русский",
+      jp: "日本語", km: "ខ្មែរ", id: "Bahasa Indonesia", mn: "Монгол",
+      my: "မြန်မာ", ne: "नेपाली", bn: "বাংলা", kk: "Қазақ",
+      fr: "Français", es: "Español", ar: "العربية", hi: "हिन्दी",
+    };
+    const langName = langNames[targetLang] || "English";
+    const prompt = `You are a construction site safety expert analyzing a photo from a construction site.
 
-        if (!image) {
-            return NextResponse.json({ error: "No image data" }, { status: 400 });
-        }
+Identify all construction-related objects, equipment, materials, and potential hazards visible in this image.
+For each item return: name_ko, name_local in ${langName}, category (equipment/material/hazard/ppe/structure/tool), risk_level (safe/caution/danger), safety_note_ko, safety_note_local in ${langName}.
+Return only a valid JSON array. If none are found, return [].`;
 
-        // 5MB limit for base64 image
-        if (typeof image !== 'string' || image.length > 5 * 1024 * 1024 * (4 / 3)) {
-            return NextResponse.json({ error: "Image too large (max 5MB)" }, { status: 413 });
-        }
-
-        const targetLang = lang || 'ko';
-
-        const langNames: Record<string, string> = {
-            ko: '한국어', en: 'English', zh: '中文', vi: 'Tiếng Việt',
-            th: 'ภาษาไทย', uz: "O'zbek", ph: 'Filipino', ru: 'Русский',
-            jp: '日本語', km: 'ខ្មែរ', id: 'Bahasa Indonesia', mn: 'Монгол',
-            my: 'မြန်မာ', ne: 'नेपाली', bn: 'বাংলা', kk: 'Қазақ',
-            fr: 'Français', es: 'Español', ar: 'العربية', hi: 'हिन्दी',
-        };
-        const langName = langNames[targetLang] || 'English';
-
-        const prompt = `You are a construction site safety expert analyzing a photo from a construction site.
-
-Identify ALL construction-related objects, equipment, materials, and potential hazards visible in this image.
-
-For each identified item, provide:
-1. name_ko: Korean name
-2. name_local: Name in ${langName} (${targetLang})
-3. category: one of "equipment", "material", "hazard", "ppe", "structure", "tool"
-4. risk_level: "safe", "caution", "danger"
-5. safety_note_ko: Brief safety note in Korean (1 sentence)
-6. safety_note_local: Same safety note in ${langName}
-
-Return ONLY valid JSON array. No markdown, no explanation.
-Example: [{"name_ko":"안전모","name_local":"Safety Helmet","category":"ppe","risk_level":"safe","safety_note_ko":"반드시 착용하세요","safety_note_local":"Must be worn at all times"}]
-
-If no construction-related items are found, return an empty array: []`;
-
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            { text: prompt },
-                            { inlineData: { mimeType: 'image/jpeg', data: image } }
-                        ]
-                    }],
-                    generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
-                }),
-            }
-        );
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("[Vision API] Gemini error:", errorText);
-            return NextResponse.json({ error: "Vision API failed" }, { status: 502 });
-        }
-
-        const data = await response.json() as GeminiVisionResponse;
-        const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-        if (!textContent) {
-            return NextResponse.json({ items: [] });
-        }
-
-        // Parse JSON from response (handle markdown code blocks)
-        const jsonMatch = textContent.match(/```json\s*([\s\S]*?)```/) || textContent.match(/(\[[\s\S]*\])/);
-        if (!jsonMatch) {
-            return NextResponse.json({ items: [] });
-        }
-
-        const items = JSON.parse(jsonMatch[1]);
-        return NextResponse.json({ items });
-    } catch (error) {
-        console.error("[Vision API] Error:", error);
-        return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    const upstream = await callV3AiVision(request, {
+      siteId,
+      image,
+      mimeType: mimeType || "image/jpeg",
+      targetLanguage: targetLang,
+      prompt,
+    });
+    if (!upstream) {
+      return NextResponse.json({ error: "Vision gateway unavailable" }, { status: 503 });
     }
+    if (!upstream.ok) {
+      const body = await upstream.text().catch(() => "");
+      console.error("[Vision API] Gateway error:", upstream.status, body.slice(0, 200));
+      return NextResponse.json({ error: "Vision API failed" }, { status: upstream.status });
+    }
+
+    const data = await upstream.json() as { text?: string };
+    const textContent = data.text?.trim() || "";
+    if (!textContent) return NextResponse.json({ items: [] });
+    const jsonMatch = textContent.match(/```json\s*([\s\S]*?)```/) || textContent.match(/(\[[\s\S]*\])/);
+    if (!jsonMatch) return NextResponse.json({ items: [] });
+    const items = JSON.parse(jsonMatch[1]);
+    return NextResponse.json({ items: Array.isArray(items) ? items : [] });
+  } catch (error) {
+    console.error("[Vision API] Error:", error);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+  }
 }

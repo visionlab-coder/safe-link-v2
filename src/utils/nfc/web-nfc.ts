@@ -1,5 +1,5 @@
 /**
- * Web NFC API 래퍼 — SAFE-LINK V2.0
+ * Web NFC API 래퍼 — SQ Link V2.0
  *
  * 지원 현황:
  *  ✓ Chrome on Android (NDEF)

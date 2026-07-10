@@ -75,7 +75,7 @@ export async function scanQrOnce(video: HTMLVideoElement, signal?: AbortSignal):
 
 export type ParsedQr = { kind: "site" | "worker" | "url" | "unknown"; raw: string; token?: string; siteCode?: string };
 
-/** SAFE-LINK QR 파싱 — site/worker 토큰 추출. */
+/** SQ Link QR 파싱 — site/worker 토큰 추출. */
 export function parseSafeLinkQr(raw: string): ParsedQr {
     try {
         const url = new URL(raw);

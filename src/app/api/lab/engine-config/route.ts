@@ -10,9 +10,9 @@ import {
     type TranslateEngine,
 } from "@/utils/lab/engine-config";
 
-// 🔐 AI 엔진/API키 설정 — SAFE-LINK 루트 관리자(MASTER_EMAILS)만 접근.
+// 🔐 AI 엔진/API키 설정 — SQ Link 루트 관리자(MASTER_EMAILS)만 접근.
 // ⚠️ 완전한 "나만" 보장은 JWT 서명검증 수정이 선결(현재는 MASTER 이메일 게이트 = 방어심층).
-const VALID_ENGINES: TranslateEngine[] = ["m2m100", "papago", "google", "gemini", "flitto"];
+const VALID_ENGINES: TranslateEngine[] = ["m2m100", "papago", "google"];
 
 export async function GET() {
     const root = await requireRootAdmin();
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
             patch.translateEngine = te;
         }
         // 키 필드: 문자열만 허용(빈 문자열 = 삭제). 길이 상한으로 남용 방지.
-        for (const f of ["papagoId", "papagoSecret", "googleKey", "geminiKey", "flittoToken"] as const) {
+        for (const f of ["papagoId", "papagoSecret", "googleKey"] as const) {
             const v = body[f];
             if (v === undefined) continue;
             if (typeof v !== "string" || v.length > 2000) {

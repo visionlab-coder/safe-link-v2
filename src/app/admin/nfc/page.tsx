@@ -5,7 +5,6 @@ import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter } from "next/navigation";
 import { ChevronRight, ClipboardList, KeyRound, LocateFixed, Nfc, RefreshCw, Users } from "lucide-react";
-import { createClient } from "@/utils/supabase/client";
 
 const MENU = [
   {
@@ -31,6 +30,12 @@ const MENU = [
   },
 ];
 
+type SiteOption = {
+  id: string;
+  name: string;
+  site_code?: string | null;
+};
+
 type Challenge = {
   challenge_code: string;
   work_date: string;
@@ -42,7 +47,7 @@ export default function AdminNfcHubPage() {
   const [siteName, setSiteName] = useState("");
   const [siteCode, setSiteCode] = useState("");
   const [mySiteId, setMySiteId] = useState<string | null>(null);
-  const [siteList, setSiteList] = useState<{ id: string; name: string }[]>([]);
+  const [siteList, setSiteList] = useState<SiteOption[]>([]);
   const [locationStatus, setLocationStatus] = useState("");
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [challengeStatus, setChallengeStatus] = useState("");
@@ -58,48 +63,38 @@ export default function AdminNfcHubPage() {
     setChallenge(data.challenge ?? null);
   }, []);
 
-  const fetchSiteAccess = useCallback(async () => {
-    const res = await fetch("/api/nfc/site-access-control");
+  const fetchSiteAccess = useCallback(async (siteId?: string | null) => {
+    const qs = siteId ? `?site_id=${encodeURIComponent(siteId)}` : "";
+    const res = await fetch(`/api/nfc/site-access-control${qs}`);
     if (!res.ok) return;
     const data = await res.json();
     setSiteAccessEnabled(data.control?.is_enabled !== false);
   }, []);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) return;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("site_id, site_code")
-        .eq("id", session.user.id)
-        .maybeSingle();
-      const siteId = (profile as { site_id?: string | null; site_code?: string | null } | null)?.site_id;
-      setSiteName((profile as { site_code?: string | null } | null)?.site_code ?? "");
+    const loadContext = async () => {
+      const [meRes, sitesRes] = await Promise.all([
+        fetch("/api/auth/me", { cache: "no-store", credentials: "include" }),
+        fetch("/api/sites/options", { cache: "no-store", credentials: "include" }),
+      ]);
+      if (!meRes.ok) return;
+      const me = await meRes.json() as { profile?: { site_id?: string | null; site_code?: string | null } | null };
+      const sitesBody = sitesRes.ok ? await sitesRes.json() as { sites?: SiteOption[] } : {};
+      const sites = sitesBody.sites ?? [];
+      const siteId = me.profile?.site_id ?? null;
       if (siteId) {
+        const site = sites.find((item) => String(item.id) === String(siteId));
         setMySiteId(siteId);
-        const { data: site } = await supabase
-          .from("sites")
-          .select("name, site_code")
-          .eq("id", siteId)
-          .maybeSingle();
-        if ((site as { name?: string } | null)?.name) setSiteName((site as { name: string }).name);
-        if ((site as { site_code?: string } | null)?.site_code) {
-          setSiteCode((site as { site_code: string }).site_code);
-        }
+        setSiteName(site?.name ?? me.profile?.site_code ?? "");
+        setSiteCode(site?.site_code ?? me.profile?.site_code ?? "");
         fetchChallenge(siteId);
-        fetchSiteAccess();
+        fetchSiteAccess(siteId);
       } else {
-        // No site_id in profile — load available sites so admin can pick one
-        const { data: sites } = await supabase
-          .from("sites")
-          .select("id, name")
-          .order("name");
-        if (sites) setSiteList(sites as { id: string; name: string }[]);
-        fetchChallenge(undefined);
-        fetchSiteAccess();
+        setSiteList(sites);
+        setChallenge(null);
       }
-    });
+    };
+    loadContext().catch(() => undefined);
   }, [fetchChallenge, fetchSiteAccess]);
 
   const saveCurrentSiteLocation = async () => {
@@ -115,6 +110,7 @@ export default function AdminNfcHubPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            site_id: mySiteId,
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
             accuracy: pos.coords.accuracy,
@@ -140,22 +136,24 @@ export default function AdminNfcHubPage() {
     if (site) {
       setMySiteId(id);
       setSiteName(site.name);
+      setSiteCode(site.site_code ?? "");
       fetchChallenge(id);
-      fetchSiteAccess();
+      fetchSiteAccess(id);
     }
   };
 
   const toggleSiteAccess = async () => {
     const nextEnabled = !siteAccessEnabled;
     const message = nextEnabled
-      ? "근로자 SAFE-LINK 기능을 다시 켜시겠습니까?"
-      : "현장 근로자 SAFE-LINK 모든 기능을 중지하시겠습니까?";
+      ? "근로자 SQ Link 기능을 다시 켜시겠습니까?"
+      : "현장 근로자 SQ Link 모든 기능을 중지하시겠습니까?";
     if (!window.confirm(message)) return;
     setSiteAccessStatus("");
     const res = await fetch("/api/nfc/site-access-control", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        site_id: mySiteId,
         is_enabled: nextEnabled,
         reason: nextEnabled ? "admin_enabled" : "admin_disabled",
       }),
@@ -250,7 +248,7 @@ export default function AdminNfcHubPage() {
           <div className="mb-5 bg-gray-900 border border-gray-800 rounded-xl p-4">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold">근로자 SAFE-LINK 기능</p>
+                <p className="text-sm font-semibold">근로자 SQ Link 기능</p>
                 <p className="text-xs text-gray-500 mt-1">
                   꺼짐 상태에서는 TBM 태그와 근로자 NFC 진입이 차단됩니다.
                 </p>
@@ -259,7 +257,7 @@ export default function AdminNfcHubPage() {
                 type="button"
                 onClick={toggleSiteAccess}
                 className={`relative h-8 w-14 rounded-full transition-colors ${siteAccessEnabled ? "bg-green-600" : "bg-gray-700"}`}
-                aria-label="Toggle worker SAFE-LINK access"
+                aria-label="Toggle worker SQ Link access"
               >
                 <span
                   className={`absolute top-1 h-6 w-6 rounded-full bg-white transition-transform ${siteAccessEnabled ? "translate-x-7" : "translate-x-1"}`}

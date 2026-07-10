@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/utils/nfc/require-admin";
 import { stripEmoji } from "@/utils/strip-emoji";
+import { getV3SessionUser } from "@/utils/auth/v3-session-user";
+import { callV3AiVendor } from "@/utils/ai/v3-ai-gateway";
 
 export const runtime = "nodejs";
 
@@ -8,12 +9,6 @@ export const runtime = "nodejs";
 // POST /api/tbm/briefing-draft
 // body: { category, subcategory?, siteId?, workTypes? }
 // 반환: { draft, hazardItems, rawTips }
-
-interface GeminiResponse {
-  candidates?: Array<{
-    content?: { parts?: Array<{ text?: string }> };
-  }>;
-}
 
 type HazardItem = {
   id: string;
@@ -26,7 +21,50 @@ type HazardItem = {
   is_critical: boolean;
 };
 
-async function generateBriefingDraft(hazardItems: HazardItem[], apiKey: string): Promise<string> {
+const DEFAULT_HAZARDS: HazardItem[] = [
+  {
+    id: "fall-001",
+    category: "고소작업",
+    subcategory: "추락",
+    hazard_description: "개구부와 단부에서 작업 중 추락 위험이 있습니다.",
+    accident_type: "추락",
+    preventive_measure: "안전난간, 덮개, 안전대 체결 상태를 작업 전 확인합니다.",
+    risk_level: 5,
+    is_critical: true,
+  },
+  {
+    id: "equipment-001",
+    category: "중장비",
+    subcategory: "협착",
+    hazard_description: "굴삭기와 지게차 작업 반경 내 접근 시 협착 위험이 있습니다.",
+    accident_type: "협착",
+    preventive_measure: "유도자를 배치하고 장비 작업 반경 출입을 통제합니다.",
+    risk_level: 5,
+    is_critical: true,
+  },
+  {
+    id: "electric-001",
+    category: "전기",
+    subcategory: "감전",
+    hazard_description: "임시 전선과 분전반 사용 중 감전 위험이 있습니다.",
+    accident_type: "감전",
+    preventive_measure: "누전차단기, 접지, 전선 피복 손상 여부를 확인합니다.",
+    risk_level: 4,
+    is_critical: true,
+  },
+  {
+    id: "fire-001",
+    category: "화기작업",
+    subcategory: "화재",
+    hazard_description: "용접과 절단 작업 중 불티로 인한 화재 위험이 있습니다.",
+    accident_type: "화재",
+    preventive_measure: "불티 비산 방지포와 소화기를 배치하고 작업 후 잔불을 확인합니다.",
+    risk_level: 4,
+    is_critical: false,
+  },
+];
+
+async function generateBriefingDraft(req: NextRequest, siteId: number, hazardItems: HazardItem[]): Promise<string> {
   const hazardSummary = hazardItems
     .slice(0, 10)
     .map(
@@ -51,39 +89,29 @@ ${hazardSummary}
 
 반드시 브리핑 텍스트만 반환하세요.`;
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
-  let res: Response;
-  try {
-    res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.5, maxOutputTokens: 1024 },
-        }),
-        signal: controller.signal,
-      }
-    );
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!res.ok) throw new Error("gemini_api_failed");
-  const data = (await res.json()) as GeminiResponse;
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-  if (!text) throw new Error("empty_gemini_response");
+  const result = await callV3AiVendor(req, {
+    siteId,
+    feature: "quiz",
+    provider: "openai-prompt",
+    sourceLanguage: "ko",
+    targetLanguage: "ko",
+    text: hazardSummary,
+    prompt,
+    maxOutputTokens: 1024,
+    temperature: 0.5,
+  });
+  const text = result?.text ?? "";
+  if (!text) throw new Error("empty_ai_response");
   return stripEmoji(text);
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await requireAdmin();
-  if (!guard.ok) return guard.response;
-
-  const apiKey = (process.env.GOOGLE_CLOUD_API_KEY ?? "").trim();
-  if (!apiKey) return NextResponse.json({ error: "GOOGLE_CLOUD_API_KEY_missing" }, { status: 500 });
+  const user = await getV3SessionUser();
+  if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  const isAdmin = user.roles.some((role) => ["ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER"].includes(role));
+  if (!isAdmin) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  const siteId = user.siteIds[0];
+  if (typeof siteId !== "number") return NextResponse.json({ error: "site_required" }, { status: 403 });
 
   let body: { category?: string; subcategory?: string; siteId?: string };
   try {
@@ -94,29 +122,22 @@ export async function POST(req: NextRequest) {
 
   const category = String(body.category ?? "").trim();
 
-  // 위험성평가 DB 조회
-  let query = guard.ctx.service
-    .from("safety_education_library")
-    .select("id, category, subcategory, hazard_description, accident_type, preventive_measure, risk_level, is_critical")
-    .order("risk_level", { ascending: false })
-    .limit(20);
+  const hazardItems = DEFAULT_HAZARDS
+    .filter((item) => !category || item.category === category)
+    .filter((item) => !body.subcategory || item.subcategory === body.subcategory)
+    .sort((a, b) => b.risk_level - a.risk_level)
+    .slice(0, 20);
 
-  if (category) query = query.eq("category", category);
-  if (body.subcategory) query = query.eq("subcategory", body.subcategory);
-
-  const { data: hazardItems, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  if (!hazardItems?.length) {
+  if (!hazardItems.length) {
     return NextResponse.json({ error: "no_hazard_items_found", hint: "category가 올바른지 확인하세요" }, { status: 404 });
   }
 
   try {
-    const draft = await generateBriefingDraft(hazardItems as HazardItem[], apiKey);
+    const draft = await generateBriefingDraft(req, siteId, hazardItems);
     return NextResponse.json({
       draft,
       hazardItemCount: hazardItems.length,
-      criticalCount: hazardItems.filter((h) => (h as HazardItem).is_critical).length,
+      criticalCount: hazardItems.filter((h) => h.is_critical).length,
       category: category || "전체",
     });
   } catch (err) {
@@ -129,20 +150,14 @@ export async function POST(req: NextRequest) {
 
 // GET /api/tbm/briefing-draft?category=xxx → 위험성평가 카테고리 목록
 export async function GET() {
-  const guard = await requireAdmin();
-  if (!guard.ok) return guard.response;
+  const user = await getV3SessionUser();
+  if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  const isAdmin = user.roles.some((role) => ["ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER"].includes(role));
+  if (!isAdmin) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
 
-  const { data, error } = await guard.ctx.service
-    .from("safety_education_library")
-    .select("category, subcategory")
-    .order("category");
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  const grouped = (data ?? []).reduce<Record<string, string[]>>((acc, row) => {
-    const r = row as { category: string; subcategory: string };
-    if (!acc[r.category]) acc[r.category] = [];
-    if (!acc[r.category].includes(r.subcategory)) acc[r.category].push(r.subcategory);
+  const grouped = DEFAULT_HAZARDS.reduce<Record<string, string[]>>((acc, row) => {
+    if (!acc[row.category]) acc[row.category] = [];
+    if (!acc[row.category].includes(row.subcategory)) acc[row.category].push(row.subcategory);
     return acc;
   }, {});
 

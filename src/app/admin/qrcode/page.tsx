@@ -6,7 +6,6 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { Shield, Users, ArrowLeft, Download, QrCode, Nfc, CheckCircle, AlertCircle, UserPlus } from "lucide-react";
 import RoleGuard from "@/components/RoleGuard";
-import { createClient } from "@/utils/supabase/client";
 import { detectNfcSupport, writeNfcUrl, NfcError } from "@/utils/nfc/web-nfc";
 
 type Site = {
@@ -45,28 +44,23 @@ export default function QRDistributionPage() {
     useEffect(() => {
         const loadSites = async () => {
             setLoadingSites(true);
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) { setLoadingSites(false); return; }
-
-            const { data: profile } = await supabase
-                .from("profiles")
-                .select("role, site_id")
-                .eq("id", session.user.id)
-                .single();
-
-            let siteRows: Site[] = [];
-            if (profile?.role === "HQ_ADMIN" || profile?.role === "ROOT" || profile?.role === "HQ_OFFICER") {
-                const { data } = await supabase.from("sites").select("id, name, code, address").order("name");
-                siteRows = data || [];
-            } else if (profile?.site_id) {
-                const { data } = await supabase.from("sites").select("id, name, code, address").eq("id", profile.site_id).limit(1);
-                siteRows = data || [];
+            try {
+                const res = await fetch("/api/sites/options", { credentials: "include", cache: "no-store" });
+                const data = res.ok ? await res.json() as { sites?: Array<{ id: string; name: string; site_code?: string | null }> } : {};
+                const siteRows: Site[] = (data.sites ?? []).map((site) => ({
+                    id: site.id,
+                    name: site.name,
+                    code: site.site_code ?? null,
+                    address: null,
+                }));
+                setSites(siteRows);
+                setSelectedSiteId(siteRows[0]?.id || "");
+            } catch {
+                setSites([]);
+                setSelectedSiteId("");
+            } finally {
+                setLoadingSites(false);
             }
-
-            setSites(siteRows);
-            setSelectedSiteId(profile?.site_id || siteRows[0]?.id || "");
-            setLoadingSites(false);
         };
         loadSites();
     }, []);

@@ -1,5 +1,5 @@
 // Pure, side-effect-free VAD (voice activity detection) finalize decision.
-// Extracted from useFlittoRTT so the end-of-speech state machine can be unit
+// Extracted so the end-of-speech state machine can be unit
 // tested without a microphone (see scripts/vad-decision-test.mjs).
 
 /** @typedef {Object} VadConfig

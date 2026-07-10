@@ -20,6 +20,13 @@
 # production
 /build
 
+# spring / gradle
+/backend/.gradle/
+/backend/build/
+/backend/out/
+/backend/.idea/
+/backend/*.iml
+
 # misc
 .DS_Store
 *.pem

@@ -77,13 +77,13 @@ const EN_TEXT: QrEntryText = {
   loading: "Loading.",
   qrLoading: "Checking the QR code.",
   siteLoading: "Checking the worksite.",
-  siteQrLabel: "SAFE-LINK Site QR",
-  workerQrLabel: "SAFE-LINK Worker QR",
+  siteQrLabel: "SQ Link Site QR",
+  workerQrLabel: "SQ Link Worker QR",
   quickEntryTitle: "Quick entry",
   chooseLanguageTitle: "Choose language",
   selectedLanguage: "Selected language",
   siteLabel: "Worksite",
-  siteFallback: "SAFE-LINK worksite",
+  siteFallback: "SQ Link worksite",
   initialsLabel: "Name initials",
   initialsPlaceholder: "e.g. KMB",
   phoneLast4Label: "Last 4 digits of phone",
@@ -91,7 +91,7 @@ const EN_TEXT: QrEntryText = {
   entering: "Processing entry",
   errorTitle: "Entry failed",
   blockedTitle: "Work ended for today",
-  blockedBody: "SAFE-LINK access is disabled until the next TBM check-in.",
+  blockedBody: "SQ Link access is disabled until the next TBM check-in.",
   workerFallbackName: "Worker",
 };
 
@@ -100,13 +100,13 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     loading: "불러오는 중입니다.",
     qrLoading: "QR 정보를 확인하고 있습니다.",
     siteLoading: "현장 정보를 확인하고 있습니다.",
-    siteQrLabel: "SAFE-LINK 현장 QR",
-    workerQrLabel: "SAFE-LINK 근로자 QR",
+    siteQrLabel: "SQ Link 현장 QR",
+    workerQrLabel: "SQ Link 근로자 QR",
     quickEntryTitle: "간편입장",
     chooseLanguageTitle: "언어를 선택하세요",
     selectedLanguage: "선택된 언어",
     siteLabel: "근무 현장",
-    siteFallback: "SAFE-LINK 현장",
+    siteFallback: "SQ Link 현장",
     initialsLabel: "이름 이니셜",
     initialsPlaceholder: "예: KMB",
     phoneLast4Label: "휴대전화 뒤 4자리",
@@ -114,7 +114,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "입장 처리 중",
     errorTitle: "입장 실패",
     blockedTitle: "오늘 근무가 종료되었습니다",
-    blockedBody: "다음 TBM 출근 태깅 전까지 SAFE-LINK 사용이 중지됩니다.",
+    blockedBody: "다음 TBM 출근 태깅 전까지 SQ Link 사용이 중지됩니다.",
     workerFallbackName: "근로자",
   },
   vi: {
@@ -129,7 +129,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "Đang xử lý",
     errorTitle: "Không vào được",
     blockedTitle: "Ca làm hôm nay đã kết thúc",
-    blockedBody: "SAFE-LINK bị tắt cho đến lần điểm danh TBM tiếp theo.",
+    blockedBody: "SQ Link bị tắt cho đến lần điểm danh TBM tiếp theo.",
   },
   zh: {
     ...EN_TEXT,
@@ -143,7 +143,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "正在处理",
     errorTitle: "进入失败",
     blockedTitle: "今天工作已结束",
-    blockedBody: "在下次 TBM 签到前，SAFE-LINK 将停止使用。",
+    blockedBody: "在下次 TBM 签到前，SQ Link 将停止使用。",
   },
   th: {
     ...EN_TEXT,
@@ -157,7 +157,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "กำลังดำเนินการ",
     errorTitle: "เข้าใช้งานไม่สำเร็จ",
     blockedTitle: "สิ้นสุดงานวันนี้แล้ว",
-    blockedBody: "SAFE-LINK จะถูกปิดจนกว่าจะเช็กอิน TBM ครั้งถัดไป",
+    blockedBody: "SQ Link จะถูกปิดจนกว่าจะเช็กอิน TBM ครั้งถัดไป",
   },
   uz: {
     ...EN_TEXT,
@@ -171,7 +171,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "Kirish bajarilmoqda",
     errorTitle: "Kirish xatosi",
     blockedTitle: "Bugungi ish tugadi",
-    blockedBody: "Keyingi TBM kirishigacha SAFE-LINK o'chiriladi.",
+    blockedBody: "Keyingi TBM kirishigacha SQ Link o'chiriladi.",
   },
   ph: {
     ...EN_TEXT,
@@ -185,7 +185,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "Pinoproseso",
     errorTitle: "Nabigo ang pagpasok",
     blockedTitle: "Tapos na ang trabaho ngayong araw",
-    blockedBody: "Naka-disable ang SAFE-LINK hanggang sa susunod na TBM check-in.",
+    blockedBody: "Naka-disable ang SQ Link hanggang sa susunod na TBM check-in.",
   },
   km: {
     ...EN_TEXT,
@@ -199,7 +199,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "កំពុងដំណើរការ",
     errorTitle: "ចូលមិនបាន",
     blockedTitle: "ការងារថ្ងៃនេះបានបញ្ចប់",
-    blockedBody: "SAFE-LINK ត្រូវបានបិទរហូតដល់ TBM បន្ទាប់។",
+    blockedBody: "SQ Link ត្រូវបានបិទរហូតដល់ TBM បន្ទាប់។",
   },
   id: {
     ...EN_TEXT,
@@ -213,7 +213,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "Memproses masuk",
     errorTitle: "Gagal masuk",
     blockedTitle: "Pekerjaan hari ini selesai",
-    blockedBody: "SAFE-LINK dinonaktifkan sampai check-in TBM berikutnya.",
+    blockedBody: "SQ Link dinonaktifkan sampai check-in TBM berikutnya.",
   },
   mn: {
     ...EN_TEXT,
@@ -227,7 +227,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "Боловсруулж байна",
     errorTitle: "Нэвтрэх алдаа",
     blockedTitle: "Өнөөдрийн ажил дууссан",
-    blockedBody: "Дараагийн TBM бүртгэл хүртэл SAFE-LINK идэвхгүй байна.",
+    blockedBody: "Дараагийн TBM бүртгэл хүртэл SQ Link идэвхгүй байна.",
   },
   my: {
     ...EN_TEXT,
@@ -241,7 +241,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "ဆောင်ရွက်နေသည်",
     errorTitle: "ဝင်ရောက်မှု မအောင်မြင်ပါ",
     blockedTitle: "ယနေ့အလုပ် ပြီးဆုံးပါပြီ",
-    blockedBody: "နောက် TBM check-in မတိုင်မီ SAFE-LINK ကို ပိတ်ထားသည်။",
+    blockedBody: "နောက် TBM check-in မတိုင်မီ SQ Link ကို ပိတ်ထားသည်။",
   },
   ne: {
     ...EN_TEXT,
@@ -255,7 +255,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "प्रवेश प्रक्रिया हुँदैछ",
     errorTitle: "प्रवेश असफल",
     blockedTitle: "आजको काम सकियो",
-    blockedBody: "अर्को TBM चेक-इनसम्म SAFE-LINK बन्द हुन्छ।",
+    blockedBody: "अर्को TBM चेक-इनसम्म SQ Link बन्द हुन्छ।",
   },
   bn: {
     ...EN_TEXT,
@@ -269,7 +269,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "প্রবেশ প্রক্রিয়া চলছে",
     errorTitle: "প্রবেশ ব্যর্থ",
     blockedTitle: "আজকের কাজ শেষ হয়েছে",
-    blockedBody: "পরবর্তী TBM চেক-ইন পর্যন্ত SAFE-LINK বন্ধ থাকবে।",
+    blockedBody: "পরবর্তী TBM চেক-ইন পর্যন্ত SQ Link বন্ধ থাকবে।",
   },
   kk: {
     ...EN_TEXT,
@@ -283,7 +283,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "Кіру өңделуде",
     errorTitle: "Кіру сәтсіз",
     blockedTitle: "Бүгінгі жұмыс аяқталды",
-    blockedBody: "Келесі TBM тіркелуіне дейін SAFE-LINK өшіріледі.",
+    blockedBody: "Келесі TBM тіркелуіне дейін SQ Link өшіріледі.",
   },
   ru: {
     ...EN_TEXT,
@@ -297,7 +297,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "Вход выполняется",
     errorTitle: "Ошибка входа",
     blockedTitle: "Работа на сегодня завершена",
-    blockedBody: "SAFE-LINK отключен до следующей отметки TBM.",
+    blockedBody: "SQ Link отключен до следующей отметки TBM.",
   },
   en: EN_TEXT,
   jp: {
@@ -312,7 +312,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "入場処理中",
     errorTitle: "入場失敗",
     blockedTitle: "本日の作業は終了しました",
-    blockedBody: "次回のTBM出勤タグまでSAFE-LINKは停止されます。",
+    blockedBody: "次回のTBM出勤タグまでSQ Linkは停止されます。",
   },
   fr: {
     ...EN_TEXT,
@@ -326,7 +326,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "Entrée en cours",
     errorTitle: "Échec de l'entrée",
     blockedTitle: "Travail terminé aujourd'hui",
-    blockedBody: "SAFE-LINK est désactivé jusqu'au prochain pointage TBM.",
+    blockedBody: "SQ Link est désactivé jusqu'au prochain pointage TBM.",
   },
   es: {
     ...EN_TEXT,
@@ -340,7 +340,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "Procesando entrada",
     errorTitle: "Error de entrada",
     blockedTitle: "El trabajo de hoy terminó",
-    blockedBody: "SAFE-LINK queda desactivado hasta el próximo registro TBM.",
+    blockedBody: "SQ Link queda desactivado hasta el próximo registro TBM.",
   },
   ar: {
     ...EN_TEXT,
@@ -354,7 +354,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "جار معالجة الدخول",
     errorTitle: "فشل الدخول",
     blockedTitle: "انتهى عمل اليوم",
-    blockedBody: "سيتم تعطيل SAFE-LINK حتى تسجيل TBM التالي.",
+    blockedBody: "سيتم تعطيل SQ Link حتى تسجيل TBM التالي.",
   },
   hi: {
     ...EN_TEXT,
@@ -368,7 +368,7 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     entering: "प्रवेश प्रक्रिया जारी",
     errorTitle: "प्रवेश विफल",
     blockedTitle: "आज का काम समाप्त हुआ",
-    blockedBody: "अगले TBM चेक-इन तक SAFE-LINK बंद रहेगा।",
+    blockedBody: "अगले TBM चेक-इन तक SQ Link बंद रहेगा।",
   },
 };
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect } from "react";
-import { useFlittoRTT } from "@/hooks/useFlittoRTT";
 
 const STT_LANG_MAP: Record<string, string> = {
     ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN",
@@ -40,14 +39,13 @@ export type STTErrorType = "mic_denied" | "network" | "api_error" | "stream_lost
 interface UseCloudSTTOptions {
     lang: string;
     onTranscript: (text: string, translations?: Record<string, string>) => void;
-    targetLangs?: string[];
     onError?: (type: STTErrorType, message: string) => void;
     /** VAD가 음성 시작을 감지하는 즉시 호출 — STT 완료 전 파트너에게 조기 신호 전달용 */
     onSpeechStart?: () => void;
     chunkInterval?: number;
     /** 침묵 감지 ms — 이 시간 이상 조용하면 자동 전송 (기본 2000ms) */
     silenceDuration?: number;
-    /** 실시간 통역 모드: latest_long 모델 + Gemini 교정 서버에서 수행 */
+    /** 실시간 통역 모드: latest_long 모델 + 서버 용어집 정규화 */
     live?: boolean;
 }
 
@@ -57,6 +55,7 @@ const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
     noiseSuppression: true,
     autoGainControl: true,
     channelCount: 1,
+    sampleRate: { ideal: 48000 },
 };
 
 const FETCH_TIMEOUT = 8_000;
@@ -74,23 +73,7 @@ export function useCloudSTT({
     chunkInterval = 10_000,
     silenceDuration = 2000,
     live = false,
-    targetLangs,
 }: UseCloudSTTOptions) {
-    // 🔀 실시간 엔진 스위치. NEXT_PUBLIC_REALTIME_STT_ENGINE==="flitto" 일 때만 Flitto 사용.
-    // 기본값(미설정)=Google → 운영 무영향(플래그로 카나리 전환/즉시 복귀). useFlittoRTT는
-    // toggle() 호출 전엔 마이크·WS 미연결(무동작)이라 무조건 호출해도 안전(Hooks 규칙 준수).
-    // Flitto는 STT만 drop-in 으로 표면화 — 번역/발음은 각 페이지 기존 경로 유지.
-    const flittoEnabled = process.env.NEXT_PUBLIC_REALTIME_STT_ENGINE === "flitto";
-    const configuredFlittoTargets = (process.env.NEXT_PUBLIC_FLITTO_TARGET_LANGS || "en")
-        .split(",").map(s => s.trim()).filter(Boolean);
-    const flittoTargets = targetLangs?.length ? targetLangs : configuredFlittoTargets;
-    const flitto = useFlittoRTT({
-        hintLangs: [lang],
-        targetLangs: flittoTargets.length ? flittoTargets : ["en"],
-        onTranscript: (src, translations) => onTranscript(src, translations),
-        onError: (m) => onError?.("api_error", m),
-    });
-
     const [isRecording, setIsRecording] = useState(false);
     const streamRef = useRef<MediaStream | null>(null);
     const recorderRef = useRef<MediaRecorder | null>(null);
@@ -179,6 +162,12 @@ export function useCloudSTT({
         if (blob.size < MIN_CHUNK_SIZE) return;
         if (mutedRef.current) return;
 
+        const trackSampleRate = streamRef.current
+            ?.getAudioTracks()[0]
+            ?.getSettings()
+            .sampleRate;
+        const sampleRateHertz = trackSampleRate ?? audioCtxRef.current?.sampleRate;
+
         if (!liveRef.current && emptyStreakRef.current >= MAX_EMPTY_STREAK) {
             emptyStreakRef.current = 0;
             return;
@@ -198,6 +187,9 @@ export function useCloudSTT({
                     audio: base64,
                     lang: getSTTLang(langRef.current),
                     mimeType: blob.type,
+                    ...(typeof sampleRateHertz === "number" && Number.isFinite(sampleRateHertz)
+                        ? { sampleRateHertz: Math.round(sampleRateHertz) }
+                        : {}),
                     ...(liveRef.current && { live: true }),
                 }),
                 signal: controller.signal,
@@ -352,10 +344,5 @@ export function useCloudSTT({
     const mute   = useCallback(() => { mutedRef.current = true;  }, []);
     const unmute = useCallback(() => { mutedRef.current = false; }, []);
 
-    if (flittoEnabled) {
-        // Flitto 경로: STT는 Flitto 스트리밍(저지연), mute/unmute는 기존 동작 유지.
-        // ⚠️ Flitto 실패 시 Google 자동 폴백 없음 — 카나리에서 문제 시 플래그 OFF로 즉시 복귀.
-        return { isRecording: flitto.isRecording, toggle: flitto.toggle, mute, unmute };
-    }
     return { isRecording, toggle, mute, unmute };
 }

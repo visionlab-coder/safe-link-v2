@@ -49,10 +49,10 @@ export function App() {
   return (
     <main className="shell">
       <section className="hero">
-        <div className="brand-mark">SL</div>
+        <div className="brand-mark">SQ</div>
         <div>
           <p className="eyebrow">FIELD SAFETY OS</p>
-          <h1>SAFE-LINK Mobile</h1>
+          <h1>SQ Link Mobile</h1>
           <p className="subtitle">Android/iOS 상용 앱 전환 진단 셸</p>
         </div>
       </section>

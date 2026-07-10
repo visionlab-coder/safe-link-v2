@@ -4,11 +4,11 @@ import { useEffect, useState, Suspense } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { createClient } from "@/utils/supabase/client";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import { playNotificationSound } from "@/utils/notifications";
 import BrandLogo from "@/components/BrandLogo";
-import { ensureLocalNotifyPermission, notifyNative } from "@/utils/native/local-notify";
+import { ensureLocalNotifyPermission } from "@/utils/native/local-notify";
+import { logoutV3 } from "@/lib/v3-auth";
 
 const workerUI: Record<string, any> = {
     ko: {
@@ -529,11 +529,11 @@ function WorkerHomeContent() {
     const searchParams = useSearchParams();
     const [profile, setProfile] = useState<any>(null);
     const [hasNewTBM, setHasNewTBM] = useState(false);
-    const [newTBMTime, setNewTBMTime] = useState<string>("");
+    const [newTBMTime] = useState<string>("");
 
     // 신규 채팅 알림 관련 상태
     const [newChatCount, setNewChatCount] = useState(0);
-    const [newChatTime, setNewChatTime] = useState<string>("");
+    const [newChatTime] = useState<string>("");
 
     const [showStopWorkModal, setShowStopWorkModal] = useState(false);
     const [stopWorkReason, setStopWorkReason] = useState("");
@@ -605,74 +605,31 @@ function WorkerHomeContent() {
     };
 
     useEffect(() => {
-        const supabase = createClient();
         const fetchProfile = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                const { data } = await supabase
-                    .from("profiles")
-                    .select("*")
-                    .eq("id", session.user.id)
-                    .single();
-
-                if (urlLang && urlLang !== data?.preferred_lang) {
-                    await supabase
-                        .from("profiles")
-                        .update({ preferred_lang: urlLang })
-                        .eq("id", session.user.id);
-                    setProfile({ ...data, preferred_lang: urlLang });
-                } else {
-                    setProfile(data);
-                }
-            }
+            const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+            if (!res.ok) return;
+            const data = (await res.json()) as {
+                user?: { id: string; email: string | null };
+                profile?: {
+                    role?: string;
+                    preferred_lang?: string | null;
+                    display_name?: string | null;
+                    site_id?: string | null;
+                    trade?: string | null;
+                    nationality?: string | null;
+                } | null;
+            };
+            if (!data.user || !data.profile) return;
+            setProfile({
+                id: data.user.id,
+                ...data.profile,
+                preferred_lang: urlLang || data.profile.preferred_lang || "ko",
+            });
         };
         fetchProfile();
 
         // 네이티브 앱에서만 로컬 알림 권한 요청(브라우저 no-op)
         ensureLocalNotifyPermission();
-
-        const channel = supabase
-            .channel("worker_tbm_realtime")
-            .on(
-                "postgres_changes",
-                { event: "INSERT", schema: "public", table: "tbm_notices" },
-                () => {
-                    setHasNewTBM(true);
-                    setNewTBMTime(new Date().toLocaleTimeString());
-                    triggerAlert();
-                    // 모바일 앱: 화면 밖(백그라운드)에서도 보이도록 로컬 알림
-                    notifyNative("🚨 새 안전 지침(TBM)", "작업 투입 전 TBM을 확인하고 서명해 주세요.");
-                }
-            )
-            .subscribe();
-
-        // 관리자가 보낸 1:1 메시지 감지 리스너 추가
-        const chatChannel = supabase
-            .channel(`worker_home_chat_alert`)
-            .on(
-                "postgres_changes",
-                { event: "INSERT", schema: "public", table: "messages" },
-                async (payload) => {
-                    const msg = payload.new as any;
-                    const { data: { session } } = await supabase.auth.getSession();
-                    if (session && msg.to_user === session.user.id) {
-                        setNewChatCount(prev => prev + 1);
-                        setNewChatTime(new Date().toLocaleTimeString());
-                        triggerAlert();
-                        // 모바일 앱: 관리자 1:1 메시지 로컬 알림
-                        notifyNative("💬 관리자 메시지", "관리자가 대화를 요청했습니다.");
-
-                        // 자동 활성화 옵션: 알림과 함께 즉각적인 대화창 이동 지원 (선택적)
-                        // router.push("/worker/chat");
-                    }
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-            supabase.removeChannel(chatChannel);
-        };
     }, [urlLang]);
 
     const lang = profile?.preferred_lang || urlLang || "ko";
@@ -697,8 +654,7 @@ function WorkerHomeContent() {
         };
 
     const handleSignOut = async () => {
-        const supabase = createClient();
-        await supabase.auth.signOut();
+        await logoutV3().catch(() => undefined);
         router.push("/");
     };
 
@@ -1039,7 +995,7 @@ function WorkerHomeContent() {
                 <footer className="mt-auto flex flex-col items-center gap-4 py-6">
                     <div className="flex items-center gap-2 opacity-20">
                         <BrandLogo compact imageClassName="max-w-[120px]" />
-                        <span className="font-black text-xl italic text-white uppercase tracking-tighter">Safe-Link OS</span>
+                        <span className="font-black text-xl italic text-white uppercase tracking-tighter">SQ Link OS</span>
                     </div>
                     <p className="text-[10px] font-black text-slate-700 tracking-[0.4em] uppercase">{t.safeWork}</p>
                 </footer>

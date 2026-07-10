@@ -1,21 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCookieUser } from "@/utils/auth/cookie-user";
 import { checkQuizTranslateLimit } from "@/utils/rate-limit";
+import { callV3AiVendor } from "@/utils/ai/v3-ai-gateway";
 
 export const runtime = "nodejs";
 
-interface GeminiResponse {
-    candidates?: Array<{
-        content?: { parts?: Array<{ text?: string }> };
-    }>;
-}
-
 /**
- * POST: Translate quiz question + options to target language using Gemini
+ * POST: Translate quiz question + options through the Spring AI Gateway
  */
 export async function POST(request: NextRequest) {
     // P5 박제
-    const user = await getCookieUser();
+    const user = await getCookieUser({ allowV3: true });
     if (!user) {
         return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     }
@@ -23,10 +18,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
     }
 
-    const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();
-    if (!apiKey) {
-        return NextResponse.json({ error: "Missing API Key" }, { status: 500 });
-    }
+    const siteId = user.siteIds?.[0];
+    if (typeof siteId !== "number") return NextResponse.json({ error: "site_required" }, { status: 403 });
 
     try {
         const body = await request.json();
@@ -60,29 +53,18 @@ Return ONLY JSON: {"question":"translated question","options":["option1","option
 Korean question: ${question}
 Korean options: ${JSON.stringify(options)}`;
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8_000);
-
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                signal: controller.signal,
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
-                }),
-            }
-        );
-        clearTimeout(timeout);
-
-        if (!response.ok) {
-            return NextResponse.json({ question, options });
-        }
-
-        const data = await response.json() as GeminiResponse;
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        const result = await callV3AiVendor(request, {
+            feature: "quiz",
+            siteId,
+            provider: "openai-prompt",
+            sourceLanguage: "ko",
+            targetLanguage: targetLang,
+            text: `${question}\n${options.join("\n")}`,
+            prompt,
+            maxOutputTokens: 512,
+            temperature: 0.1,
+        });
+        const text = result?.text;
         if (!text) return NextResponse.json({ question, options });
 
         const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*\})/);

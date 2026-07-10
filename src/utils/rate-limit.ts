@@ -19,11 +19,18 @@ function makeRedisRatelimit(requests: number, windowSeconds: number): Ratelimit 
   });
 }
 
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const ADMIN_SIGNUP_IP_MAX = Number(process.env.ADMIN_SIGNUP_IP_RATE_LIMIT_MAX ?? (IS_PRODUCTION ? "20" : "100"));
+const ADMIN_SIGNUP_EMAIL_MAX = Number(process.env.ADMIN_SIGNUP_EMAIL_RATE_LIMIT_MAX ?? (IS_PRODUCTION ? "5" : "50"));
+const ADMIN_SIGNUP_WINDOW_SECONDS = Number(process.env.ADMIN_SIGNUP_RATE_LIMIT_WINDOW_SECONDS ?? "600");
+const ADMIN_SIGNUP_WINDOW_MS = ADMIN_SIGNUP_WINDOW_SECONDS * 1000;
+
 // Sliding-window rate limiters for each endpoint family.
 // In production these share state across all Vercel instances — no per-instance bypass.
 const workerLoginLimiter = makeRedisRatelimit(5, 60);        // 5/min
 const workerLoginPhoneLimiter = makeRedisRatelimit(5, 60);   // 5/min per phone
-const adminSignupLimiter = makeRedisRatelimit(3, 600);       // 3/10min
+const adminSignupIpLimiter = makeRedisRatelimit(ADMIN_SIGNUP_IP_MAX, ADMIN_SIGNUP_WINDOW_SECONDS);
+const adminSignupEmailLimiter = makeRedisRatelimit(ADMIN_SIGNUP_EMAIL_MAX, ADMIN_SIGNUP_WINDOW_SECONDS);
 const qrEntryLimiter = makeRedisRatelimit(10, 60);           // 10/min
 const nfcEntryLimiter = makeRedisRatelimit(20, 60);          // 20/min per IP
 const translateLimiter = makeRedisRatelimit(60, 60);         // 60/min per user/IP (4x paid API calls)
@@ -32,8 +39,10 @@ const hiinfoLimiter = makeRedisRatelimit(10, 60);
 const sttLimiter = makeRedisRatelimit(30, 60);          // 30/min per uid — 비용 보호
 const ttsLimiter = makeRedisRatelimit(60, 60);          // 60/min per uid — 캐시 고려
 const quizTranslateLimiter = makeRedisRatelimit(30, 60); // 30/min per uid
+const travelSessionLimiter = makeRedisRatelimit(5, 60);   // 5/min per IP
 
 // In-memory fallback (single-instance only — acceptable for dev/staging)
+const REDIS_RATE_LIMIT_TIMEOUT_MS = Number(process.env.RATE_LIMIT_REDIS_TIMEOUT_MS ?? "1500");
 const inMemoryMap = new Map<string, { count: number; resetAt: number }>();
 function inMemoryCheck(key: string, max: number, windowMs: number): boolean {
   const now = Date.now();
@@ -49,8 +58,20 @@ function inMemoryCheck(key: string, max: number, windowMs: number): boolean {
 
 async function check(limiter: Ratelimit | null, key: string, max: number, windowMs: number): Promise<boolean> {
   if (limiter) {
-    const { success } = await limiter.limit(key);
-    return success;
+    try {
+      const { success } = await Promise.race([
+        limiter.limit(key),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("redis_rate_limit_timeout")), REDIS_RATE_LIMIT_TIMEOUT_MS),
+        ),
+      ]);
+      return success;
+    } catch (error) {
+      console.warn("[rate-limit] Redis unavailable, using in-memory fallback", {
+        key,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
   return inMemoryCheck(key, max, windowMs);
 }
@@ -63,8 +84,16 @@ export async function checkWorkerLoginPhoneLimit(phoneDigits: string): Promise<b
   return check(workerLoginPhoneLimiter, `wl:phone:${phoneDigits}`, 5, 60_000);
 }
 
-export async function checkAdminSignupLimit(ip: string): Promise<boolean> {
-  return check(adminSignupLimiter, `as:ip:${ip}`, 3, 600_000);
+export async function checkAdminSignupLimit(ip: string, email: string): Promise<boolean> {
+  const normalizedEmail = email.trim().toLowerCase();
+  const ipAllowed = await check(adminSignupIpLimiter, `as:ip:${ip}`, ADMIN_SIGNUP_IP_MAX, ADMIN_SIGNUP_WINDOW_MS);
+  if (!ipAllowed) return false;
+  return check(
+    adminSignupEmailLimiter,
+    `as:email:${normalizedEmail}`,
+    ADMIN_SIGNUP_EMAIL_MAX,
+    ADMIN_SIGNUP_WINDOW_MS,
+  );
 }
 
 export async function checkQrEntryLimit(ip: string): Promise<boolean> {
@@ -93,4 +122,8 @@ export async function checkTtsLimit(uid: string): Promise<boolean> {
 
 export async function checkQuizTranslateLimit(uid: string): Promise<boolean> {
   return check(quizTranslateLimiter, `quiz:uid:${uid}`, 30, 60_000);
+}
+
+export async function checkTravelSessionLimit(ip: string): Promise<boolean> {
+  return check(travelSessionLimiter, `travel-session:ip:${ip}`, 5, 60_000);
 }

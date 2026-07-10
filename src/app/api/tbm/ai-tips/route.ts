@@ -1,17 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 export const runtime = "nodejs";
 import { getErrorMessage } from '@/utils/errors';
-import { requireAdmin } from '@/utils/nfc/require-admin';
-
-interface GeminiTipsResponse {
-    candidates?: Array<{
-        content?: {
-            parts?: Array<{
-                text?: string;
-            }>;
-        };
-    }>;
-}
+import { getV3SessionUser } from '@/utils/auth/v3-session-user';
+import { callV3AiVendor } from '@/utils/ai/v3-ai-gateway';
 
 interface TipsPayload {
     tips?: string[];
@@ -19,15 +10,15 @@ interface TipsPayload {
 
 /**
  * POST /api/tbm/ai-tips
- * Gemini AI 기반 건설 현장 TBM 안전 수칙 3개 생성
+ * Spring AI Gateway 기반 건설 현장 TBM 안전 수칙 3개 생성
  */
 export async function POST(request: NextRequest) {
-    const guard = await requireAdmin();
-    if (!guard.ok) return guard.response;
-
-    const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim();
-
-
+    const user = await getV3SessionUser();
+    if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+    const isAdmin = user.roles.some((role) => ["ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER"].includes(role));
+    if (!isAdmin) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+    const siteId = user.siteIds[0];
+    if (typeof siteId !== "number") return NextResponse.json({ error: "site_required" }, { status: 403 });
 
     let context = "";
     try {
@@ -50,39 +41,23 @@ export async function POST(request: NextRequest) {
 - 절대. 이모지나 이모티콘을 어떠한 경우에도 포함하지 마세요. (TTS 읽기 오류 방지용)
 - JSON 형식으로만 응답: {"tips": ["수칙1", "수칙2", "수칙3"]}`;
 
-    if (!apiKey) {
-        console.warn("[AI-Tips] GOOGLE_CLOUD_API_KEY is missing. Using fallback tips.");
-        return NextResponse.json({ tips: getFallbackTips() });
-    }
-
     try {
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        responseMimeType: "application/json",
-                        temperature: 0.9,
-                        maxOutputTokens: 512
-                    }
-                })
-            }
-        );
+        const result = await callV3AiVendor(request, {
+            siteId,
+            feature: "quiz",
+            provider: "openai-prompt",
+            sourceLanguage: "ko",
+            targetLanguage: "ko",
+            text: context || today,
+            prompt,
+            maxOutputTokens: 512,
+            temperature: 0.9,
+        });
+        const textContent = result?.text;
+        if (!textContent) throw new Error("Empty AI response");
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("[AI-Tips] Gemini API Error:", errorText);
-            return NextResponse.json({ tips: getFallbackTips() });
-        }
-
-        const data = await response.json() as GeminiTipsResponse;
-        const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!textContent) throw new Error("Empty Gemini response");
-
-        const parsed = JSON.parse(textContent) as TipsPayload;
+        const jsonMatch = textContent.match(/```json\s*([\s\S]*?)```/) || textContent.match(/(\{[\s\S]*\})/);
+        const parsed = JSON.parse(jsonMatch?.[1] || textContent) as TipsPayload;
         if (!Array.isArray(parsed.tips) || parsed.tips.length === 0) {
             throw new Error("Invalid tips format");
         }
@@ -93,7 +68,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({ tips: cleanTips });
     } catch (error: unknown) {
-        console.error("[AI-Tips] Gemini failed:", getErrorMessage(error));
+        console.error("[AI-Tips] AI gateway failed:", getErrorMessage(error));
         return NextResponse.json({ tips: getFallbackTips() });
     }
 }

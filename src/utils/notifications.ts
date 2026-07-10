@@ -1,5 +1,5 @@
 /**
- * SAFE-LINK Notification Sound Utility
+ * SQ Link Notification Sound Utility
  * Uses Web Audio API to generate a clean, premium notification chime.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
