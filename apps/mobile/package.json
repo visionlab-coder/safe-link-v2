@@ -8,8 +8,16 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
     "cap:add:android": "cap add android",
-    "cap:sync": "cap sync android",
-    "android:assemble:debug": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/assemble-android-debug.ps1"
+    "cap:add:ios": "cap add ios",
+    "cap:sync:android": "cap sync android",
+    "cap:sync:ios": "cap sync ios",
+    "cap:open:ios": "cap open ios",
+    "android:check:release": "cd android && ./gradlew safeLinkReleaseReadiness",
+    "ios:check:release": "node scripts/check-ios-release.mjs",
+    "store:check": "node scripts/check-store-readiness.mjs",
+    "android:assemble:debug": "cd android && ./gradlew assembleDebug",
+    "android:bundle:release": "cd android && ./gradlew bundleRelease",
+    "android:assemble:release": "cd android && ./gradlew bundleRelease"
   },
   "dependencies": {
     "@capacitor/core": "^8.0.0",
@@ -21,6 +29,7 @@
   "devDependencies": {
     "@capacitor/android": "^8.0.0",
     "@capacitor/cli": "^8.0.0",
+    "@capacitor/ios": "^8.4.2",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.1.0",

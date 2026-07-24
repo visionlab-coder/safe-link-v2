@@ -48,7 +48,7 @@ console.log("\n" + "=".repeat(72));
 console.log("Step 2: profiles 의 nationality 컬럼 확인 + nfc_workers 매칭 백필");
 console.log("=".repeat(72));
 
-const { data: nationalitySample, error: colErr } = await sb
+const { error: colErr } = await sb
   .from("profiles")
   .select("nationality")
   .limit(1);

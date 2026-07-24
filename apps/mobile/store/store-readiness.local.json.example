@@ -1,0 +1,23 @@
+{
+  "companyLegalName": "서원건설",
+  "appName": "SQ Link",
+  "bundleId": "kr.co.safelink.mobile",
+  "sku": "sq-link-ios",
+  "primaryCategory": "Business",
+  "supportEmail": "",
+  "supportUrl": "https://app.safe-link.co.kr/support",
+  "privacyPolicyUrl": "https://app.safe-link.co.kr/privacy",
+  "accountDeletionUrl": "https://app.safe-link.co.kr/account/delete",
+  "marketingUrl": "https://safe-link.co.kr",
+  "reviewDemoAccountEmail": "",
+  "reviewDemoAccountPasswordStatus": "MISSING",
+  "reviewDemoSiteName": "",
+  "reviewQrUrlStatus": "MISSING",
+  "iphoneScreenshotsStatus": "MISSING",
+  "ipadScreenshotsStatus": "NOT_APPLICABLE",
+  "appIcon1024Status": "MISSING",
+  "privacyAnswersReviewedByCompany": false,
+  "accountDeletionFlowImplemented": false,
+  "productionHttpsReady": false,
+  "notes": "Copy to store-readiness.local.json and fill values locally. Do not commit local review credentials."
+}

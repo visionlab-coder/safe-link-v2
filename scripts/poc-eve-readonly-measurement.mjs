@@ -1,7 +1,6 @@
 // 🔒 PoC 직전 측정 — 코드 변경 0건. 5가지 기능 현재 응답시간만 기록.
 // 회귀 방지 최우선. 모든 호출은 read-only.
 const BASE = "https://safe-link-v2.vercel.app";
-const EDU_SITE = "00000000-0000-0000-0000-000000000101";
 
 function parseCookie(h) {
   const m = (h ?? "").match(/sb-wzmzpuxpcpuvuacwmslj-auth-token=([^;]+)/);

@@ -28,7 +28,7 @@ function sanitizeAuthError(msg: string): string {
     return "이미 등록된 계정입니다. 로그인을 시도해주세요.";
   }
   if (m.includes("password_min_length") || m.includes("password_too_short")) {
-    return "비밀번호는 8자 이상으로 입력해주세요.";
+    return "비밀번호는 12자 이상으로 입력해주세요.";
   }
   if (m.includes("domain_not_allowed")) {
     return "회사 이메일(@seowonenc.co.kr)만 회원가입이 가능합니다.";
@@ -42,7 +42,7 @@ function sanitizeAuthError(msg: string): string {
   if (m.includes("v3_backend_unreachable") || m.includes("v3_admin_signup_failed_503")) {
     return "백엔드 서버 연결 오류입니다. Spring Boot 서버가 실행 중인지 확인해주세요.";
   }
-  if (m.includes("account_not_active")) {
+  if (m.includes("account_pending") || m.includes("account_not_active")) {
     return "승인 대기 중인 계정입니다. 관리자 승인 후 로그인할 수 있습니다.";
   }
   if (m.includes("not confirmed") || m.includes("email") && m.includes("confirm")) {

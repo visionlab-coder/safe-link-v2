@@ -71,7 +71,7 @@ const { count: anon_edu, error: anon_err } = await anonSb
 console.log(`\n[4] anon 으로 safety_education_library 조회: ${anon_err?.message ?? `${anon_edu}건`}`);
 
 // 5) P3 마이그레이션 적용 검증 — 새 컬럼 존재 여부
-const { data: cols_check, error: cols_err } = await sb
+const { error: cols_err } = await sb
   .from("safety_education_library")
   .select("id, crew_type, worksite_type, applicable_time_window, ppe_required, inspection_checklist, site_id")
   .limit(1);

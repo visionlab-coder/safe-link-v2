@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
+const safeLinkApiBaseUrl = process.env.NEXT_PUBLIC_SAFE_LINK_API_BASE_URL;
+
 const nextConfig: NextConfig = {
+  output: "standalone",
   outputFileTracingRoot: process.cwd(),
   images: {
     unoptimized: true,
@@ -18,6 +21,7 @@ const nextConfig: NextConfig = {
     const scriptSrc = `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`;
     const connectSrc = [
       "connect-src 'self'",
+      safeLinkApiBaseUrl || "",
       "https://generativelanguage.googleapis.com https://sheets.googleapis.com https://www.googleapis.com",
       "https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.xethub.hf.co",
       isDev ? "ws://localhost:* http://localhost:*" : "",

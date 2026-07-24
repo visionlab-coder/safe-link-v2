@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SQ Link Dev</string>
+    <string name="title_activity_main">SQ Link Dev</string>
+    <string name="package_name">kr.co.safelink.mobile.dev</string>
+    <string name="custom_url_scheme">kr.co.safelink.mobile.dev</string>
+</resources>

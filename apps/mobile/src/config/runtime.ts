@@ -1,8 +1,6 @@
 export type RuntimeConfig = {
   appEnv: string;
   apiBaseUrl: string | null;
-  supabaseUrl: string | null;
-  supabasePublishableKeyConfigured: boolean;
 };
 
 function normalizedUrl(value: string | undefined): string | null {
@@ -19,9 +17,6 @@ function normalizedUrl(value: string | undefined): string | null {
 export function getRuntimeConfig(): RuntimeConfig {
   return {
     appEnv: import.meta.env.VITE_APP_ENV || "development",
-    apiBaseUrl: normalizedUrl(import.meta.env.VITE_SAFE_LINK_API_BASE_URL),
-    supabaseUrl: normalizedUrl(import.meta.env.VITE_SUPABASE_URL),
-    supabasePublishableKeyConfigured:
-      Boolean(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)
+    apiBaseUrl: normalizedUrl(import.meta.env.VITE_SAFE_LINK_API_BASE_URL)
   };
 }

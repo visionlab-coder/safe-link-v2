@@ -19,7 +19,7 @@ public class AiGatewayHealthIndicator implements HealthIndicator {
         if (properties.isVendorEnabled()) {
             builder = Health.up().withDetail("vendor", "configured");
         } else {
-            builder = Health.up().withDetail("vendor", "not_configured");
+            builder = Health.unknown().withDetail("vendor", "not_configured");
         }
         return builder
             .withDetail("mode", properties.isVendorEnabled() ? "VENDOR_ENABLED" : "MOCK_OR_FALLBACK")

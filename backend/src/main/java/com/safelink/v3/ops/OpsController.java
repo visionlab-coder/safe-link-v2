@@ -277,51 +277,36 @@ public class OpsController {
     @GetMapping("/system/security-logs")
     public Map<String, List<Map<String, Object>>> systemSecurityLogs(@AuthenticationPrincipal SessionPrincipal actor) {
         requireRootOrHq(actor);
-        Instant sevenDaysAgo = Instant.now().minus(Duration.ofDays(7));
-        List<Map<String, Object>> profileLogs = jdbc.sql("""
-                select u.id, u.display_name, ur.role, ur.granted_at
-                from user_roles ur
-                join users u on u.id = ur.user_id
-                where ur.granted_at >= :since
-                order by ur.granted_at desc
-                limit 20
+        audit.record(actor.userId(), null, "system.security_logs.read", "audit_log", null, "ALLOWED", "root_or_hq", Map.of());
+        List<Map<String, Object>> logs = jdbc.sql("""
+                select a.id, a.occurred_at, a.action, a.resource_type, a.resource_id,
+                       a.decision, a.reason, a.metadata, a.site_id,
+                       coalesce(u.display_name, u.email, 'system') as actor
+                from audit_logs a
+                left join users u on u.id = a.actor_user_id
+                order by a.occurred_at desc, a.id desc
+                limit 100
             """)
-            .param("since", java.sql.Timestamp.from(sevenDaysAgo))
-            .query((rs, rowNum) -> Map.<String, Object>of(
-                "id", "profile-" + rs.getLong("id") + "-" + rs.getString("role"),
-                "timestamp", rs.getTimestamp("granted_at").toInstant().toString(),
-                "event", "[AUTH] 권한 변경 → " + rs.getString("role"),
-                "actor", rs.getString("display_name") == null ? String.valueOf(rs.getLong("id")) : rs.getString("display_name"),
-                "severity", ("ROOT".equals(rs.getString("role")) || "HQ_ADMIN".equals(rs.getString("role"))) ? "warn" : "info"
-            ))
+            .query((rs, rowNum) -> {
+                String decision = rs.getString("decision");
+                String action = rs.getString("action");
+                String reason = rs.getString("reason");
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("id", String.valueOf(rs.getLong("id")));
+                row.put("timestamp", rs.getTimestamp("occurred_at").toInstant().toString());
+                row.put("event", "[AUDIT] " + action + " → " + decision + (reason == null || reason.isBlank() ? "" : " (" + reason + ")"));
+                row.put("actor", rs.getString("actor"));
+                row.put("severity", "DENIED".equals(decision) || "ERROR".equals(decision) ? "warn" : "info");
+                row.put("action", action);
+                row.put("decision", decision);
+                row.put("reason", reason == null ? "" : reason);
+                row.put("resource_type", rs.getString("resource_type"));
+                row.put("resource_id", rs.getString("resource_id"));
+                row.put("site_id", rs.getObject("site_id") == null ? null : String.valueOf(rs.getLong("site_id")));
+                row.put("metadata", rs.getString("metadata"));
+                return row;
+            })
             .list();
-        List<Map<String, Object>> alertLogs = jdbc.sql("""
-                select id, site_id, created_at, resolved
-                from stop_work_alerts
-                where created_at >= :since
-                order by created_at desc
-                limit 10
-            """)
-            .param("since", java.sql.Timestamp.from(sevenDaysAgo))
-            .query((rs, rowNum) -> Map.<String, Object>of(
-                "id", "alert-" + rs.getLong("id"),
-                "timestamp", rs.getTimestamp("created_at").toInstant().toString(),
-                "event", rs.getBoolean("resolved") ? "[SAFETY] 작업중지 해제" : "[SAFETY] 작업중지 알람 발생",
-                "actor", "현장 " + rs.getLong("site_id"),
-                "severity", rs.getBoolean("resolved") ? "info" : "critical"
-            ))
-            .list();
-        List<Map<String, Object>> logs = new ArrayList<>();
-        logs.add(Map.of(
-            "id", "session-now",
-            "timestamp", Instant.now().toString(),
-            "event", "[SYSTEM] 통합관제 접근 — 세션 시작",
-            "actor", actor.displayName() == null ? actor.email() : actor.displayName(),
-            "severity", "info"
-        ));
-        logs.addAll(profileLogs);
-        logs.addAll(alertLogs);
-        logs.sort((a, b) -> String.valueOf(b.get("timestamp")).compareTo(String.valueOf(a.get("timestamp"))));
         return Map.of("logs", logs);
     }
 

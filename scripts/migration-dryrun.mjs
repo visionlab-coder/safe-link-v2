@@ -35,7 +35,7 @@ const NEW_TABLES = [
 ];
 
 async function tableExists(name) {
-  const { data, error } = await sb.from(name).select("*", { count: "exact", head: true }).limit(0);
+  const { error } = await sb.from(name).select("*", { count: "exact", head: true }).limit(0);
   return { exists: !error, error: error?.message ?? null };
 }
 

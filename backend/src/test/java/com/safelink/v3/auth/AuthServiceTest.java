@@ -55,7 +55,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void rejectsInactiveAccount() {
+    void reportsPendingApprovalOnlyAfterThePasswordIsVerified() {
         var account = new UserAccount(
             8L,
             "pending@example.com",
@@ -67,11 +67,13 @@ class AuthServiceTest {
         );
         when(users.findByEmail("pending@example.com")).thenReturn(Optional.of(account));
 
-        assertThatThrownBy(() -> authService.authenticate("pending@example.com", "password", "127.0.0.1"))
-            .isInstanceOf(BadCredentialsException.class)
-            .hasMessage("account_not_active");
+        when(passwordEncoder.matches("password", "$2a$hash")).thenReturn(true);
 
-        verify(audit).record(eq(8L), eq(null), eq("auth.login"), eq("user"), eq("8"), eq("DENIED"), eq("account_not_active"), any());
+        assertThatThrownBy(() -> authService.authenticate("pending@example.com", "password", "127.0.0.1"))
+            .isInstanceOf(AuthService.AccountPendingApprovalException.class)
+            .hasMessage("account_pending_approval");
+
+        verify(audit).record(eq(8L), eq(null), eq("auth.login"), eq("user"), eq("8"), eq("DENIED"), eq("approval_pending"), any());
     }
 
     @Test
@@ -167,12 +169,12 @@ class AuthServiceTest {
             Set.of()
         );
         when(users.findByEmail("admin@seowonenc.co.kr")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode("password123")).thenReturn("$2a$new");
+        when(passwordEncoder.encode("password1234")).thenReturn("$2a$new");
         when(users.createPendingAdminSignupAccount("admin@seowonenc.co.kr", "Admin", "ko", "$2a$new")).thenReturn(account);
 
         AuthService.PendingAdminSignup signup = authService.registerDirectAdminSignup(
             "ADMIN@seowonenc.co.kr",
-            "password123",
+            "password1234",
             "Admin",
             "ko",
             "127.0.0.1"
@@ -197,6 +199,19 @@ class AuthServiceTest {
             .hasMessage("domain_not_allowed");
 
         verify(audit).record(eq(null), eq(null), eq("auth.admin_signup"), eq("user"), eq("admin@example.com"), eq("DENIED"), eq("domain_not_allowed"), any());
+    }
+
+    @Test
+    void directAdminSignupRequiresAtLeastTwelveCharacterPassword() {
+        assertThatThrownBy(() -> authService.registerDirectAdminSignup(
+            "admin@seowonenc.co.kr",
+            "password123",
+            "Admin",
+            "ko",
+            "127.0.0.1"
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("password_min_length");
     }
 
     @Test
@@ -249,7 +264,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.registerDirectAdminSignup(
             "admin@seowonenc.co.kr",
-            "password123",
+            "password1234",
             "Admin",
             "ko",
             "127.0.0.1"

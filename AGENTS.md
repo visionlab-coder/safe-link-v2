@@ -7,7 +7,7 @@
 - 해당 V3 프로젝트는 타회사에서 바이브코딩한 프로젝트를 상용화하기 위해 디벨롭하는 외주 프로젝트다.
 - 레거시 프로젝트는 다른 경로에 별도로 존재한다.
 - 레거시 기준 경로는 `/Users/sieon/Desktop/project/safelink/safe-link-v2` 이다.
-- V3 작업 경로는 `/Users/sieon/Desktop/project/safelink/safeLink_v3` 이다.
+- V3 작업 경로는 `/Users/sieon/Desktop/project/safelink/safeLink_v3_git` 이다.
 - 현재 프로젝트 내부에 V2 명칭, PoC 문서, Supabase/Workers 코드가 남아 있어도 그것을 실제 레거시 원본으로 간주하지 않는다.
 - V3 작업은 상용화 기준으로 보안, 권한, 운영, 모니터링, 데이터 격리 구조를 재설계하는 방향으로 진행한다.
 - 레거시에서 가져올 것은 기능 흐름과 UX 아이디어이며, 인증/권한/세션/Service Role/Workers/Supabase 의존 구조를 그대로 복사하지 않는다.

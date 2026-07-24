@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 export const SAFE_LINK_V3_API_BASE_URL =
-  process.env.NEXT_PUBLIC_SAFE_LINK_API_BASE_URL || "http://localhost:8080";
+  process.env.SAFE_LINK_INTERNAL_API_BASE_URL || process.env.NEXT_PUBLIC_SAFE_LINK_API_BASE_URL || "http://localhost:8080";
 
 function mergeSetCookie(cookieHeader: string, setCookie: string | null): string {
   if (!setCookie) return cookieHeader;

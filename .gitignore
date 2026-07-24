@@ -20,6 +20,26 @@
 # production
 /build
 
+# mobile build artifacts
+/apps/mobile/node_modules/
+/apps/mobile/dist/
+/apps/mobile/android/.gradle/
+/apps/mobile/android/app/build/
+/apps/mobile/android/release.local.properties
+/apps/mobile/android/*.jks
+/apps/mobile/android/*.keystore
+/apps/mobile/android/app/*.jks
+/apps/mobile/android/app/*.keystore
+/apps/mobile/ios/App/build/
+/apps/mobile/ios/App/output/
+/apps/mobile/ios/DerivedData/
+/apps/mobile/ios/xcuserdata/
+/apps/mobile/ios/release.local.xcconfig
+/apps/mobile/ios/ExportOptions.plist
+/apps/mobile/ios/*.xcarchive
+/apps/mobile/ios/*.ipa
+/apps/mobile/store/store-readiness.local.json
+
 # spring / gradle
 /backend/.gradle/
 /backend/build/

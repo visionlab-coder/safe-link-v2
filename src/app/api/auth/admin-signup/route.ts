@@ -5,7 +5,7 @@ import { checkAdminSignupLimit } from "@/utils/rate-limit";
 export const runtime = "nodejs";
 
 const SAFE_LINK_V3_API_BASE_URL =
-  process.env.NEXT_PUBLIC_SAFE_LINK_API_BASE_URL || "http://localhost:8080";
+  process.env.SAFE_LINK_INTERNAL_API_BASE_URL || process.env.NEXT_PUBLIC_SAFE_LINK_API_BASE_URL || "http://localhost:8080";
 
 const ALLOWED_ADMIN_SIGNUP_DOMAINS = new Set(["seowonenc.co.kr"]);
 

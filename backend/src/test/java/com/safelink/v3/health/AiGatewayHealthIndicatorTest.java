@@ -28,4 +28,14 @@ class AiGatewayHealthIndicatorTest {
             .doesNotContainValue("naver-secret")
             .doesNotContainValue("openai-secret");
     }
+
+    @Test
+    void reportsFallbackModeAsUnknown() {
+        var health = new AiGatewayHealthIndicator(new AiProperties()).health();
+
+        assertThat(health.getStatus()).isEqualTo(Status.UNKNOWN);
+        assertThat(health.getDetails())
+            .containsEntry("vendor", "not_configured")
+            .containsEntry("mode", "MOCK_OR_FALLBACK");
+    }
 }

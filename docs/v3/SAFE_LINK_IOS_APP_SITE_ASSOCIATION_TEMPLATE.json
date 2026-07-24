@@ -1,0 +1,17 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "REPLACE_WITH_APPLE_TEAM_ID.kr.co.safelink.mobile"
+        ],
+        "components": [
+          {
+            "/": "/*",
+            "comment": "Open SQ Link web routes in the installed iOS app."
+          }
+        ]
+      }
+    ]
+  }
+}

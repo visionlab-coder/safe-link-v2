@@ -4,6 +4,8 @@ import java.util.Map;
 import com.safelink.v3.auth.AuthService.WorkerQuickLoginConflictException;
 import com.safelink.v3.auth.AuthService.WorkerQuickLoginNotFoundException;
 import com.safelink.v3.auth.AuthService.UserAlreadyExistsException;
+import com.safelink.v3.auth.AuthService.AccountPendingApprovalException;
+import com.safelink.v3.auth.LoginAttemptRateLimiter.LoginRateLimitExceededException;
 import com.safelink.v3.incentive.IncentiveController.AlreadyGrantedException;
 import com.safelink.v3.quiz.QuizController.AlreadyAnsweredException;
 import org.springframework.http.HttpStatus;
@@ -24,6 +26,16 @@ public class ApiExceptionHandler {
     @ExceptionHandler(BadCredentialsException.class)
     ResponseEntity<Map<String, String>> badCredentials(BadCredentialsException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(AccountPendingApprovalException.class)
+    ResponseEntity<Map<String, String>> accountPendingApproval(AccountPendingApprovalException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(LoginRateLimitExceededException.class)
+    ResponseEntity<Map<String, String>> loginRateLimited(LoginRateLimitExceededException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of("error", ex.getMessage()));
     }
 
     @ExceptionHandler(NotFoundException.class)

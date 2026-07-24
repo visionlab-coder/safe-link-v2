@@ -1,0 +1,103 @@
+name: Deploy SQ Link V3 production
+
+on:
+  push:
+    branches:
+      - refactor/v3-commercialization-20260710
+
+concurrency:
+  group: safelink-v3-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-deploy:
+    name: Test, build, and deploy
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    env:
+      NEXT_PUBLIC_SAFE_LINK_API_BASE_URL: https://api.safe-link.co.kr
+      SAFE_LINK_PUBLIC_APP_URL: https://app.safe-link.co.kr
+      DEPLOY_HOST: ${{ secrets.SAFE_LINK_DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.SAFE_LINK_DEPLOY_USER }}
+      DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.SAFE_LINK_DEPLOY_SSH_PRIVATE_KEY }}
+    steps:
+      - name: Check required deployment secrets
+        shell: bash
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_PRIVATE_KEY"
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install and build frontend
+        run: |
+          npm ci
+          npm run build
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Test and build backend
+        working-directory: backend
+        run: |
+          ./gradlew test --no-daemon
+          ./gradlew bootJar --no-daemon
+
+      - name: Assemble immutable release artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_dir="release"
+          rm -rf "$release_dir"
+          mkdir -p "$release_dir/frontend/.next" "$release_dir/backend"
+          cp -R .next/standalone/. "$release_dir/frontend/"
+          cp -R .next/static "$release_dir/frontend/.next/static"
+          if [ -d public ]; then cp -R public "$release_dir/frontend/public"; fi
+          cp backend/build/libs/safe-link-v3-backend-*.jar "$release_dir/backend/safe-link-v3-backend.jar"
+          tar -C "$release_dir" -czf "safe-link-v3-${GITHUB_SHA}.tgz" .
+
+      - name: Configure deployment SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload release artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          scp -i ~/.ssh/id_ed25519 -o BatchMode=yes \
+            "safe-link-v3-${GITHUB_SHA}.tgz" \
+            "$DEPLOY_USER@$DEPLOY_HOST:/home/$DEPLOY_USER/incoming/"
+
+      - name: Activate release and smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes "$DEPLOY_USER@$DEPLOY_HOST" \
+            "sudo /usr/local/sbin/safelink-v3-activate-release '${GITHUB_SHA}'"
+          for attempt in {1..18}; do
+            if curl --fail --silent --show-error --max-time 10 https://api.safe-link.co.kr/actuator/health/readiness | grep -q 'UP' \
+              && curl --silent --show-error --max-time 10 -I https://app.safe-link.co.kr/admin | grep -qi '^location: https://app.safe-link.co.kr/auth'; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Production smoke test failed after deployment" >&2
+          exit 1

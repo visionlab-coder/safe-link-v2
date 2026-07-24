@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuthService {
     private static final String ADMIN_SIGNUP_DOMAIN = "seowonenc.co.kr";
+    private static final int ADMIN_SIGNUP_PASSWORD_MIN_LENGTH = 12;
 
     private final UserAccountRepository users;
     private final PasswordEncoder passwordEncoder;
@@ -34,13 +35,17 @@ public class AuthService {
                 return new BadCredentialsException("invalid_credentials");
             });
 
-        if (!account.isActive()) {
-            audit.record(account.id(), null, "auth.login", "user", String.valueOf(account.id()), "DENIED", "account_not_active", Map.of("ip", ipAddress));
-            throw new BadCredentialsException("account_not_active");
-        }
-
         if (account.passwordHash() == null || !passwordEncoder.matches(rawPassword, account.passwordHash())) {
             audit.record(account.id(), null, "auth.login", "user", String.valueOf(account.id()), "DENIED", "password_mismatch", Map.of("ip", ipAddress));
+            throw new BadCredentialsException("invalid_credentials");
+        }
+
+        if ("PENDING".equalsIgnoreCase(account.accountStatus())) {
+            audit.record(account.id(), null, "auth.login", "user", String.valueOf(account.id()), "DENIED", "approval_pending", Map.of("ip", ipAddress));
+            throw new AccountPendingApprovalException("account_pending_approval");
+        }
+        if (!account.isActive()) {
+            audit.record(account.id(), null, "auth.login", "user", String.valueOf(account.id()), "DENIED", "account_not_active", Map.of("ip", ipAddress));
             throw new BadCredentialsException("invalid_credentials");
         }
 
@@ -61,7 +66,7 @@ public class AuthService {
             audit.record(null, null, "auth.admin_signup", "user", normalizedEmail, "DENIED", "domain_not_allowed", Map.of("ip", ipAddress));
             throw new IllegalArgumentException("domain_not_allowed");
         }
-        if (rawPassword == null || rawPassword.length() < 8) {
+        if (rawPassword == null || rawPassword.length() < ADMIN_SIGNUP_PASSWORD_MIN_LENGTH) {
             throw new IllegalArgumentException("password_min_length");
         }
         if (users.findByEmail(normalizedEmail).isPresent()) {
@@ -201,6 +206,12 @@ public class AuthService {
         String accountStatus,
         boolean approvalRequired
     ) {}
+
+    public static class AccountPendingApprovalException extends RuntimeException {
+        public AccountPendingApprovalException(String message) {
+            super(message);
+        }
+    }
 
     private static String normalizeEmail(String email) {
         if (email == null || email.isBlank()) {

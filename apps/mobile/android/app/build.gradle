@@ -1,0 +1,151 @@
+apply plugin: 'com.android.application'
+
+import java.util.Properties
+
+def safeLinkReleasePropsFile = rootProject.file('release.local.properties')
+def safeLinkReleaseProps = new Properties()
+if (safeLinkReleasePropsFile.exists()) {
+    safeLinkReleasePropsFile.withInputStream { safeLinkReleaseProps.load(it) }
+}
+
+def safeLinkValue = { String name, String fallback = null ->
+    def propValue = project.findProperty(name)
+    if (propValue != null && propValue.toString().trim()) return propValue.toString().trim()
+
+    def releasePropValue = safeLinkReleaseProps.getProperty(name)
+    if (releasePropValue != null && releasePropValue.trim()) return releasePropValue.trim()
+
+    def envValue = System.getenv(name)
+    if (envValue != null && envValue.trim()) return envValue.trim()
+
+    return fallback
+}
+
+def safeLinkAndroidAppId = safeLinkValue('SAFE_LINK_ANDROID_APP_ID', 'kr.co.safelink.mobile.dev')
+def safeLinkAndroidAppName = safeLinkValue('SAFE_LINK_ANDROID_APP_NAME', 'SQ Link Dev')
+def safeLinkAndroidAppLinkHost = safeLinkValue('SAFE_LINK_ANDROID_APP_LINK_HOST', 'app-test.safe-link.co.kr')
+def safeLinkVersionCode = safeLinkValue('SAFE_LINK_ANDROID_VERSION_CODE', '1') as Integer
+def safeLinkVersionName = safeLinkValue('SAFE_LINK_ANDROID_VERSION_NAME', '1.0')
+
+def safeLinkKeystorePath = safeLinkValue('SAFE_LINK_ANDROID_KEYSTORE_PATH')
+def safeLinkKeystorePassword = safeLinkValue('SAFE_LINK_ANDROID_KEYSTORE_PASSWORD')
+def safeLinkKeyAlias = safeLinkValue('SAFE_LINK_ANDROID_KEY_ALIAS')
+def safeLinkKeyPassword = safeLinkValue('SAFE_LINK_ANDROID_KEY_PASSWORD')
+def safeLinkReleaseSigningConfigured = [
+    safeLinkKeystorePath,
+    safeLinkKeystorePassword,
+    safeLinkKeyAlias,
+    safeLinkKeyPassword
+].every { it != null && it.toString().trim() }
+
+android {
+    namespace = "kr.co.safelink.mobile.dev"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId safeLinkAndroidAppId
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode safeLinkVersionCode
+        versionName safeLinkVersionName
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders = [
+            appLabel: safeLinkAndroidAppName,
+            appLinkHost: safeLinkAndroidAppLinkHost
+        ]
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        release {
+            if (safeLinkReleaseSigningConfigured) {
+                storeFile file(safeLinkKeystorePath)
+                storePassword safeLinkKeystorePassword
+                keyAlias safeLinkKeyAlias
+                keyPassword safeLinkKeyPassword
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (safeLinkReleaseSigningConfigured) {
+                signingConfig signingConfigs.release
+            }
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+tasks.register('safeLinkReleaseReadiness') {
+    group = 'verification'
+    description = 'Checks whether Android release values are ready for Google Play upload.'
+
+    doLast {
+        def missing = []
+        if (!safeLinkAndroidAppId || safeLinkAndroidAppId == 'kr.co.safelink.mobile.dev' || safeLinkAndroidAppId.endsWith('.dev')) {
+            missing << 'SAFE_LINK_ANDROID_APP_ID final production package id'
+        }
+        if (!safeLinkAndroidAppName || safeLinkAndroidAppName == 'SQ Link Dev') {
+            missing << 'SAFE_LINK_ANDROID_APP_NAME final store app name'
+        }
+        if (!safeLinkAndroidAppLinkHost || safeLinkAndroidAppLinkHost == 'app-test.safe-link.co.kr') {
+            missing << 'SAFE_LINK_ANDROID_APP_LINK_HOST production App Links host'
+        }
+        if (!safeLinkReleaseSigningConfigured) {
+            missing << 'SAFE_LINK_ANDROID_KEYSTORE_PATH / SAFE_LINK_ANDROID_KEYSTORE_PASSWORD / SAFE_LINK_ANDROID_KEY_ALIAS / SAFE_LINK_ANDROID_KEY_PASSWORD'
+        }
+        if (safeLinkKeystorePath && !file(safeLinkKeystorePath).exists()) {
+            missing << 'SAFE_LINK_ANDROID_KEYSTORE_PATH existing keystore file'
+        }
+
+        println "SAFE_LINK_ANDROID_APP_ID=${safeLinkAndroidAppId}"
+        println "SAFE_LINK_ANDROID_APP_NAME=${safeLinkAndroidAppName}"
+        println "SAFE_LINK_ANDROID_APP_LINK_HOST=${safeLinkAndroidAppLinkHost}"
+        println "SAFE_LINK_ANDROID_VERSION_CODE=${safeLinkVersionCode}"
+        println "SAFE_LINK_ANDROID_VERSION_NAME=${safeLinkVersionName}"
+        println "SAFE_LINK_ANDROID_KEYSTORE_PATH=${safeLinkKeystorePath ? 'SET' : 'MISSING'}"
+        println "SAFE_LINK_ANDROID_KEYSTORE_PASSWORD=${safeLinkKeystorePassword ? 'SET' : 'MISSING'}"
+        println "SAFE_LINK_ANDROID_KEY_ALIAS=${safeLinkKeyAlias ? 'SET' : 'MISSING'}"
+        println "SAFE_LINK_ANDROID_KEY_PASSWORD=${safeLinkKeyPassword ? 'SET' : 'MISSING'}"
+
+        if (!missing.isEmpty()) {
+            throw new GradleException("Android release is not ready. Missing/fix: " + missing.join(', '))
+        }
+    }
+}
+
+tasks.matching { it.name == 'bundleRelease' }.configureEach {
+    dependsOn('safeLinkReleaseReadiness')
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

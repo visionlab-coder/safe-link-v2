@@ -9,7 +9,8 @@ const EVIL = "https://evil.example.com";
 let pass = 0, fail = 0;
 const check = (name, cond, extra = "") => {
     console.log(`${cond ? "✅" : "❌"} ${name}${extra ? "  ("+extra+")" : ""}`);
-    cond ? pass++ : fail++;
+    if (cond) pass++;
+    else fail++;
 };
 const acao = (r) => r.headers.get("access-control-allow-origin");
 

@@ -49,11 +49,13 @@ public class AuthController {
     );
     private final AuthService authService;
     private final AuditService audit;
+    private final LoginAttemptRateLimiter loginAttemptRateLimiter;
     private final HttpSessionSecurityContextRepository contextRepository = new HttpSessionSecurityContextRepository();
 
-    public AuthController(AuthService authService, AuditService audit) {
+    public AuthController(AuthService authService, AuditService audit, LoginAttemptRateLimiter loginAttemptRateLimiter) {
         this.authService = authService;
         this.audit = audit;
+        this.loginAttemptRateLimiter = loginAttemptRateLimiter;
     }
 
     @GetMapping("/csrf")
@@ -67,7 +69,16 @@ public class AuthController {
         HttpServletRequest servletRequest,
         HttpServletResponse servletResponse
     ) {
-        var principal = authService.authenticate(request.email(), request.password(), clientIp(servletRequest));
+        String ipAddress = clientIp(servletRequest);
+        loginAttemptRateLimiter.checkAllowed(request.email(), ipAddress);
+        SessionPrincipal principal;
+        try {
+            principal = authService.authenticate(request.email(), request.password(), ipAddress);
+        } catch (org.springframework.security.authentication.BadCredentialsException ex) {
+            loginAttemptRateLimiter.recordFailure(request.email(), ipAddress);
+            throw ex;
+        }
+        loginAttemptRateLimiter.clear(request.email(), ipAddress);
         establishSession(principal, servletRequest, servletResponse);
         return CurrentUserResponse.from(principal);
     }

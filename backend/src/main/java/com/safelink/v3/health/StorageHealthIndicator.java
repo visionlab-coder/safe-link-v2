@@ -18,7 +18,7 @@ public class StorageHealthIndicator implements HealthIndicator {
         if (storage.isConfigured()) {
             return Health.up().withDetail("objectStorage", "configured").build();
         }
-        return Health.up()
+        return Health.unknown()
             .withDetail("objectStorage", "not_configured")
             .withDetail("mode", "LOCAL_FALLBACK")
             .build();

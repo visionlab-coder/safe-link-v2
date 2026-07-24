@@ -44,9 +44,7 @@ admins.forEach((a, i) => {
 
   const createdAt = u.created_at;
   const lastSignIn = u.last_sign_in_at;
-  const emailConfirmed = u.email_confirmed_at;
   const recoverySent = u.recovery_sent_at;
-  const identities = (u.identities ?? []).map((id) => id.provider).join(",");
 
   let status, hint;
   if (lastSignIn && new Date(lastSignIn) > new Date(createdAt)) {

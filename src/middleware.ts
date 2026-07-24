@@ -9,7 +9,9 @@ const AI_API_PREFIXES = [
 ];
 const AI_API_EXACT_PATHS = new Set(["/api/quiz"]);
 
-const V3_API_BASE_URL = process.env.NEXT_PUBLIC_SAFE_LINK_API_BASE_URL || "http://localhost:8080";
+const V3_API_BASE_URL = process.env.SAFE_LINK_INTERNAL_API_BASE_URL || process.env.NEXT_PUBLIC_SAFE_LINK_API_BASE_URL || "http://localhost:8080";
+const SAFE_LINK_PUBLIC_APP_URL = process.env.SAFE_LINK_PUBLIC_APP_URL ||
+  (process.env.NODE_ENV === "production" ? "https://app.safe-link.co.kr" : "");
 
 type V3AuthResult = {
   userId: number;
@@ -35,6 +37,13 @@ async function resolveV3Auth(request: NextRequest): Promise<V3AuthResult | null>
   } catch {
     return null;
   }
+}
+
+function publicRedirect(pathname: string, request: NextRequest): NextResponse {
+  // A standalone Next.js server commonly sees its own internal host (localhost).
+  // Never build a browser-facing redirect from that host in production.
+  const origin = SAFE_LINK_PUBLIC_APP_URL || request.nextUrl.origin;
+  return NextResponse.redirect(new URL(pathname, origin));
 }
 
 function needsV3AiAuth(pathname: string): boolean {
@@ -65,24 +74,24 @@ export async function middleware(request: NextRequest) {
 
   const v3Auth = await resolveV3Auth(request);
   if (!v3Auth) {
-    return NextResponse.redirect(new URL("/auth", request.url));
+    return publicRedirect("/auth", request);
   }
 
   if (pathname.startsWith("/system")) {
     if (!v3Auth.roles.some((role) => canAccessSystem(role))) {
-      return NextResponse.redirect(new URL("/", request.url));
+      return publicRedirect("/", request);
     }
   } else if (pathname.startsWith("/admin")) {
     if (!v3Auth.roles.some((role) => hasAllowedRole(role, "admin"))) {
-      return NextResponse.redirect(new URL("/auth", request.url));
+      return publicRedirect("/auth", request);
     }
   } else if (pathname.startsWith("/control")) {
     if (!v3Auth.roles.some((role) => hasAllowedRole(role, "hq"))) {
-      return NextResponse.redirect(new URL("/auth", request.url));
+      return publicRedirect("/auth", request);
     }
   } else if (pathname.startsWith("/worker")) {
     if (!v3Auth.roles.some((role) => hasAllowedRole(role, "worker"))) {
-      return NextResponse.redirect(new URL("/auth", request.url));
+      return publicRedirect("/auth", request);
     }
   }
 

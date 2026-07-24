@@ -1,6 +1,7 @@
 package com.safelink.v3.config;
 
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,10 +26,20 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableConfigurationProperties(SecurityProperties.class)
 public class SecurityConfig {
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(
+        HttpSecurity http,
+        @Value("${server.servlet.session.cookie.secure:false}") boolean secureCookie
+    ) throws Exception {
+        var csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        csrfTokenRepository.setCookieCustomizer(cookie -> cookie
+            .secure(secureCookie)
+            .sameSite("Lax")
+            .path("/")
+        );
+
         http.cors(Customizer.withDefaults());
         http.csrf(csrf -> csrf
-            .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+            .csrfTokenRepository(csrfTokenRepository)
             .ignoringRequestMatchers(
                 new AntPathRequestMatcher("/api/v1/auth/login", "POST"),
                 new AntPathRequestMatcher("/api/v1/auth/admin-signup", "POST"),

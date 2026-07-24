@@ -1,6 +1,11 @@
-// 5명 관리자 (HQ Admin 기존 + 신규 4명) 모두 seowon2030 으로 production 로그인 검증.
+// 5명 관리자 계정의 production 로그인 검증. 비밀번호는 SMOKE_PASSWORD 환경변수로 주입한다.
 const BASE = "https://safe-link-v2.vercel.app";
-const PASSWORD = "seowon2030";
+const PASSWORD = process.env.SMOKE_PASSWORD;
+
+if (!PASSWORD) {
+  console.error("SMOKE_PASSWORD is required; refusing to run credential smoke test.");
+  process.exit(1);
+}
 
 const TARGETS = [
   { email: "hq.admin@safelink.local", label: "HQ Admin (어제 설정)" },
@@ -34,5 +39,5 @@ for (const t of TARGETS) {
 }
 
 console.log("\n" + "=".repeat(80));
-console.log(`종합: ${pass}/${TARGETS.length} 통과`);
+console.log(`종합: ${pass}/${TARGETS.length} 통과, ${fail} 실패`);
 console.log("=".repeat(80));

@@ -41,10 +41,7 @@ export function App() {
     };
   }, []);
 
-  const ready =
-    Boolean(config.apiBaseUrl) &&
-    Boolean(config.supabaseUrl) &&
-    config.supabasePublishableKeyConfigured;
+  const ready = Boolean(config.apiBaseUrl);
 
   return (
     <main className="shell">
@@ -77,19 +74,9 @@ export function App() {
         />
         <StatusRow label="Environment" value={config.appEnv.toUpperCase()} />
         <StatusRow
-          label="API base URL"
+          label="Spring Boot API"
           value={config.apiBaseUrl ? "CONFIGURED" : "MISSING"}
           tone={config.apiBaseUrl ? "good" : "warn"}
-        />
-        <StatusRow
-          label="Supabase URL"
-          value={config.supabaseUrl ? "CONFIGURED" : "MISSING"}
-          tone={config.supabaseUrl ? "good" : "warn"}
-        />
-        <StatusRow
-          label="Publishable key"
-          value={config.supabasePublishableKeyConfigured ? "CONFIGURED" : "MISSING"}
-          tone={config.supabasePublishableKeyConfigured ? "good" : "warn"}
         />
       </section>
 

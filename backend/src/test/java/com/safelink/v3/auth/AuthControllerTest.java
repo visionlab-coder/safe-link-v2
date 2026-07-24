@@ -22,13 +22,15 @@ import org.springframework.http.HttpStatus;
 class AuthControllerTest {
     private AuthService authService;
     private AuditService audit;
+    private LoginAttemptRateLimiter loginAttemptRateLimiter;
     private AuthController authController;
 
     @BeforeEach
     void setUp() {
         authService = mock(AuthService.class);
         audit = mock(AuditService.class);
-        authController = new AuthController(authService, audit);
+        loginAttemptRateLimiter = mock(LoginAttemptRateLimiter.class);
+        authController = new AuthController(authService, audit, loginAttemptRateLimiter);
     }
 
     @Test
@@ -43,7 +45,7 @@ class AuthControllerTest {
         );
         when(authService.registerDirectAdminSignup(
             eq("admin@seowonenc.co.kr"),
-            eq("password123"),
+            eq("password1234"),
             eq("Admin"),
             eq("ko"),
             any()
@@ -54,7 +56,7 @@ class AuthControllerTest {
         var response = authController.adminSignup(
             Map.of(
                 "email", "admin@seowonenc.co.kr",
-                "password", "password123",
+                "password", "password1234",
                 "display_name", "Admin",
                 "preferred_lang", "ko"
             ),
@@ -69,7 +71,7 @@ class AuthControllerTest {
         assertThat(request.getSession(false)).isNull();
         verify(authService).registerDirectAdminSignup(
             eq("admin@seowonenc.co.kr"),
-            eq("password123"),
+            eq("password1234"),
             eq("Admin"),
             eq("ko"),
             any()

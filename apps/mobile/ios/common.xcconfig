@@ -1,0 +1,9 @@
+// Shared iOS app settings. Local release values may override these defaults.
+SAFE_LINK_IOS_BUNDLE_ID = kr.co.safelink.mobile.dev
+SAFE_LINK_IOS_APP_NAME = SQ Link Dev
+SAFE_LINK_IOS_APP_LINK_HOST = app-test.safe-link.co.kr
+SAFE_LINK_IOS_VERSION = 1.0
+SAFE_LINK_IOS_BUILD = 1
+SAFE_LINK_IOS_TEAM_ID =
+
+#include? "release.local.xcconfig"
