@@ -655,7 +655,7 @@ function WorkerHomeContent() {
 
     const handleSignOut = async () => {
         await logoutV3().catch(() => undefined);
-        router.push("/");
+        router.push("/auth");
     };
 
     return (

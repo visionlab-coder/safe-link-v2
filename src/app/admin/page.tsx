@@ -180,7 +180,7 @@ function AdminDashboardContent() {
 
     const handleSignOut = async () => {
         await logoutV3().catch(() => undefined);
-        router.push("/");
+        router.push("/auth");
     };
 
     const lang = currentUser?.prefLang || urlLang || "ko";
