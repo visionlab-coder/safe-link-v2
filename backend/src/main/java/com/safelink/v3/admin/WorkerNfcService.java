@@ -72,13 +72,14 @@ public class WorkerNfcService {
 
     public WorkerListResponse list(SessionPrincipal actor, String requestedSiteId, String q, boolean activeOnly, int limit) {
         Long siteId = parseOptionalLong(requestedSiteId);
-        if (!actor.hasAnyGlobalRole()) {
+        if (siteId == null && !actor.hasAnyGlobalRole()) {
             if (actor.siteIds().isEmpty()) {
                 throw new IllegalArgumentException("admin_site_required");
             }
             siteId = actor.siteIds().stream().sorted().findFirst().orElseThrow();
-        } else if (siteId != null) {
-            siteGuard.requireSiteAccess(actor, siteId, "admin.worker.list", "site", String.valueOf(siteId));
+        }
+        if (siteId != null) {
+            siteGuard.requireGlobalOrSiteAdmin(actor, siteId, "admin.worker.list", "site", String.valueOf(siteId));
         }
 
         int safeLimit = Math.max(1, Math.min(limit <= 0 ? 50 : limit, 200));
