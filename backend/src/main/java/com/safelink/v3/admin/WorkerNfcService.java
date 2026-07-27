@@ -389,13 +389,26 @@ public class WorkerNfcService {
         }
         Long workerId = parseOptionalLong(request.workerId());
         Long stickerId = parseOptionalLong(request.stickerId());
-        Long siteId = workerId == null ? null : findWorker(workerId).map(WorkerResponse::assignedSiteIdLong).orElse(null);
-        if (siteId == null && stickerId != null) {
-            siteId = jdbc.sql("select site_id from worker_stickers where id = :stickerId")
+        Long siteId = null;
+        if (stickerId != null) {
+            var sticker = jdbc.sql("select worker_id, site_id from worker_stickers where id = :stickerId")
                 .param("stickerId", stickerId)
-                .query(Long.class)
+                .query((rs, rowNum) -> new long[] {rs.getLong("worker_id"), rs.getLong("site_id")})
                 .optional()
-                .orElse(null);
+                .orElseThrow(() -> new NotFoundException("sticker_not_found"));
+            Long stickerWorkerId = sticker[0];
+            if (workerId != null && !workerId.equals(stickerWorkerId)) {
+                throw new IllegalArgumentException("sticker_worker_mismatch");
+            }
+            workerId = stickerWorkerId;
+            siteId = sticker[1];
+        } else if (workerId != null) {
+            siteId = findWorker(workerId)
+                .map(WorkerResponse::assignedSiteIdLong)
+                .orElseThrow(() -> new NotFoundException("worker_not_found"));
+        }
+        if (siteId == null) {
+            throw new IllegalArgumentException("sticker_or_worker_required");
         }
         siteGuard.requireGlobalOrSiteAdmin(actor, siteId, "admin.worker.sticker.event", "worker_sticker", request.stickerId());
 
