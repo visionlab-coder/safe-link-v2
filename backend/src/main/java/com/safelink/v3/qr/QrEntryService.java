@@ -103,22 +103,25 @@ public class QrEntryService {
             throw new IllegalArgumentException("worker_match_ambiguous");
         }
         if (matches.size() == 1) {
-            return matches.getFirst();
+            return requireActiveWorker(matches.getFirst(), siteId, ipAddress);
         }
 
         String email = internalWorkerEmail(siteId, initials, phoneLast4);
         Optional<Long> existing = findUserIdByEmail(email);
-        if (existing.isPresent()) {
-            var account = users.findById(existing.get())
-                .orElseThrow(() -> new IllegalStateException("worker_user_not_found"));
-            if (!account.isActive()) {
-                audit.record(account.id(), siteId, "qr.site_entry", "worker", String.valueOf(account.id()), "DENIED", "worker_inactive", Map.of("ip", ipAddress));
-                throw new IllegalArgumentException("worker_inactive");
-            }
-        }
+        if (existing.isPresent()) return requireActiveWorker(existing.get(), siteId, ipAddress);
         Long workerId = existing.orElseGet(() -> createInternalWorker(email, initials, preferredLanguage));
         ensureWorkerContracts(workerId, siteId, initials, phoneLast4);
         audit.record(workerId, siteId, "qr.worker.auto_enroll", "worker", String.valueOf(workerId), "ALLOWED", "created_or_restored", Map.of("ip", ipAddress));
+        return workerId;
+    }
+
+    private Long requireActiveWorker(Long workerId, Long siteId, String ipAddress) {
+        var account = users.findById(workerId)
+            .orElseThrow(() -> new IllegalStateException("worker_user_not_found"));
+        if (!account.isActive()) {
+            audit.record(account.id(), siteId, "qr.site_entry", "worker", String.valueOf(account.id()), "DENIED", "worker_inactive", Map.of("ip", ipAddress));
+            throw new IllegalArgumentException("worker_inactive");
+        }
         return workerId;
     }
 
@@ -188,10 +191,8 @@ public class QrEntryService {
                 join users u on u.id = q.user_id
                 join user_roles ur on ur.user_id = u.id
                 join site_memberships sm on sm.user_id = u.id
-                where q.enabled = true
-                  and q.name_initials = :initials
+                where q.name_initials = :initials
                   and q.phone_last4 = :phoneLast4
-                  and u.account_status = 'ACTIVE'
                   and ur.role = 'WORKER'
                   and ur.revoked_at is null
                   and sm.site_id = :siteId
