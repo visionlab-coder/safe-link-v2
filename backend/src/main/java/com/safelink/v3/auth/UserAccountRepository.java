@@ -233,6 +233,20 @@ public class UserAccountRepository {
         return findById(userId).orElseThrow(() -> new IllegalStateException("approved_user_not_found"));
     }
 
+    public void rejectPendingAdminAccount(Long userId) {
+        int updated = jdbc.sql("""
+                update users
+                set account_status = 'DEACTIVATED'
+                where id = :userId
+                  and account_status = 'PENDING'
+            """)
+            .param("userId", userId)
+            .update();
+        if (updated != 1) {
+            throw new IllegalArgumentException("account_not_pending");
+        }
+    }
+
     public List<UserAccount> findPendingAdminSignupAccounts() {
         return jdbc.sql("""
                 select u.id, u.email, u.display_name, u.preferred_language, u.account_status, c.password_hash

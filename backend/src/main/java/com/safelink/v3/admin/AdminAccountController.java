@@ -84,6 +84,24 @@ public class AdminAccountController {
         return ApprovedAdminAccount.from(approved);
     }
 
+    @PostMapping("/{userId}/reject")
+    public java.util.Map<String, Boolean> reject(
+        @AuthenticationPrincipal SessionPrincipal actor,
+        @PathVariable Long userId
+    ) {
+        // A pending applicant has no site membership yet; only a global administrator
+        // may reject it before a site-specific role is granted.
+        requireApprovalAuthority(actor, null, Role.SITE_ADMIN);
+        var account = users.findById(userId)
+            .orElseThrow(() -> new NotFoundException("pending_admin_not_found"));
+        if (!"PENDING".equalsIgnoreCase(account.accountStatus())) {
+            throw new IllegalArgumentException("account_not_pending");
+        }
+        users.rejectPendingAdminAccount(userId);
+        audit.record(actor.userId(), null, "admin.account.reject", "user", String.valueOf(userId), "ALLOWED", "rejected", Map.of());
+        return java.util.Map.of("ok", true);
+    }
+
     private void requireApprovalAuthority(SessionPrincipal actor, Long siteId, Role targetRole) {
         if (actor == null) {
             throw new AccessDeniedException("authentication_required");
