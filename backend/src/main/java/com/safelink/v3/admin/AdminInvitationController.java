@@ -71,7 +71,9 @@ public class AdminInvitationController {
             .param("targetSiteId", request.targetSiteId())
             .param("tokenHash", tokenHash)
             .param("invitedBy", actor.userId())
-            .param("expiresAt", request.expiresAt())
+            // PostgreSQL JDBC does not bind java.time.Instant without an explicit SQL type.
+            // Convert it to Timestamp so invitation expiry is stored consistently in UTC.
+            .param("expiresAt", java.sql.Timestamp.from(request.expiresAt()))
             .query(Long.class)
             .single();
 
