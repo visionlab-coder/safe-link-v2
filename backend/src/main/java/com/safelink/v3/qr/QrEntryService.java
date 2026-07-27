@@ -108,6 +108,14 @@ public class QrEntryService {
 
         String email = internalWorkerEmail(siteId, initials, phoneLast4);
         Optional<Long> existing = findUserIdByEmail(email);
+        if (existing.isPresent()) {
+            var account = users.findById(existing.get())
+                .orElseThrow(() -> new IllegalStateException("worker_user_not_found"));
+            if (!account.isActive()) {
+                audit.record(account.id(), siteId, "qr.site_entry", "worker", String.valueOf(account.id()), "DENIED", "worker_inactive", Map.of("ip", ipAddress));
+                throw new IllegalArgumentException("worker_inactive");
+            }
+        }
         Long workerId = existing.orElseGet(() -> createInternalWorker(email, initials, preferredLanguage));
         ensureWorkerContracts(workerId, siteId, initials, phoneLast4);
         audit.record(workerId, siteId, "qr.worker.auto_enroll", "worker", String.valueOf(workerId), "ALLOWED", "created_or_restored", Map.of("ip", ipAddress));
