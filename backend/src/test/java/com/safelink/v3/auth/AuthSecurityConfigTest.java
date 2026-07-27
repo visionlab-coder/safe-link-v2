@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.safelink.v3.audit.AuditService;
+import com.safelink.v3.auth.UserAccountRepository;
 import com.safelink.v3.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,9 @@ class AuthSecurityConfigTest {
 
     @MockitoBean
     private LoginAttemptRateLimiter loginAttemptRateLimiter;
+
+    @MockitoBean
+    private UserAccountRepository userAccountRepository;
 
     @Test
     void csrfCookieUsesSecureFlagWhenSessionCookieSecure() throws Exception {

@@ -16,10 +16,12 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import com.safelink.v3.security.CurrentAccountSessionFilter;
 
 @Configuration
 @EnableMethodSecurity
@@ -28,6 +30,7 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(
         HttpSecurity http,
+        CurrentAccountSessionFilter currentAccountSessionFilter,
         @Value("${server.servlet.session.cookie.secure:false}") boolean secureCookie
     ) throws Exception {
         var csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
@@ -57,6 +60,7 @@ public class SecurityConfig {
             .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
             .sessionFixation(fixation -> fixation.migrateSession())
         );
+        http.addFilterAfter(currentAccountSessionFilter, SecurityContextHolderFilter.class);
         http.authorizeHttpRequests(auth -> auth
             .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf").permitAll()
