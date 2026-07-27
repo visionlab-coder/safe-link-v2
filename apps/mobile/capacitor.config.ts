@@ -4,7 +4,9 @@ import type { CapacitorConfig } from "@capacitor/cli";
 // 최종 스토어 업로드 전에는 MOBILE_APP_ID를 회사 명의 bundle/package id로 확정해야 한다.
 const appId = process.env.MOBILE_APP_ID || "kr.co.safelink.mobile.dev";
 const appName = process.env.MOBILE_APP_NAME || "SQ Link Dev";
-const webappUrl = process.env.MOBILE_WEBAPP_URL || "https://app-test.safe-link.co.kr";
+// 릴리스 환경변수가 빠진 상태에서 시험용 도메인으로 패키징되지 않도록,
+// 기본값도 운영 웹앱으로 둔다. 스테이징 빌드는 MOBILE_WEBAPP_URL로 명시한다.
+const webappUrl = process.env.MOBILE_WEBAPP_URL || "https://app.safe-link.co.kr";
 
 const config: CapacitorConfig = {
   appId,
