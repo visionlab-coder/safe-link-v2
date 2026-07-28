@@ -53,6 +53,8 @@ export default function WorkerVisionPage() {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [items, setItems] = useState<VisionItem[]>([]);
     const [hasResult, setHasResult] = useState(false);
+    const [cameraError, setCameraError] = useState("");
+    const [analysisError, setAnalysisError] = useState("");
 
     useEffect(() => {
         const loadLang = async () => {
@@ -66,9 +68,32 @@ export default function WorkerVisionPage() {
 
     const t = getT(lang);
 
+    const openCamera = async () => {
+        setCameraError("");
+        if (!navigator.mediaDevices?.getUserMedia) {
+            setCameraError(lang === "ko"
+                ? "이 브라우저에서는 카메라 접근을 지원하지 않습니다. Safari에서 다시 시도해 주세요."
+                : "Camera access is unavailable in this browser. Please try Safari.");
+            return;
+        }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: "environment" } },
+            });
+            stream.getTracks().forEach((track) => track.stop());
+            fileInputRef.current?.click();
+        } catch {
+            setCameraError(lang === "ko"
+                ? "카메라 권한이 거부되었습니다. iPhone 설정 → Safari → 카메라에서 허용한 뒤 다시 시도해 주세요."
+                : "Camera permission was denied. Allow camera access in Safari settings and try again.");
+        }
+    };
+
     const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        setCameraError("");
+        setAnalysisError("");
 
         // Preview
         const reader = new FileReader();
@@ -88,10 +113,16 @@ export default function WorkerVisionPage() {
                     body: JSON.stringify({ image: base64, lang }),
                 });
                 const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(String(data.error || `HTTP ${res.status}`));
+                }
                 setItems(data.items || []);
             } catch (err) {
                 console.error("[Vision] Error:", err);
                 setItems([]);
+                setAnalysisError(lang === "ko"
+                    ? "AI 분석에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 촬영해 주세요."
+                    : "AI analysis failed. Check your network and try again.");
             } finally {
                 setIsAnalyzing(false);
                 setHasResult(true);
@@ -129,7 +160,7 @@ export default function WorkerVisionPage() {
 
                 {!imagePreview && (
                     <button
-                        onClick={() => fileInputRef.current?.click()}
+                        onClick={openCamera}
                         className="flex-1 min-h-[300px] glass rounded-[48px] border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-6 tap-effect hover:border-blue-500/30 transition-all group"
                     >
                         <div className="w-24 h-24 glass rounded-[32px] flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
@@ -140,6 +171,11 @@ export default function WorkerVisionPage() {
                         </div>
                         <span className="text-xl font-black text-slate-400 uppercase tracking-widest">{t.capture}</span>
                     </button>
+                )}
+                {cameraError && (
+                    <div role="alert" className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200">
+                        {cameraError}
+                    </div>
                 )}
 
                 {/* Image Preview */}
@@ -182,7 +218,11 @@ export default function WorkerVisionPage() {
                 {/* Results */}
                 {hasResult && (
                     <div className="flex flex-col gap-4">
-                        {items.length === 0 ? (
+                        {analysisError ? (
+                            <div role="alert" className="glass rounded-[32px] border border-red-500/30 bg-red-500/10 p-8 text-center">
+                                <p className="font-bold text-red-200">{analysisError}</p>
+                            </div>
+                        ) : items.length === 0 ? (
                             <div className="glass rounded-[32px] p-12 text-center border-white/5">
                                 <p className="text-slate-500 font-bold">{t.noItems}</p>
                             </div>
@@ -223,7 +263,13 @@ export default function WorkerVisionPage() {
                 {hasResult && (
                     <div className="flex gap-3">
                         <button
-                            onClick={() => { setImagePreview(null); setItems([]); setHasResult(false); fileInputRef.current?.click(); }}
+                            onClick={() => {
+                                setImagePreview(null);
+                                setItems([]);
+                                setHasResult(false);
+                                setAnalysisError("");
+                                void openCamera();
+                            }}
                             className="flex-1 py-5 glass rounded-[24px] border-white/10 text-white font-black tap-effect"
                         >
                             {t.retake}
