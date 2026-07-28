@@ -94,6 +94,10 @@ export async function logoutV3(): Promise<void> {
     credentials: "include",
   });
   if (!response.ok) throw new Error(`v3_logout_failed_${response.status}`);
+  if (typeof window !== "undefined") {
+    window.sessionStorage.removeItem("safe-link-session-active");
+    window.sessionStorage.removeItem("safe-link-worker-active");
+  }
 }
 
 export async function setupProfileV3(input: V3ProfileSetupInput): Promise<V3CurrentUser> {

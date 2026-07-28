@@ -30,11 +30,20 @@ export default function AuthListener() {
         const onFocus = () => {
             void checkSession();
         };
+        const onPageShow = (event: PageTransitionEvent) => {
+            if (event.persisted) {
+                void checkSession();
+            }
+        };
+
+        void checkSession();
         window.addEventListener("focus", onFocus);
+        window.addEventListener("pageshow", onPageShow);
 
         return () => {
             cancelled = true;
             window.removeEventListener("focus", onFocus);
+            window.removeEventListener("pageshow", onPageShow);
         };
     }, [pathname, router]);
 

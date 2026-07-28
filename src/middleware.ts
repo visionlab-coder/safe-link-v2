@@ -51,6 +51,12 @@ function needsV3AiAuth(pathname: string): boolean {
     AI_API_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
+function protectedResponse(request: NextRequest): NextResponse {
+  const response = NextResponse.next({ request });
+  response.headers.set("Cache-Control", "private, no-store, max-age=0");
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -59,7 +65,7 @@ export async function middleware(request: NextRequest) {
     if (!v3Auth) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    return NextResponse.next({ request });
+    return protectedResponse(request);
   }
 
   const needsRoleCheck =
@@ -95,7 +101,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.next({ request });
+  return protectedResponse(request);
 }
 
 export const config = {
