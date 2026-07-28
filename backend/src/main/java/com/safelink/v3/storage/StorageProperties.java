@@ -13,6 +13,7 @@ public class StorageProperties {
     private boolean pathStyleAccess = true;
     private long uploadUrlTtlSeconds = 600;
     private long downloadUrlTtlSeconds = 300;
+    private long maxUploadBytes = 10 * 1024 * 1024;
     private String localRoot = System.getProperty("java.io.tmpdir") + "/safe-link-v3-object-storage";
 
     public boolean isEnabled() { return enabled; }
@@ -33,6 +34,8 @@ public class StorageProperties {
     public void setUploadUrlTtlSeconds(long uploadUrlTtlSeconds) { this.uploadUrlTtlSeconds = uploadUrlTtlSeconds; }
     public long getDownloadUrlTtlSeconds() { return downloadUrlTtlSeconds; }
     public void setDownloadUrlTtlSeconds(long downloadUrlTtlSeconds) { this.downloadUrlTtlSeconds = downloadUrlTtlSeconds; }
+    public long getMaxUploadBytes() { return maxUploadBytes; }
+    public void setMaxUploadBytes(long maxUploadBytes) { this.maxUploadBytes = maxUploadBytes; }
     public String getLocalRoot() { return localRoot; }
     public void setLocalRoot(String localRoot) { this.localRoot = localRoot; }
 }

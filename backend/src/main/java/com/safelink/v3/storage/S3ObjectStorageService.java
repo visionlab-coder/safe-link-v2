@@ -8,6 +8,8 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
@@ -72,6 +74,26 @@ public class S3ObjectStorageService implements ObjectStorageService {
             ? "application/octet-stream"
             : response.response().contentType();
         return new StoredObject(contentType, response.asByteArray());
+    }
+
+    @Override
+    public ObjectMetadata headObject(String objectKey) {
+        var response = s3.headObject(HeadObjectRequest.builder()
+            .bucket(properties.getBucket())
+            .key(objectKey)
+            .build());
+        String contentType = response.contentType() == null
+            ? "application/octet-stream"
+            : response.contentType();
+        return new ObjectMetadata(contentType, response.contentLength());
+    }
+
+    @Override
+    public void deleteObject(String objectKey) {
+        s3.deleteObject(DeleteObjectRequest.builder()
+            .bucket(properties.getBucket())
+            .key(objectKey)
+            .build());
     }
 
     @Override

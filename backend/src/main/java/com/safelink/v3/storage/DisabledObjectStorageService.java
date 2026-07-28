@@ -54,6 +54,33 @@ public class DisabledObjectStorageService implements ObjectStorageService {
     }
 
     @Override
+    public ObjectMetadata headObject(String objectKey) {
+        Path target = resolveObjectPath(objectKey);
+        try {
+            if (!Files.exists(target)) {
+                throw new ServiceUnavailableException("local_object_not_found");
+            }
+            String contentType = Files.exists(contentTypePath(target))
+                ? Files.readString(contentTypePath(target)).trim()
+                : "application/octet-stream";
+            return new ObjectMetadata(contentType, Files.size(target));
+        } catch (IOException e) {
+            throw new ServiceUnavailableException("local_object_storage_read_failed");
+        }
+    }
+
+    @Override
+    public void deleteObject(String objectKey) {
+        Path target = resolveObjectPath(objectKey);
+        try {
+            Files.deleteIfExists(target);
+            Files.deleteIfExists(contentTypePath(target));
+        } catch (IOException e) {
+            throw new ServiceUnavailableException("local_object_storage_delete_failed");
+        }
+    }
+
+    @Override
     public boolean isConfigured() {
         return false;
     }

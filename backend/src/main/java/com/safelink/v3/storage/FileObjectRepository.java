@@ -67,4 +67,24 @@ public class FileObjectRepository {
             .optional()
             .orElseThrow(() -> new NotFoundException("file_object_not_found"));
     }
+
+    public void markReady(Long id) {
+        jdbc.sql("""
+                update file_objects
+                set status = 'READY', verified_at = now()
+                where id = :id and status = 'PENDING_UPLOAD'
+            """)
+            .param("id", id)
+            .update();
+    }
+
+    public void markQuarantined(Long id) {
+        jdbc.sql("""
+                update file_objects
+                set status = 'QUARANTINED'
+                where id = :id and status = 'PENDING_UPLOAD'
+            """)
+            .param("id", id)
+            .update();
+    }
 }

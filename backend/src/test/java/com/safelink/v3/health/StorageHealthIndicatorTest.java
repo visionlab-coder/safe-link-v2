@@ -46,7 +46,9 @@ class StorageHealthIndicatorTest {
             @Override public URI createUploadUrl(String objectKey, String contentType, Duration ttl) { return URI.create("https://example.invalid/upload"); }
             @Override public URI createDownloadUrl(String objectKey, Duration ttl) { return URI.create("https://example.invalid/download"); }
             @Override public void putObject(String objectKey, String contentType, byte[] bytes) {}
+            @Override public ObjectMetadata headObject(String objectKey) { return new ObjectMetadata("text/plain", 0); }
             @Override public StoredObject getObject(String objectKey) { return new StoredObject("text/plain", new byte[0]); }
+            @Override public void deleteObject(String objectKey) {}
             @Override public boolean isConfigured() { return true; }
             @Override public void verifyAvailable() {
                 if (failProbe) throw new IllegalStateException("offline");
