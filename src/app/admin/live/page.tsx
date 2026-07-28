@@ -60,6 +60,7 @@ function AdminLiveContent() {
     const handleTranscript = useCallback(async (text: string) => {
         const cleanText = text.trim().replace(/\s+/g, " ");
         if (!sessionId || !cleanText) return;
+        setSttError("");
 
         const now = Date.now();
         if (lastSentRef.current.text === cleanText && now - lastSentRef.current.at < 10_000) {

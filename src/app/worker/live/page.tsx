@@ -96,6 +96,7 @@ export default function WorkerLivePage() {
         if (!authReady?.siteId || !activeAdminId) return;
         const cleanText = text.trim().replace(/\s+/g, " ");
         if (!cleanText) return;
+        setSttError("");
 
         let koreanText = "";
         try {

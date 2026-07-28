@@ -225,6 +225,13 @@ export function useCloudSTT({
                 }
             } else {
                 emptyStreakRef.current += 1;
+                if (emptyStreakRef.current >= MAX_EMPTY_STREAK) {
+                    onErrorRef.current?.(
+                        "api_error",
+                        "음성을 인식하지 못했습니다. 마이크 가까이에서 또렷하게 말한 뒤 다시 시도해 주세요.",
+                    );
+                    emptyStreakRef.current = 0;
+                }
             }
         } catch (e: unknown) {
             if (e instanceof DOMException && e.name === "AbortError") {
