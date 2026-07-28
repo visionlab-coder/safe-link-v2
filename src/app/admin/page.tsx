@@ -198,9 +198,9 @@ function AdminDashboardContent() {
             <div className="min-h-screen bg-mesh text-white p-4 md:p-8 flex flex-col gap-8 pb-12 font-sans selection:bg-blue-500/30">
 
                 {/* 💎 Premium Header */}
-                <header className="flex justify-between items-start animate-float">
-                    <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2 mb-1">
+                <header className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start animate-float">
+                    <div className="flex min-w-0 flex-col gap-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
                             <BrandLogo compact showProduct imageClassName="max-w-[160px]" />
                             <div className="flex items-center gap-1 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
                                 <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
@@ -218,16 +218,16 @@ function AdminDashboardContent() {
                             {currentUser?.title && <span className="text-slate-600 ml-2">[{currentUser.title}]</span>}
                         </p>
                     </div>
-                    <div className="flex flex-col items-end gap-3">
-                        <div className={`px-4 py-2 glass rounded-full border border-white/5 shadow-xl text-xs font-black tracking-widest uppercase ${currentUser?.role === 'HQ_ADMIN' ? 'text-blue-400 border-blue-500/20' : 'text-amber-400 border-amber-500/20'
+                    <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end sm:gap-3">
+                        <div className={`shrink-0 whitespace-nowrap px-3 py-2 sm:px-4 glass rounded-full border border-white/5 shadow-xl text-xs font-black tracking-widest uppercase ${currentUser?.role === 'HQ_ADMIN' ? 'text-blue-400 border-blue-500/20' : 'text-amber-400 border-amber-500/20'
                             }`}>
                             {roleDisplay}
                         </div>
-                        <div className="flex gap-4">
-                            <button onClick={() => router.push('/auth/setup')} className="min-h-11 inline-flex items-center text-[10px] font-black text-blue-500 hover:text-blue-400 uppercase tracking-widest px-2 py-1 transition-colors">
+                        <div className="flex shrink-0 gap-2 sm:gap-4">
+                            <button onClick={() => router.push('/auth/setup')} className="min-h-11 inline-flex items-center whitespace-nowrap text-[10px] font-black text-blue-500 hover:text-blue-400 uppercase tracking-widest px-2 py-1 transition-colors">
                                 Profile Edit
                             </button>
-                            <button onClick={handleSignOut} className="min-h-11 inline-flex items-center text-[10px] font-black text-slate-500 hover:text-red-400 uppercase tracking-widest px-2 py-1 transition-colors">
+                            <button onClick={handleSignOut} className="min-h-11 inline-flex items-center whitespace-nowrap text-[10px] font-black text-slate-500 hover:text-red-400 uppercase tracking-widest px-2 py-1 transition-colors">
                                 {t.signOut}
                             </button>
                         </div>

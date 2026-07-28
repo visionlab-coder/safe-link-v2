@@ -667,9 +667,9 @@ function WorkerHomeContent() {
             <div className="min-h-screen bg-mesh text-white p-4 md:p-8 flex flex-col gap-8 pb-12 font-sans selection:bg-red-500/30">
 
                 {/* 💎 Premium Header */}
-                <header className="flex justify-between items-start animate-float">
-                    <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2 mb-1">
+                <header className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start animate-float">
+                    <div className="flex min-w-0 flex-col gap-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
                             <BrandLogo compact showProduct imageClassName="max-w-[150px]" />
                             <div className="flex items-center gap-1 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-full">
                                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
@@ -680,8 +680,8 @@ function WorkerHomeContent() {
                             {profile ? t.greeting(profile.display_name || "Worker") : "Connecting..."}
                         </p>
                     </div>
-                    <div className="flex flex-col items-end gap-3">
-                        <div className="flex items-center gap-3 glass px-4 py-2 rounded-full border-white/5 shadow-xl">
+                    <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end sm:gap-3">
+                        <div className="flex shrink-0 items-center gap-3 glass px-4 py-2 rounded-full border-white/5 shadow-xl">
                             <Image
                                 src={`https://flagcdn.com/w40/${iso}.png`}
                                 alt={lang}
@@ -692,11 +692,11 @@ function WorkerHomeContent() {
                             />
                             <span className="text-xs text-white font-black">{lang.toUpperCase()}</span>
                         </div>
-                        <div className="flex gap-4">
-                            <button onClick={() => router.push('/auth/setup')} className="min-h-11 inline-flex items-center text-[10px] font-black text-blue-400 hover:text-blue-200 uppercase tracking-widest px-2 py-1 transition-colors">
+                        <div className="flex shrink-0 gap-2 sm:gap-4">
+                            <button onClick={() => router.push('/auth/setup')} className="min-h-11 inline-flex items-center whitespace-nowrap text-[10px] font-black text-blue-400 hover:text-blue-200 uppercase tracking-widest px-2 py-1 transition-colors">
                                 Profile Edit
                             </button>
-                            <button onClick={handleSignOut} className="min-h-11 inline-flex items-center text-[10px] font-black text-slate-500 hover:text-red-400 uppercase tracking-widest px-2 py-1 transition-colors">
+                            <button onClick={handleSignOut} className="min-h-11 inline-flex items-center whitespace-nowrap text-[10px] font-black text-slate-500 hover:text-red-400 uppercase tracking-widest px-2 py-1 transition-colors">
                                 {t.signOut}
                             </button>
                         </div>
