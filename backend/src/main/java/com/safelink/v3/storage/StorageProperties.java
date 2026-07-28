@@ -14,6 +14,7 @@ public class StorageProperties {
     private long uploadUrlTtlSeconds = 600;
     private long downloadUrlTtlSeconds = 300;
     private long maxUploadBytes = 10 * 1024 * 1024;
+    private String publicApiBaseUrl = "https://api.safe-link.co.kr";
     private String localRoot = System.getProperty("java.io.tmpdir") + "/safe-link-v3-object-storage";
 
     public boolean isEnabled() { return enabled; }
@@ -36,6 +37,8 @@ public class StorageProperties {
     public void setDownloadUrlTtlSeconds(long downloadUrlTtlSeconds) { this.downloadUrlTtlSeconds = downloadUrlTtlSeconds; }
     public long getMaxUploadBytes() { return maxUploadBytes; }
     public void setMaxUploadBytes(long maxUploadBytes) { this.maxUploadBytes = maxUploadBytes; }
+    public String getPublicApiBaseUrl() { return publicApiBaseUrl; }
+    public void setPublicApiBaseUrl(String publicApiBaseUrl) { this.publicApiBaseUrl = publicApiBaseUrl; }
     public String getLocalRoot() { return localRoot; }
     public void setLocalRoot(String localRoot) { this.localRoot = localRoot; }
 }

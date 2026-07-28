@@ -8,21 +8,29 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 @RestController
 @RequestMapping("/api/v1/files")
@@ -113,9 +121,48 @@ public class FileObjectController {
     public DownloadUrlResponse downloadUrl(@AuthenticationPrincipal SessionPrincipal actor, @PathVariable Long id) {
         FileObject file = files.get(id);
         siteGuard.requireSiteAccess(actor, file.siteId(), "file.download_url.create", "file_object", String.valueOf(id));
-        URI downloadUrl = storage.createDownloadUrl(file.objectKey(), Duration.ofSeconds(properties.getDownloadUrlTtlSeconds()));
+        if (!"READY".equals(file.status())) {
+            throw new IllegalArgumentException("file_not_ready");
+        }
+        long expiresAt = Instant.now().plusSeconds(properties.getDownloadUrlTtlSeconds()).getEpochSecond();
+        String signature = downloadSignature(id, actor.userId(), expiresAt);
+        String baseUrl = properties.getPublicApiBaseUrl().replaceAll("/+$", "");
+        URI downloadUrl = URI.create("%s/api/v1/files/%d/content?expires=%d&signature=%s"
+            .formatted(baseUrl, id, expiresAt, signature));
         audit.record(actor.userId(), file.siteId(), "file.download_url.create", "file_object", String.valueOf(id), "ALLOWED", "presigned_get", Map.of("purpose", file.purpose()));
         return new DownloadUrlResponse(id, downloadUrl.toString(), properties.getDownloadUrlTtlSeconds());
+    }
+
+    @GetMapping("/{id}/content")
+    public ResponseEntity<byte[]> downloadContent(
+        @AuthenticationPrincipal SessionPrincipal actor,
+        @PathVariable Long id,
+        @RequestParam long expires,
+        @RequestParam String signature
+    ) {
+        if (actor == null || expires < Instant.now().getEpochSecond()) {
+            throw new IllegalArgumentException("download_url_expired");
+        }
+        String expected = downloadSignature(id, actor.userId(), expires);
+        if (signature == null || !MessageDigest.isEqual(
+            expected.getBytes(StandardCharsets.US_ASCII),
+            signature.getBytes(StandardCharsets.US_ASCII)
+        )) {
+            throw new IllegalArgumentException("download_signature_invalid");
+        }
+
+        FileObject file = files.get(id);
+        siteGuard.requireSiteAccess(actor, file.siteId(), "file.download", "file_object", String.valueOf(id));
+        if (!"READY".equals(file.status())) {
+            throw new IllegalArgumentException("file_not_ready");
+        }
+        ObjectStorageService.StoredObject object = storage.getObject(file.objectKey());
+        audit.record(actor.userId(), file.siteId(), "file.download", "file_object", String.valueOf(id), "ALLOWED", "signed_proxy", Map.of("purpose", file.purpose()));
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_TYPE, object.contentType())
+            .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment")
+            .body(object.bytes());
     }
 
     public record UploadUrlRequest(@NotNull Long siteId, @NotBlank String purpose, @NotBlank String mimeType, @Min(1) Long byteSize, @NotBlank String sha256) {}
@@ -128,6 +175,21 @@ public class FileObjectController {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException("sha256_unavailable", impossible);
+        }
+    }
+
+    private String downloadSignature(Long fileId, Long userId, long expiresAt) {
+        String secret = properties.getSecretKey();
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException("download_signing_secret_not_configured");
+        }
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] signature = mac.doFinal(("%d|%d|%d".formatted(fileId, userId, expiresAt)).getBytes(StandardCharsets.UTF_8));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(signature);
+        } catch (Exception e) {
+            throw new IllegalStateException("download_signing_failed", e);
         }
     }
 
