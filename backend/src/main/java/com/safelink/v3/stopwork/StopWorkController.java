@@ -169,7 +169,7 @@ public class StopWorkController {
             .query(String.class)
             .optional()
             .orElse(null);
-        String payloadJson = writeJson(payload);
+        String payloadJson = canonicalJson(writeJson(payload));
         String eventHash = sha256(siteId + "|" + entityType + "|" + entityId + "|" + eventType + "|" + payloadJson + "|" + (previousHash == null ? "" : previousHash));
         Long eventId = jdbc.sql("""
                 insert into claim13_hash_chain_events(site_id, entity_type, entity_id, event_type, payload, previous_hash, event_hash, created_by)
@@ -208,6 +208,13 @@ public class StopWorkController {
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("json_write_failed", e);
         }
+    }
+
+    private String canonicalJson(String payloadJson) {
+        return jdbc.sql("select cast(cast(:payload as jsonb) as text)")
+            .param("payload", payloadJson)
+            .query(String.class)
+            .single();
     }
 
     private static String sha256(String value) {

@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.safelink.v3.config.SecurityConfig;
+import com.safelink.v3.audit.AuditService;
 import com.safelink.v3.auth.UserAccountRepository;
 import com.safelink.v3.qr.QrEntryService.QrEntryResponse;
 import com.safelink.v3.qr.QrEntryService.SitePayload;
@@ -28,6 +29,9 @@ class QrEntrySecurityConfigTest {
 
     @MockitoBean
     private UserAccountRepository userAccountRepository;
+
+    @MockitoBean
+    private AuditService auditService;
 
     @Test
     void qrSiteEntryInfoPostDoesNotRequireCsrf() throws Exception {

@@ -61,7 +61,7 @@ export const PROFILE_ROLE_DEFAULT_ROUTE: Record<ProfileRole, string> = {
   SITE_ADMIN: "/admin",
   SAFETY_MANAGER: "/admin",
   WORKER: "/worker",
-  VIEWER: "/worker",
+  VIEWER: "/admin",
   ROOT: "/system",
   SAFETY_OFFICER: "/admin",
   TEAM_LEADER: "/admin",
@@ -109,7 +109,7 @@ export function hasAllowedRole(role: ProfileRole, allowedRole: AllowedRole): boo
   }
 
   if (allowedRole === "admin") {
-    return v3Role === "HQ_ADMIN" || v3Role === "SITE_ADMIN" || v3Role === "SAFETY_MANAGER";
+    return v3Role === "HQ_ADMIN" || v3Role === "SITE_ADMIN" || v3Role === "SAFETY_MANAGER" || v3Role === "VIEWER";
   }
 
   if (allowedRole === "hq") {

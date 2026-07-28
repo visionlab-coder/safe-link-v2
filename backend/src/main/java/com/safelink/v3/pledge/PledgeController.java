@@ -141,6 +141,9 @@ public class PledgeController {
             throw new AccessDeniedException("FORBIDDEN");
         }
         siteGuard.requireSiteAccess(actor, pledge.siteId(), "pledge.sign", "claim13_pledge", String.valueOf(id));
+        if (pledge.approvedAt() != null) {
+            throw new IllegalArgumentException("pledge_already_signed");
+        }
         StoredSignature signature = storeSignatureIfPresent(pledge.siteId(), actor.userId(), request.signatureData(), "pledge-signatures");
         if (signature == null) {
             throw new IllegalArgumentException("signatureData_required");
@@ -262,7 +265,7 @@ public class PledgeController {
     }
 
     private Long appendHashEvent(Long siteId, String entityType, String entityId, String eventType, Map<String, ?> payload, Long createdBy) {
-        String payloadJson = toJson(payload);
+        String payloadJson = canonicalJson(toJson(payload));
         String previousHash = jdbc.sql("""
                 select event_hash
                 from claim13_hash_chain_events
@@ -318,9 +321,10 @@ public class PledgeController {
 
     private PledgeRow pledge(Long id) {
         return jdbc.sql("""
-                select id, tbm_session_id, worker_id, site_id, pledge_content_hash
+                select id, tbm_session_id, worker_id, site_id, pledge_content_hash, approved_at
                 from claim13_pledges
                 where id = :id
+                for update
             """)
             .param("id", id)
             .query((rs, rowNum) -> new PledgeRow(
@@ -328,7 +332,8 @@ public class PledgeController {
                 rs.getString("tbm_session_id"),
                 rs.getLong("worker_id"),
                 rs.getLong("site_id"),
-                rs.getString("pledge_content_hash")
+                rs.getString("pledge_content_hash"),
+                rs.getObject("approved_at", OffsetDateTime.class)
             ))
             .optional()
             .orElseThrow(() -> new IllegalArgumentException("pledge_not_found"));
@@ -360,6 +365,13 @@ public class PledgeController {
         } catch (Exception e) {
             throw new IllegalArgumentException("payload_invalid");
         }
+    }
+
+    private String canonicalJson(String payloadJson) {
+        return jdbc.sql("select cast(cast(:payload as jsonb) as text)")
+            .param("payload", payloadJson)
+            .query(String.class)
+            .single();
     }
 
     private static void requireWorker(SessionPrincipal actor) {
@@ -452,7 +464,7 @@ public class PledgeController {
     public record PledgeReportResponse(Map<String, ?> session, int signedCount, int unsignedCount, List<PledgePayload> pledges, Map<String, ?> legalTbmChecklist, Map<String, ?> report) {}
     public record PledgePayload(String id, @JsonProperty("worker_id") String workerId, @JsonProperty("site_id") String siteId, @JsonProperty("pledge_content_hash") String pledgeContentHash, @JsonProperty("nfc_uid") String nfcUid, @JsonProperty("approved_at") String approved_at, @JsonProperty("hash_chain_event_id") String hashChainEventId, @JsonProperty("created_at") String createdAt, @JsonProperty("signature_file_id") String signatureFileId, @JsonProperty("signature_sha256") String signatureSha256) {}
     public record HashChainVerifyResponse(String siteId, boolean valid, List<Map<String, Object>> breaks) {}
-    private record PledgeRow(Long id, String tbmSessionId, Long workerId, Long siteId, String pledgeContentHash) {}
+    private record PledgeRow(Long id, String tbmSessionId, Long workerId, Long siteId, String pledgeContentHash, OffsetDateTime approvedAt) {}
     private record StoredSignature(Long fileObjectId, String sha256) {}
     private record DecodedSignature(String mimeType, byte[] bytes) {}
     private record HashChainRow(Long id, String entityType, String entityId, String eventType, String payload, String previousHash, String eventHash) {}

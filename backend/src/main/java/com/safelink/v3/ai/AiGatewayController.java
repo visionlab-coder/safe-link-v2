@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,8 +44,9 @@ public class AiGatewayController {
     private final AuditService audit;
     private final AiVendorService vendor;
     private final AiMediaService media;
+    private final AiTranslationCacheService translationCache;
 
-    public AiGatewayController(AiQuotaService quota, AiUsageRepository usage, AiProperties properties, SiteGuard siteGuard, AuditService audit, AiVendorService vendor, AiMediaService media) {
+    public AiGatewayController(AiQuotaService quota, AiUsageRepository usage, AiProperties properties, SiteGuard siteGuard, AuditService audit, AiVendorService vendor, AiMediaService media, AiTranslationCacheService translationCache) {
         this.quota = quota;
         this.usage = usage;
         this.properties = properties;
@@ -52,6 +54,7 @@ public class AiGatewayController {
         this.audit = audit;
         this.vendor = vendor;
         this.media = media;
+        this.translationCache = translationCache;
     }
 
     @PostMapping("/translate")
@@ -68,6 +71,27 @@ public class AiGatewayController {
             throw new AccessDeniedException("ai_quota_exceeded");
         }
 
+        var cached = translationCache.get(
+            request.siteId(),
+            request.sourceLanguage(),
+            request.targetLanguage(),
+            request.text()
+        );
+        if (cached.isPresent()) {
+            usage.log(
+                actor.userId(),
+                request.siteId(),
+                "translate",
+                "cache",
+                "translation-v1",
+                request.text().length(),
+                cached.get().length(),
+                0,
+                "0"
+            );
+            return ResponseEntity.ok(new TranslateResponse(cached.get(), "cache", "translation-v1"));
+        }
+
         if (!properties.isVendorEnabled()) {
             audit.record(actor.userId(), request.siteId(), "ai.translate", "ai_vendor", "disabled", "DENIED", "vendor_disabled", Map.of("feature", "translate"));
             usage.log(actor.userId(), request.siteId(), "translate", "DISABLED", "none", request.text().length(), 0, 0, "0");
@@ -77,7 +101,8 @@ public class AiGatewayController {
         Instant started = Instant.now();
         var result = vendor.translateAuto(request.text(), request.sourceLanguage(), request.targetLanguage());
         long durationMs = Duration.between(started, Instant.now()).toMillis();
-        usage.log(actor.userId(), request.siteId(), "translate", result.vendor(), result.model(), request.text().length(), result.text().length(), durationMs, "0");
+        translationCache.put(request.siteId(), request.sourceLanguage(), request.targetLanguage(), request.text(), result.text());
+        usage.log(actor.userId(), request.siteId(), "translate", result.vendor(), result.model(), request.text().length(), result.text().length(), durationMs, AiCostEstimator.estimate("translate", result.vendor(), request.text().length(), result.text().length()));
         audit.record(actor.userId(), request.siteId(), "ai.translate", "ai_vendor", result.vendor(), "ALLOWED", "translated", Map.of("sourceLanguage", request.sourceLanguage(), "targetLanguage", request.targetLanguage()));
         return ResponseEntity.ok(new TranslateResponse(result.text(), result.vendor(), result.model()));
     }
@@ -123,7 +148,7 @@ public class AiGatewayController {
         Instant started = Instant.now();
         var result = vendor.call(request.provider(), request.text(), request.sourceLanguage(), request.targetLanguage(), request.prompt(), request.maxOutputTokens(), request.temperature());
         long durationMs = Duration.between(started, Instant.now()).toMillis();
-        usage.log(actor.userId(), request.siteId(), feature, result.vendor(), result.model(), request.text().length(), result.text().length(), durationMs, "0");
+        usage.log(actor.userId(), request.siteId(), feature, result.vendor(), result.model(), request.text().length(), result.text().length(), durationMs, AiCostEstimator.estimate(feature, result.vendor(), request.text().length(), result.text().length()));
         audit.record(actor.userId(), request.siteId(), "ai.%s.vendor".formatted(feature), "ai_vendor", result.vendor(), "ALLOWED", "vendor_call", Map.of("provider", request.provider(), "model", result.model()));
         return new VendorResponse(result.text(), result.vendor(), result.model());
     }
@@ -135,6 +160,7 @@ public class AiGatewayController {
             throw new AccessDeniedException("ai_role_denied");
         }
         siteGuard.requireSiteAccess(actor, request.siteId(), "ai.vision", "site", String.valueOf(request.siteId()));
+        validateImagePayload(request.image(), request.mimeType());
         if (request.image().length() > 7_000_000) {
             throw new IllegalArgumentException("vision_image_too_large");
         }
@@ -150,7 +176,7 @@ public class AiGatewayController {
         Instant started = Instant.now();
         var result = vendor.analyzeImage(request.prompt(), request.image(), request.mimeType(), request.targetLanguage(), 2048);
         long durationMs = Duration.between(started, Instant.now()).toMillis();
-        usage.log(actor.userId(), request.siteId(), "vision", result.vendor(), result.model(), request.image().length(), result.text().length(), durationMs, "0");
+        usage.log(actor.userId(), request.siteId(), "vision", result.vendor(), result.model(), request.image().length(), result.text().length(), durationMs, AiCostEstimator.estimate("vision", result.vendor(), request.image().length(), result.text().length()));
         audit.record(actor.userId(), request.siteId(), "ai.vision", "ai_vendor", result.vendor(), "ALLOWED", "image_analyzed", Map.of("model", result.model()));
         return new VisionResponse(result.text(), result.vendor(), result.model());
     }
@@ -171,7 +197,7 @@ public class AiGatewayController {
             request.prompt()
         );
         long durationMs = Duration.between(started, Instant.now()).toMillis();
-        usage.log(actor.userId(), request.siteId(), "stt", result.vendor(), result.model(), request.audio().length(), result.transcript().length(), durationMs, "0");
+        usage.log(actor.userId(), request.siteId(), "stt", result.vendor(), result.model(), request.audio().length(), result.transcript().length(), durationMs, AiCostEstimator.estimate("stt", result.vendor(), request.audio().length(), result.transcript().length()));
         audit.record(actor.userId(), request.siteId(), "ai.stt", "ai_vendor", result.vendor(), "ALLOWED", "transcribed", Map.of("model", result.model(), "quotaUsed", decision.used()));
         return new SttResponse(result.transcript(), result.vendor(), result.model());
     }
@@ -191,7 +217,7 @@ public class AiGatewayController {
             cleanOptional(request.audioEncoding(), "MP3")
         );
         long durationMs = Duration.between(started, Instant.now()).toMillis();
-        usage.log(actor.userId(), request.siteId(), "tts", result.vendor(), result.model(), request.text().length(), result.audioBase64().length(), durationMs, "0");
+        usage.log(actor.userId(), request.siteId(), "tts", result.vendor(), result.model(), request.text().length(), result.audioBase64().length(), durationMs, AiCostEstimator.estimate("tts", result.vendor(), request.text().length(), result.audioBase64().length()));
         audit.record(actor.userId(), request.siteId(), "ai.tts", "ai_vendor", result.vendor(), "ALLOWED", "synthesized", Map.of("model", result.model(), "quotaUsed", decision.used()));
         return new TtsResponse(result.audioBase64(), result.contentType(), result.vendor(), result.model());
     }
@@ -290,6 +316,52 @@ public class AiGatewayController {
 
     private static long safeSize(Long value) {
         return value == null || value < 0 ? 0 : value;
+    }
+
+    static void validateImagePayload(String image, String mimeType) {
+        String normalizedMimeType = mimeType == null ? "" : mimeType.trim().toLowerCase();
+        if (!Set.of("image/jpeg", "image/png", "image/webp").contains(normalizedMimeType)) {
+            throw new IllegalArgumentException("vision_image_type_not_allowed");
+        }
+
+        byte[] decoded;
+        try {
+            decoded = Base64.getDecoder().decode(image);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("vision_image_base64_invalid");
+        }
+        if (decoded.length == 0) {
+            throw new IllegalArgumentException("vision_image_empty");
+        }
+
+        boolean signatureMatches = switch (normalizedMimeType) {
+            case "image/jpeg" -> decoded.length >= 3
+                && (decoded[0] & 0xff) == 0xff
+                && (decoded[1] & 0xff) == 0xd8
+                && (decoded[2] & 0xff) == 0xff;
+            case "image/png" -> decoded.length >= 8
+                && (decoded[0] & 0xff) == 0x89
+                && decoded[1] == 0x50
+                && decoded[2] == 0x4e
+                && decoded[3] == 0x47
+                && decoded[4] == 0x0d
+                && decoded[5] == 0x0a
+                && decoded[6] == 0x1a
+                && decoded[7] == 0x0a;
+            case "image/webp" -> decoded.length >= 12
+                && decoded[0] == 'R'
+                && decoded[1] == 'I'
+                && decoded[2] == 'F'
+                && decoded[3] == 'F'
+                && decoded[8] == 'W'
+                && decoded[9] == 'E'
+                && decoded[10] == 'B'
+                && decoded[11] == 'P';
+            default -> false;
+        };
+        if (!signatureMatches) {
+            throw new IllegalArgumentException("vision_image_signature_mismatch");
+        }
     }
 
     private static Long firstSiteId(SessionPrincipal actor) {

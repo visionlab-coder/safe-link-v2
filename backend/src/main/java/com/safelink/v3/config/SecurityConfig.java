@@ -22,6 +22,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import com.safelink.v3.security.CurrentAccountSessionFilter;
+import com.safelink.v3.security.ViewerReadOnlyFilter;
 
 @Configuration
 @EnableMethodSecurity
@@ -31,6 +32,7 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(
         HttpSecurity http,
         CurrentAccountSessionFilter currentAccountSessionFilter,
+        ViewerReadOnlyFilter viewerReadOnlyFilter,
         @Value("${server.servlet.session.cookie.secure:false}") boolean secureCookie
     ) throws Exception {
         var csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
@@ -61,6 +63,7 @@ public class SecurityConfig {
             .sessionFixation(fixation -> fixation.migrateSession())
         );
         http.addFilterAfter(currentAccountSessionFilter, SecurityContextHolderFilter.class);
+        http.addFilterAfter(viewerReadOnlyFilter, CurrentAccountSessionFilter.class);
         http.authorizeHttpRequests(auth -> auth
             .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf").permitAll()
