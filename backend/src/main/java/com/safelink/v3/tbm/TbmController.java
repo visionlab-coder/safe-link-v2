@@ -274,7 +274,7 @@ public class TbmController {
 
     private static void requireTbmAdmin(SessionPrincipal actor) {
         if (actor == null || actor.roles().stream().noneMatch(role ->
-            role == Role.ROOT || role == Role.HQ_ADMIN || role == Role.SITE_ADMIN || role == Role.SAFETY_MANAGER
+            role == Role.ROOT || role == Role.HQ_ADMIN || role == Role.SITE_ADMIN || role == Role.SAFETY_MANAGER || role == Role.VIEWER
         )) {
             throw new AccessDeniedException("admin_required");
         }

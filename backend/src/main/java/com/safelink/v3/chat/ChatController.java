@@ -337,6 +337,7 @@ public class ChatController {
                 || role.equals(Role.HQ_ADMIN.name())
                 || role.equals(Role.SITE_ADMIN.name())
                 || role.equals(Role.SAFETY_MANAGER.name())
+                || role.equals(Role.VIEWER.name())
         );
     }
 

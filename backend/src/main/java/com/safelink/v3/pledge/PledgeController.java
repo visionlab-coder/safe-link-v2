@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -353,7 +354,14 @@ public class PledgeController {
         }
         DecodedSignature signature = decodeSignature(signatureData);
         String sha256 = sha256(signature.bytes());
-        String objectKey = "sites/%d/%s/%d/%s.%s".formatted(siteId, folder, workerId, sha256, extensionFor(signature.mimeType()));
+        String objectKey = "sites/%d/%s/%d/%s-%s.%s".formatted(
+            siteId,
+            folder,
+            workerId,
+            UUID.randomUUID(),
+            sha256,
+            extensionFor(signature.mimeType())
+        );
         storage.putObject(objectKey, signature.mimeType(), signature.bytes());
         Long fileObjectId = files.createReady(siteId, workerId, objectKey, sha256, signature.mimeType(), (long) signature.bytes().length, "PLEDGE_SIGNATURE");
         return new StoredSignature(fileObjectId, sha256);
