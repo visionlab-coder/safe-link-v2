@@ -47,12 +47,15 @@ const getT = (lang: string) => i18n[lang] || i18n["en"];
 
 export default function WorkerVisionPage() {
     const router = useRouter();
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
     const [lang, setLang] = useState("ko");
     const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [items, setItems] = useState<VisionItem[]>([]);
     const [hasResult, setHasResult] = useState(false);
+    const [cameraError, setCameraError] = useState("");
     const [analysisError, setAnalysisError] = useState("");
 
     useEffect(() => {
@@ -65,53 +68,118 @@ export default function WorkerVisionPage() {
         loadLang();
     }, []);
 
+    useEffect(() => {
+        return () => {
+            streamRef.current?.getTracks().forEach((track) => track.stop());
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!isCameraOpen || !videoRef.current || !streamRef.current) return;
+        videoRef.current.srcObject = streamRef.current;
+        void videoRef.current.play();
+    }, [isCameraOpen]);
+
     const t = getT(lang);
 
-    const openCamera = () => {
-        // iOS Safari requires the file/camera picker to be opened synchronously
-        // inside the user's tap. Awaiting getUserMedia first loses that gesture.
-        fileInputRef.current?.click();
+    const stopCamera = () => {
+        streamRef.current?.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+        if (videoRef.current) videoRef.current.srcObject = null;
+        setIsCameraOpen(false);
     };
 
-    const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+    const openCamera = async () => {
+        setCameraError("");
+        if (!navigator.mediaDevices?.getUserMedia) {
+            setCameraError(lang === "ko"
+                ? "이 브라우저에서는 카메라 촬영을 지원하지 않습니다. 최신 Safari에서 다시 시도해 주세요."
+                : "Camera capture is unavailable. Please try the latest Safari.");
+            return;
+        }
+
+        try {
+            stopCamera();
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: {
+                    facingMode: { ideal: "environment" },
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
+                },
+            });
+            streamRef.current = stream;
+            setIsCameraOpen(true);
+        } catch (err) {
+            const errorName = err instanceof DOMException ? err.name : "";
+            setCameraError(errorName === "NotAllowedError"
+                ? (lang === "ko"
+                    ? "카메라 권한이 거부되었습니다. iPhone 설정 → Safari → 카메라에서 허용한 뒤 다시 시도해 주세요."
+                    : "Camera permission was denied. Allow camera access in Safari settings and try again.")
+                : (lang === "ko"
+                    ? "카메라를 시작하지 못했습니다. 다른 앱에서 카메라를 사용 중인지 확인해 주세요."
+                    : "Could not start the camera. Check whether another app is using it."));
+        }
+    };
+
+    const analyzeImage = async (dataUrl: string) => {
         setAnalysisError("");
+        setImagePreview(dataUrl);
+        setIsAnalyzing(true);
+        setItems([]);
+        setHasResult(false);
 
-        // Preview
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-            const dataUrl = ev.target?.result as string;
-            setImagePreview(dataUrl);
-            setIsAnalyzing(true);
-            setItems([]);
-            setHasResult(false);
-
-            try {
-                // Extract base64 data (remove data:image/...;base64, prefix)
-                const base64 = dataUrl.split(",")[1];
-                const res = await fetch("/api/vision", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ image: base64, lang }),
-                });
-                const data = await res.json();
-                if (!res.ok) {
-                    throw new Error(String(data.error || `HTTP ${res.status}`));
-                }
-                setItems(data.items || []);
-            } catch (err) {
-                console.error("[Vision] Error:", err);
-                setItems([]);
-                setAnalysisError(lang === "ko"
-                    ? "AI 분석에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 촬영해 주세요."
-                    : "AI analysis failed. Check your network and try again.");
-            } finally {
-                setIsAnalyzing(false);
-                setHasResult(true);
+        try {
+            const base64 = dataUrl.split(",")[1];
+            const res = await fetch("/api/vision", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image: base64, lang }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(String(data.error || `HTTP ${res.status}`));
             }
-        };
-        reader.readAsDataURL(file);
+            setItems(data.items || []);
+        } catch (err) {
+            const reason = err instanceof Error ? err.message : "";
+            console.error("[Vision] Error:", err);
+            setItems([]);
+            setAnalysisError(
+                reason.includes("ai_vendor_not_configured") || reason.includes("google_vision_not_configured")
+                    ? (lang === "ko"
+                        ? "운영 서버에 AI 분석 서비스가 설정되지 않았습니다. 관리자에게 문의해 주세요."
+                        : "The AI analysis service is not configured on the server. Contact an administrator.")
+                    : (lang === "ko"
+                        ? "AI 분석에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 촬영해 주세요."
+                        : "AI analysis failed. Check your network and try again.")
+            );
+        } finally {
+            setIsAnalyzing(false);
+            setHasResult(true);
+        }
+    };
+
+    const capturePhoto = () => {
+        const video = videoRef.current;
+        if (!video || !video.videoWidth || !video.videoHeight) {
+            setCameraError(lang === "ko"
+                ? "카메라 준비 중입니다. 잠시 후 다시 촬영해 주세요."
+                : "The camera is still starting. Please try again.");
+            return;
+        }
+
+        const maxWidth = 1600;
+        const scale = Math.min(1, maxWidth / video.videoWidth);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(video.videoWidth * scale);
+        canvas.height = Math.round(video.videoHeight * scale);
+        const context = canvas.getContext("2d");
+        if (!context) return;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+        stopCamera();
+        void analyzeImage(dataUrl);
     };
 
     const dangerCount = items.filter(i => i.risk_level === "danger").length;
@@ -138,10 +206,7 @@ export default function WorkerVisionPage() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                 </div>
 
-                {/* Camera Capture */}
-                <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleCapture} className="hidden" />
-
-                {!imagePreview && (
+                {!imagePreview && !isCameraOpen && (
                     <button
                         onClick={openCamera}
                         className="flex-1 min-h-[300px] glass rounded-[48px] border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-6 tap-effect hover:border-blue-500/30 transition-all group"
@@ -154,6 +219,37 @@ export default function WorkerVisionPage() {
                         </div>
                         <span className="text-xl font-black text-slate-400 uppercase tracking-widest">{t.capture}</span>
                     </button>
+                )}
+                {isCameraOpen && !imagePreview && (
+                    <div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-black">
+                        <video
+                            ref={videoRef}
+                            autoPlay
+                            muted
+                            playsInline
+                            className="aspect-[3/4] max-h-[65vh] w-full object-cover"
+                        />
+                        <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-5 bg-gradient-to-t from-black/80 to-transparent px-6 pb-6 pt-14">
+                            <button
+                                type="button"
+                                onClick={stopCamera}
+                                className="rounded-full bg-slate-800/90 px-5 py-3 text-sm font-black text-white"
+                            >
+                                {t.back}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={capturePhoto}
+                                aria-label={t.capture}
+                                className="h-20 w-20 rounded-full border-[6px] border-white bg-blue-500 shadow-2xl tap-effect"
+                            />
+                        </div>
+                    </div>
+                )}
+                {cameraError && (
+                    <div role="alert" className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200">
+                        {cameraError}
+                    </div>
                 )}
                 {/* Image Preview */}
                 {imagePreview && (
@@ -245,7 +341,7 @@ export default function WorkerVisionPage() {
                                 setItems([]);
                                 setHasResult(false);
                                 setAnalysisError("");
-                                openCamera();
+                                void openCamera();
                             }}
                             className="flex-1 py-5 glass rounded-[24px] border-white/10 text-white font-black tap-effect"
                         >
