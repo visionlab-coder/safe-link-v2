@@ -113,6 +113,7 @@ function AdminChatContent() {
     const [activeWorker, setActiveWorker] = useState<WorkerProfile | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [text, setText] = useState("");
+    const [sttError, setSttError] = useState("");
     const [isSending, setIsSending] = useState(false);
     const [myId, setMyId] = useState("");
     const onlineUsers = usePresence(myId || null);
@@ -364,12 +365,14 @@ function AdminChatContent() {
     };
 
     const handleTranscript = useCallback((transcript: string) => {
+        setSttError("");
         setText(prev => prev ? `${prev} ${transcript}` : transcript);
     }, []);
 
     const { isRecording, toggle: toggleRecording } = useCloudSTT({
         lang: adminLang,
         onTranscript: handleTranscript,
+        onError: (_type, message) => setSttError(message),
         chunkInterval: 4000,   // 4s max — 채팅은 짧은 발화, 10s 대기 불필요
         silenceDuration: 1200, // 1.2s 침묵 = 대화형 자연 휴지
     });
@@ -836,7 +839,12 @@ function AdminChatContent() {
                         </div>
 
                         {/* Input Area */}
-                        <div className="p-3 md:p-6 bg-white border-t border-slate-200 shrink-0 z-10 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] flex gap-2 md:gap-3 items-end">
+                        <div className="relative p-3 md:p-6 bg-white border-t border-slate-200 shrink-0 z-10 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] flex gap-2 md:gap-3 items-end">
+                            {sttError && (
+                                <p role="status" aria-live="polite" className="absolute -top-10 left-3 right-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 shadow-sm">
+                                    {sttError}
+                                </p>
+                            )}
 
                             <button
                                 onClick={toggleRecording}

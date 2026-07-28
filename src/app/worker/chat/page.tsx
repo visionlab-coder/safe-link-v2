@@ -236,6 +236,7 @@ function WorkerChatContent() {
     const [lang, setLang] = useState("ko");
     const [messages, setMessages] = useState<Message[]>([]);
     const [text, setText] = useState("");
+    const [sttError, setSttError] = useState("");
     const [isSending, setIsSending] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const processedAudioIds = useRef<Set<string>>(new Set());
@@ -498,12 +499,14 @@ function WorkerChatContent() {
     };
 
     const handleTranscript = useCallback((transcript: string) => {
+        setSttError("");
         setText(prev => prev ? `${prev} ${transcript}` : transcript);
     }, []);
 
     const { isRecording, toggle: toggleRecording } = useCloudSTT({
         lang,
         onTranscript: handleTranscript,
+        onError: (_type, message) => setSttError(message),
         chunkInterval: 4000,   // 4s max — 채팅은 짧은 발화, 10s 대기 불필요
         silenceDuration: 1200, // 1.2s 침묵 = 대화형 자연 휴지
     });
@@ -700,7 +703,12 @@ function WorkerChatContent() {
                                     </AnimatePresence>
                                     <div ref={messagesEndRef} />
                                 </div>
-                                <div className="p-4 md:p-6 bg-white border-t border-slate-200 shadow-[0_-10px_30px_rgba(0,0,0,0.02)] flex gap-2 items-center">
+                                <div className="relative p-4 md:p-6 bg-white border-t border-slate-200 shadow-[0_-10px_30px_rgba(0,0,0,0.02)] flex gap-2 items-center">
+                                    {sttError && (
+                                        <p role="status" aria-live="polite" className="absolute -top-10 left-3 right-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 shadow-sm">
+                                            {sttError}
+                                        </p>
+                                    )}
                                     <button onClick={toggleRecording} className={`p-5 rounded-full shadow-md transition-all border-2 ${isRecording ? 'bg-red-500 border-red-500 text-white animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-400'}`}><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg></button>
                                     <div className="relative flex flex-1 items-center bg-slate-50 border-2 border-slate-200 rounded-[36px] overflow-hidden focus-within:border-blue-500 transition-all shadow-inner">
                                         <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={isRecording ? t.listening : t.chatPlaceholder} className="w-full bg-transparent p-5 pl-8 text-slate-800 text-xl font-black outline-none resize-none min-h-[72px]" rows={1} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} />

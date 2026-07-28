@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { Shield, Users, ArrowLeft, Download, QrCode, Nfc, CheckCircle, AlertCircle, UserPlus } from "lucide-react";
 import RoleGuard from "@/components/RoleGuard";
 import { detectNfcSupport, writeNfcUrl, NfcError } from "@/utils/nfc/web-nfc";
+import { QRCodeCanvas } from "qrcode.react";
 
 type Site = {
     id: string;
@@ -75,21 +76,16 @@ export default function QRDistributionPage() {
         return `${baseUrl}${path}?${params.toString()}`;
     };
 
-    const getQrImageUrl = (url: string) =>
-        `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}`;
-
-    const handleDownload = async (title: string, url: string) => {
+    const handleDownload = (title: string, canvasId: string) => {
         try {
-            const response = await fetch(getQrImageUrl(url));
-            const blob = await response.blob();
-            const objectUrl = URL.createObjectURL(blob);
+            const canvas = document.getElementById(canvasId);
+            if (!(canvas instanceof HTMLCanvasElement)) throw new Error("qr_canvas_not_found");
             const link = document.createElement("a");
-            link.href = objectUrl;
+            link.href = canvas.toDataURL("image/png");
             link.download = `${title.replace(/[^a-zA-Z0-9]+/g, "_")}_qr.png`;
             document.body.appendChild(link);
             link.click();
             link.remove();
-            URL.revokeObjectURL(objectUrl);
         } catch {
             alert("QR 이미지 다운로드에 실패했습니다.");
         }
@@ -421,7 +417,16 @@ export default function QRDistributionPage() {
                                             </div>
                                         </div>
                                         {nfcUrl && (
-                                            <div className="bg-slate-900 rounded-xl p-3">
+                                            <div className="bg-slate-900 rounded-xl p-3 flex flex-col gap-3">
+                                                <div className="mx-auto rounded-xl bg-white p-3">
+                                                    <QRCodeCanvas
+                                                        id="nfc-worker-qr-canvas"
+                                                        value={nfcUrl}
+                                                        size={220}
+                                                        level="M"
+                                                        marginSize={1}
+                                                    />
+                                                </div>
                                                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">발급 URL (QR 출력 가능)</p>
                                                 <p className="text-xs font-mono text-cyan-400 break-all">{nfcUrl}</p>
                                             </div>
@@ -446,7 +451,7 @@ export default function QRDistributionPage() {
                                         </button>
                                         {nfcUrl && (
                                             <button
-                                                onClick={() => handleDownload(`NFC_${nfcWorkerCode}`, getQrImageUrl(nfcUrl))}
+                                                onClick={() => handleDownload(`NFC_${nfcWorkerCode}`, "nfc-worker-qr-canvas")}
                                                 className="flex-1 bg-white/5 hover:bg-white/10 py-3 rounded-2xl font-black text-slate-300 transition-all flex items-center justify-center gap-2"
                                             >
                                                 <Download className="w-4 h-4" /> QR 출력
@@ -484,13 +489,12 @@ export default function QRDistributionPage() {
 
                                     <div className="flex flex-col items-center gap-6 bg-white/5 p-8 rounded-[40px] border border-white/5 group-hover:bg-white/10 transition-colors">
                                         <div className="bg-white p-5 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-                                            <Image
-                                                src={getQrImageUrl(qr.url)}
-                                                alt="QR Code"
-                                                width={240}
-                                                height={240}
-                                                className="w-full h-auto"
-                                                unoptimized
+                                            <QRCodeCanvas
+                                                id={`site-${qr.key}-qr-canvas`}
+                                                value={qr.url}
+                                                size={240}
+                                                level="M"
+                                                marginSize={1}
                                             />
                                         </div>
                                         <p className="text-xs font-mono text-blue-400 opacity-60 break-all text-center px-2">{qr.url}</p>
@@ -498,7 +502,7 @@ export default function QRDistributionPage() {
 
                                     <div className="flex gap-4 mt-auto">
                                         <button
-                                            onClick={() => handleDownload(qr.title, qr.url)}
+                                            onClick={() => handleDownload(qr.title, `site-${qr.key}-qr-canvas`)}
                                             className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white font-black rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95"
                                         >
                                             <Download className="w-5 h-5" /> 다운로드

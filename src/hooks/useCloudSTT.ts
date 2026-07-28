@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect } from "react";
+import { createVadState, stepVad, VAD_DEFAULTS } from "@/lib/vad/finalize-decision.mjs";
 
 const STT_LANG_MAP: Record<string, string> = {
     ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN",
@@ -19,7 +20,8 @@ function getMediaMimeType(): string {
     if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) return "audio/webm;codecs=opus";
     if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) return "audio/ogg;codecs=opus";
     if (MediaRecorder.isTypeSupported("audio/webm")) return "audio/webm";
-    return "audio/ogg";
+    if (MediaRecorder.isTypeSupported("audio/mp4")) return "audio/mp4";
+    return "";
 }
 
 async function blobToBase64(blob: Blob): Promise<string> {
@@ -59,7 +61,8 @@ const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
 };
 
 const FETCH_TIMEOUT = 8_000;
-const MIN_CHUNK_SIZE = 2000;
+// 짧은 인사말도 버리지 않는다. 일부 Android 기기는 1~2초 Opus 청크가 2KB 미만이다.
+const MIN_CHUNK_SIZE = 400;
 const MAX_EMPTY_STREAK = 2;
 
 /** 침묵 판정 RMS 임계값 (0~1) — 건설 현장 배경음 고려해 낮게 설정 */
@@ -254,7 +257,9 @@ export function useCloudSTT({
             if (!streamOk || !activeRef.current || !streamRef.current) return;
 
             const mimeType = getMediaMimeType();
-            const recorder = new MediaRecorder(streamRef.current, { mimeType });
+            const recorder = mimeType
+                ? new MediaRecorder(streamRef.current, { mimeType })
+                : new MediaRecorder(streamRef.current);
             const chunks: Blob[] = [];
 
             recorder.ondataavailable = (e) => {
@@ -296,6 +301,7 @@ export function useCloudSTT({
 
             const floatBuf = new Float32Array(analyser.fftSize);
             let speechFiredThisCycle = false; // 사이클당 1회만 onSpeechStart 호출
+            let vadState = createVadState();
 
             const vadLoop = () => {
                 if (!activeRef.current || recorder.state !== "recording") return;
@@ -304,28 +310,26 @@ export function useCloudSTT({
                 let sum = 0;
                 for (let i = 0; i < floatBuf.length; i++) sum += floatBuf[i] * floatBuf[i];
                 const rms = Math.sqrt(sum / floatBuf.length);
-                setAudioLevel(Math.min(1, rms / 0.15));
 
                 const now = Date.now();
+                const decision = stepVad(vadState, rms, now, {
+                    ...VAD_DEFAULTS,
+                    absoluteFloor: SILENCE_RMS_THRESHOLD,
+                    silenceMs: silenceDurationRef.current,
+                    maxUtteranceMs: chunkIntervalRef.current,
+                });
+                vadState = decision;
+                setAudioLevel(Math.min(1, rms / Math.max(decision.threshold, 0.02)));
 
-                if (rms < SILENCE_RMS_THRESHOLD) {
-                    // 침묵 감지
-                    if (silenceStartRef.current === null) {
-                        silenceStartRef.current = now;
-                    } else if (now - silenceStartRef.current >= silenceDurationRef.current) {
-                        // 침묵 지속시간 초과 → 전송
-                        silenceStartRef.current = null;
-                        if (recorder.state === "recording") recorder.stop();
-                        return; // VAD 루프 중단 (onstop에서 새 사이클 시작)
-                    }
-                } else {
-                    // 말소리 감지 → 침묵 타이머 리셋
-                    silenceStartRef.current = null;
-                    // 이번 사이클에서 첫 음성 감지 + muted 아닐 때 → 파트너에게 즉시 신호
-                    if (!speechFiredThisCycle && !mutedRef.current) {
-                        speechFiredThisCycle = true;
-                        onSpeechStartRef.current?.();
-                    }
+                // 녹음 직후의 조용한 구간만으로 청크를 잘라버리지 않는다.
+                // 실제 발화를 한 번 감지한 뒤 이어지는 침묵에서만 STT 요청을 보낸다.
+                if (decision.speechDetected && !speechFiredThisCycle && !mutedRef.current) {
+                    speechFiredThisCycle = true;
+                    onSpeechStartRef.current?.();
+                }
+                if (decision.action !== "none") {
+                    if (recorder.state === "recording") recorder.stop();
+                    return;
                 }
 
                 vadFrameRef.current = requestAnimationFrame(vadLoop);

@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { ArrowLeft, Download, Hammer, RefreshCw } from "lucide-react";
 import RoleGuard from "@/components/RoleGuard";
 import { TRADE_LABEL, type TradeType } from "@/lib/roles";
+import { QRCodeCanvas } from "qrcode.react";
 
 // 🆕 2026-06-09 — 사이트+공종 QR 생성 페이지
 //
@@ -84,10 +84,6 @@ export default function TeamQrPage() {
     const qrUrl = selectedSiteId
         ? `${baseUrl}/qr/site?site_id=${encodeURIComponent(selectedSiteId)}&trade=${selectedTrade}&lang=ko`
         : "";
-    const qrImageUrl = qrUrl
-        ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}`
-        : "";
-
     const handleCopy = async () => {
         if (!qrUrl) return;
         await navigator.clipboard.writeText(qrUrl);
@@ -96,15 +92,14 @@ export default function TeamQrPage() {
     };
 
     const handleDownload = async () => {
-        if (!qrImageUrl) return;
+        if (!qrUrl) return;
         try {
-            const r = await fetch(qrImageUrl);
-            const blob = await r.blob();
+            const canvas = document.getElementById("team-qr-canvas");
+            if (!(canvas instanceof HTMLCanvasElement)) throw new Error("qr_canvas_not_found");
             const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
+            a.href = canvas.toDataURL("image/png");
             a.download = `qr_${selectedSite?.site_code ?? "site"}_${selectedTrade}.png`;
             a.click();
-            URL.revokeObjectURL(a.href);
         } catch {
             alert("QR 이미지 다운로드에 실패했습니다.");
         }
@@ -214,12 +209,12 @@ export default function TeamQrPage() {
                                 {selectedSite?.name} · {TRADE_LABEL[selectedTrade]}
                             </p>
                             <div className="bg-white p-5 rounded-3xl shadow-2xl">
-                                <Image
-                                    src={qrImageUrl}
-                                    alt={`QR ${selectedSite?.name} ${TRADE_LABEL[selectedTrade]}`}
-                                    width={320}
-                                    height={320}
-                                    unoptimized
+                                <QRCodeCanvas
+                                    id="team-qr-canvas"
+                                    value={qrUrl}
+                                    size={320}
+                                    level="M"
+                                    marginSize={1}
                                 />
                             </div>
                             <div className="w-full bg-slate-950 rounded-xl p-3">
