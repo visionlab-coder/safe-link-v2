@@ -50,7 +50,7 @@ public class QrEntryService {
         String nationality = cleanCountry(request.nationality());
         String trade = cleanTrade(request.trade());
 
-        Long workerId = findOrCreateWorker(site.id(), initials, phoneLast4, preferredLanguage, ipAddress);
+        Long workerId = findRegisteredWorker(site.id(), initials, phoneLast4, ipAddress);
         users.updatePreferredLanguage(workerId, preferredLanguage);
 
         var account = users.findById(workerId)
@@ -90,11 +90,10 @@ public class QrEntryService {
         return new EntryOutcome(response, access.active() ? account.toPrincipal() : null);
     }
 
-    private Long findOrCreateWorker(
+    private Long findRegisteredWorker(
         Long siteId,
         String initials,
         String phoneLast4,
-        String preferredLanguage,
         String ipAddress
     ) {
         List<Long> matches = findWorkerIds(siteId, initials, phoneLast4);
@@ -106,13 +105,8 @@ public class QrEntryService {
             return requireActiveWorker(matches.getFirst(), siteId, ipAddress);
         }
 
-        String email = internalWorkerEmail(siteId, initials, phoneLast4);
-        Optional<Long> existing = findUserIdByEmail(email);
-        if (existing.isPresent()) return requireActiveWorker(existing.get(), siteId, ipAddress);
-        Long workerId = existing.orElseGet(() -> createInternalWorker(email, initials, preferredLanguage));
-        ensureWorkerContracts(workerId, siteId, initials, phoneLast4);
-        audit.record(workerId, siteId, "qr.worker.auto_enroll", "worker", String.valueOf(workerId), "ALLOWED", "created_or_restored", Map.of("ip", ipAddress));
-        return workerId;
+        audit.record(null, siteId, "qr.site_entry", "worker", null, "DENIED", "worker_not_found", Map.of("ip", ipAddress));
+        throw new NotFoundException("worker_not_found");
     }
 
     private Long requireActiveWorker(Long workerId, Long siteId, String ipAddress) {
@@ -123,65 +117,6 @@ public class QrEntryService {
             throw new IllegalArgumentException("worker_inactive");
         }
         return workerId;
-    }
-
-    private Long createInternalWorker(String email, String initials, String preferredLanguage) {
-        try {
-            return jdbc.sql("""
-                    insert into users(email, display_name, preferred_language, account_status)
-                    values (:email, :displayName, :preferredLanguage, 'ACTIVE')
-                    returning id
-                """)
-                .param("email", email)
-                .param("displayName", initials)
-                .param("preferredLanguage", preferredLanguage)
-                .query(Long.class)
-                .single();
-        } catch (DataIntegrityViolationException e) {
-            return findUserIdByEmail(email)
-                .orElseThrow(() -> e);
-        }
-    }
-
-    private void ensureWorkerContracts(Long workerId, Long siteId, String initials, String phoneLast4) {
-        jdbc.sql("""
-                insert into user_roles(user_id, role, granted_by)
-                select :workerId, 'WORKER', null
-                where not exists (
-                  select 1
-                  from user_roles
-                  where user_id = :workerId
-                    and role = 'WORKER'
-                    and revoked_at is null
-                )
-            """)
-            .param("workerId", workerId)
-            .update();
-
-        jdbc.sql("""
-                insert into site_memberships(user_id, site_id, role, status)
-                values (:workerId, :siteId, 'WORKER', 'ACTIVE')
-                on conflict (user_id, site_id, role)
-                do update set status = 'ACTIVE'
-            """)
-            .param("workerId", workerId)
-            .param("siteId", siteId)
-            .update();
-
-        jdbc.sql("""
-                insert into worker_quick_login_credentials(user_id, name_initials, phone_last4, enabled)
-                values (:workerId, :initials, :phoneLast4, true)
-                on conflict (user_id)
-                do update set
-                  name_initials = excluded.name_initials,
-                  phone_last4 = excluded.phone_last4,
-                  enabled = true,
-                  updated_at = now()
-            """)
-            .param("workerId", workerId)
-            .param("initials", initials)
-            .param("phoneLast4", phoneLast4)
-            .update();
     }
 
     private List<Long> findWorkerIds(Long siteId, String initials, String phoneLast4) {
@@ -301,18 +236,6 @@ public class QrEntryService {
             .orElseThrow(() -> new NotFoundException("site_not_found"));
     }
 
-    private Optional<Long> findUserIdByEmail(String email) {
-        return jdbc.sql("""
-                select id
-                from users
-                where lower(email) = lower(:email)
-                limit 1
-            """)
-            .param("email", email)
-            .query(Long.class)
-            .optional();
-    }
-
     private static String cleanInitials(String value) {
         String initials = value == null ? "" : value.trim().replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
         if (!INITIALS_PATTERN.matcher(initials).matches()) {
@@ -348,10 +271,6 @@ public class QrEntryService {
             return "general";
         }
         return trade.substring(0, Math.min(32, trade.length()));
-    }
-
-    private static String internalWorkerEmail(Long siteId, String initials, String phoneLast4) {
-        return "qr." + siteId + "." + initials.toLowerCase(Locale.ROOT) + "." + phoneLast4 + "@safe-link.internal";
     }
 
     public record QrEntryRequest(
