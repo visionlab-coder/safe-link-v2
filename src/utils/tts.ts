@@ -79,6 +79,16 @@ export const playPremiumAudio = (
         return;
     }
 
+    // iPhone/iPad Safari는 비동기 네트워크 요청 뒤의 audio.play()/speechSynthesis를
+    // 사용자 제스처로 인정하지 않아 무음으로 끝날 수 있다. 클릭 이벤트 안에서
+    // 브라우저 TTS를 즉시 시작해야 재생 권한이 유지된다.
+    const isAppleMobile = /iPad|iPhone|iPod/.test(navigator.userAgent)
+        || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (isAppleMobile) {
+        playBrowserNativeAudio(cleanText, langCode, gender, onEnd);
+        return;
+    }
+
     // Cloud TTS 우선 (Google Neural2 고품질) → 브라우저 TTS 폴백
     // 이유: 브라우저 TTS는 자동재생 차단·음성 불안정 이슈가 빈번
     playProxyAudio(cleanText, langCode, gender, (success) => {
@@ -127,13 +137,8 @@ const playBrowserNativeAudio = (text: string, langCode: string, gender: VoiceGen
         return { voice: v, score };
     }).sort((a, b) => b.score - a.score);
 
+    // iOS는 첫 호출에서 getVoices()가 빈 배열이어도 기본 음성으로는 재생할 수 있다.
     const bestVoice = scored.length > 0 ? scored[0].voice : null;
-
-    if (!bestVoice) {
-        console.warn("[PremiumTTS] No usable browser voices. Silence fallthrough.");
-        if (onEnd) onEnd();
-        return;
-    }
 
     window.speechSynthesis.cancel();
     const chunks = chunkText(text);
@@ -143,20 +148,46 @@ const playBrowserNativeAudio = (text: string, langCode: string, gender: VoiceGen
         if (current >= chunks.length) { if (onEnd) onEnd(); return; }
         const currentChunk = chunks[current++];
         const utter = new SpeechSynthesisUtterance(currentChunk);
-        utter.voice = bestVoice;
+        if (bestVoice) utter.voice = bestVoice;
         utter.lang = targetLang;
 
         // 🚀 중국어 발화 속도 최적화 (너무 느리다는 피드백 반영)
         utter.rate = targetLang.startsWith('zh') ? 1.15 : 0.95;
 
-        utter.onend = speakNext;
-        utter.onerror = (err) => {
-            console.warn(`[PremiumTTS] Browser Native Runtime Fallback: ${bestVoice.name}`, err);
-            // ❌ 에러 발생 시 해당 음성 블랙리스트 추가
-            voiceBlacklist.add(bestVoice.name);
+        // 일부 iOS Safari 버전은 긴 문장의 onend/onerror를 누락한다.
+        // 영구 잠김을 막되 실제 재생 시간을 충분히 보장하는 안전 타임아웃이다.
+        const maxChunkMs = Math.min(45_000, Math.max(10_000, currentChunk.length * 250 + 8_000));
+        let settled = false;
+        const finishChunk = () => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(watchdog);
+            speakNext();
+        };
+        const watchdog = window.setTimeout(() => {
+            console.warn("[PremiumTTS] Browser speech completion event timed out.");
             window.speechSynthesis.cancel();
-            // 즉시 Proxy로 재시도
-            playProxyAudio(currentChunk, langCode, gender, () => speakNext());
+            finishChunk();
+        }, maxChunkMs);
+
+        utter.onend = finishChunk;
+        utter.onerror = (err) => {
+            console.warn(`[PremiumTTS] Browser Native Runtime Fallback: ${bestVoice?.name ?? "default"}`, err);
+            // ❌ 에러 발생 시 해당 음성 블랙리스트 추가
+            if (bestVoice) voiceBlacklist.add(bestVoice.name);
+            window.speechSynthesis.cancel();
+            window.clearTimeout(watchdog);
+            if (settled) return;
+            settled = true;
+            // Apple 모바일은 비동기 Proxy 재시도가 다시 자동재생 차단될 수 있으므로
+            // 다음 청크로 안전하게 진행한다. 그 외 브라우저만 Proxy를 재시도한다.
+            const isAppleMobile = /iPad|iPhone|iPod/.test(navigator.userAgent)
+                || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+            if (isAppleMobile) {
+                speakNext();
+            } else {
+                playProxyAudio(currentChunk, langCode, gender, () => speakNext());
+            }
         };
         window.speechSynthesis.speak(utter);
     };
