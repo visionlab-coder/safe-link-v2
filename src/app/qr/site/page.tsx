@@ -27,7 +27,7 @@ const ERROR_MESSAGES: Record<QrLanguageCode, Record<string, string>> = {
     site_access_disabled: "이 현장은 현재 SQ Link 근로자 입장이 중지되어 있습니다.",
     initials_required: "이름 이니셜을 입력하세요.",
     phone_last4_required: "휴대전화 뒤 4자리를 입력하세요.",
-    worker_not_found: "입력한 정보와 일치하는 근로자를 찾을 수 없습니다.",
+    worker_not_found: "등록되지 않은 근로자입니다. 이니셜과 휴대전화 뒤 4자리를 확인하세요.",
     worker_match_ambiguous: "같은 정보의 근로자가 2명 이상입니다. 관리자에게 확인하세요.",
     checkin_failed: "입장 처리 중 오류가 발생했습니다. 다시 시도하세요.",
     preference_update_failed: "언어 저장 중 오류가 발생했습니다. 다시 시도하세요.",

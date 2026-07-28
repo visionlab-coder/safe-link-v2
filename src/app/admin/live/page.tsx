@@ -20,6 +20,7 @@ function AdminLiveContent() {
     }>>([]);
     const [siteId, setSiteId] = useState<string | null>(null);
     const [listenerCount] = useState(0);
+    const [sttError, setSttError] = useState("");
     const scrollRef = useRef<HTMLDivElement>(null);
     const [adminId, setAdminId] = useState("");
     const lastSentRef = useRef<{ text: string; at: number }>({ text: "", at: 0 });
@@ -121,12 +122,14 @@ function AdminLiveContent() {
 
     const {
         isRecording,
+        audioLevel,
         toggle: toggleRecording,
         mute: muteRecording,
         unmute: unmuteRecording,
     } = useCloudSTT({
         lang: "ko",
         onTranscript: handleTranscript,
+        onError: (_type, message) => setSttError(message),
         chunkInterval: 6000,   // 6s — 교육 발화는 문장이 길므로 완전한 문장 단위 전송
         silenceDuration: 2500, // 2.5s — 자연 휴지 허용, 문장 경계에서 자동 분할
         live: true,
@@ -184,13 +187,14 @@ function AdminLiveContent() {
         };
     }, [adminId, siteId, muteRecording, unmuteRecording]);
 
-    const handleStartBroadcast = () => {
+    const handleStartBroadcast = async () => {
         const newSessionId = `live_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         setSessionId(newSessionId);
         lastSentRef.current = { text: "", at: 0 };
         setTranscripts([]);
-        setIsLive(true);
-        setTimeout(() => toggleRecording(), 100);
+        setSttError("");
+        const started = await toggleRecording();
+        setIsLive(started === true);
     };
 
     const handleStopBroadcast = () => {
@@ -324,11 +328,22 @@ function AdminLiveContent() {
                             <div className="flex items-center justify-center gap-4 py-4">
                                 <div className="flex gap-1">
                                     {[...Array(5)].map((_, i) => (
-                                        <div key={i} className="w-1.5 bg-red-500 rounded-full animate-pulse" style={{ height: `${12 + Math.random() * 20}px`, animationDelay: `${i * 0.15}s` }} />
+                                        <div
+                                            key={i}
+                                            className="w-1.5 bg-red-500 rounded-full transition-[height] duration-75"
+                                            style={{ height: `${8 + Math.max(0.08, audioLevel) * (12 + i * 5)}px` }}
+                                        />
                                     ))}
                                 </div>
-                                <span className="text-sm font-black text-red-400 uppercase tracking-widest">Recording</span>
+                                <span className="text-sm font-black text-red-400 uppercase tracking-widest">
+                                    {isRecording ? `Recording ${Math.round(audioLevel * 100)}%` : "Microphone stopped"}
+                                </span>
                             </div>
+                            {sttError && (
+                                <div role="alert" className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200">
+                                    {sttError}
+                                </div>
+                            )}
 
                             <button
                                 onClick={handleStopBroadcast}

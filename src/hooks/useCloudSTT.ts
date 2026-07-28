@@ -75,6 +75,7 @@ export function useCloudSTT({
     live = false,
 }: UseCloudSTTOptions) {
     const [isRecording, setIsRecording] = useState(false);
+    const [audioLevel, setAudioLevel] = useState(0);
     const streamRef = useRef<MediaStream | null>(null);
     const recorderRef = useRef<MediaRecorder | null>(null);
     const activeRef = useRef(false);
@@ -115,6 +116,7 @@ export function useCloudSTT({
         audioCtxRef.current = null;
         analyserRef.current = null;
         silenceStartRef.current = null;
+        setAudioLevel(0);
     }, []);
 
     const stopInternal = useCallback(() => {
@@ -138,7 +140,13 @@ export function useCloudSTT({
     const acquireStream = useCallback(async (): Promise<MediaStream> => {
         try {
             return await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
-        } catch {
+        } catch (error) {
+            if (
+                error instanceof DOMException
+                && (error.name === "NotAllowedError" || error.name === "SecurityError")
+            ) {
+                throw error;
+            }
             return await navigator.mediaDevices.getUserMedia({ audio: true });
         }
     }, []);
@@ -152,8 +160,15 @@ export function useCloudSTT({
         try {
             streamRef.current = await acquireStream();
             return true;
-        } catch {
-            onErrorRef.current?.("stream_lost", "마이크 연결이 끊어졌습니다. 다시 시도해주세요.");
+        } catch (error) {
+            const denied = error instanceof DOMException
+                && (error.name === "NotAllowedError" || error.name === "SecurityError");
+            onErrorRef.current?.(
+                denied ? "mic_denied" : "stream_lost",
+                denied
+                    ? "마이크 권한이 거부되었습니다. Safari 설정에서 마이크를 허용한 뒤 다시 시도하세요."
+                    : "마이크 연결이 끊어졌습니다. 다시 시도해주세요.",
+            );
             return false;
         }
     }, [acquireStream]);
@@ -282,6 +297,7 @@ export function useCloudSTT({
                 let sum = 0;
                 for (let i = 0; i < floatBuf.length; i++) sum += floatBuf[i] * floatBuf[i];
                 const rms = Math.sqrt(sum / floatBuf.length);
+                setAudioLevel(Math.min(1, rms / 0.15));
 
                 const now = Date.now();
 
@@ -334,15 +350,25 @@ export function useCloudSTT({
             activeRef.current = true;
             emptyStreakRef.current = 0;
             setIsRecording(true);
-            startCycle();
-        } catch {
-            onErrorRef.current?.("mic_denied", "마이크 권한을 허용해주세요.");
+            await startCycle();
+            return true;
+        } catch (error) {
+            const denied = error instanceof DOMException
+                && (error.name === "NotAllowedError" || error.name === "SecurityError");
+            stopInternal();
+            onErrorRef.current?.(
+                denied ? "mic_denied" : "stream_lost",
+                denied
+                    ? "마이크 권한이 거부되었습니다. Safari 설정 → 웹사이트 → 마이크에서 허용해 주세요."
+                    : "마이크를 시작할 수 없습니다. 다른 앱이 마이크를 사용 중인지 확인해 주세요.",
+            );
             setIsRecording(false);
+            return false;
         }
     }, [startCycle, acquireStream, stopInternal]);
 
     const mute   = useCallback(() => { mutedRef.current = true;  }, []);
     const unmute = useCallback(() => { mutedRef.current = false; }, []);
 
-    return { isRecording, toggle, mute, unmute };
+    return { isRecording, audioLevel, toggle, mute, unmute };
 }

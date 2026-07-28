@@ -68,8 +68,10 @@ export default function QRDistributionPage() {
     const selectedSite = sites.find((s) => s.id === selectedSiteId) || null;
 
     const buildRoleUrl = (role: "admin" | "worker") => {
-        const base = `${baseUrl}/?role=${role}`;
-        return selectedSiteId ? `${base}&site_id=${encodeURIComponent(selectedSiteId)}` : base;
+        const path = role === "worker" ? "/qr/site" : "/auth";
+        const params = new URLSearchParams({ role });
+        if (selectedSiteId) params.set("site_id", selectedSiteId);
+        return `${baseUrl}${path}?${params.toString()}`;
     };
 
     const getQrImageUrl = (url: string) =>

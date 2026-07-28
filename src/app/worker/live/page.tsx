@@ -44,6 +44,7 @@ export default function WorkerLivePage() {
     const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
     const [isConnected, setIsConnected] = useState(false);
     const [audioEnabled, setAudioEnabled] = useState(true);
+    const [sttError, setSttError] = useState("");
     // profileId와 siteId를 동시에 세팅하여 subscription이 한 번만 생성되도록
     const [authReady, setAuthReady] = useState<{
         profileId: string;
@@ -153,12 +154,14 @@ export default function WorkerLivePage() {
 
     const {
         isRecording,
+        audioLevel,
         toggle: toggleRecording,
         mute: muteRecording,
         unmute: unmuteRecording,
     } = useCloudSTT({
         lang,
         onTranscript: handleWorkerTranscript,
+        onError: (_type, message) => setSttError(message),
         live: true,
     });
 
@@ -384,6 +387,11 @@ export default function WorkerLivePage() {
                 </div>
 
                 <div className="sticky bottom-0 glass border-t border-white/5 px-6 py-4 flex gap-3">
+                    {sttError && (
+                        <div role="alert" className="absolute bottom-full inset-x-4 mb-2 rounded-2xl border border-red-500/30 bg-red-950/95 px-4 py-3 text-sm font-bold text-red-100">
+                            {sttError}
+                        </div>
+                    )}
                     <button
                         onClick={toggleRecording}
                         disabled={!authReady?.siteId || !activeAdminId}
@@ -394,7 +402,7 @@ export default function WorkerLivePage() {
                         }`}
                     >
                         {isRecording
-                            ? "STOP SPEAKING"
+                            ? `STOP SPEAKING · ${Math.round(audioLevel * 100)}%`
                             : activeAdminId
                                 ? "SPEAK TO MANAGER"
                                 : "WAITING FOR MANAGER"}
