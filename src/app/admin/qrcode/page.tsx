@@ -32,6 +32,7 @@ export default function QRDistributionPage() {
     const [nfcStep, setNfcStep] = useState<NfcStep>("idle");
     const [nfcUrl, setNfcUrl] = useState("");
     const [nfcWorkerCode, setNfcWorkerCode] = useState("");
+    const [nfcIssuedWorkerId, setNfcIssuedWorkerId] = useState("");
     const [nfcError, setNfcError] = useState("");
     const [nfcLoading, setNfcLoading] = useState(false);
 
@@ -112,26 +113,54 @@ export default function QRDistributionPage() {
         setNfcLoading(true);
 
         try {
-            // 근로자 등록
-            const regRes = await fetch("/api/nfc/workers", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    full_name: name,
-                    assigned_site_id: selectedSiteId || undefined,
-                    consent_signed_at: new Date().toISOString(),
-                    nationality: "KR",
-                    trade: "general",
-                    preferred_lang: "ko",
-                    name_initials: nfcNameInitials.trim() || undefined,
-                    phone_last4: nfcPhoneLast4.trim() || undefined,
-                }),
-            });
-            const regData = await regRes.json() as { worker?: { id: string; worker_code: string }; error?: string; detail?: string };
-            if (!regRes.ok) { setNfcError(`${regData.error || "등록 실패"}${regData.detail ? `: ${regData.detail}` : ""}`); setNfcLoading(false); return; }
+            const cleanInitials = nfcNameInitials.trim();
+            const cleanLast4 = nfcPhoneLast4.trim();
+            if (!cleanInitials || cleanLast4.length !== 4) {
+                setNfcError("영문 이니셜과 휴대전화 번호 뒤 4자리를 입력해주세요.");
+                setNfcLoading(false);
+                return;
+            }
 
-            const workerId = regData.worker!.id;
-            setNfcWorkerCode(regData.worker!.worker_code);
+            let workerId = nfcIssuedWorkerId;
+            if (!workerId) {
+                // 근로자 등록. V3 API는 worker wrapper 없이 WorkerResponse를 바로 반환한다.
+                const regRes = await fetch("/api/nfc/workers", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        full_name: name,
+                        assigned_site_id: selectedSiteId || undefined,
+                        consent_signed_at: new Date().toISOString(),
+                        nationality: "KR",
+                        trade: "general",
+                        preferred_lang: "ko",
+                        name_initials: cleanInitials,
+                        phone_last4: cleanLast4,
+                    }),
+                });
+                const regData = await regRes.json() as {
+                    id?: string;
+                    worker_code?: string;
+                    worker?: { id?: string; worker_code?: string };
+                    error?: string;
+                    detail?: string;
+                };
+                if (!regRes.ok) {
+                    setNfcError(`${regData.error || "등록 실패"}${regData.detail ? `: ${regData.detail}` : ""}`);
+                    setNfcLoading(false);
+                    return;
+                }
+
+                workerId = regData.id || regData.worker?.id || "";
+                const workerCode = regData.worker_code || regData.worker?.worker_code || "";
+                if (!workerId) {
+                    setNfcError("근로자 등록 응답에 ID가 없습니다. 다시 시도해주세요.");
+                    setNfcLoading(false);
+                    return;
+                }
+                setNfcIssuedWorkerId(workerId);
+                setNfcWorkerCode(workerCode);
+            }
 
             // 스티커 URL 발급
             const issueRes = await fetch("/api/nfc/sticker/issue", {
@@ -178,6 +207,7 @@ export default function QRDistributionPage() {
         setNfcPhoneLast4("");
         setNfcUrl("");
         setNfcWorkerCode("");
+        setNfcIssuedWorkerId("");
         setNfcError("");
         setNfcLoading(false);
     };
@@ -203,20 +233,20 @@ export default function QRDistributionPage() {
 
     return (
         <RoleGuard allowedRole="admin">
-            <main className="min-h-screen bg-[#070710] text-white p-6 md:p-12 font-sans">
+            <main className="min-h-screen bg-[#070710] text-white p-4 sm:p-6 md:p-12 font-sans">
                 <div className="max-w-6xl mx-auto flex flex-col gap-10">
 
                     {/* Header */}
-                    <header className="flex items-center gap-6">
+                    <header className="flex items-center gap-3 sm:gap-6">
                         <button
                             onClick={() => router.back()}
-                            className="w-12 h-12 glass rounded-2xl flex items-center justify-center text-slate-400 hover:text-white transition-all shadow-lg active:scale-90"
+                            className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 glass rounded-2xl flex items-center justify-center text-slate-400 hover:text-white transition-all shadow-lg active:scale-90"
                         >
                             <ArrowLeft className="w-6 h-6" />
                         </button>
-                        <div>
-                            <h1 className="text-4xl font-black italic tracking-tighter text-white uppercase text-gradient">Access Center</h1>
-                            <p className="text-slate-500 font-bold tracking-tight uppercase text-sm">QR 배포 · NFC 카드 발급 통합</p>
+                        <div className="min-w-0 flex-1">
+                            <h1 className="whitespace-nowrap text-2xl sm:text-4xl font-black italic tracking-tighter text-white uppercase text-gradient">Access Center</h1>
+                            <p className="text-slate-500 font-bold tracking-tight uppercase text-xs sm:text-sm">QR 배포 · NFC 카드 발급 통합</p>
                         </div>
                     </header>
 
@@ -275,16 +305,16 @@ export default function QRDistributionPage() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.1 }}
-                        className="glass rounded-[48px] p-10 border-white/10 hover:border-cyan-500/20 transition-all shadow-2xl relative overflow-hidden"
+                        className="glass rounded-[32px] sm:rounded-[48px] p-5 sm:p-10 border-white/10 hover:border-cyan-500/20 transition-all shadow-2xl relative overflow-hidden"
                     >
                         <div className="absolute top-0 left-0 w-96 h-96 bg-cyan-500/5 blur-[120px] rounded-full -ml-48 -mt-48 pointer-events-none" />
                         <div className="relative flex flex-col gap-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 glass rounded-2xl flex items-center justify-center text-cyan-400 shadow-lg">
+                            <div className="flex items-start sm:items-center gap-3 sm:gap-4">
+                                <div className="w-12 h-12 sm:w-14 sm:h-14 shrink-0 glass rounded-2xl flex items-center justify-center text-cyan-400 shadow-lg">
                                     <Nfc className="w-8 h-8" />
                                 </div>
                                 <div>
-                                    <h2 className="text-2xl font-black text-white uppercase italic">NFC 근로자 카드 발급</h2>
+                                    <h2 className="text-xl sm:text-2xl font-black text-white uppercase italic">NFC 근로자 카드 발급</h2>
                                     <p className="text-slate-400 font-bold text-sm">이름 입력 → NFC 태그 쓰기. 근로자는 터치 후 국적만 선택합니다.</p>
                                 </div>
                             </div>
@@ -301,9 +331,9 @@ export default function QRDistributionPage() {
                                         />
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         <div>
-                                            <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 block">이니셜 (로마자, 선택)</label>
+                                            <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 block">이니셜 (로마자, 필수)</label>
                                             <input
                                                 value={nfcNameInitials}
                                                 onChange={(e) => setNfcNameInitials(e.target.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase())}
@@ -313,7 +343,7 @@ export default function QRDistributionPage() {
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 block">전화 뒷자리 (선택)</label>
+                                            <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 block">전화 뒷자리 (필수)</label>
                                             <input
                                                 value={nfcPhoneLast4}
                                                 onChange={(e) => setNfcPhoneLast4(e.target.value.replace(/\D/g, "").slice(0, 4))}
@@ -328,7 +358,7 @@ export default function QRDistributionPage() {
 
                                     <button
                                         onClick={handleNfcIssue}
-                                        disabled={nfcLoading || !nfcWorkerName.trim()}
+                                        disabled={nfcLoading || !nfcWorkerName.trim() || !nfcNameInitials.trim() || nfcPhoneLast4.length !== 4}
                                         className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-black rounded-2xl transition-all flex items-center justify-center gap-2"
                                     >
                                         <UserPlus className="w-4 h-4" />
