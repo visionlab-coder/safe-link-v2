@@ -224,7 +224,13 @@ function AdminChatContent() {
                 void fetchMessages({ scroll: false });
             });
             events.onerror = () => {};
-            return () => events.close();
+            const fallbackPoll = window.setInterval(() => {
+                void fetchMessages({ scroll: false });
+            }, 3000);
+            return () => {
+                window.clearInterval(fallbackPoll);
+                events.close();
+            };
         }
     }, [activeWorker, fetchMessages]);
 
@@ -524,8 +530,8 @@ function AdminChatContent() {
         <RoleGuard allowedRole="admin">
             {/* White/Bright Theme applied to root */}
             <div className="h-dvh min-h-0 overflow-hidden bg-slate-50 text-slate-900 font-sans flex flex-col selection:bg-blue-200">
-                <header className="sticky top-0 z-50 shrink-0 bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex items-center justify-between shadow-sm">
-                    <div className="flex items-center gap-4">
+                <header className="sticky top-0 z-50 shrink-0 bg-white border-b border-slate-200 px-4 md:px-6 py-3 md:py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between shadow-sm">
+                    <div className="flex min-w-0 items-center gap-4">
                         <button onClick={() => { if (activeWorker) setActiveWorker(null); else router.back(); }} className="p-2 -ml-2 rounded-full hover:bg-slate-100 transition-colors tap-effect text-slate-500 relative">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
@@ -536,14 +542,14 @@ function AdminChatContent() {
                                 </span>
                             )}
                         </button>
-                        <div className="flex flex-col">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xl font-black tracking-tight text-slate-800 uppercase">{activeWorker ? activeWorker.display_name : t.title}</span>
+                        <div className="flex min-w-0 flex-col">
+                            <div className="flex min-w-0 items-center gap-2">
+                                <span className="truncate text-xl font-black tracking-tight text-slate-800 uppercase">{activeWorker ? activeWorker.display_name : t.title}</span>
                                 <span className="px-2 py-0.5 bg-red-500 text-[10px] font-black rounded text-white tracking-widest uppercase animate-pulse">Live</span>
                             </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex w-full flex-wrap items-center justify-between gap-2 md:w-auto md:flex-nowrap md:justify-end md:gap-3">
                         {/* Voice Gender Switch - Always visible to ensure use in 1:1 and mobile */}
                         <div className="flex items-center bg-slate-100 rounded-full p-1 border border-slate-200 shadow-inner">
                             <button
@@ -561,7 +567,7 @@ function AdminChatContent() {
                         </div>
 
                         {activeWorker && (
-                            <div className="flex items-center gap-1">
+                            <div className="flex flex-wrap items-center justify-end gap-1">
                                 <ExportMenu disabled={messages.length === 0} onExport={handleExport} />
                                 <button
                                     onClick={async () => {

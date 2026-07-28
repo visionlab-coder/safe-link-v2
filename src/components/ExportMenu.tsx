@@ -21,11 +21,11 @@ export default function ExportMenu({ disabled, onExport, includeJson = false }: 
   const options = includeJson ? [...OPTIONS, { format: "json" as const, label: "JSON", icon: FileJson }] : OPTIONS;
 
   return (
-    <div className="relative group/export">
+    <div className="relative shrink-0 group/export">
       <button
         type="button"
         disabled={disabled}
-        className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-gray-100 font-bold py-2.5 px-4 rounded-xl text-sm transition-colors"
+        className="flex shrink-0 items-center gap-2 whitespace-nowrap bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-gray-100 font-bold py-2.5 px-4 rounded-xl text-sm transition-colors"
       >
         <Download className="w-4 h-4" />
         내보내기

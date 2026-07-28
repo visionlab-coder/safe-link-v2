@@ -378,8 +378,12 @@ function WorkerChatContent() {
             void fetchMessages(false);
         });
         events.onerror = () => {};
+        const fallbackPoll = window.setInterval(() => {
+            void fetchMessages(false);
+        }, 3000);
 
         return () => {
+            window.clearInterval(fallbackPoll);
             events.close();
         };
     }, [myId, activeAdmin, siteId, markMessagesRead]); // lang 제거: 언어 변경 시 채널 재생성 불필요
