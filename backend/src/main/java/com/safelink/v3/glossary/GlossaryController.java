@@ -2,6 +2,7 @@ package com.safelink.v3.glossary;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.safelink.v3.auth.SessionPrincipal;
+import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -34,7 +35,7 @@ public class GlossaryController {
         @RequestParam(name = "slang", required = false) List<String> slang
     ) {
         List<String> slangs = slang == null ? List.of() : slang.stream()
-            .map(GlossaryController::cleanOptional)
+            .map(GlossaryController::normalizeSlang)
             .filter(value -> !value.isBlank())
             .distinct()
             .limit(300)
@@ -86,7 +87,7 @@ public class GlossaryController {
     @Transactional
     public GlossaryTerm upsert(@AuthenticationPrincipal SessionPrincipal actor, @RequestBody GlossaryUpsertRequest request) {
         requireGlossaryManager(actor);
-        String slang = cleanRequired(request.slang(), "slang_required");
+        String slang = requiredSlang(request.slang());
         String standard = cleanRequired(request.standard(), "standard_required");
         String category = cleanCategory(request.category());
         return jdbc.sql("""
@@ -165,7 +166,7 @@ public class GlossaryController {
         if (valid.isEmpty()) {
             throw new IllegalArgumentException("no_valid_rows");
         }
-        List<String> slangs = valid.stream().map(row -> cleanRequired(row.slang(), "slang_required")).distinct().toList();
+        List<String> slangs = valid.stream().map(row -> requiredSlang(row.slang())).distinct().toList();
         var existing = jdbc.sql("select slang from construction_glossary where slang in (:slangs)")
             .param("slangs", slangs)
             .query(String.class)
@@ -175,7 +176,7 @@ public class GlossaryController {
 
         int inserted = 0;
         for (GlossaryImportRow row : valid) {
-            String slang = cleanRequired(row.slang(), "slang_required");
+            String slang = requiredSlang(row.slang());
             if (existing.contains(slang)) {
                 continue;
             }
@@ -213,6 +214,21 @@ public class GlossaryController {
             throw new IllegalArgumentException(error);
         }
         return cleaned.substring(0, Math.min(cleaned.length(), 200));
+    }
+
+    private static String requiredSlang(String value) {
+        String normalized = normalizeSlang(value);
+        if (normalized.isBlank()) {
+            throw new IllegalArgumentException("slang_required");
+        }
+        return normalized.substring(0, Math.min(normalized.length(), 200));
+    }
+
+    private static String normalizeSlang(String value) {
+        if (value == null) return "";
+        return Normalizer.normalize(value, Normalizer.Form.NFKC)
+            .trim()
+            .toLowerCase(Locale.ROOT);
     }
 
     private static String cleanOptional(String value) {
