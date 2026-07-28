@@ -388,7 +388,7 @@ function AuthContent() {
           <p className="text-[10px] text-slate-700 tracking-[0.4em] uppercase mt-1.5">Field Communication OS</p>
           {selectedLangObj && (
             <button onClick={() => setMode("lang")}
-              className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs text-slate-400 hover:text-slate-200 transition-all duration-200 hover:bg-white/5"
+              className="mt-3 min-h-11 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs text-slate-400 hover:text-slate-200 transition-all duration-200 hover:bg-white/5"
               style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
               <Image src={`https://flagcdn.com/w40/${selectedLangObj.iso}.png`}
                 alt={selectedLangObj.name} width={16} height={11} className="rounded-sm" unoptimized />
@@ -514,6 +514,7 @@ function AuthContent() {
                 <div style={fieldBox}>
                   <input
                     type="text"
+                    aria-label="이름 이니셜"
                     placeholder="이름 이니셜 (예: BK, NGUYEN)"
                     value={initials}
                     onChange={e => setInitials(e.target.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toUpperCase())}
@@ -526,6 +527,7 @@ function AuthContent() {
                 <div style={fieldBox}>
                   <input
                     type="tel"
+                    aria-label="휴대전화 뒷 4자리"
                     inputMode="numeric"
                     placeholder="휴대전화 뒷 4자리 (예: 1234)"
                     value={phoneLast4}
@@ -568,7 +570,7 @@ function AuthContent() {
 
                 {/* Back */}
                 <button onClick={() => setMode("role")}
-                  className="flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-300 transition-colors mx-auto">
+                  className="min-h-11 flex items-center justify-center gap-1.5 px-3 text-xs font-semibold text-slate-600 hover:text-slate-300 transition-colors mx-auto">
                   <ArrowLeft className="w-3.5 h-3.5" />
                   {t.back}
                 </button>
@@ -594,14 +596,14 @@ function AuthContent() {
 
                 {/* Email */}
                 <div style={fieldBox}>
-                  <input type="email" placeholder="Email" value={adminEmail}
+                  <input type="email" aria-label="Email" placeholder="Email" value={adminEmail}
                     onChange={e => setAdminEmail(e.target.value)}
                     className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
                 </div>
 
                 {/* Password */}
                 <div style={fieldBox}>
-                  <input type="password" placeholder={t.pass} value={password}
+                  <input type="password" aria-label={t.pass} placeholder={t.pass} value={password}
                     onChange={e => setPassword(e.target.value)}
                     onKeyDown={e => !adminSignupMode && e.key === "Enter" && handleAdminLogin()}
                     className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
@@ -617,7 +619,7 @@ function AuthContent() {
                           ? "rgba(16,185,129,0.5)"
                           : "rgba(255,255,255,0.08)"}`,
                     }}>
-                      <input type="password" placeholder={t.passConfirm} value={passConfirm}
+                      <input type="password" aria-label={t.passConfirm} placeholder={t.passConfirm} value={passConfirm}
                         onChange={e => setPassConfirm(e.target.value)}
                         className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5 pr-11" />
                       {passConfirm && (
@@ -630,7 +632,7 @@ function AuthContent() {
                       )}
                     </div>
                     <div style={fieldBox}>
-                      <input type="email" placeholder={t.backupEmail} value={backupEmail}
+                      <input type="email" aria-label={t.backupEmail} placeholder={t.backupEmail} value={backupEmail}
                         onChange={e => setBackupEmail(e.target.value)}
                         className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
                     </div>
@@ -646,13 +648,13 @@ function AuthContent() {
                 </button>
 
                 <button onClick={() => { setAdminSignupMode(v => !v); setPassConfirm(""); setBackupEmail(""); }}
-                  className="text-xs font-semibold text-center text-blue-400 hover:text-blue-300 transition-colors">
+                  className="min-h-11 px-3 text-xs font-semibold text-center text-blue-400 hover:text-blue-300 transition-colors">
                   {adminSignupMode ? t.adminLoginLink : t.adminSignupLink}
                 </button>
 
                 {/* Back */}
                 <button onClick={() => setMode("role")}
-                  className="flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-300 transition-colors mx-auto">
+                  className="min-h-11 flex items-center justify-center gap-1.5 px-3 text-xs font-semibold text-slate-600 hover:text-slate-300 transition-colors mx-auto">
                   <ArrowLeft className="w-3.5 h-3.5" />
                   {t.back}
                 </button>

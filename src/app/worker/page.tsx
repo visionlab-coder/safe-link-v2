@@ -693,10 +693,10 @@ function WorkerHomeContent() {
                             <span className="text-xs text-white font-black">{lang.toUpperCase()}</span>
                         </div>
                         <div className="flex gap-4">
-                            <button onClick={() => router.push('/auth/setup')} className="text-[10px] font-black text-blue-400 hover:text-blue-200 uppercase tracking-widest py-1 transition-colors">
+                            <button onClick={() => router.push('/auth/setup')} className="min-h-11 inline-flex items-center text-[10px] font-black text-blue-400 hover:text-blue-200 uppercase tracking-widest px-2 py-1 transition-colors">
                                 Profile Edit
                             </button>
-                            <button onClick={handleSignOut} className="text-[10px] font-black text-slate-500 hover:text-red-400 uppercase tracking-widest py-1 transition-colors">
+                            <button onClick={handleSignOut} className="min-h-11 inline-flex items-center text-[10px] font-black text-slate-500 hover:text-red-400 uppercase tracking-widest px-2 py-1 transition-colors">
                                 {t.signOut}
                             </button>
                         </div>

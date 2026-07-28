@@ -170,6 +170,14 @@ img[srcset*="%2Fimages%2Fsafelink-pages"] {
   transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+@media (pointer: coarse) {
+  button,
+  [role="button"] {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }

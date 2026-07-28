@@ -87,7 +87,7 @@ export default function SiteAgentBriefing({ role, siteId, lang = "ko" }: { role:
             </div>
 
             <div className="mt-5 flex justify-end">
-                <button className="flex items-center gap-1 text-[10px] font-black text-slate-500 hover:text-blue-400 transition-colors uppercase tracking-widest">
+                <button className="min-h-11 flex items-center gap-1 px-2 text-[10px] font-black text-slate-500 hover:text-blue-400 transition-colors uppercase tracking-widest">
                     Detailed Analytics <ChevronRight className="w-3 h-3" />
                 </button>
             </div>

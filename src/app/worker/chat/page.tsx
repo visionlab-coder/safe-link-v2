@@ -540,7 +540,7 @@ function WorkerChatContent() {
                     </div>
                     <div className="flex items-center gap-2">
                         {/* 🔊 Voice On/Off Toggle */}
-                        <button onClick={toggleVoice} className="flex flex-col items-center gap-0.5">
+                        <button onClick={toggleVoice} className="min-h-11 min-w-11 flex flex-col items-center justify-center gap-0.5">
                             <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ${voiceEnabled ? 'bg-blue-500' : 'bg-slate-300'}`}>
                                 <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200 ${voiceEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
                             </div>
@@ -549,10 +549,10 @@ function WorkerChatContent() {
                             </span>
                         </button>
                         <div className="flex items-center bg-slate-100 rounded-full p-1 border border-slate-200">
-                            <button onClick={() => changeGender('male')} className={`px-2 py-1 rounded-full text-[9px] font-black transition-all ${voiceGender === 'male' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>MALE</button>
-                            <button onClick={() => changeGender('female')} className={`px-2 py-1 rounded-full text-[9px] font-black transition-all ${voiceGender === 'female' ? 'bg-pink-500 text-white' : 'text-slate-400'}`}>FEMALE</button>
+                            <button onClick={() => changeGender('male')} className={`min-h-11 min-w-11 px-2 py-1 rounded-full text-[9px] font-black transition-all ${voiceGender === 'male' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>MALE</button>
+                            <button onClick={() => changeGender('female')} className={`min-h-11 min-w-11 px-2 py-1 rounded-full text-[9px] font-black transition-all ${voiceGender === 'female' ? 'bg-pink-500 text-white' : 'text-slate-400'}`}>FEMALE</button>
                         </div>
-                        <button onClick={() => setShowSidebar(!showSidebar)} className="p-2 rounded-full hover:bg-slate-100 text-slate-500 relative transition-all">
+                        <button aria-label="대화 상대 목록" onClick={() => setShowSidebar(!showSidebar)} className="min-h-11 min-w-11 p-2 rounded-full hover:bg-slate-100 text-slate-500 relative transition-all">
                             <Users className="w-6 h-6" />
                             {Object.values(unreadAdmins).reduce((a, b) => a + b, 0) > 0 && (
                                 <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 rounded-full border-[2px] border-white text-white text-[10px] font-black flex items-center justify-center">
