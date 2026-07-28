@@ -207,10 +207,28 @@ public class ChatRepository {
         return getThread(id);
     }
 
-    public MessageRow insertMessage(Long threadId, Long siteId, Long senderUserId, String sourceLanguage, String targetLanguage, String sourceText, String translatedText) {
+    public MessageRow insertMessage(
+        Long threadId,
+        Long siteId,
+        Long senderUserId,
+        String sourceLanguage,
+        String targetLanguage,
+        String sourceText,
+        String translatedText,
+        String clientMessageId
+    ) {
         Long id = jdbc.sql("""
-                insert into chat_messages(thread_id, site_id, sender_user_id, source_language, target_language, source_text, translated_text)
-                values (:threadId, :siteId, :senderUserId, :sourceLanguage, :targetLanguage, :sourceText, :translatedText)
+                insert into chat_messages(
+                    thread_id, site_id, sender_user_id, source_language, target_language,
+                    source_text, translated_text, client_message_id
+                )
+                values (
+                    :threadId, :siteId, :senderUserId, :sourceLanguage, :targetLanguage,
+                    :sourceText, :translatedText, :clientMessageId
+                )
+                on conflict (thread_id, sender_user_id, client_message_id)
+                where client_message_id is not null
+                do update set client_message_id = excluded.client_message_id
                 returning id
             """)
             .param("threadId", threadId)
@@ -220,6 +238,7 @@ public class ChatRepository {
             .param("targetLanguage", targetLanguage)
             .param("sourceText", sourceText)
             .param("translatedText", translatedText)
+            .param("clientMessageId", clientMessageId)
             .query(Long.class)
             .single();
         return jdbc.sql("""

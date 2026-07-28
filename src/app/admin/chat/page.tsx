@@ -389,7 +389,7 @@ function AdminChatContent() {
         if (!messageText.trim() || !activeWorker || !myId || isSending) return;
 
         const originalText = messageText.trim();
-        const tempId = `temp-${Date.now()}`;
+        const tempId = `temp-${crypto.randomUUID()}`;
 
         // 🚀 즉시 표시 (번역 전)
         clearComposer();
@@ -433,6 +433,7 @@ function AdminChatContent() {
                 target_lang: activeWorker.preferred_lang,
                 source_text: originalText,
                 translated_text: JSON.stringify({ norm: normalized, text: translated, pron, rev }),
+                client_message_id: tempId,
             };
 
             const msgRes = await fetch("/api/chat/messages", {

@@ -52,7 +52,16 @@ public class ChatController {
         var thread = chat.getThread(threadId);
         siteGuard.requireSiteAccess(actor, thread.siteId(), "chat.message.create", "chat_thread", String.valueOf(threadId));
         requireConversationAccess(actor, thread, "chat.message.create");
-        var inserted = chat.insertMessage(threadId, thread.siteId(), actor.userId(), request.sourceLanguage(), request.targetLanguage(), request.sourceText(), request.translatedText());
+        var inserted = chat.insertMessage(
+            threadId,
+            thread.siteId(),
+            actor.userId(),
+            request.sourceLanguage(),
+            request.targetLanguage(),
+            request.sourceText(),
+            request.translatedText(),
+            request.clientMessageId()
+        );
         audit.record(actor.userId(), thread.siteId(), "chat.message.create", "chat_message", String.valueOf(inserted.id()), "ALLOWED", "server_api", Map.of("threadId", threadId));
         eventBus.publish(threadId, inserted);
         eventBus.publishUser(thread.workerId(), inserted);
@@ -167,7 +176,8 @@ public class ChatController {
             cleanLanguage(request.sourceLang()),
             cleanLanguage(request.targetLang()),
             sourceText,
-            request.translatedText() == null ? sourceText : request.translatedText()
+            request.translatedText() == null ? sourceText : request.translatedText(),
+            cleanClientMessageId(request.clientMessageId())
         );
         audit.record(actor.userId(), conversation.thread().siteId(), "chat.message.create", "chat_message", String.valueOf(inserted.id()), "ALLOWED", "compat_server_api", Map.of("threadId", conversation.thread().id()));
         eventBus.publish(conversation.thread().id(), inserted);
@@ -300,6 +310,15 @@ public class ChatController {
         return language.matches("^[a-z]{2,16}$") ? language : "ko";
     }
 
+    private static String cleanClientMessageId(String value) {
+        if (value == null || value.isBlank()) return null;
+        String cleaned = value.trim();
+        if (cleaned.length() > 100 || !cleaned.matches("^[A-Za-z0-9._:-]+$")) {
+            throw new IllegalArgumentException("invalid_client_message_id");
+        }
+        return cleaned;
+    }
+
     private static void requireWorker(SessionPrincipal actor) {
         if (actor == null || !actor.hasRole(Role.WORKER)) {
             throw new IllegalArgumentException("worker_required");
@@ -349,7 +368,13 @@ public class ChatController {
             .orElse(null);
     }
 
-    public record SendMessageRequest(@NotBlank String sourceLanguage, @NotBlank String targetLanguage, @NotBlank String sourceText, String translatedText) {}
+    public record SendMessageRequest(
+        @NotBlank String sourceLanguage,
+        @NotBlank String targetLanguage,
+        @NotBlank String sourceText,
+        String translatedText,
+        String clientMessageId
+    ) {}
     public record Conversation(ChatRepository.ThreadRow thread, Long workerId, Long adminId) {}
     public record AdminWorkersResponse(@JsonProperty("site_id") String siteId, String role, List<WorkerPeerResponse> workers) {}
     public record WorkerPeerResponse(String id, @JsonProperty("display_name") String displayName, @JsonProperty("preferred_lang") String preferredLang, String nationality, @JsonProperty("site_id") String siteId) {}
@@ -374,7 +399,8 @@ public class ChatController {
         @JsonProperty("source_lang") String sourceLang,
         @JsonProperty("target_lang") String targetLang,
         @JsonProperty("source_text") String sourceText,
-        @JsonProperty("translated_text") String translatedText
+        @JsonProperty("translated_text") String translatedText,
+        @JsonProperty("client_message_id") String clientMessageId
     ) {}
     public record CompatReadRequest(@JsonProperty("peer_id") String peerId, List<CompatTranslationUpdate> translations) {}
     public record CompatTranslationUpdate(String id, @JsonProperty("translated_text") String translatedText) {}
