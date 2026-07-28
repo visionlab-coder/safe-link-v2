@@ -5,15 +5,6 @@ export const runtime = "nodejs";
 const SAFE_LINK_V3_API_BASE_URL =
   process.env.SAFE_LINK_INTERNAL_API_BASE_URL || process.env.NEXT_PUBLIC_SAFE_LINK_API_BASE_URL || "http://localhost:8080";
 
-function readCookieValue(cookieHeader: string, name: string): string | null {
-  const prefix = `${name}=`;
-  return cookieHeader
-    .split(";")
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(prefix))
-    ?.slice(prefix.length) ?? null;
-}
-
 function mergeSetCookie(cookieHeader: string, setCookie: string | null): string {
   if (!setCookie) return cookieHeader;
   const firstPair = setCookie.split(";")[0]?.trim();
@@ -30,23 +21,22 @@ function mergeSetCookie(cookieHeader: string, setCookie: string | null): string 
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   let cookie = req.headers.get("cookie") ?? "";
-  let csrf = req.headers.get("x-xsrf-token") ?? readCookieValue(cookie, "XSRF-TOKEN");
-
-  if (!csrf) {
-    const csrfResponse = await fetch(`${SAFE_LINK_V3_API_BASE_URL}/api/v1/auth/csrf`, {
-      headers: cookie ? { cookie } : undefined,
-      cache: "no-store",
-    });
-    const csrfBody = (await csrfResponse.json().catch(() => ({}))) as { token?: string };
-    csrf = csrfBody.token ?? null;
-    cookie = mergeSetCookie(cookie, csrfResponse.headers.get("set-cookie"));
+  const csrfResponse = await fetch(`${SAFE_LINK_V3_API_BASE_URL}/api/v1/auth/csrf`, {
+    headers: cookie ? { cookie } : undefined,
+    cache: "no-store",
+  });
+  const csrfBody = (await csrfResponse.json().catch(() => ({}))) as { token?: string };
+  const csrf = csrfBody.token ?? null;
+  if (!csrfResponse.ok || !csrf) {
+    return NextResponse.json({ error: "csrf_refresh_failed" }, { status: 503 });
   }
+  cookie = mergeSetCookie(cookie, csrfResponse.headers.get("set-cookie"));
 
   const upstream = await fetch(`${SAFE_LINK_V3_API_BASE_URL}/api/v1/auth/logout`, {
     method: "POST",
     headers: {
       ...(cookie ? { cookie } : {}),
-      ...(csrf ? { "X-XSRF-TOKEN": csrf } : {}),
+      "X-XSRF-TOKEN": csrf,
     },
     cache: "no-store",
   });
