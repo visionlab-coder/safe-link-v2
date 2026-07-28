@@ -2,7 +2,7 @@
 
 ## 목적
 
-`refactor/v3-commercialization-20260710` 브랜치에 push되면 GitHub Actions가 frontend와 backend를 테스트·빌드하고 운영 서버에 불변 release로 배포한다. 배포 중에는 release 디렉터리를 새로 만들고 `current` 심볼릭 링크만 교체하므로, 실패한 빌드를 현재 운영 파일 위에 덮어쓰지 않는다.
+GitHub Actions의 `Deploy SQ Link V3 production` workflow를 수동 실행하면 선택한 브랜치의 frontend와 backend를 테스트·빌드하고 운영 서버에 불변 release로 배포한다. 단순 push만으로는 운영 배포를 시작하지 않아, 개발 중인 커밋이나 실패한 반복 실행 때문에 배포 실패 알림이 계속 발송되지 않는다. 배포 중에는 release 디렉터리를 새로 만들고 `current` 심볼릭 링크만 교체하므로, 실패한 빌드를 현재 운영 파일 위에 덮어쓰지 않는다.
 
 ## 비밀값 관리 기준
 
@@ -13,10 +13,10 @@ GitHub 저장소 **Settings → Secrets and variables → Actions → Secrets**�
 | 이름 | 용도 | 비고 |
 |---|---|---|
 | `SAFE_LINK_DEPLOY_HOST` | 운영 서버 host 또는 IP | 배포 설정을 한곳에 두기 위해 Secret으로 관리 |
-| `SAFE_LINK_DEPLOY_USER` | SSH 배포 계정 | 현재 `ubuntu` |
+| `SAFE_LINK_DEPLOY_USER` | SSH 배포 계정 | `safelink-deploy` 전용 제한 계정 |
 | `SAFE_LINK_DEPLOY_SSH_PRIVATE_KEY` | GitHub Actions 전용 SSH 개인키 | 개인 개발자 PEM 키를 재사용하지 않는다 |
 
-`SAFE_LINK_DEPLOY_SSH_PRIVATE_KEY`는 GitHub Actions 전용으로 새로 발급한다. 공개키만 운영 서버의 `ubuntu` 계정 `authorized_keys`에 등록한다. 이 키는 Actions 외에는 사용하지 않고, 유출 또는 담당자 변경 시 즉시 폐기·교체한다.
+`SAFE_LINK_DEPLOY_SSH_PRIVATE_KEY`는 GitHub Actions 전용으로 새로 발급한다. 공개키만 운영 서버의 `safelink-deploy` 계정 `authorized_keys`에 등록한다. 이 계정은 release 활성화 명령만 `sudo`로 실행할 수 있으며 임의 관리자 명령은 실행할 수 없다. 이 키는 Actions 외에는 사용하지 않고, 유출 또는 담당자 변경 시 즉시 폐기·교체한다.
 
 ### 운영 서버 환경파일
 
@@ -31,14 +31,14 @@ GitHub 저장소 **Settings → Secrets and variables → Actions → Secrets**�
 
 ## 최초 1회 서버 준비
 
-1. GitHub Actions 전용 ED25519 키 쌍을 발급한다.
-2. 공개키를 `/home/ubuntu/.ssh/authorized_keys`에 추가한다.
-3. 이 저장소의 `scripts/deploy/install-server-ci-deploy.sh`와 `scripts/deploy/activate-release.sh`를 서버에 복사한다.
-4. 서버에서 `sudo bash install-server-ci-deploy.sh`를 한 번 실행한다.
+1. 이 저장소의 `scripts/deploy/install-server-ci-deploy.sh`와 `scripts/deploy/activate-release.sh`를 서버에 복사한다.
+2. 서버에서 `sudo bash install-server-ci-deploy.sh`를 한 번 실행해 제한된 `safelink-deploy` 계정을 만든다.
+3. GitHub Actions 전용 ED25519 키 쌍을 발급한다.
+4. 공개키를 `/home/safelink-deploy/.ssh/authorized_keys`에 추가한다.
 5. 위 세 GitHub Actions Secret을 등록한다.
-6. 대상 브랜치에 push하여 첫 배포를 실행한다.
+6. 대상 브랜치를 push한 뒤 GitHub Actions에서 `Deploy SQ Link V3 production`을 수동 실행한다.
 
-설치 스크립트는 서비스가 immutable release의 `current` 링크를 실행하도록 바꾸고, GitHub Actions SSH 계정에는 `/usr/local/sbin/safelink-v3-activate-release <git-sha>`만 비밀번호 없이 실행할 권한을 부여한다. 임의 `sudo` 권한을 주지 않는다.
+설치 스크립트는 서비스가 immutable release의 `current` 링크를 실행하도록 바꾸고, GitHub Actions 전용 `safelink-deploy` 계정에는 `/usr/local/sbin/safelink-v3-activate-release <git-sha>`만 비밀번호 없이 실행할 권한을 부여한다. 임의 `sudo` 권한을 주지 않는다.
 
 ## 배포 검증과 롤백
 

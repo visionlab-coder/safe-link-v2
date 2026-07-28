@@ -64,11 +64,14 @@ export async function GET(req: NextRequest) {
   const ai = await getJson<AiStatus>("/api/v1/ai/status", cookie);
   if (ai.ok && ai.data) {
     const mode = ai.data.vendorEnabled ? "vendor configured" : "mock/fallback";
-    results.google_translate = ok(`AI gateway ${ai.data.status ?? "UP"} (${mode})`);
-    results.google_tts = ok(`AI gateway ${ai.data.status ?? "UP"} (${mode})`);
-    results.google_stt = ok(`AI gateway ${ai.data.status ?? "UP"} (${mode})`);
-    results.openai = ok(`AI gateway ${ai.data.status ?? "UP"} (${mode})`);
-    results.naver_papago = ok(`AI gateway ${ai.data.status ?? "UP"} (${mode})`);
+    const vendorStatus = ai.data.vendorEnabled
+      ? ok(`AI gateway ${ai.data.status ?? "UP"} (${mode})`)
+      : fail(`AI vendor disabled (${mode})`);
+    results.google_translate = vendorStatus;
+    results.google_tts = vendorStatus;
+    results.google_stt = vendorStatus;
+    results.openai = vendorStatus;
+    results.naver_papago = vendorStatus;
   } else {
     const message = ai.status === 401 || ai.status === 403 ? "Spring session required" : `AI gateway ${ai.status}`;
     results.google_translate = fail(message);

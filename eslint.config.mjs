@@ -22,8 +22,12 @@ const eslintConfig = defineConfig([
     // Default ignores of eslint-config-next:
     ".next/**",
     ".open-next/**",
+    ".codex-backups/**",
     "out/**",
     "build/**",
+    "apps/mobile/dist/**",
+    "apps/mobile/android/app/src/main/assets/public/**",
+    "apps/mobile/ios/App/App/public/**",
     "next-env.d.ts",
     "scripts/**/*.js",
     "verify_fix.js",

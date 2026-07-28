@@ -13,6 +13,7 @@ import com.safelink.v3.audit.AuditService;
 import com.safelink.v3.domain.Role;
 import java.util.Map;
 import java.util.Set;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -24,6 +25,11 @@ class AuthControllerTest {
     private AuditService audit;
     private LoginAttemptRateLimiter loginAttemptRateLimiter;
     private AuthController authController;
+
+    @AfterEach
+    void clearSecurityContext() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
 
     @BeforeEach
     void setUp() {

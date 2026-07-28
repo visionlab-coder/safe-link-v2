@@ -61,7 +61,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const setCookie = upstream.headers.get("set-cookie");
   if (setCookie) response.headers.append("set-cookie", setCookie);
   if (upstream.ok) {
-    response.cookies.set("SAFE_LINK_SESSION", "", { path: "/", maxAge: 0, httpOnly: true, sameSite: "lax" });
+    const expired = new Date(0);
+    response.cookies.set("SAFE_LINK_SESSION", "", {
+      path: "/",
+      maxAge: 0,
+      expires: expired,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    });
+    response.cookies.set("XSRF-TOKEN", "", {
+      path: "/",
+      maxAge: 0,
+      expires: expired,
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    });
   }
   return response;
 }

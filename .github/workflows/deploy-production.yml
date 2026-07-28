@@ -82,14 +82,14 @@ jobs:
           set -euo pipefail
           scp -i ~/.ssh/id_ed25519 -o BatchMode=yes \
             "safe-link-v3-${GITHUB_SHA}.tgz" \
-            "$DEPLOY_USER@$DEPLOY_HOST:/home/$DEPLOY_USER/safelink-v3/incoming/"
+            "$DEPLOY_USER@$DEPLOY_HOST:/home/$DEPLOY_USER/incoming/"
 
       - name: Activate release and smoke test
         shell: bash
         run: |
           set -euo pipefail
           ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes "$DEPLOY_USER@$DEPLOY_HOST" \
-            "sudo mv /home/$DEPLOY_USER/safelink-v3/incoming/safe-link-v3-${GITHUB_SHA}.tgz /home/safelink-deploy/incoming/safe-link-v3-${GITHUB_SHA}.tgz && sudo /usr/local/sbin/safelink-v3-activate-release '${GITHUB_SHA}'"
+            "sudo /usr/local/sbin/safelink-v3-activate-release '${GITHUB_SHA}'"
           for attempt in {1..18}; do
             if curl --fail --silent --show-error --max-time 10 https://api.safe-link.co.kr/actuator/health/readiness | grep -q 'UP' \
               && curl --silent --show-error --max-time 10 -I https://app.safe-link.co.kr/admin | grep -qi '^location: https://app.safe-link.co.kr/auth'; then

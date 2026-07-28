@@ -12,6 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.safelink.v3.audit.AuditService;
 import com.safelink.v3.auth.UserAccountRepository;
 import com.safelink.v3.config.SecurityConfig;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -39,6 +41,16 @@ class AuthSecurityConfigTest {
 
     @MockitoBean
     private UserAccountRepository userAccountRepository;
+
+    @BeforeEach
+    void resetSecurityContext() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
 
     @Test
     void csrfCookieUsesSecureFlagWhenSessionCookieSecure() throws Exception {

@@ -4,10 +4,21 @@
 set -euo pipefail
 
 APP_ROOT=/home/ubuntu/safelink-v3
+DEPLOY_USER=safelink-deploy
+DEPLOY_HOME=/home/$DEPLOY_USER
 ACTIVATOR=/usr/local/sbin/safelink-v3-activate-release
 SUDOERS_FILE=/etc/sudoers.d/safelink-v3-github-deploy
 
-install -d -o ubuntu -g ubuntu -m 0755 "$APP_ROOT/releases" "$APP_ROOT/incoming"
+if ! id "$DEPLOY_USER" >/dev/null 2>&1; then
+  useradd --create-home --shell /bin/bash "$DEPLOY_USER"
+fi
+
+install -d -o ubuntu -g ubuntu -m 0755 "$APP_ROOT/releases"
+install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 0750 "$DEPLOY_HOME/incoming"
+install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 0700 "$DEPLOY_HOME/.ssh"
+touch "$DEPLOY_HOME/.ssh/authorized_keys"
+chown "$DEPLOY_USER:$DEPLOY_USER" "$DEPLOY_HOME/.ssh/authorized_keys"
+chmod 0600 "$DEPLOY_HOME/.ssh/authorized_keys"
 install -m 0755 "$(dirname "$0")/activate-release.sh" "$ACTIVATOR"
 
 cat > /etc/systemd/system/safelink-v3-frontend.service <<'UNIT'
@@ -54,7 +65,7 @@ UNIT
 
 cat > "$SUDOERS_FILE" <<'SUDOERS'
 Cmnd_Alias SAFELINK_V3_DEPLOY = /usr/local/sbin/safelink-v3-activate-release *
-ubuntu ALL=(root) NOPASSWD: SAFELINK_V3_DEPLOY
+safelink-deploy ALL=(root) NOPASSWD: SAFELINK_V3_DEPLOY
 SUDOERS
 chmod 0440 "$SUDOERS_FILE"
 visudo -cf "$SUDOERS_FILE"

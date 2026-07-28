@@ -8,8 +8,9 @@ if [ "$#" -ne 1 ] || ! [[ "$1" =~ ^[0-9a-f]{40}$ ]]; then
 fi
 
 APP_ROOT=/home/ubuntu/safelink-v3
+UPLOAD_ROOT=/home/safelink-deploy/incoming
 RELEASE_ID="$1"
-ARCHIVE="$APP_ROOT/incoming/safe-link-v3-${RELEASE_ID}.tgz"
+ARCHIVE="$UPLOAD_ROOT/safe-link-v3-${RELEASE_ID}.tgz"
 RELEASE_DIR="$APP_ROOT/releases/$RELEASE_ID"
 STAGING_DIR="$APP_ROOT/releases/.${RELEASE_ID}.staging"
 
