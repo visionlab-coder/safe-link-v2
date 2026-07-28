@@ -812,7 +812,7 @@ function AdminChatContent() {
                                                         </div>
                                                         {m.source_text !== parsed.text && m.source_lang !== 'ko' && (
                                                             <div className="pt-3 border-t border-slate-100 flex items-start gap-1.5">
-                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-500 shrink-0 mt-0.5 font-black">原文</span>
+                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-500 shrink-0 mt-0.5 font-black">원문</span>
                                                                 <span className="min-w-0 break-words font-bold text-base md:text-lg text-slate-500">{m.source_text}</span>
                                                             </div>
                                                         )}
