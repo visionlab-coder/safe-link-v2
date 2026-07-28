@@ -9,6 +9,7 @@ public interface ObjectStorageService {
     void putObject(String objectKey, String contentType, byte[] bytes);
     StoredObject getObject(String objectKey);
     boolean isConfigured();
+    default void verifyAvailable() {}
 
     record StoredObject(String contentType, byte[] bytes) {}
 }

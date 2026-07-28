@@ -2,11 +2,10 @@ package com.safelink.v3.storage;
 
 import java.net.URI;
 import java.time.Duration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -14,8 +13,6 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
-@Service
-@ConditionalOnBean(S3Presigner.class)
 public class S3ObjectStorageService implements ObjectStorageService {
     private final S3Presigner presigner;
     private final S3Client s3;
@@ -80,5 +77,10 @@ public class S3ObjectStorageService implements ObjectStorageService {
     @Override
     public boolean isConfigured() {
         return true;
+    }
+
+    @Override
+    public void verifyAvailable() {
+        s3.headBucket(HeadBucketRequest.builder().bucket(properties.getBucket()).build());
     }
 }

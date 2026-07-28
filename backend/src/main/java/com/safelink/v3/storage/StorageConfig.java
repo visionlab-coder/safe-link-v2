@@ -55,6 +55,16 @@ public class StorageConfig {
     }
 
     @Bean
+    @ConditionalOnProperty(prefix = "safe-link.storage", name = "enabled", havingValue = "true")
+    ObjectStorageService s3ObjectStorageService(
+        S3Presigner presigner,
+        S3Client s3,
+        StorageProperties properties
+    ) {
+        return new S3ObjectStorageService(presigner, s3, properties);
+    }
+
+    @Bean
     @ConditionalOnMissingBean(ObjectStorageService.class)
     ObjectStorageService disabledObjectStorageService(StorageProperties properties) {
         return new DisabledObjectStorageService(Path.of(properties.getLocalRoot()));

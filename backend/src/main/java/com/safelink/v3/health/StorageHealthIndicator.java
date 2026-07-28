@@ -16,7 +16,15 @@ public class StorageHealthIndicator implements HealthIndicator {
     @Override
     public Health health() {
         if (storage.isConfigured()) {
-            return Health.up().withDetail("objectStorage", "configured").build();
+            try {
+                storage.verifyAvailable();
+                return Health.up().withDetail("objectStorage", "configured").build();
+            } catch (RuntimeException ex) {
+                return Health.down()
+                    .withDetail("objectStorage", "unavailable")
+                    .withDetail("reason", ex.getClass().getSimpleName())
+                    .build();
+            }
         }
         return Health.unknown()
             .withDetail("objectStorage", "not_configured")
