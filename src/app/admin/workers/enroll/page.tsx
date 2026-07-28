@@ -94,8 +94,8 @@ function WorkerEnrollInner() {
         setError(`${data.error || "근로자 등록에 실패했습니다."}${data.detail ? `: ${data.detail}` : ""}`);
         return;
       }
-      workerId = data.worker.id;
-      setWorkerCode(data.worker.worker_code);
+      workerId = data.id;
+      setWorkerCode(data.worker_code);
     }
 
     const issueRes = await fetch("/api/nfc/sticker/issue", {
