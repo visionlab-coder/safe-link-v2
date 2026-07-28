@@ -55,13 +55,14 @@ function rowsFromText(text: string, source: string): PreviewRow[] {
 
     return lines
         .map<PreviewRow | null>((line, index) => {
-            const parts = splitDelimitedLine(line).map(part => part.trim()).filter(Boolean);
+            const parts = splitDelimitedLine(line).map(part => part.trim());
             const isHeader = index === 0 && parts.some(part => HEADER_KEYWORDS.some(keyword => part.toLowerCase().includes(keyword.toLowerCase())));
 
-            if (isHeader || parts.length < 2) return null;
+            if (isHeader) return null;
 
             const slang = parts[0] || "";
             const standard = parts[1] || "";
+            if (!slang && !standard) return null;
             const category = normalizeCategory(parts[2] || "");
 
             return {
