@@ -654,8 +654,12 @@ function WorkerHomeContent() {
         };
 
     const handleSignOut = async () => {
-        await logoutV3().catch(() => undefined);
-        router.push("/auth");
+        try {
+            await logoutV3();
+            window.location.replace("/auth");
+        } catch {
+            window.alert("로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+        }
     };
 
     return (
