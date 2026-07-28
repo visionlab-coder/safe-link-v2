@@ -327,17 +327,13 @@ function AdminLiveContent() {
                             </div>
 
                             <div className="flex items-center justify-center gap-4 py-4">
-                                <div className="flex gap-1">
-                                    {[...Array(5)].map((_, i) => (
-                                        <div
-                                            key={i}
-                                            className="w-1.5 bg-red-500 rounded-full transition-[height] duration-75"
-                                            style={{ height: `${8 + Math.max(0.08, audioLevel) * (12 + i * 5)}px` }}
-                                        />
-                                    ))}
-                                </div>
+                                <div
+                                    aria-hidden="true"
+                                    className="h-4 w-4 rounded-full bg-red-500 shadow-[0_0_18px_rgba(239,68,68,0.7)] transition-transform duration-75"
+                                    style={{ transform: `scale(${0.85 + Math.min(1, audioLevel) * 1.8})` }}
+                                />
                                 <span className="text-sm font-black text-red-400 uppercase tracking-widest">
-                                    {isRecording ? `Recording ${Math.round(audioLevel * 100)}%` : "Microphone stopped"}
+                                    {isRecording ? "Recording" : "Microphone stopped"}
                                 </span>
                             </div>
                             {sttError && (

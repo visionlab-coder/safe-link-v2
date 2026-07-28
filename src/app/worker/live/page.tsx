@@ -396,17 +396,26 @@ export default function WorkerLivePage() {
                     <button
                         onClick={toggleRecording}
                         disabled={!authReady?.siteId || !activeAdminId}
-                        className={`flex-1 py-4 rounded-2xl font-black tap-effect text-center transition-colors ${
+                        className={`flex flex-1 items-center justify-center gap-3 py-4 rounded-2xl font-black tap-effect text-center transition-colors ${
                             isRecording
                                 ? "bg-red-600 text-white"
                                 : "bg-emerald-500 text-slate-950 disabled:bg-slate-800 disabled:text-slate-600"
                         }`}
                     >
-                        {isRecording
-                            ? `STOP SPEAKING · ${Math.round(audioLevel * 100)}%`
-                            : activeAdminId
-                                ? "SPEAK TO MANAGER"
-                                : "WAITING FOR MANAGER"}
+                        {isRecording ? (
+                            <>
+                                <span
+                                    aria-hidden="true"
+                                    className="h-3.5 w-3.5 shrink-0 rounded-full bg-white shadow-[0_0_14px_rgba(255,255,255,0.75)] transition-transform duration-75"
+                                    style={{ transform: `scale(${0.85 + Math.min(1, audioLevel) * 1.8})` }}
+                                />
+                                <span>STOP SPEAKING</span>
+                            </>
+                        ) : activeAdminId ? (
+                            "SPEAK TO MANAGER"
+                        ) : (
+                            "WAITING FOR MANAGER"
+                        )}
                     </button>
                     <button onClick={() => router.push("/worker")} className="px-6 py-4 glass rounded-2xl border-white/10 text-slate-400 font-black tap-effect text-center">
                         {t.back}

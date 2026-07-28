@@ -53,7 +53,6 @@ export default function WorkerVisionPage() {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [items, setItems] = useState<VisionItem[]>([]);
     const [hasResult, setHasResult] = useState(false);
-    const [cameraError, setCameraError] = useState("");
     const [analysisError, setAnalysisError] = useState("");
 
     useEffect(() => {
@@ -68,31 +67,15 @@ export default function WorkerVisionPage() {
 
     const t = getT(lang);
 
-    const openCamera = async () => {
-        setCameraError("");
-        if (!navigator.mediaDevices?.getUserMedia) {
-            setCameraError(lang === "ko"
-                ? "이 브라우저에서는 카메라 접근을 지원하지 않습니다. Safari에서 다시 시도해 주세요."
-                : "Camera access is unavailable in this browser. Please try Safari.");
-            return;
-        }
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: { ideal: "environment" } },
-            });
-            stream.getTracks().forEach((track) => track.stop());
-            fileInputRef.current?.click();
-        } catch {
-            setCameraError(lang === "ko"
-                ? "카메라 권한이 거부되었습니다. iPhone 설정 → Safari → 카메라에서 허용한 뒤 다시 시도해 주세요."
-                : "Camera permission was denied. Allow camera access in Safari settings and try again.");
-        }
+    const openCamera = () => {
+        // iOS Safari requires the file/camera picker to be opened synchronously
+        // inside the user's tap. Awaiting getUserMedia first loses that gesture.
+        fileInputRef.current?.click();
     };
 
     const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        setCameraError("");
         setAnalysisError("");
 
         // Preview
@@ -172,12 +155,6 @@ export default function WorkerVisionPage() {
                         <span className="text-xl font-black text-slate-400 uppercase tracking-widest">{t.capture}</span>
                     </button>
                 )}
-                {cameraError && (
-                    <div role="alert" className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200">
-                        {cameraError}
-                    </div>
-                )}
-
                 {/* Image Preview */}
                 {imagePreview && (
                     <div className="relative rounded-[32px] overflow-hidden border border-white/10">
@@ -268,7 +245,7 @@ export default function WorkerVisionPage() {
                                 setItems([]);
                                 setHasResult(false);
                                 setAnalysisError("");
-                                void openCamera();
+                                openCamera();
                             }}
                             className="flex-1 py-5 glass rounded-[24px] border-white/10 text-white font-black tap-effect"
                         >
