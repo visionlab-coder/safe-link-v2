@@ -61,6 +61,7 @@ if (WORKER_VUS > 0) {
 
 export const options = {
   scenarios,
+  noCookiesReset: true,
   thresholds: {
     ...commonThresholds(),
     "http_req_duration{name:GET /api/v1/auth/me}": ["p(95)<600"],
