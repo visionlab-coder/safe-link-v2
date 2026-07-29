@@ -1,6 +1,8 @@
 package com.safelink.v3.auth;
 
 import com.safelink.v3.domain.Role;
+import java.sql.Array;
+import java.sql.SQLException;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -41,7 +43,26 @@ public class UserAccountRepository {
 
     public Optional<UserAccount> findById(Long userId) {
         return jdbc.sql("""
-                select u.id, u.email, u.display_name, u.preferred_language, u.account_status, c.password_hash
+                select u.id,
+                       u.email,
+                       u.display_name,
+                       u.preferred_language,
+                       u.account_status,
+                       c.password_hash,
+                       array(
+                         select ur.role
+                         from user_roles ur
+                         where ur.user_id = u.id
+                           and ur.revoked_at is null
+                         order by ur.role
+                       ) as active_roles,
+                       array(
+                         select sm.site_id
+                         from site_memberships sm
+                         where sm.user_id = u.id
+                           and sm.status = 'ACTIVE'
+                         order by sm.site_id
+                       ) as active_site_ids
                 from users u
                 left join user_credentials c on c.user_id = u.id and c.disabled_at is null
                 where u.id = :userId
@@ -55,8 +76,8 @@ public class UserAccountRepository {
                 rs.getString("preferred_language"),
                 rs.getString("account_status"),
                 rs.getString("password_hash"),
-                rolesFor(rs.getLong("id")),
-                sitesFor(rs.getLong("id"))
+                rolesFrom(rs.getArray("active_roles")),
+                siteIdsFrom(rs.getArray("active_site_ids"))
             ))
             .optional();
     }
@@ -332,6 +353,30 @@ public class UserAccountRepository {
             .param("userId", userId)
             .query(Long.class)
             .list());
+    }
+
+    private Set<Role> rolesFrom(Array values) throws SQLException {
+        var roles = new LinkedHashSet<Role>();
+        if (values == null) {
+            return roles;
+        }
+        for (Object value : (Object[]) values.getArray()) {
+            roles.add(Role.parse(String.valueOf(value)));
+        }
+        return roles;
+    }
+
+    private Set<Long> siteIdsFrom(Array values) throws SQLException {
+        var siteIds = new LinkedHashSet<Long>();
+        if (values == null) {
+            return siteIds;
+        }
+        for (Object value : (Object[]) values.getArray()) {
+            siteIds.add(value instanceof Number number
+                ? number.longValue()
+                : Long.parseLong(String.valueOf(value)));
+        }
+        return siteIds;
     }
 
     public record SiteOption(Long siteId, String name, String siteCode) {}
