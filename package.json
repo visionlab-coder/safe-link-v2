@@ -9,6 +9,9 @@
     "preview": "opennextjs-cloudflare build && wrangler dev",
     "start": "next start",
     "lint": "eslint",
+    "load:smoke": "k6 run tests/load/smoke.js",
+    "load:authenticated": "k6 run tests/load/authenticated-read.js",
+    "load:pagination": "k6 run tests/load/pagination.js",
     "m2m100:start": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-m2m100-onnx-local.ps1"
   },
   "dependencies": {

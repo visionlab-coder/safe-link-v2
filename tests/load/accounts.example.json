@@ -1,0 +1,17 @@
+{
+  "admins": [
+    {
+      "email": "qa-admin@example.com",
+      "password": "replace-me",
+      "site_id": "1"
+    }
+  ],
+  "workers": [
+    {
+      "name_initials": "QA",
+      "phone_last4": "0000",
+      "preferred_lang": "ko",
+      "site_id": "1"
+    }
+  ]
+}
