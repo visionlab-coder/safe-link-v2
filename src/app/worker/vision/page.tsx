@@ -126,7 +126,7 @@ export default function WorkerVisionPage() {
         }
     };
 
-    const analyzeImage = async (dataUrl: string) => {
+    const analyzeImage = async (dataUrl: string, mimeType: string) => {
         setAnalysisError("");
         setImagePreview(dataUrl);
         setIsAnalyzing(true);
@@ -138,7 +138,7 @@ export default function WorkerVisionPage() {
             const res = await fetch("/api/vision", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ image: base64, lang }),
+                body: JSON.stringify({ image: base64, lang, mimeType }),
             });
             const data = await res.json();
             if (!res.ok) {
@@ -210,7 +210,7 @@ export default function WorkerVisionPage() {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
         stopCamera();
-        void analyzeImage(dataUrl);
+        void analyzeImage(dataUrl, "image/jpeg");
     };
 
     const selectPhoto = (file: File | undefined) => {
@@ -231,7 +231,7 @@ export default function WorkerVisionPage() {
 
         const reader = new FileReader();
         reader.onload = () => {
-            if (typeof reader.result === "string") void analyzeImage(reader.result);
+            if (typeof reader.result === "string") void analyzeImage(reader.result, file.type);
         };
         reader.onerror = () => setCameraError(lang === "ko"
             ? "이미지 파일을 읽지 못했습니다. 다른 파일을 선택해 주세요."
