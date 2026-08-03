@@ -145,15 +145,42 @@ export default function WorkerVisionPage() {
             const reason = err instanceof Error ? err.message : "";
             console.error("[Vision] Error:", err);
             setItems([]);
-            setAnalysisError(
-                reason.includes("ai_vendor_not_configured") || reason.includes("google_vision_not_configured")
-                    ? (lang === "ko"
-                        ? "운영 서버에 AI 분석 서비스가 설정되지 않았습니다. 관리자에게 문의해 주세요."
-                        : "The AI analysis service is not configured on the server. Contact an administrator.")
-                    : (lang === "ko"
-                        ? "AI 분석에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 촬영해 주세요."
-                        : "AI analysis failed. Check your network and try again.")
-            );
+            const message = (() => {
+                if (reason.includes("vision_image_too_large") || reason.includes("Image too large")) {
+                    return lang === "ko"
+                        ? "사진 용량이 5MB를 초과했습니다. 해상도를 낮추거나 다시 촬영해 주세요."
+                        : "The photo exceeds 5MB. Reduce its size or take another photo.";
+                }
+                if (
+                    reason.includes("vision_image_type_not_allowed") ||
+                    reason.includes("vision_image_base64_invalid") ||
+                    reason.includes("vision_image_empty") ||
+                    reason.includes("vision_image_signature_mismatch")
+                ) {
+                    return lang === "ko"
+                        ? "지원하지 않거나 손상된 이미지입니다. JPG, PNG 또는 WEBP 사진으로 다시 시도해 주세요."
+                        : "This image is unsupported or corrupted. Try a JPG, PNG, or WEBP photo.";
+                }
+                if (reason.includes("ai_quota_exceeded")) {
+                    return lang === "ko"
+                        ? "AI 분석 사용 한도에 도달했습니다. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요."
+                        : "The AI analysis quota has been reached. Try later or contact an administrator.";
+                }
+                if (
+                    reason.includes("ai_vendor_not_configured") ||
+                    reason.includes("google_vision_not_configured") ||
+                    reason.includes("google_vision_failed") ||
+                    reason.includes("vision_api_failed")
+                ) {
+                    return lang === "ko"
+                        ? "AI 분석 서비스를 사용할 수 없습니다. 관리자에게 문의해 주세요."
+                        : "The AI analysis service is unavailable. Contact an administrator.";
+                }
+                return lang === "ko"
+                    ? "AI 분석 요청에 실패했습니다. 연결 상태를 확인한 뒤 다시 촬영해 주세요."
+                    : "The AI analysis request failed. Check your connection and try again.";
+            })();
+            setAnalysisError(message);
         } finally {
             setIsAnalyzing(false);
             setHasResult(true);

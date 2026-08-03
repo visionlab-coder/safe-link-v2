@@ -127,17 +127,13 @@ public class ReportVerificationController {
         String currentPerceptual = perceptualHash(readJson(value.payload()));
 
         Map<String, Object> envelope = new LinkedHashMap<>();
-        envelope.put("report_id", value.reportId());
         envelope.put("report_type", value.reportType());
-        envelope.put("site_id", value.siteId() == null ? null : String.valueOf(value.siteId()));
         envelope.put("created_at", value.createdAt().toString());
         envelope.put("retention_until", value.retentionUntil() == null ? null : value.retentionUntil().toString());
 
         Map<String, Object> integrity = new LinkedHashMap<>();
         integrity.put("sha256_hash_match", providedHash == null ? null : providedHash.equals(value.reportHash()));
         integrity.put("perceptual_hash_match", value.perceptualHash() == null ? null : currentPerceptual.equals(value.perceptualHash()));
-        integrity.put("current_perceptual_hash", currentPerceptual);
-        integrity.put("original_perceptual_hash", value.perceptualHash());
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("ok", true);

@@ -3,6 +3,8 @@ package com.safelink.v3.glossary;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.safelink.v3.auth.SessionPrincipal;
 import java.text.Normalizer;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -159,25 +161,45 @@ public class GlossaryController {
         if (rows == null || rows.isEmpty()) {
             throw new IllegalArgumentException("rows_empty");
         }
-        List<GlossaryImportRow> valid = rows.stream()
-            .filter(row -> row != null && !cleanOptional(row.slang()).isBlank() && !cleanOptional(row.standard()).isBlank())
+        List<GlossaryImportRow> limitedRows = rows.stream()
             .limit(1000)
             .toList();
-        if (valid.isEmpty()) {
-            throw new IllegalArgumentException("no_valid_rows");
+        List<String> slangs = limitedRows.stream()
+            .filter(row -> row != null && !cleanOptional(row.slang()).isBlank() && !cleanOptional(row.standard()).isBlank())
+            .map(row -> requiredSlang(row.slang()))
+            .distinct()
+            .toList();
+        var existing = new HashSet<String>();
+        if (!slangs.isEmpty()) {
+            existing.addAll(jdbc.sql("select slang from construction_glossary where slang in (:slangs)")
+                .param("slangs", slangs)
+                .query(String.class)
+                .list());
         }
-        List<String> slangs = valid.stream().map(row -> requiredSlang(row.slang())).distinct().toList();
-        var existing = jdbc.sql("select slang from construction_glossary where slang in (:slangs)")
-            .param("slangs", slangs)
-            .query(String.class)
-            .list()
-            .stream()
-            .collect(java.util.stream.Collectors.toSet());
 
         int inserted = 0;
-        for (GlossaryImportRow row : valid) {
+        int duplicate = 0;
+        int invalid = 0;
+        List<ImportRowResult> results = new ArrayList<>();
+        for (int index = 0; index < rows.size(); index++) {
+            if (index >= 1000) {
+                invalid++;
+                results.add(new ImportRowResult(index + 1, "", "", "INVALID", "row_limit_exceeded"));
+                continue;
+            }
+            GlossaryImportRow row = rows.get(index);
+            String rawSlang = row == null ? "" : cleanOptional(row.slang());
+            String rawStandard = row == null ? "" : cleanOptional(row.standard());
+            if (rawSlang.isBlank() || rawStandard.isBlank()) {
+                invalid++;
+                String reason = rawSlang.isBlank() ? "slang_required" : "standard_required";
+                results.add(new ImportRowResult(index + 1, rawSlang, rawStandard, "INVALID", reason));
+                continue;
+            }
             String slang = requiredSlang(row.slang());
             if (existing.contains(slang)) {
+                duplicate++;
+                results.add(new ImportRowResult(index + 1, slang, rawStandard, "DUPLICATE", "slang_already_exists"));
                 continue;
             }
             jdbc.sql("""
@@ -190,12 +212,10 @@ public class GlossaryController {
                 .update();
             existing.add(slang);
             inserted++;
+            results.add(new ImportRowResult(index + 1, slang, rawStandard, "INSERTED", null));
         }
-        int dup = valid.size() - inserted;
-        String message = inserted == 0
-            ? "모두 이미 등록된 항목입니다 (%d개 중복).".formatted(dup)
-            : "%d개 저장 완료 (%d개 중복 건너뜀).".formatted(inserted, dup);
-        return new ImportResponse(inserted, dup, message);
+        String message = "%d개 저장 완료 (%d개 중복, %d개 오류).".formatted(inserted, duplicate, invalid);
+        return new ImportResponse(inserted, duplicate, invalid, results, message);
     }
 
     private static void requireGlossaryManager(SessionPrincipal actor) {
@@ -270,7 +290,8 @@ public class GlossaryController {
 
     public record GlossaryListResponse(List<GlossaryTerm> terms) {}
     public record GlossaryTranslationListResponse(List<GlossaryTranslation> terms) {}
-    public record ImportResponse(int ok, int dup, String message) {}
+    public record ImportResponse(int ok, int dup, int invalid, List<ImportRowResult> rows, String message) {}
+    public record ImportRowResult(int row, String slang, String standard, String status, String reason) {}
     public record GlossaryTerm(Long id, String slang, String standard, String category, @JsonProperty("is_active") boolean isActive) {}
     public record GlossaryTranslation(Long glossaryId, String standard, String standardCore, String pivotEnglish, String localTerm, String language) {}
     public record GlossaryUpsertRequest(String slang, String standard, String category, @JsonProperty("is_active") Boolean isActive) {}

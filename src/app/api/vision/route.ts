@@ -51,7 +51,16 @@ Return only a valid JSON array. If none are found, return [].`;
     if (!upstream.ok) {
       const body = await upstream.text().catch(() => "");
       console.error("[Vision API] Gateway error:", upstream.status, body.slice(0, 200));
-      return NextResponse.json({ error: "Vision API failed" }, { status: upstream.status });
+      let upstreamError = "vision_api_failed";
+      try {
+        const parsed = JSON.parse(body) as { error?: unknown };
+        if (typeof parsed.error === "string" && parsed.error.length <= 120) {
+          upstreamError = parsed.error;
+        }
+      } catch {
+        // Do not expose an upstream HTML/error body to the client.
+      }
+      return NextResponse.json({ error: upstreamError }, { status: upstream.status });
     }
 
     const data = await upstream.json() as { text?: string };

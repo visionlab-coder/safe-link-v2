@@ -115,6 +115,20 @@ public class TbmController {
             ? "TBM 안전 브리핑"
             : request.title().trim();
 
+        if (tbm.listWorkers(actor.hasAnyGlobalRole(), actor.siteIds(), siteId).isEmpty()) {
+            audit.record(
+                actor.userId(),
+                siteId,
+                "tbm.notice.create",
+                "tbm_notice",
+                null,
+                "DENIED",
+                "tbm_no_target_workers",
+                Map.of()
+            );
+            throw new IllegalArgumentException("tbm_no_target_workers");
+        }
+
         var notice = tbm.createPublished(siteId, actor.userId(), title, content);
         audit.record(actor.userId(), siteId, "tbm.notice.create", "tbm_notice", String.valueOf(notice.id()), "ALLOWED", "compat_server_api", Map.of());
         return new TbmBroadcastResponse(toCompatNotice(notice));

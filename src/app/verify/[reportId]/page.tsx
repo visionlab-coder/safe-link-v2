@@ -65,10 +65,6 @@ export default async function VerifyReportPage({
               <dd className="font-bold">{envelope.report_type}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">사이트 ID</dt>
-              <dd className="font-mono text-xs">{envelope.site_id ?? "—"}</dd>
-            </div>
-            <div>
               <dt className="text-slate-500">생성일</dt>
               <dd>{new Date(envelope.created_at).toLocaleString("ko-KR")}</dd>
             </div>
@@ -95,16 +91,9 @@ export default async function VerifyReportPage({
               status={perc}
             />
           </div>
-          <div className="mt-4 p-3 bg-slate-950 rounded-lg text-xs font-mono break-all">
-            <div className="text-slate-500 mb-1">현재 인지 해시:</div>
-            <div className="text-slate-300">{integrity.current_perceptual_hash}</div>
-            {integrity.original_perceptual_hash && (
-              <>
-                <div className="text-slate-500 mt-2 mb-1">원본 인지 해시:</div>
-                <div className="text-slate-300">{integrity.original_perceptual_hash}</div>
-              </>
-            )}
-          </div>
+          <p className="mt-4 text-xs text-slate-500">
+            공개 검증 화면에는 보고서 내용, 현장 식별자, 근로자 정보 및 원본 해시를 표시하지 않습니다.
+          </p>
         </div>
 
         <div className="text-xs text-slate-500 text-center">

@@ -1,0 +1,70 @@
+package com.safelink.v3.tbm;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.safelink.v3.audit.AuditService;
+import com.safelink.v3.auth.SessionPrincipal;
+import com.safelink.v3.domain.Role;
+import com.safelink.v3.security.SiteGuard;
+import com.safelink.v3.storage.FileObjectRepository;
+import com.safelink.v3.storage.ObjectStorageService;
+import java.util.Map;
+import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+class TbmControllerTest {
+    private TbmRepository tbm;
+    private AuditService audit;
+    private TbmController controller;
+
+    @BeforeEach
+    void setUp() {
+        tbm = mock(TbmRepository.class);
+        audit = mock(AuditService.class);
+        controller = new TbmController(
+            tbm,
+            mock(FileObjectRepository.class),
+            mock(ObjectStorageService.class),
+            mock(SiteGuard.class),
+            audit
+        );
+    }
+
+    @Test
+    void rejectsBroadcastWhenSiteHasNoActiveWorkers() {
+        var actor = new SessionPrincipal(
+            10L,
+            "admin@example.com",
+            "현장 관리자",
+            Set.of(Role.SITE_ADMIN),
+            Set.of(2L)
+        );
+        when(tbm.listWorkers(false, Set.of(2L), 2L)).thenReturn(java.util.List.of());
+
+        assertThatThrownBy(() -> controller.broadcast(
+            actor,
+            new TbmController.BroadcastRequest("안전모를 착용하세요", "2", "오늘의 TBM")
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("tbm_no_target_workers");
+
+        verify(tbm, never()).createPublished(any(), any(), any(), any());
+        verify(audit).record(
+            eq(10L),
+            eq(2L),
+            eq("tbm.notice.create"),
+            eq("tbm_notice"),
+            eq(null),
+            eq("DENIED"),
+            eq("tbm_no_target_workers"),
+            eq(Map.of())
+        );
+    }
+}

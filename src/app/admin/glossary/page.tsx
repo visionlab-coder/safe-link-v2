@@ -26,6 +26,14 @@ type PreviewRow = {
     source?: string;
 };
 
+type ImportRowResult = {
+    row: number;
+    slang: string;
+    standard: string;
+    status: "INSERTED" | "DUPLICATE" | "INVALID";
+    reason?: string | null;
+};
+
 const VALID_CATEGORIES = ["시설", "자재", "도구", "장비", "작업", "검사", "설비", "구조", "안전", "인원", "상태", "단위", "행정", "기타"];
 
 const HEADER_KEYWORDS = ["용어", "은어", "현장용어", "표준어", "standard", "slang", "category", "분류", "카테고리"];
@@ -171,7 +179,12 @@ export default function GlossaryPage() {
 
     const [isDragging, setIsDragging] = useState(false);
     const [preview, setPreview] = useState<PreviewRow[]>([]);
-    const [importStatus, setImportStatus] = useState<{ ok: number; dup: number; invalid: number } | null>(null);
+    const [importStatus, setImportStatus] = useState<{
+        ok: number;
+        dup: number;
+        invalid: number;
+        rows: ImportRowResult[];
+    } | null>(null);
     const [isImporting, setIsImporting] = useState(false);
     const [webUrl, setWebUrl] = useState("");
     const [pasteText, setPasteText] = useState("");
@@ -356,7 +369,7 @@ export default function GlossaryPage() {
         const res = await fetch("/api/glossary/import", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(validRows.map(r => ({ slang: r.slang, standard: r.standard, category: r.category }))),
+            body: JSON.stringify(preview.map(r => ({ slang: r.slang, standard: r.standard, category: r.category }))),
         });
         const result = await res.json();
 
@@ -364,8 +377,13 @@ export default function GlossaryPage() {
             setImportError("저장 실패: " + (result.error ?? res.statusText));
         } else {
             clearGlossaryCache();
-            const invalid = preview.filter(r => !r.valid).length;
-            setImportStatus({ ok: result.ok, dup: result.dup, invalid });
+            const rows = Array.isArray(result.rows) ? result.rows as ImportRowResult[] : [];
+            setImportStatus({
+                ok: Number(result.ok ?? 0),
+                dup: Number(result.dup ?? 0),
+                invalid: Number(result.invalid ?? preview.filter(r => !r.valid).length),
+                rows,
+            });
             if (result.ok === 0) {
                 setImportError(result.message ?? "저장된 항목이 없습니다. 모두 이미 등록된 항목이거나 중복입니다.");
             } else {
@@ -758,6 +776,18 @@ export default function GlossaryPage() {
                                     )}
                                     {importStatus.invalid > 0 && (
                                         <p className="text-red-400">❌ {importStatus.invalid}개 누락 — 건너뜀</p>
+                                    )}
+                                    {importStatus.rows.some(row => row.status !== "INSERTED") && (
+                                        <div className="mt-2 max-h-32 overflow-y-auto rounded-lg border border-white/10 bg-black/20 px-3 py-2 space-y-1">
+                                            {importStatus.rows
+                                                .filter(row => row.status !== "INSERTED")
+                                                .map(row => (
+                                                    <p key={`${row.row}-${row.status}`} className={row.status === "INVALID" ? "text-red-300" : "text-yellow-300"}>
+                                                        {row.row}행 · {row.status === "INVALID" ? "오류" : "중복"} · {row.slang || "은어 없음"}
+                                                        {row.reason ? ` (${row.reason})` : ""}
+                                                    </p>
+                                                ))}
+                                        </div>
                                     )}
                                 </div>
                             )}
