@@ -295,7 +295,10 @@ function AdminTBMCreateContent() {
 
             const res = await fetch("/api/tbm/broadcast", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Idempotency-Key": crypto.randomUUID(),
+                },
                 body: JSON.stringify({
                     content_ko: normalized,
                     site_id: adminSiteId ?? undefined,

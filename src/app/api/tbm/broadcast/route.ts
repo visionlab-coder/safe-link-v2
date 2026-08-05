@@ -6,7 +6,10 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   return proxyV3Api(req, "/api/v1/tbm/compat/broadcast", {
     method: "POST",
-    headers: { "Content-Type": req.headers.get("content-type") ?? "application/json" },
+    headers: {
+      "Content-Type": req.headers.get("content-type") ?? "application/json",
+      ...(req.headers.get("idempotency-key") ? { "Idempotency-Key": req.headers.get("idempotency-key")! } : {}),
+    },
     body: await req.text(),
   });
 }

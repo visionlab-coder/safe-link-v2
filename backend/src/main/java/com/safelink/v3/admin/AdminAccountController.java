@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,11 +26,13 @@ public class AdminAccountController {
     private final UserAccountRepository users;
     private final SiteGuard siteGuard;
     private final AuditService audit;
+    private final JdbcClient jdbc;
 
-    public AdminAccountController(UserAccountRepository users, SiteGuard siteGuard, AuditService audit) {
+    public AdminAccountController(UserAccountRepository users, SiteGuard siteGuard, AuditService audit, JdbcClient jdbc) {
         this.users = users;
         this.siteGuard = siteGuard;
         this.audit = audit;
+        this.jdbc = jdbc;
     }
 
     @GetMapping("/pending")
@@ -70,7 +73,36 @@ public class AdminAccountController {
             users.assertActiveSite(siteId);
         }
 
+        var acceptedInvitation = jdbc.sql("""
+                select id, target_role, target_site_id
+                from admin_invitations
+                where accepted_by = :userId and status = 'ACCEPTED'
+                order by accepted_at desc
+                limit 1
+            """)
+            .param("userId", userId)
+            .query((rs, rowNum) -> new AcceptedInvitation(
+                rs.getLong("id"),
+                Role.parse(rs.getString("target_role")),
+                rs.getObject("target_site_id", Long.class)
+            ))
+            .optional();
+        if (acceptedInvitation.isPresent()) {
+            var invitation = acceptedInvitation.get();
+            if (invitation.targetRole() != role || !java.util.Objects.equals(invitation.targetSiteId(), siteId)) {
+                throw new IllegalArgumentException("invitation_scope_mismatch");
+            }
+        }
+
         var approved = users.approvePendingAdminAccount(userId, role, siteId, actor.userId());
+        acceptedInvitation.ifPresent(invitation -> jdbc.sql("""
+                update admin_invitations
+                set status = 'APPROVED', decided_by = :actorId, decided_at = now()
+                where id = :id and status = 'ACCEPTED'
+            """)
+            .param("actorId", actor.userId())
+            .param("id", invitation.id())
+            .update());
         audit.record(
             actor.userId(),
             role.hasGlobalSiteScope() ? null : siteId,
@@ -143,4 +175,5 @@ public class AdminAccountController {
             );
         }
     }
+    private record AcceptedInvitation(Long id, Role targetRole, Long targetSiteId) {}
 }

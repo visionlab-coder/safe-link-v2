@@ -2,6 +2,7 @@ package com.safelink.v3.admin;
 
 import com.safelink.v3.audit.AuditService;
 import com.safelink.v3.auth.SessionPrincipal;
+import com.safelink.v3.auth.UserAccountRepository;
 import com.safelink.v3.domain.Role;
 import com.safelink.v3.security.SiteGuard;
 import jakarta.validation.Valid;
@@ -18,6 +19,9 @@ import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,11 +33,21 @@ public class AdminInvitationController {
     private final JdbcClient jdbc;
     private final SiteGuard siteGuard;
     private final AuditService audit;
+    private final UserAccountRepository users;
+    private final PasswordEncoder passwordEncoder;
 
-    public AdminInvitationController(JdbcClient jdbc, SiteGuard siteGuard, AuditService audit) {
+    public AdminInvitationController(
+        JdbcClient jdbc,
+        SiteGuard siteGuard,
+        AuditService audit,
+        UserAccountRepository users,
+        PasswordEncoder passwordEncoder
+    ) {
         this.jdbc = jdbc;
         this.siteGuard = siteGuard;
         this.audit = audit;
+        this.users = users;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @PostMapping
@@ -81,6 +95,112 @@ public class AdminInvitationController {
         return new InvitationResponse(id, "PENDING", rawToken);
     }
 
+    @PostMapping("/accept")
+    @Transactional(noRollbackFor = InvitationExpiredException.class)
+    public AcceptedInvitationResponse accept(@Valid @RequestBody AcceptInvitationRequest request) {
+        String tokenHash = sha256(request.token().trim());
+        InvitationRow invitation = jdbc.sql("""
+                select id, email, target_role, target_site_id, status, expires_at
+                from admin_invitations
+                where token_hash = :tokenHash
+                for update
+            """)
+            .param("tokenHash", tokenHash)
+            .query((rs, rowNum) -> new InvitationRow(
+                rs.getLong("id"),
+                rs.getString("email"),
+                Role.parse(rs.getString("target_role")),
+                rs.getObject("target_site_id", Long.class),
+                rs.getString("status"),
+                rs.getTimestamp("expires_at").toInstant()
+            ))
+            .optional()
+            .orElseThrow(() -> new IllegalArgumentException("invitation_invalid"));
+
+        if (!"PENDING".equals(invitation.status())) {
+            throw new IllegalArgumentException("invitation_not_pending");
+        }
+        if (!invitation.expiresAt().isAfter(Instant.now())) {
+            jdbc.sql("""
+                    update admin_invitations
+                    set status = 'EXPIRED', decided_at = now()
+                    where id = :id and status = 'PENDING'
+                """)
+                .param("id", invitation.id())
+                .update();
+            audit.record(null, invitation.targetSiteId(), "admin.invitation.accept", "admin_invitation", String.valueOf(invitation.id()), "DENIED", "expired", Map.of());
+            throw new InvitationExpiredException();
+        }
+        if (invitation.email() == null || invitation.email().isBlank()) {
+            throw new IllegalArgumentException("invitation_email_required");
+        }
+        if (users.findByEmail(invitation.email()).isPresent()) {
+            throw new IllegalArgumentException("invitation_email_already_registered");
+        }
+
+        var account = users.createPendingAdminSignupAccount(
+            invitation.email().trim().toLowerCase(java.util.Locale.ROOT),
+            request.displayName().trim(),
+            request.preferredLanguage() == null || request.preferredLanguage().isBlank() ? "ko" : request.preferredLanguage().trim().toLowerCase(java.util.Locale.ROOT),
+            passwordEncoder.encode(request.password())
+        );
+        jdbc.sql("""
+                update admin_invitations
+                set status = 'ACCEPTED', accepted_by = :userId, accepted_at = now()
+                where id = :id and status = 'PENDING'
+            """)
+            .param("userId", account.id())
+            .param("id", invitation.id())
+            .update();
+        audit.record(account.id(), invitation.targetSiteId(), "admin.invitation.accept", "admin_invitation", String.valueOf(invitation.id()), "ALLOWED", "pending_approval", Map.of("targetRole", invitation.targetRole().name()));
+        return new AcceptedInvitationResponse(invitation.id(), "ACCEPTED", account.id(), "PENDING", true);
+    }
+
+    @PostMapping("/{invitationId}/revoke")
+    @Transactional
+    public InvitationStatusResponse revoke(
+        @AuthenticationPrincipal SessionPrincipal actor,
+        @PathVariable Long invitationId
+    ) {
+        InvitationRow invitation = jdbc.sql("""
+                select id, email, target_role, target_site_id, status, expires_at
+                from admin_invitations
+                where id = :id
+                for update
+            """)
+            .param("id", invitationId)
+            .query((rs, rowNum) -> new InvitationRow(
+                rs.getLong("id"),
+                rs.getString("email"),
+                Role.parse(rs.getString("target_role")),
+                rs.getObject("target_site_id", Long.class),
+                rs.getString("status"),
+                rs.getTimestamp("expires_at").toInstant()
+            ))
+            .optional()
+            .orElseThrow(() -> new IllegalArgumentException("invitation_not_found"));
+        if (invitation.targetSiteId() == null) {
+            if (actor == null || !actor.hasAnyGlobalRole()) {
+                throw new AccessDeniedException("global_role_required");
+            }
+        } else {
+            siteGuard.requireGlobalOrSiteAdmin(actor, invitation.targetSiteId(), "admin.invitation.revoke", "admin_invitation", String.valueOf(invitationId));
+        }
+        if (!"PENDING".equals(invitation.status())) {
+            throw new IllegalArgumentException("invitation_not_pending");
+        }
+        jdbc.sql("""
+                update admin_invitations
+                set status = 'REVOKED', decided_by = :actorId, decided_at = now()
+                where id = :id and status = 'PENDING'
+            """)
+            .param("actorId", actor.userId())
+            .param("id", invitationId)
+            .update();
+        audit.record(actor.userId(), invitation.targetSiteId(), "admin.invitation.revoke", "admin_invitation", String.valueOf(invitationId), "ALLOWED", "revoked", Map.of());
+        return new InvitationStatusResponse(invitationId, "REVOKED");
+    }
+
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
@@ -96,4 +216,20 @@ public class AdminInvitationController {
 
     public record CreateInvitationRequest(String email, String phone, @NotBlank String targetRole, Long targetSiteId, @NotNull @Future Instant expiresAt) {}
     public record InvitationResponse(Long id, String status, String oneTimeToken) {}
+    public record AcceptInvitationRequest(@NotBlank String token, @NotBlank String password, @NotBlank String displayName, String preferredLanguage) {
+        public AcceptInvitationRequest {
+            if (password != null && password.length() < 12) {
+                throw new IllegalArgumentException("password_min_length");
+            }
+        }
+    }
+    public record AcceptedInvitationResponse(Long invitationId, String invitationStatus, Long userId, String accountStatus, boolean approvalRequired) {}
+    public record InvitationStatusResponse(Long invitationId, String status) {}
+    private record InvitationRow(Long id, String email, Role targetRole, Long targetSiteId, String status, Instant expiresAt) {}
+
+    private static final class InvitationExpiredException extends IllegalArgumentException {
+        private InvitationExpiredException() {
+            super("invitation_expired");
+        }
+    }
 }

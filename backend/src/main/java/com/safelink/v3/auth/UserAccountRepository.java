@@ -59,8 +59,10 @@ public class UserAccountRepository {
                        array(
                          select sm.site_id
                          from site_memberships sm
+                         join sites s on s.id = sm.site_id
                          where sm.user_id = u.id
                            and sm.status = 'ACTIVE'
+                           and s.status = 'ACTIVE'
                          order by sm.site_id
                        ) as active_site_ids
                 from users u
@@ -118,6 +120,7 @@ public class UserAccountRepository {
                 select id, name
                 from sites
                 where id in (:siteIds)
+                  and status = 'ACTIVE'
                 order by name, id
             """)
             .param("siteIds", siteIds)
@@ -151,6 +154,22 @@ public class UserAccountRepository {
             .param("displayName", displayName)
             .param("preferredLanguage", preferredLanguage)
             .update();
+    }
+
+    public void updatePassword(Long userId, String passwordHash) {
+        int updated = jdbc.sql("""
+                update user_credentials
+                set password_hash = :passwordHash,
+                    password_updated_at = now(),
+                    disabled_at = null
+                where user_id = :userId
+            """)
+            .param("passwordHash", passwordHash)
+            .param("userId", userId)
+            .update();
+        if (updated != 1) {
+            throw new IllegalArgumentException("password_reset_account_invalid");
+        }
     }
 
     public UserAccount createPendingAdminSignupAccount(
@@ -344,11 +363,13 @@ public class UserAccountRepository {
 
     private Set<Long> sitesFor(Long userId) {
         return new LinkedHashSet<>(jdbc.sql("""
-                select site_id
-                from site_memberships
-                where user_id = :userId
-                  and status = 'ACTIVE'
-                order by site_id
+                select sm.site_id
+                from site_memberships sm
+                join sites s on s.id = sm.site_id
+                where sm.user_id = :userId
+                  and sm.status = 'ACTIVE'
+                  and s.status = 'ACTIVE'
+                order by sm.site_id
             """)
             .param("userId", userId)
             .query(Long.class)

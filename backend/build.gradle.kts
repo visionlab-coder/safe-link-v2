@@ -2,6 +2,7 @@ plugins {
     java
     id("org.springframework.boot") version "3.4.7"
     id("io.spring.dependency-management") version "1.1.7"
+    id("org.owasp.dependencycheck") version "12.2.2"
 }
 
 group = "com.safelink"
@@ -36,4 +37,9 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+dependencyCheck {
+    formats = listOf("HTML", "JSON")
+    failBuildOnCVSS = 7.0F
 }

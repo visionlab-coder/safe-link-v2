@@ -49,6 +49,8 @@ public class SecurityConfig {
                 new AntPathRequestMatcher("/api/v1/auth/login", "POST"),
                 new AntPathRequestMatcher("/api/v1/auth/admin-signup", "POST"),
                 new AntPathRequestMatcher("/api/v1/auth/worker-quick-login", "POST"),
+                new AntPathRequestMatcher("/api/v1/auth/password-reset/**", "POST"),
+                new AntPathRequestMatcher("/api/v1/admin/invitations/accept", "POST"),
                 new AntPathRequestMatcher("/api/v1/qr/site-entry", "POST"),
                 new AntPathRequestMatcher("/api/v1/qr/worker-token", "POST"),
                 new AntPathRequestMatcher("/api/v1/nfc/worker-preference", "POST"),
@@ -70,6 +72,8 @@ public class SecurityConfig {
             .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/auth/admin-signup").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/auth/worker-quick-login").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/v1/auth/password-reset/**").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/v1/admin/invitations/accept").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/qr/site-entry").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/qr/worker-token").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/nfc/worker-info").permitAll()

@@ -20,6 +20,8 @@ import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.mockito.Answers;
 
 class AdminAccountControllerTest {
     private UserAccountRepository users;
@@ -32,7 +34,7 @@ class AdminAccountControllerTest {
         users = mock(UserAccountRepository.class);
         siteGuard = mock(SiteGuard.class);
         audit = mock(AuditService.class);
-        controller = new AdminAccountController(users, siteGuard, audit);
+        controller = new AdminAccountController(users, siteGuard, audit, mock(JdbcClient.class, Answers.RETURNS_DEEP_STUBS));
     }
 
     @Test

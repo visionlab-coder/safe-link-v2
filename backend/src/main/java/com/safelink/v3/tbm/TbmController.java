@@ -35,6 +35,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -106,6 +107,7 @@ public class TbmController {
     @PostMapping("/broadcast")
     public TbmBroadcastResponse broadcast(
         @AuthenticationPrincipal SessionPrincipal actor,
+        @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
         @RequestBody BroadcastRequest request
     ) {
         requireTbmAdmin(actor);
@@ -129,7 +131,8 @@ public class TbmController {
             throw new IllegalArgumentException("tbm_no_target_workers");
         }
 
-        var notice = tbm.createPublished(siteId, actor.userId(), title, content);
+        String cleanIdempotencyKey = cleanIdempotencyKey(idempotencyKey);
+        var notice = tbm.createPublished(siteId, actor.userId(), title, content, cleanIdempotencyKey);
         audit.record(actor.userId(), siteId, "tbm.notice.create", "tbm_notice", String.valueOf(notice.id()), "ALLOWED", "compat_server_api", Map.of());
         return new TbmBroadcastResponse(toCompatNotice(notice));
     }
@@ -316,6 +319,17 @@ public class TbmController {
         String cleaned = value == null ? "" : value.trim();
         if (cleaned.isBlank()) {
             throw new IllegalArgumentException(error);
+        }
+        return cleaned;
+    }
+
+    private static String cleanIdempotencyKey(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String cleaned = value.trim();
+        if (cleaned.length() > 128 || !cleaned.matches("^[A-Za-z0-9._:-]+$")) {
+            throw new IllegalArgumentException("idempotency_key_invalid");
         }
         return cleaned;
     }

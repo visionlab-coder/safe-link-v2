@@ -78,10 +78,12 @@ public class TbmRepository {
         return statement.query(this::mapNotice).list();
     }
 
-    public NoticeRow createPublished(Long siteId, Long createdBy, String title, String content) {
+    public NoticeRow createPublished(Long siteId, Long createdBy, String title, String content, String idempotencyKey) {
         Long id = jdbc.sql("""
-                insert into tbm_notices(site_id, created_by, title, source_text, normalized_text, status, published_at)
-                values (:siteId, :createdBy, :title, :sourceText, :normalizedText, 'PUBLISHED', now())
+                insert into tbm_notices(site_id, created_by, title, source_text, normalized_text, status, published_at, idempotency_key)
+                values (:siteId, :createdBy, :title, :sourceText, :normalizedText, 'PUBLISHED', now(), :idempotencyKey)
+                on conflict (site_id, idempotency_key) where idempotency_key is not null
+                do update set idempotency_key = excluded.idempotency_key
                 returning id
             """)
             .param("siteId", siteId)
@@ -89,6 +91,7 @@ public class TbmRepository {
             .param("title", title)
             .param("sourceText", content)
             .param("normalizedText", content)
+            .param("idempotencyKey", idempotencyKey)
             .query(Long.class)
             .single();
         return getNotice(id);
@@ -166,6 +169,7 @@ public class TbmRepository {
                 select distinct u.id, u.display_name, u.preferred_language, sm.site_id
                 from users u
                 join site_memberships sm on sm.user_id = u.id and sm.status = 'ACTIVE' and sm.role = 'WORKER'
+                join sites s on s.id = sm.site_id and s.status = 'ACTIVE'
                 join user_roles ur on ur.user_id = u.id and ur.revoked_at is null and ur.role = 'WORKER'
                 where u.account_status = 'ACTIVE'
                   %s

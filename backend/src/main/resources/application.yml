@@ -74,6 +74,8 @@ safe-link:
     allowed-origins: ${SAFE_LINK_CORS_ALLOWED_ORIGINS:http://localhost:3000}
   security:
     max-sessions-per-user: ${SAFE_LINK_MAX_SESSIONS_PER_USER:5}
+  password-reset:
+    expose-token: ${SAFE_LINK_PASSWORD_RESET_EXPOSE_TOKEN:false}
   root-bootstrap:
     enabled: ${SAFE_LINK_ROOT_BOOTSTRAP_ENABLED:false}
     email: ${SAFE_LINK_ROOT_BOOTSTRAP_EMAIL:}
