@@ -132,7 +132,7 @@ export default function RootLayout({
         />
         <OfflineBanner />
         <AuthListener />
-        {children}
+        <div className="safe-area-page">{children}</div>
       </body>
     </html>
   );
