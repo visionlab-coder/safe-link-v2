@@ -297,7 +297,7 @@ export default function AdminIncentivePage() {
       </div>
 
       {grantForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setGrantForm(null)}>
+        <div className="safe-area-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setGrantForm(null)}>
           <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
             <p className="font-bold text-white mb-4">장비 유형 선택</p>
             <div className="grid grid-cols-3 gap-2 mb-4">

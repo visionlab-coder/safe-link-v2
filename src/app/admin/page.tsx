@@ -195,7 +195,7 @@ function AdminDashboardContent() {
 
     return (
         <RoleGuard allowedRole="admin">
-            <div className="safe-area-top min-h-screen bg-mesh text-white p-4 md:p-8 flex flex-col gap-8 pb-12 font-sans selection:bg-blue-500/30">
+            <div className="min-h-screen bg-mesh text-white p-4 md:p-8 flex flex-col gap-8 pb-12 font-sans selection:bg-blue-500/30">
 
                 {/* 💎 Premium Header */}
                 <header className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start animate-float">

@@ -123,7 +123,7 @@ export default function SwarmAgentHUD() {
                     initial={{ opacity: 0, scale: 0.9, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                    className={`fixed bottom-24 right-4 md:right-8 z-[100] w-64 rounded-2xl p-4 shadow-2xl border-2 backdrop-blur-xl transition-colors duration-500
+                    className={`safe-area-floating-bottom-right fixed z-[100] w-64 rounded-2xl p-4 shadow-2xl border-2 backdrop-blur-xl transition-colors duration-500
                         ${isNoisy ? 'bg-red-900/90 border-red-500 text-white' : 'bg-slate-900/80 border-slate-700 text-slate-100'}
                     `}
                 >
@@ -184,7 +184,7 @@ export default function SwarmAgentHUD() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.8 }}
                     onClick={() => setIsMinimized(false)}
-                    className={`fixed bottom-24 right-4 md:right-8 z-[100] flex items-center gap-2 px-4 py-2.5 rounded-full shadow-xl border backdrop-blur-md transition-colors 
+                    className={`safe-area-floating-bottom-right fixed z-[100] flex items-center gap-2 px-4 py-2.5 rounded-full shadow-xl border backdrop-blur-md transition-colors
                         ${isActive ? 'bg-emerald-900/90 border-emerald-500/50 text-emerald-400' : 'bg-slate-900/90 border-slate-700 text-slate-400 hover:text-white'}`}
                 >
                     <Activity className={`w-4 h-4 ${isActive ? 'animate-pulse text-emerald-400' : ''}`} />

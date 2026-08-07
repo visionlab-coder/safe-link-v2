@@ -87,7 +87,7 @@ function LandingPageInner() {
   };
 
   return (
-    <main className="safe-area-landing relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-mesh p-4 py-10 selection:bg-blue-500/30">
+    <main className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-mesh p-4 py-10 selection:bg-blue-500/30">
 
       {/* ?뭿 Background Ambient Lights */}
       <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-blue-600/10 blur-[160px] rounded-full pointer-events-none animate-pulse-soft" />

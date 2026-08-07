@@ -664,7 +664,7 @@ function WorkerHomeContent() {
 
     return (
         <RoleGuard allowedRole="worker">
-            <div className="safe-area-top min-h-screen bg-mesh text-white p-4 md:p-8 flex flex-col gap-8 pb-12 font-sans selection:bg-red-500/30">
+            <div className="min-h-screen bg-mesh text-white p-4 md:p-8 flex flex-col gap-8 pb-12 font-sans selection:bg-red-500/30">
 
                 {/* 💎 Premium Header */}
                 <header className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start animate-float">
@@ -735,7 +735,7 @@ function WorkerHomeContent() {
 
                 {/* 🛑 작업중지 모달 */}
                 {showStopWorkModal && (
-                    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-fadeIn">
+                    <div className="safe-area-overlay fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center animate-fadeIn">
                         <div className="bg-slate-900 rounded-[40px] p-8 w-full max-w-md border-2 border-red-500/50 shadow-[0_0_80px_-20px_rgba(239,68,68,0.5)] flex flex-col gap-6">
                             {stopWorkSent ? (
                                 <div className="flex flex-col items-center gap-4 py-8">

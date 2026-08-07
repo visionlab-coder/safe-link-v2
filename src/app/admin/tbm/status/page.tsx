@@ -508,7 +508,7 @@ function TBMStatusPageContent() {
     return (
         <RoleGuard allowedRole="admin">
             <div className="min-h-screen bg-mesh text-slate-50 flex flex-col font-sans selection:bg-blue-500/30">
-                <header className="sticky top-0 z-50 glass border-b border-white/5 px-6 py-4 flex items-center justify-between">
+                <header className="safe-area-sticky-top sticky z-50 glass border-b border-white/5 px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors tap-effect text-slate-400">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -711,7 +711,7 @@ function TBMStatusPageContent() {
 
                 {/* ✍️ Signature Preview Modal */}
                 {selectedSignature && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl transition-all" onClick={() => setSelectedSignature(null)}>
+                    <div className="safe-area-overlay fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl transition-all" onClick={() => setSelectedSignature(null)}>
                         <div className="relative glass p-1 rounded-[40px] border border-white/20 shadow-2xl animate-float max-w-lg w-full" onClick={e => e.stopPropagation()}>
                             <div className="bg-white rounded-[38px] overflow-hidden p-8 flex flex-col gap-6 items-center">
                                 <div className="flex justify-between w-full items-center">

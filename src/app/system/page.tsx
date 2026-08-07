@@ -599,7 +599,7 @@ export default function SystemAdminPage() {
                     type="button"
                     aria-label="시스템 메뉴 열기"
                     onClick={() => setIsSidebarOpen(true)}
-                    className={`fixed left-4 top-4 z-40 md:hidden w-11 h-11 rounded-2xl border border-white/10 bg-slate-950/80 backdrop-blur-xl text-white items-center justify-center shadow-xl shadow-black/30 ${isSidebarOpen ? "hidden" : "flex"}`}
+                    className={`safe-area-fixed-corner-top fixed z-40 md:hidden w-11 h-11 rounded-2xl border border-white/10 bg-slate-950/80 backdrop-blur-xl text-white items-center justify-center shadow-xl shadow-black/30 ${isSidebarOpen ? "hidden" : "flex"}`}
                 >
                     <Menu className="w-5 h-5" />
                 </button>
@@ -609,7 +609,7 @@ export default function SystemAdminPage() {
                         type="button"
                         aria-label="시스템 메뉴 열기"
                         onClick={() => setIsSidebarCollapsed(false)}
-                        className="fixed left-4 top-4 z-40 hidden md:flex w-11 h-11 rounded-2xl border border-white/10 bg-slate-950/80 backdrop-blur-xl text-white items-center justify-center shadow-xl shadow-black/30"
+                        className="safe-area-fixed-corner-top fixed z-40 hidden md:flex w-11 h-11 rounded-2xl border border-white/10 bg-slate-950/80 backdrop-blur-xl text-white items-center justify-center shadow-xl shadow-black/30"
                     >
                         <Menu className="w-5 h-5" />
                     </button>
@@ -625,7 +625,7 @@ export default function SystemAdminPage() {
                 )}
 
                 {/* Sidebar */}
-                <aside className={`fixed left-0 top-0 bottom-0 w-64 bg-slate-950/90 md:bg-slate-950/50 backdrop-blur-xl border-r border-white/5 z-50 flex flex-col p-6 transition-transform duration-300 ease-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} ${isSidebarCollapsed ? "md:-translate-x-full" : "md:translate-x-0"}`}>
+                <aside className={`safe-area-fixed-rail fixed left-0 top-0 bottom-0 w-64 bg-slate-950/90 md:bg-slate-950/50 backdrop-blur-xl border-r border-white/5 z-50 flex flex-col p-6 transition-transform duration-300 ease-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} ${isSidebarCollapsed ? "md:-translate-x-full" : "md:translate-x-0"}`}>
                     <div className="flex items-center gap-3 mb-10 px-2">
                         <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
                             <Shield className="w-6 h-6 text-white" />
@@ -1604,7 +1604,7 @@ export default function SystemAdminPage() {
                     {/* Site Add/Edit Modal */}
                     <AnimatePresence>
                         {isModalOpen && (
-                            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                            <div className="safe-area-overlay fixed inset-0 z-[100] flex items-center justify-center">
                                 <motion.div
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}

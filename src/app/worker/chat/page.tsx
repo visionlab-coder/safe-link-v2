@@ -530,7 +530,7 @@ function WorkerChatContent() {
     return (
         <RoleGuard allowedRole="worker">
             <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-                <header className="sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-4 flex items-center justify-between shadow-sm">
+                <header className="safe-area-sticky-top sticky z-50 bg-white border-b border-slate-200 px-4 py-4 flex items-center justify-between shadow-sm">
                     <div className="flex items-center gap-3">
                         <button onClick={() => activeAdmin ? setActiveAdmin(null) : router.back()} className="p-2 -ml-2 rounded-full hover:bg-slate-100 transition-colors text-slate-500">
                             <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>

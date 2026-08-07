@@ -200,7 +200,7 @@ function AdminQuizContent() {
   return (
     <RoleGuard allowedRole="admin">
       <div className="min-h-screen bg-mesh text-white font-sans flex flex-col selection:bg-blue-500/30">
-        <header className="sticky top-0 z-50 glass border-b border-white/5 px-6 py-4 flex items-center gap-4">
+        <header className="safe-area-sticky-top sticky z-50 glass border-b border-white/5 px-6 py-4 flex items-center gap-4">
           <button
             onClick={() => router.back()}
             className="p-2 -ml-2 rounded-full hover:bg-white/5 tap-effect text-slate-400"

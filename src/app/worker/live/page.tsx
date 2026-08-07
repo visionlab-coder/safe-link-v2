@@ -311,7 +311,7 @@ export default function WorkerLivePage() {
     return (
         <RoleGuard allowedRole="worker">
             <div className="h-screen bg-mesh text-white font-sans flex flex-col overflow-hidden">
-                <header className="sticky top-0 z-50 glass border-b border-white/5 px-6 py-4 flex items-center justify-between">
+                <header className="safe-area-sticky-top sticky z-50 glass border-b border-white/5 px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <button onClick={() => router.push("/worker")} className="p-2 -ml-2 rounded-full hover:bg-white/5 tap-effect text-slate-400">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

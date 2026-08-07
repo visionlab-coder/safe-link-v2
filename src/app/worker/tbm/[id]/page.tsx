@@ -357,7 +357,7 @@ function WorkerTBMDetailContent() {
             <div className="min-h-screen bg-mesh text-slate-50 flex flex-col font-sans selection:bg-red-500/30">
 
                 {/* 💎 Header */}
-                <header className="sticky top-0 z-50 glass border-b border-white/5 px-4 md:px-8 py-4 flex items-center justify-between">
+                <header className="safe-area-sticky-top sticky z-50 glass border-b border-white/5 px-4 md:px-8 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <button onClick={handleBack} className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors tap-effect text-slate-400">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -629,7 +629,7 @@ function WorkerTBMDetailContent() {
 
                 {/* 🚀 Sticky CTA Button */}
                 {!loading && tbm && (
-                    <div className="fixed bottom-0 inset-x-0 p-6 md:p-10 pointer-events-none">
+                    <div className="safe-area-fixed-bottom fixed bottom-0 inset-x-0 md:p-10 pointer-events-none">
                         <div className="max-w-2xl mx-auto pointer-events-auto">
                             <button
                                 onClick={handleSubmit}

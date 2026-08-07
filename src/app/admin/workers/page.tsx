@@ -245,7 +245,7 @@ export default function AdminWorkersPage() {
       </div>
 
       {qrModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setQrModal(null)}>
+        <div className="safe-area-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setQrModal(null)}>
           <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-sm w-full" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div>

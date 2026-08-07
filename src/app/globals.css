@@ -6,6 +6,10 @@
   --accent: #ef4444;
   --glass: rgba(15, 23, 42, 0.7);
   --glass-border: rgba(255, 255, 255, 0.1);
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
 }
 
 @theme inline {
@@ -30,6 +34,25 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  box-sizing: border-box;
+  min-height: 100dvh;
+  padding-top: var(--safe-area-top);
+  padding-right: var(--safe-area-right);
+  padding-bottom: var(--safe-area-bottom);
+  padding-left: var(--safe-area-left);
+}
+
+/* Keep full-screen page shells inside the usable iOS viewport. */
+.min-h-screen {
+  min-height: calc(100dvh - var(--safe-area-top) - var(--safe-area-bottom));
+}
+
+.h-screen {
+  height: calc(100dvh - var(--safe-area-top) - var(--safe-area-bottom));
+}
+
+.h-dvh {
+  height: calc(100dvh - var(--safe-area-top) - var(--safe-area-bottom));
 }
 
 /*
@@ -45,18 +68,59 @@ body {
   }
 }
 
-/* Native iOS/PWA: keep the first header below the notch/Dynamic Island. */
-.safe-area-top {
-  padding-top: max(1rem, calc(env(safe-area-inset-top, 0px) + 0.75rem));
+/*
+ * Fixed/sticky UI does not inherit the body safe-area padding. These helpers
+ * keep controls and text outside the Dynamic Island while allowing their
+ * background to continue behind the status bar.
+ */
+.safe-area-sticky-top {
+  top: var(--safe-area-top);
 }
 
-.safe-area-landing {
-  padding-top: max(2.5rem, calc(env(safe-area-inset-top, 0px) + 0.75rem));
+.safe-area-fixed-corner-top {
+  top: calc(var(--safe-area-top) + 1rem);
+  left: calc(var(--safe-area-left) + 1rem);
+}
+
+.safe-area-fixed-rail {
+  padding-top: calc(var(--safe-area-top) + 1.5rem);
+  padding-bottom: calc(var(--safe-area-bottom) + 1.5rem);
+  padding-left: calc(var(--safe-area-left) + 1.5rem);
+}
+
+.safe-area-banner {
+  padding-top: calc(var(--safe-area-top) + 0.75rem);
+  padding-right: calc(var(--safe-area-right) + 1rem);
+  padding-left: calc(var(--safe-area-left) + 1rem);
+}
+
+.safe-area-overlay {
+  padding-top: max(1rem, calc(var(--safe-area-top) + 0.75rem));
+  padding-right: max(1rem, calc(var(--safe-area-right) + 0.75rem));
+  padding-bottom: max(1rem, calc(var(--safe-area-bottom) + 0.75rem));
+  padding-left: max(1rem, calc(var(--safe-area-left) + 0.75rem));
+}
+
+.safe-area-fixed-bottom {
+  padding-right: calc(var(--safe-area-right) + 1.5rem);
+  padding-bottom: calc(var(--safe-area-bottom) + 1.5rem);
+  padding-left: calc(var(--safe-area-left) + 1.5rem);
+}
+
+.safe-area-floating-bottom-right {
+  right: calc(var(--safe-area-right) + 1rem);
+  bottom: calc(var(--safe-area-bottom) + 6rem);
 }
 
 @media (min-width: 768px) {
-  .safe-area-top {
-    padding-top: max(2rem, calc(env(safe-area-inset-top, 0px) + 0.75rem));
+  .safe-area-floating-bottom-right {
+    right: calc(var(--safe-area-right) + 2rem);
+  }
+
+  .safe-area-fixed-bottom {
+    padding-right: calc(var(--safe-area-right) + 2.5rem);
+    padding-bottom: calc(var(--safe-area-bottom) + 2.5rem);
+    padding-left: calc(var(--safe-area-left) + 2.5rem);
   }
 }
 

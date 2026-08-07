@@ -533,7 +533,7 @@ function AdminChatContent() {
         <RoleGuard allowedRole="admin">
             {/* White/Bright Theme applied to root */}
             <div className="h-dvh min-h-0 overflow-hidden bg-slate-50 text-slate-900 font-sans flex flex-col selection:bg-blue-200">
-                <header className="sticky top-0 z-50 shrink-0 bg-white border-b border-slate-200 px-4 md:px-6 py-3 md:py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between shadow-sm">
+                <header className="safe-area-sticky-top sticky z-50 shrink-0 bg-white border-b border-slate-200 px-4 md:px-6 py-3 md:py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between shadow-sm">
                     <div className="flex min-w-0 items-center gap-4">
                         <button onClick={() => { if (activeWorker) setActiveWorker(null); else router.back(); }} className="p-2 -ml-2 rounded-full hover:bg-slate-100 transition-colors tap-effect text-slate-500 relative">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -688,7 +688,7 @@ function AdminChatContent() {
                         {showQR && (
                             <motion.div
                                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                                className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+                                className="safe-area-overlay fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center"
                                 onClick={() => setShowQR(false)}
                             >
                                 <motion.div
