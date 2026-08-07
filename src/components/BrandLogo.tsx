@@ -24,7 +24,8 @@ export default function BrandLogo({
         alt="SEOWON"
         width={width}
         height={height}
-        priority={!compact}
+        priority
+        unoptimized
         className={`h-auto w-auto object-contain drop-shadow-sm ${imageClassName}`}
       />
       </div>

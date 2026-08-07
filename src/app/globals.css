@@ -50,6 +50,10 @@ body {
   padding-top: max(1rem, calc(env(safe-area-inset-top, 0px) + 0.75rem));
 }
 
+.safe-area-landing {
+  padding-top: max(2.5rem, calc(env(safe-area-inset-top, 0px) + 0.75rem));
+}
+
 @media (min-width: 768px) {
   .safe-area-top {
     padding-top: max(2rem, calc(env(safe-area-inset-top, 0px) + 0.75rem));
