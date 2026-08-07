@@ -46,6 +46,19 @@ body {
   min-height: 100dvh;
 }
 
+/* Prevent scrolling page content from showing through the iOS status bar. */
+.safe-area-page::before {
+  content: "";
+  position: fixed;
+  z-index: 40;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--safe-area-top);
+  pointer-events: none;
+  background: #020617;
+}
+
 .safe-area-page > * {
   box-sizing: border-box;
   border-style: solid;
@@ -55,6 +68,11 @@ body {
   border-bottom-width: var(--safe-area-bottom);
   border-left-width: var(--safe-area-left);
   background-clip: border-box;
+}
+
+/* A real top header owns the safe area instead of leaving a spacer above it. */
+.safe-area-page > :has(.safe-area-sticky-top) {
+  border-top-width: 0;
 }
 
 /*
@@ -76,7 +94,8 @@ body {
  * background to continue behind the status bar.
  */
 .safe-area-sticky-top {
-  top: var(--safe-area-top);
+  top: 0;
+  padding-top: calc(var(--safe-area-top) + 1rem);
 }
 
 .safe-area-fixed-corner-top {
