@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Noto_Sans, Noto_Sans_KR, Noto_Sans_SC, Noto_Sans_TC, Noto_Sans_JP, Noto_Sans_Thai, Noto_Sans_Arabic, Noto_Sans_Devanagari } from "next/font/google";
 import "./globals.css";
 import AuthListener from "@/components/AuthListener";
@@ -85,6 +85,12 @@ export const metadata: Metadata = {
     title: "SQ Link",
     statusBarStyle: "black-translucent",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
