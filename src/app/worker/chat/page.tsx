@@ -250,11 +250,18 @@ function WorkerChatContent() {
     const [admins, setAdmins] = useState<AdminProfile[]>([]);
     const [activeAdmin, setActiveAdmin] = useState<AdminProfile | null>(null);
     const [siteId, setSiteId] = useState<string | null>(null);
+    const [adminActivity, setAdminActivity] = useState<Record<string, number>>({});
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const voiceGenderRef = useRef<'male' | 'female'>('female');
     const [showSidebar, setShowSidebar] = useState(false);
     const [unreadAdmins, setUnreadAdmins] = useState<Record<string, number>>({});
     const activeAdminRef = useRef<AdminProfile | null>(null);
+
+    const recordAdminActivity = useCallback((adminId: string, createdAt?: string) => {
+        const parsed = createdAt ? Date.parse(createdAt) : Date.now();
+        const timestamp = Number.isFinite(parsed) ? parsed : Date.now();
+        setAdminActivity(prev => prev[adminId] === timestamp ? prev : { ...prev, [adminId]: timestamp });
+    }, []);
     const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
         if (typeof window === 'undefined') return true;
         return localStorage.getItem('sl_voice_enabled') !== 'false';
@@ -350,6 +357,8 @@ function WorkerChatContent() {
 
             const payload = (await res.json()) as ChatMessagesResponse;
             const sorted = payload.messages ?? [];
+            const latest = sorted.at(-1);
+            if (latest) recordAdminActivity(activeAdmin.id, latest.created_at);
             const newIncoming = sorted.filter((m) =>
                 m.from_user === activeAdmin.id &&
                 m.to_user === myId &&
@@ -384,7 +393,7 @@ function WorkerChatContent() {
             window.clearInterval(fallbackPoll);
             events.close();
         };
-    }, [myId, activeAdmin, siteId, markMessagesRead]); // lang 제거: 언어 변경 시 채널 재생성 불필요
+    }, [myId, activeAdmin, siteId, markMessagesRead, recordAdminActivity]); // lang 제거: 언어 변경 시 채널 재생성 불필요
 
     // 🆕 Global Message Monitor (For Unread Notifications)
     const unreadAdminSeenRef = useRef<Set<string>>(new Set());
@@ -397,7 +406,10 @@ function WorkerChatContent() {
                 const res = await fetch(`/api/chat/messages?peer_id=${admin.id}&limit=5`, { cache: "no-store" });
                 if (!res.ok) continue;
                 const payload = (await res.json()) as ChatMessagesResponse;
-                const incoming = (payload.messages ?? []).filter((msg) =>
+                const recent = payload.messages ?? [];
+                const latest = recent.at(-1);
+                if (latest) recordAdminActivity(admin.id, latest.created_at);
+                const incoming = recent.filter((msg) =>
                     msg.from_user === admin.id &&
                     msg.to_user === myId &&
                     msg.is_read === false &&
@@ -415,13 +427,14 @@ function WorkerChatContent() {
         void pollUnread();
         const events = new EventSource("/api/chat/user-events");
         events.addEventListener("message", () => {
+            void load();
             void pollUnread();
         });
         return () => {
             cancelled = true;
             events.close();
         };
-    }, [myId, admins]);
+    }, [myId, admins, load, recordAdminActivity]);
 
     const handleSend = async (overrideText?: string | React.MouseEvent) => {
         const messageText = typeof overrideText === 'string' ? overrideText : text;
@@ -433,6 +446,7 @@ function WorkerChatContent() {
         // 🚀 즉시 표시 (번역 전)
         setText("");
         setIsSending(true);
+        recordAdminActivity(activeAdmin.id);
         setMessages(prev => [...prev, {
             id: tempId, from_user: myId, to_user: activeAdmin.id,
             source_lang: lang, target_lang: "ko",
@@ -516,13 +530,19 @@ function WorkerChatContent() {
     };
 
     // Filter admins based on user criteria: ROOT excluded, friends/site prioritized
-    const filteredAdmins = admins.filter(a => {
-        // Show friends, same-site staff, or ALL if no specific site set (inclusive fallback)
-        if (friendIds.has(a.id)) return true;
-        if (siteId && a.site_id === siteId) return true;
-        if (!siteId) return true; // Show all if site unknown to prevent empty list
-        return false;
-    });
+    const filteredAdmins = admins
+        .filter(a => {
+            // Show friends, same-site staff, or ALL if no specific site set (inclusive fallback)
+            if (friendIds.has(a.id)) return true;
+            if (siteId && a.site_id === siteId) return true;
+            if (!siteId) return true; // Show all if site unknown to prevent empty list
+            return false;
+        })
+        .sort((a, b) => {
+            const activityDelta = (adminActivity[b.id] || 0) - (adminActivity[a.id] || 0);
+            if (activityDelta !== 0) return activityDelta;
+            return Number(friendIds.has(b.id)) - Number(friendIds.has(a.id));
+        });
 
     return (
         <RoleGuard allowedRole="worker">

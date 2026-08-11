@@ -127,6 +127,17 @@ function AdminChatContent() {
     const MSG_PAGE_SIZE = 50;
     const [hasMore, setHasMore] = useState(false);
     const [loadingOlder, setLoadingOlder] = useState(false);
+    const [hiddenWorkers, setHiddenWorkers] = useState<Set<string>>(new Set());
+    const [workerActivity, setWorkerActivity] = useState<Record<string, number>>({});
+    const [showQR, setShowQR] = useState(false);
+    const [workerNfcUrl, setWorkerNfcUrl] = useState<string | null>(null);
+    const [workerNfcLoading, setWorkerNfcLoading] = useState(false);
+
+    const recordWorkerActivity = useCallback((workerId: string, createdAt?: string) => {
+        const parsed = createdAt ? Date.parse(createdAt) : Date.now();
+        const timestamp = Number.isFinite(parsed) ? parsed : Date.now();
+        setWorkerActivity(prev => prev[workerId] === timestamp ? prev : { ...prev, [workerId]: timestamp });
+    }, []);
 
     // Helper to change gender: updates ref immediately (no async delay) + state for UI
     const changeGender = (g: 'male' | 'female') => {
@@ -181,13 +192,15 @@ function AdminChatContent() {
 
         const payload = (await res.json()) as ChatMessagesResponse;
         const sorted = payload.messages ?? [];
+        const latest = sorted.at(-1);
+        if (latest) recordWorkerActivity(activeWorker.id, latest.created_at);
         setMessages(sorted);
         setHasMore(sorted.length >= MSG_PAGE_SIZE);
         if (options.scroll !== false) {
             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
         }
         void markMessagesRead(activeWorker.id);
-    }, [activeWorker, myId, markMessagesRead]);
+    }, [activeWorker, myId, markMessagesRead, recordWorkerActivity]);
 
     const loadOlderMessages = useCallback(async () => {
         if (loadingOlder || !activeWorker || !myId || messages.length === 0) return;
@@ -325,7 +338,10 @@ function AdminChatContent() {
                 const res = await fetch(`/api/chat/messages?peer_id=${worker.id}&limit=5`, { cache: "no-store" });
                 if (!res.ok) continue;
                 const payload = (await res.json()) as ChatMessagesResponse;
-                const incoming = (payload.messages ?? []).filter((msg) =>
+                const recent = payload.messages ?? [];
+                const latest = recent.at(-1);
+                if (latest) recordWorkerActivity(worker.id, latest.created_at);
+                const incoming = recent.filter((msg) =>
                     msg.from_user === worker.id &&
                     msg.to_user === myId &&
                     msg.is_read === false &&
@@ -335,6 +351,13 @@ function AdminChatContent() {
                 incoming.forEach((msg) => {
                     unreadWorkerSeenRef.current.add(msg.id);
                     void analyzeMessageWithAI(msg.source_text);
+                });
+                setHiddenWorkers(prev => {
+                    if (!prev.has(worker.id)) return prev;
+                    const next = new Set(prev);
+                    next.delete(worker.id);
+                    localStorage.setItem("adm_hidden_workers", JSON.stringify(Array.from(next)));
+                    return next;
                 });
                 setUnreadWorkers(prev => ({ ...prev, [worker.id]: (prev[worker.id] || 0) + incoming.length }));
                 playNotificationSound();
@@ -346,13 +369,14 @@ function AdminChatContent() {
         void pollUnread();
         const events = new EventSource("/api/chat/user-events");
         events.addEventListener("message", () => {
+            void load();
             void pollUnread();
         });
         return () => {
             cancelled = true;
             events.close();
         };
-    }, [myId, workers]);
+    }, [myId, workers, load, recordWorkerActivity]);
 
     const playAudio = (text: string, langCode: string) => {
         const currentGender = voiceGenderRef.current;
@@ -398,6 +422,7 @@ function AdminChatContent() {
         // 🚀 즉시 표시 (번역 전)
         clearComposer();
         setIsSending(true);
+        recordWorkerActivity(activeWorker.id);
         setMessages(prev => [...prev, {
             id: tempId, from_user: myId, to_user: activeWorker.id,
             source_lang: "ko", target_lang: activeWorker.preferred_lang,
@@ -459,11 +484,6 @@ function AdminChatContent() {
         }
     };
 
-    const [hiddenWorkers, setHiddenWorkers] = useState<Set<string>>(new Set());
-    const [showQR, setShowQR] = useState(false);
-    const [workerNfcUrl, setWorkerNfcUrl] = useState<string | null>(null);
-    const [workerNfcLoading, setWorkerNfcLoading] = useState(false);
-
     useEffect(() => {
         const saved = localStorage.getItem("adm_hidden_workers");
         if (saved) setHiddenWorkers(new Set(JSON.parse(saved)));
@@ -483,7 +503,8 @@ function AdminChatContent() {
     // ROOT 제외 + 숨긴 근로자 제외
     const filteredWorkers = workers
         .filter(w => !hiddenWorkers.has(w.id))
-        .filter(w => (w.display_name || "").toLowerCase().includes(searchQuery.toLowerCase()));
+        .filter(w => (w.display_name || "").toLowerCase().includes(searchQuery.toLowerCase()))
+        .sort((a, b) => (workerActivity[b.id] || 0) - (workerActivity[a.id] || 0));
 
     const handleExport = async (format: ExportFormat) => {
         if (!activeWorker || messages.length === 0) return;
