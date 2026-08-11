@@ -257,6 +257,7 @@ function WorkerChatContent() {
     const [showSidebar, setShowSidebar] = useState(false);
     const [unreadAdmins, setUnreadAdmins] = useState<Record<string, number>>({});
     const activeAdminRef = useRef<AdminProfile | null>(null);
+    const latestMessageIdRef = useRef<string | null>(null);
 
     const recordAdminActivity = useCallback((adminId: string, createdAt?: string) => {
         const parsed = createdAt ? Date.parse(createdAt) : Date.now();
@@ -269,6 +270,13 @@ function WorkerChatContent() {
         if (!container) return;
         container.scrollTo({ top: container.scrollHeight, behavior });
     }, []);
+
+    const revealLatestMessage = useCallback(() => {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => scrollMessagesToBottom("smooth"));
+        });
+        window.setTimeout(() => scrollMessagesToBottom("auto"), 240);
+    }, [scrollMessagesToBottom]);
     const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
         if (typeof window === 'undefined') return true;
         return localStorage.getItem('sl_voice_enabled') !== 'false';
@@ -369,6 +377,8 @@ function WorkerChatContent() {
             const payload = (await res.json()) as ChatMessagesResponse;
             const sorted = payload.messages ?? [];
             const latest = sorted.at(-1);
+            const hasNewLatestMessage = Boolean(latest?.id && latest.id !== latestMessageIdRef.current);
+            latestMessageIdRef.current = latest?.id ?? null;
             if (latest) recordAdminActivity(activeAdmin.id, latest.created_at);
             const newIncoming = sorted.filter((m) =>
                 m.from_user === activeAdmin.id &&
@@ -394,8 +404,8 @@ function WorkerChatContent() {
                     ));
                 });
             }
-            if (scroll) {
-                setTimeout(() => scrollMessagesToBottom("smooth"), 200);
+            if (scroll || hasNewLatestMessage) {
+                revealLatestMessage();
             }
             if (!scroll && newIncoming.length > 0) {
                 playNotificationSound();
@@ -425,7 +435,7 @@ function WorkerChatContent() {
             document.removeEventListener("visibilitychange", refreshVisibleChat);
             events.close();
         };
-    }, [myId, activeAdmin, siteId, markMessagesRead, recordAdminActivity, scrollMessagesToBottom]); // lang 제거: 언어 변경 시 채널 재생성 불필요
+    }, [myId, activeAdmin, siteId, markMessagesRead, recordAdminActivity, revealLatestMessage]); // lang 제거: 언어 변경 시 채널 재생성 불필요
 
     // 🆕 Global Message Monitor (For Unread Notifications)
     const unreadAdminSeenRef = useRef<Set<string>>(new Set());
@@ -486,7 +496,7 @@ function WorkerChatContent() {
             translated_text: JSON.stringify({ text: originalText, pron: "", rev: "" }),
             created_at: new Date().toISOString(),
         }]);
-        setTimeout(() => scrollMessagesToBottom("smooth"), 50);
+        revealLatestMessage();
 
         try {
             let translated = originalText;
@@ -783,7 +793,7 @@ function WorkerChatContent() {
             <style jsx global>{`::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }`}</style>
 
             {/* 🤖 Tier 3 Ambient Edge Agent */}
-            <SwarmAgentHUD />
+            <SwarmAgentHUD lang={lang} />
         </RoleGuard>
     );
 }

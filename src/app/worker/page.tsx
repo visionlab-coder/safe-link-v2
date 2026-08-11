@@ -1006,7 +1006,7 @@ function WorkerHomeContent() {
                 </footer>
 
                 {/* 🤖 Tier 3 Ambient Edge Agent */}
-                <SwarmAgentHUD />
+                <SwarmAgentHUD lang={lang} />
 
             </div>
         </RoleGuard>

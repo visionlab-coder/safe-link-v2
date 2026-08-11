@@ -133,12 +133,20 @@ function AdminChatContent() {
     const [workerNfcUrl, setWorkerNfcUrl] = useState<string | null>(null);
     const [workerNfcLoading, setWorkerNfcLoading] = useState(false);
     const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
+    const latestMessageIdRef = useRef<string | null>(null);
 
     const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
         const container = messagesContainerRef.current;
         if (!container) return;
         container.scrollTo({ top: container.scrollHeight, behavior });
     }, []);
+
+    const revealLatestMessage = useCallback(() => {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => scrollMessagesToBottom("smooth"));
+        });
+        window.setTimeout(() => scrollMessagesToBottom("auto"), 240);
+    }, [scrollMessagesToBottom]);
 
     const recordWorkerActivity = useCallback((workerId: string, createdAt?: string) => {
         const parsed = createdAt ? Date.parse(createdAt) : Date.now();
@@ -201,11 +209,13 @@ function AdminChatContent() {
         const payload = (await res.json()) as ChatMessagesResponse;
         const sorted = payload.messages ?? [];
         const latest = sorted.at(-1);
+        const hasNewLatestMessage = Boolean(latest?.id && latest.id !== latestMessageIdRef.current);
+        latestMessageIdRef.current = latest?.id ?? null;
         if (latest) recordWorkerActivity(activeWorker.id, latest.created_at);
         setMessages(sorted);
         setHasMore(sorted.length >= MSG_PAGE_SIZE);
-        if (options.scroll !== false) {
-            setTimeout(() => scrollMessagesToBottom("smooth"), 100);
+        if (options.scroll !== false || hasNewLatestMessage) {
+            revealLatestMessage();
         }
         const hasUnreadIncoming = sorted.some(message =>
             message.from_user === activeWorker.id &&
@@ -222,7 +232,7 @@ function AdminChatContent() {
                 ));
             });
         }
-    }, [activeWorker, myId, markMessagesRead, recordWorkerActivity, scrollMessagesToBottom]);
+    }, [activeWorker, myId, markMessagesRead, recordWorkerActivity, revealLatestMessage]);
 
     const loadOlderMessages = useCallback(async () => {
         if (loadingOlder || !activeWorker || !myId || messages.length === 0) return;
@@ -462,7 +472,7 @@ function AdminChatContent() {
             translated_text: JSON.stringify({ norm: originalText, text: originalText, pron: "", rev: "" }),
             created_at: new Date().toISOString(),
         }]);
-        setTimeout(() => scrollMessagesToBottom("smooth"), 50);
+        revealLatestMessage();
 
         try {
             const { normalized } = await normalizeKoAsync(originalText);

@@ -666,7 +666,7 @@ function WorkerTBMDetailContent() {
                 `}</style>
 
                 {/* 🤖 Tier 3 Ambient Edge Agent */}
-                <SwarmAgentHUD />
+                <SwarmAgentHUD lang={preferredLang} />
             </div>
         </RoleGuard>
     );
