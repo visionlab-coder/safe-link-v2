@@ -578,7 +578,10 @@ function WorkerChatContent() {
 
     return (
         <RoleGuard allowedRole="worker">
-            <div className="h-dvh min-h-0 overflow-hidden bg-slate-50 text-slate-900 flex flex-col font-sans">
+            <div
+                className="h-dvh min-h-0 overflow-hidden bg-slate-50 text-slate-900 flex flex-col font-sans"
+                style={{ borderBottomWidth: 0 }}
+            >
                 <header className="safe-area-sticky-top sticky z-50 bg-white border-b border-slate-200 px-4 py-4 flex items-center justify-between shadow-sm">
                     <div className="flex items-center gap-3">
                         <button onClick={() => activeAdmin ? setActiveAdmin(null) : router.back()} className="p-2 -ml-2 rounded-full hover:bg-slate-100 transition-colors text-slate-500">
@@ -752,16 +755,16 @@ function WorkerChatContent() {
                                     </AnimatePresence>
                                     <div aria-hidden="true" className="h-px shrink-0" />
                                 </div>
-                                <div className="sticky bottom-0 z-40 shrink-0 p-4 md:p-6 bg-white border-t border-slate-200 shadow-[0_-10px_30px_rgba(0,0,0,0.02)] flex gap-2 items-center" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)" }}>
+                                <div className="sticky bottom-0 z-40 shrink-0 bg-white border-t border-slate-200 px-2 pt-2 md:p-6 shadow-[0_-10px_30px_rgba(0,0,0,0.02)] flex gap-2 items-center" style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 0.25rem)" }}>
                                     {sttError && (
                                         <p role="status" aria-live="polite" className="absolute -top-10 left-3 right-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 shadow-sm">
                                             {sttError}
                                         </p>
                                     )}
-                                    <button onClick={toggleRecording} className={`p-5 rounded-full shadow-md transition-all border-2 ${isRecording ? 'bg-red-500 border-red-500 text-white animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-400'}`}><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg></button>
-                                    <div className="relative flex flex-1 items-center bg-slate-50 border-2 border-slate-200 rounded-[36px] overflow-hidden focus-within:border-blue-500 transition-all shadow-inner">
-                                        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={isRecording ? t.listening : t.chatPlaceholder} className="w-full bg-transparent p-5 pl-8 text-slate-800 text-xl font-black outline-none resize-none min-h-[72px]" rows={1} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} />
-                                        <button onClick={handleSend} disabled={!text.trim() || isSending} className="mr-3 bg-blue-600 text-white p-5 rounded-full disabled:opacity-30 shadow-md transform active:scale-95 transition-all">{isSending ? <div className="w-7 h-7 border-[3px] border-white border-t-transparent rounded-full animate-spin" /> : <svg className="w-8 h-8 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>}</button>
+                                    <button onClick={toggleRecording} className={`flex h-12 w-12 md:h-16 md:w-16 shrink-0 items-center justify-center rounded-full shadow-md transition-all border-2 ${isRecording ? 'bg-red-500 border-red-500 text-white animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-400'}`}><svg className="w-6 h-6 md:w-7 md:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg></button>
+                                    <div className="relative flex min-w-0 flex-1 items-center bg-slate-50 border-2 border-slate-200 rounded-[28px] md:rounded-[36px] overflow-hidden focus-within:border-blue-500 transition-all shadow-inner">
+                                        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={isRecording ? t.listening : t.chatPlaceholder} className="w-full min-w-0 overflow-hidden whitespace-pre-wrap bg-transparent px-3 py-3 md:p-5 md:pl-8 text-slate-800 text-base md:text-lg font-black outline-none resize-none min-h-[52px] md:min-h-[64px] leading-snug placeholder:whitespace-nowrap placeholder:text-sm placeholder:font-bold placeholder:tracking-tight placeholder:text-slate-400" rows={1} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} />
+                                        <button onClick={handleSend} disabled={!text.trim() || isSending} className="mr-2 md:mr-3 flex h-11 w-11 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white disabled:opacity-30 shadow-md transform active:scale-95 transition-all">{isSending ? <div className="w-6 h-6 md:w-7 md:h-7 border-[3px] border-white border-t-transparent rounded-full animate-spin" /> : <svg className="w-6 h-6 md:w-7 md:h-7 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>}</button>
                                     </div>
                                 </div>
                             </>

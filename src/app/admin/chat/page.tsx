@@ -580,7 +580,10 @@ function AdminChatContent() {
     return (
         <RoleGuard allowedRole="admin">
             {/* White/Bright Theme applied to root */}
-            <div className="h-dvh min-h-0 overflow-hidden bg-slate-50 text-slate-900 font-sans flex flex-col selection:bg-blue-200">
+            <div
+                className="h-dvh min-h-0 overflow-hidden bg-slate-50 text-slate-900 font-sans flex flex-col selection:bg-blue-200"
+                style={{ borderBottomWidth: 0 }}
+            >
                 <header className="safe-area-sticky-top sticky z-50 shrink-0 bg-white border-b border-slate-200 px-4 md:px-6 py-3 md:py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between shadow-sm">
                     <div className="flex min-w-0 items-center gap-4">
                         <button onClick={() => { if (activeWorker) setActiveWorker(null); else router.back(); }} className="p-2 -ml-2 rounded-full hover:bg-slate-100 transition-colors tap-effect text-slate-500 relative">
@@ -886,7 +889,7 @@ function AdminChatContent() {
                         </div>
 
                         {/* Input Area */}
-                        <div className="sticky bottom-0 z-40 shrink-0 p-3 md:p-6 bg-white border-t border-slate-200 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] flex gap-2 md:gap-3 items-end" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)" }}>
+                        <div className="sticky bottom-0 z-40 shrink-0 bg-white border-t border-slate-200 px-2 pt-2 md:p-6 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] flex gap-2 md:gap-3 items-end" style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 0.25rem)" }}>
                             {sttError && (
                                 <p role="status" aria-live="polite" className="absolute -top-10 left-3 right-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 shadow-sm">
                                     {sttError}
@@ -911,7 +914,7 @@ function AdminChatContent() {
                                         setText(e.currentTarget.value);
                                     }}
                                     placeholder={isRecording ? t.listening : t.chatPlaceholder}
-                                    className="w-full min-w-0 bg-transparent px-4 py-3 md:p-5 md:pl-8 text-slate-800 text-base md:text-lg font-black outline-none resize-none max-h-32 min-h-[52px] md:min-h-[64px] leading-snug placeholder-slate-400"
+                                    className="w-full min-w-0 overflow-hidden whitespace-pre-wrap bg-transparent px-3 py-3 md:p-5 md:pl-8 text-slate-800 text-base md:text-lg font-black outline-none resize-none max-h-32 min-h-[52px] md:min-h-[64px] leading-snug placeholder:whitespace-nowrap placeholder:text-sm placeholder:font-bold placeholder:tracking-tight placeholder:text-slate-400"
                                     rows={1}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && !e.shiftKey) {
