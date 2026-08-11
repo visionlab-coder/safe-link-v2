@@ -79,12 +79,13 @@ export const playPremiumAudio = (
         return;
     }
 
-    // iPhone/iPad Safari는 비동기 네트워크 요청 뒤의 audio.play()/speechSynthesis를
-    // 사용자 제스처로 인정하지 않아 무음으로 끝날 수 있다. 클릭 이벤트 안에서
-    // 브라우저 TTS를 즉시 시작해야 재생 권한이 유지된다.
+    // 모바일 브라우저/WebView는 비동기 네트워크 요청 뒤의 audio.play()/speechSynthesis를
+    // 사용자 제스처로 인정하지 않거나, 음성 목록 로딩 전에는 무음으로 끝날 수 있다.
+    // 클릭 이벤트 안에서 기기 TTS를 즉시 시작해 재생 권한을 유지한다.
     const isAppleMobile = /iPad|iPhone|iPod/.test(navigator.userAgent)
         || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    if (isAppleMobile) {
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    if ((isAppleMobile || isAndroid) && window.speechSynthesis) {
         playBrowserNativeAudio(cleanText, langCode, gender, onEnd);
         return;
     }
@@ -236,16 +237,13 @@ const tryBrowserFallback = (text: string, lang: string, gender: VoiceGender, onE
     const targetLang = getVoiceLang(lang);
     const targetLangBase = targetLang.split('-')[0].toLowerCase();
     const voices = window.speechSynthesis.getVoices();
-    const voice = voices.find(v => v.lang.toLowerCase().startsWith(targetLangBase));
-
-    if (!voice) {
-        onEnd();
-        return;
-    }
+    const voice = voices.find(v => v.lang.toLowerCase().startsWith(targetLangBase)) ?? null;
 
     window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(text);
-    utter.voice = voice;
+    // Android WebView는 첫 호출에서 getVoices()가 비어 있어도 기본 TTS 엔진으로
+    // 언어 코드를 지정하면 정상 재생할 수 있다.
+    if (voice) utter.voice = voice;
     utter.lang = targetLang;
     utter.rate = 0.95;
     utter.onend = onEnd;

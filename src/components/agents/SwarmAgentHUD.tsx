@@ -12,7 +12,7 @@ export default function SwarmAgentHUD() {
     const [isActive, setIsActive] = useState(false);
     const [noiseLevel, setNoiseLevel] = useState(0); // 0 ~ 100 퍼센트에지
     const [isNoisy, setIsNoisy] = useState(false);
-    const [agentMessage, setAgentMessage] = useState<string>("Edge Agent 대기 중");
+    const [agentMessage, setAgentMessage] = useState<string>("주변 소음 감지 대기 중");
     const [isMinimized, setIsMinimized] = useState(true);
 
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -28,7 +28,7 @@ export default function SwarmAgentHUD() {
         if (noiseLevel > 75) {
             if (!isNoisy) {
                 setIsNoisy(true);
-                setAgentMessage("🚨 소음 경고: 볼륨 최대치 변경, 햅틱 발동");
+                setAgentMessage("🚨 소음 경고: 진동 알림 실행");
                 // 폰 진동 (지원되는 경우)
                 if (navigator.vibrate) {
                     navigator.vibrate([200, 100, 200, 100, 200]);
@@ -72,7 +72,7 @@ export default function SwarmAgentHUD() {
 
     const stopAgent = () => {
         setIsActive(false);
-        setAgentMessage("💤 Agent 절전 모드");
+        setAgentMessage("💤 주변 소음 감지 중지");
         if (requestFrameRef.current) cancelAnimationFrame(requestFrameRef.current);
         if (streamRef.current) {
             streamRef.current.getTracks().forEach(track => track.stop());
@@ -123,25 +123,33 @@ export default function SwarmAgentHUD() {
                     initial={{ opacity: 0, scale: 0.9, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                    className={`safe-area-floating-bottom-right fixed z-[100] w-64 rounded-2xl p-4 shadow-2xl border-2 backdrop-blur-xl transition-colors duration-500
+                    style={{
+                        insetInlineEnd: "calc(env(safe-area-inset-right, 0px) + 1rem)",
+                        bottom: "calc(env(safe-area-inset-bottom, 0px) + 6rem)",
+                    }}
+                    className={`fixed z-[100] w-64 rounded-2xl p-4 shadow-2xl border-2 backdrop-blur-xl transition-colors duration-500
                         ${isNoisy ? 'bg-red-900/90 border-red-500 text-white' : 'bg-slate-900/80 border-slate-700 text-slate-100'}
                     `}
                 >
                     <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
-                        <div className="flex items-center gap-2">
-                            <Activity className={`w-4 h-4 ${isActive ? 'animate-pulse text-emerald-400' : 'text-slate-400'}`} />
-                            <span className="text-[10px] font-black tracking-widest uppercase">Ambient Agent</span>
+                        <div className="flex min-w-0 items-center gap-2">
+                            <Activity className={`block h-4 w-4 shrink-0 ${isActive ? 'animate-pulse text-emerald-400' : 'text-slate-400'}`} />
+                            <span className="truncate text-[11px] font-black leading-none tracking-tight">주변 소음 감지</span>
                         </div>
                         <div className="flex items-center gap-1">
                             <button
+                                type="button"
                                 onClick={isActive ? stopAgent : startAgent}
-                                className={`p-1.5 rounded-full transition-colors ${isActive ? 'bg-red-500/20 text-red-400 hover:bg-red-500/40' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40'}`}
+                                aria-label={isActive ? "소음 감지 중지" : "소음 감지 시작"}
+                                className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full p-0 transition-colors ${isActive ? 'bg-red-500/20 text-red-400 hover:bg-red-500/40' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40'}`}
                             >
                                 {isActive ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                             </button>
                             <button
+                                type="button"
                                 onClick={() => setIsMinimized(true)}
-                                className="p-1.5 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors ml-1"
+                                aria-label="소음 감지 창 접기"
+                                className="ml-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 p-0 text-white transition-colors hover:bg-white/20"
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                             </button>
@@ -184,11 +192,21 @@ export default function SwarmAgentHUD() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.8 }}
                     onClick={() => setIsMinimized(false)}
-                    className={`safe-area-floating-bottom-right fixed z-[100] flex items-center gap-2 px-4 py-2.5 rounded-full shadow-xl border backdrop-blur-md transition-colors
+                    type="button"
+                    aria-label={isActive ? "주변 소음 감지 중, 상세 보기" : "주변 소음 감지 열기"}
+                    style={{
+                        insetInlineEnd: "calc(env(safe-area-inset-right, 0px) + 1rem)",
+                        bottom: "calc(env(safe-area-inset-bottom, 0px) + 6rem)",
+                    }}
+                    className={`fixed z-[100] inline-flex h-11 w-[8.25rem] items-center justify-center whitespace-nowrap rounded-full border p-0 leading-none shadow-xl backdrop-blur-md transition-colors
                         ${isActive ? 'bg-emerald-900/90 border-emerald-500/50 text-emerald-400' : 'bg-slate-900/90 border-slate-700 text-slate-400 hover:text-white'}`}
                 >
-                    <Activity className={`w-4 h-4 ${isActive ? 'animate-pulse text-emerald-400' : ''}`} />
-                    <span className="text-[10px] font-black tracking-widest uppercase">{isActive ? 'Monitoring' : 'Agent'}</span>
+                    <span className="inline-flex items-center justify-center gap-2 leading-none">
+                        <Activity className={`block h-4 w-4 shrink-0 ${isActive ? 'animate-pulse text-emerald-400' : ''}`} />
+                        <span className="block text-[11px] font-black leading-none tracking-tight">
+                            {isActive ? '소음 감지 중' : '소음 감지'}
+                        </span>
+                    </span>
                 </motion.button>
             )}
         </AnimatePresence>

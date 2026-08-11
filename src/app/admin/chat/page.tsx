@@ -6,13 +6,14 @@ import RoleGuard from "@/components/RoleGuard";
 import { normalizeKoAsync } from "@/utils/normalize";
 import { motion, AnimatePresence } from "framer-motion";
 import { analyzeMessageWithAI } from "@/utils/ai/watchdog";
-import { playPremiumAudio, playProxyAudio } from "@/utils/tts";
+import { playPremiumAudio } from "@/utils/tts";
 import { playNotificationSound } from "@/utils/notifications";
 import { Trash2, QrCode } from "lucide-react";
 import { hangulize } from "@/utils/hangulize";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
 import { usePresence } from "@/hooks/usePresence";
 import ExportMenu from "@/components/ExportMenu";
+import ChatPlayButton from "@/components/ChatPlayButton";
 import { exportData, type ExportFormat } from "@/utils/export-files";
 
 type ParsedMessage = { norm: string; text: string; pron: string; rev: string };
@@ -354,14 +355,8 @@ function AdminChatContent() {
     }, [myId, workers]);
 
     const playAudio = (text: string, langCode: string) => {
-        // 프리미엄 AI 음성을 위해 Proxy(클라우드) 엔진 우선 사용
         const currentGender = voiceGenderRef.current;
-        playProxyAudio(text, langCode, currentGender, (success) => {
-            if (!success) {
-                // 실패 시 브라우저 내장 음성으로 백업
-                playPremiumAudio(text, langCode, currentGender);
-            }
-        });
+        playPremiumAudio(text, langCode, currentGender);
     };
 
     const handleTranscript = useCallback((transcript: string) => {
@@ -760,15 +755,12 @@ function AdminChatContent() {
                                                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                                                     {isAdmin ? t.admin : activeWorker?.display_name}
                                                 </span>
-                                                <button
+                                                <ChatPlayButton
                                                     onClick={() => playAudio(
                                                         isAdmin ? (parsed.text || m.source_text) : (parsed.text || m.source_text),
                                                         isAdmin ? (activeWorker?.preferred_lang || "ko") : "ko"
                                                     )}
-                                                    className="text-blue-500 hover:text-blue-600 tap-effect bg-white outline-none rounded-full p-1 shadow-sm border border-slate-200"
-                                                >
-                                                    <svg className="w-3.5 h-3.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-                                                </button>
+                                                />
                                             </div>
 
                                             <div className={`max-w-full min-w-0 overflow-hidden p-4 md:p-5 rounded-3xl shadow-md border flex flex-col gap-3 ${isAdmin ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>

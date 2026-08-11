@@ -7,11 +7,12 @@ import RoleGuard from "@/components/RoleGuard";
 
 import { Users, QrCode } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { playPremiumAudio, playProxyAudio } from "@/utils/tts";
+import { playPremiumAudio } from "@/utils/tts";
 import { playNotificationSound } from "@/utils/notifications";
 import { formalizeKo } from "@/utils/politeness";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
 import { usePresence } from "@/hooks/usePresence";
+import ChatPlayButton from "@/components/ChatPlayButton";
 
 type ParsedMessage = { text: string; pron: string; rev: string };
 
@@ -269,11 +270,7 @@ function WorkerChatContent() {
 
     const playAudio = (text: string, langCode: string) => {
         const currentGender = voiceGenderRef.current;
-        playProxyAudio(text, langCode, currentGender, (success) => {
-            if (!success) {
-                playPremiumAudio(text, langCode, currentGender);
-            }
-        });
+        playPremiumAudio(text, langCode, currentGender);
     };
 
     const toggleVoice = () => {
@@ -653,7 +650,7 @@ function WorkerChatContent() {
                                                 <motion.div key={m.id || i} initial={{ opacity: 0, scale: 0.9, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} className={`flex flex-col max-w-[85%] ${isMe ? 'self-end items-end' : 'self-start items-start'}`}>
                                                     <div className={`flex items-center gap-2 mb-1 ${isMe ? 'mr-3' : 'ml-3'}`}>
                                                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{isMe ? t.me : activeAdmin.display_name}</span>
-                                                        <button onClick={() => {
+                                                        <ChatPlayButton onClick={() => {
                                                                 if (!voiceEnabled) return;
                                                                 if (isMe) {
                                                                     playAudio(m.source_text, lang);
@@ -663,7 +660,7 @@ function WorkerChatContent() {
                                                                     const audioLang = parsed.text ? lang : 'ko';
                                                                     playAudio(audioText, audioLang);
                                                                 }
-                                                            }} className={`p-1 rounded-full border shadow-sm transition-colors ${voiceEnabled ? 'bg-white border-slate-200 text-blue-500' : 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed'}`}><svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg></button>
+                                                            }} disabled={!voiceEnabled} />
                                                     </div>
                                                     <div className={`p-5 rounded-[32px] shadow-lg border-2 flex flex-col gap-3 ${isMe ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
 
