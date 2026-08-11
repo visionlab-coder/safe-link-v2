@@ -133,7 +133,9 @@ export default function SwarmAgentHUD() {
                 >
                     <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
                         <div className="flex min-w-0 items-center gap-2">
-                            <Activity className={`block h-4 w-4 shrink-0 ${isActive ? 'animate-pulse text-emerald-400' : 'text-slate-400'}`} />
+                            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 leading-none">
+                                <Activity className={`block h-4 w-4 ${isActive ? 'animate-pulse text-emerald-400' : 'text-slate-400'}`} />
+                            </span>
                             <span className="truncate text-[11px] font-black leading-none tracking-tight">주변 소음 감지</span>
                         </div>
                         <div className="flex items-center gap-1">
@@ -198,12 +200,14 @@ export default function SwarmAgentHUD() {
                         insetInlineEnd: "calc(env(safe-area-inset-right, 0px) + 1rem)",
                         bottom: "calc(env(safe-area-inset-bottom, 0px) + 6rem)",
                     }}
-                    className={`fixed z-[100] inline-flex h-11 w-[8.25rem] items-center justify-center whitespace-nowrap rounded-full border p-0 leading-none shadow-xl backdrop-blur-md transition-colors
+                    className={`fixed z-[100] h-11 w-[8.25rem] whitespace-nowrap rounded-full border p-0 leading-none shadow-xl backdrop-blur-md transition-colors
                         ${isActive ? 'bg-emerald-900/90 border-emerald-500/50 text-emerald-400' : 'bg-slate-900/90 border-slate-700 text-slate-400 hover:text-white'}`}
                 >
-                    <span className="inline-flex items-center justify-center gap-2 leading-none">
-                        <Activity className={`block h-4 w-4 shrink-0 ${isActive ? 'animate-pulse text-emerald-400' : ''}`} />
-                        <span className="block text-[11px] font-black leading-none tracking-tight">
+                    <span className="grid h-full w-full grid-cols-[1.25rem_1fr] items-center gap-2 px-4 leading-none">
+                        <span className="relative block h-5 w-5">
+                            <Activity className={`absolute left-1/2 top-1/2 block h-4 w-4 -translate-x-1/2 -translate-y-1/2 ${isActive ? 'animate-pulse text-emerald-400' : ''}`} />
+                        </span>
+                        <span className="block text-center text-[11px] font-black leading-none tracking-tight">
                             {isActive ? '소음 감지 중' : '소음 감지'}
                         </span>
                     </span>

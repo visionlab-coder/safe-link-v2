@@ -158,6 +158,12 @@ public class ChatController {
         return eventBus.subscribeUser(actor.userId());
     }
 
+    @GetMapping("/compat/unread-count")
+    public Map<String, Integer> compatUnreadCount(@AuthenticationPrincipal SessionPrincipal actor) {
+        if (actor == null) throw new AccessDeniedException("authentication_required");
+        return Map.of("count", chat.countUnreadMessages(actor.userId()));
+    }
+
     @PostMapping("/compat/messages")
     public ChatMessageResponse compatSend(
         @AuthenticationPrincipal SessionPrincipal actor,
@@ -187,7 +193,7 @@ public class ChatController {
     }
 
     @PatchMapping("/compat/messages")
-    public Map<String, Boolean> compatRead(
+    public Map<String, Object> compatRead(
         @AuthenticationPrincipal SessionPrincipal actor,
         @RequestBody CompatReadRequest request
     ) {
@@ -204,12 +210,14 @@ public class ChatController {
                 audit.record(actor.userId(), conversation.thread().siteId(), "chat.message.translation.update", "chat_message", update.id(), "ALLOWED", "compat_translation_correction", Map.of());
             }
             eventBus.publish(conversation.thread().id(), Map.of("type", "translation-updated"));
-            return Map.of("ok", true);
+            return Map.of("ok", true, "updated", true);
         }
-        chat.markThreadMessagesRead(conversation.thread().id(), actor.userId());
-        audit.record(actor.userId(), conversation.thread().siteId(), "chat.message.read", "chat_thread", String.valueOf(conversation.thread().id()), "ALLOWED", "compat_read_receipt", Map.of());
-        eventBus.publish(conversation.thread().id(), Map.of("type", "read", "userId", actor.userId()));
-        return Map.of("ok", true);
+        int marked = chat.markThreadMessagesRead(conversation.thread().id(), actor.userId());
+        if (marked > 0) {
+            audit.record(actor.userId(), conversation.thread().siteId(), "chat.message.read", "chat_thread", String.valueOf(conversation.thread().id()), "ALLOWED", "compat_read_receipt", Map.of("messageCount", marked));
+            eventBus.publish(conversation.thread().id(), Map.of("type", "read", "userId", actor.userId(), "messageCount", marked));
+        }
+        return Map.of("ok", true, "updated", marked > 0, "messageCount", marked);
     }
 
     private CompatMessageResponse toCompatMessage(ChatRepository.MessageRow message, Conversation conversation) {

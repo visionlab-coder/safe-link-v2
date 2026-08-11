@@ -10,6 +10,7 @@ import SiteAgentBriefing from "@/components/agents/SiteAgentBriefing";
 import SystemHealthCheck from "@/components/SystemHealthCheck";
 import BrandLogo from "@/components/BrandLogo";
 import { logoutV3 } from "@/lib/v3-auth";
+import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
 
 // 관리자 모드: 한국어 / 영어 / 중국어 3개 (그 외 언어는 영어 fallback)
 const adminUI: Record<string, any> = {
@@ -176,7 +177,7 @@ function AdminDashboardContent() {
         return () => { cancelled = true; };
     }, [urlLang]);
 
-    const [newChatCount] = useState(0);
+    const newChatCount = useUnreadChatCount(currentUser?.id);
 
     const handleSignOut = async () => {
         try {

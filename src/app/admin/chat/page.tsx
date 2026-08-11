@@ -121,7 +121,7 @@ function AdminChatContent() {
     const triedJitTranslate = useRef<Set<string>>(new Set());
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const voiceGenderRef = useRef<'male' | 'female'>('female');
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const isComposingRef = useRef(false);
     const MSG_PAGE_SIZE = 50;
@@ -132,6 +132,13 @@ function AdminChatContent() {
     const [showQR, setShowQR] = useState(false);
     const [workerNfcUrl, setWorkerNfcUrl] = useState<string | null>(null);
     const [workerNfcLoading, setWorkerNfcLoading] = useState(false);
+    const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
+
+    const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+        const container = messagesContainerRef.current;
+        if (!container) return;
+        container.scrollTo({ top: container.scrollHeight, behavior });
+    }, []);
 
     const recordWorkerActivity = useCallback((workerId: string, createdAt?: string) => {
         const parsed = createdAt ? Date.parse(createdAt) : Date.now();
@@ -175,11 +182,12 @@ function AdminChatContent() {
     }, [router, urlLang]);
 
     const markMessagesRead = useCallback(async (peerId: string) => {
-        await fetch("/api/chat/messages", {
+        const response = await fetch("/api/chat/messages", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ peer_id: peerId }),
-        }).catch(() => {});
+        }).catch(() => null);
+        return response?.ok === true;
     }, []);
 
     const fetchMessages = useCallback(async (options: { scroll?: boolean } = {}) => {
@@ -197,10 +205,24 @@ function AdminChatContent() {
         setMessages(sorted);
         setHasMore(sorted.length >= MSG_PAGE_SIZE);
         if (options.scroll !== false) {
-            setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+            setTimeout(() => scrollMessagesToBottom("smooth"), 100);
         }
-        void markMessagesRead(activeWorker.id);
-    }, [activeWorker, myId, markMessagesRead, recordWorkerActivity]);
+        const hasUnreadIncoming = sorted.some(message =>
+            message.from_user === activeWorker.id &&
+            message.to_user === myId &&
+            message.is_read === false
+        );
+        if (hasUnreadIncoming) {
+            void markMessagesRead(activeWorker.id).then(marked => {
+                if (!marked) return;
+                setMessages(current => current.map(message =>
+                    message.from_user === activeWorker.id && message.to_user === myId
+                        ? { ...message, is_read: true }
+                        : message
+                ));
+            });
+        }
+    }, [activeWorker, myId, markMessagesRead, recordWorkerActivity, scrollMessagesToBottom]);
 
     const loadOlderMessages = useCallback(async () => {
         if (loadingOlder || !activeWorker || !myId || messages.length === 0) return;
@@ -242,8 +264,15 @@ function AdminChatContent() {
             const fallbackPoll = window.setInterval(() => {
                 void fetchMessages({ scroll: false });
             }, 3000);
+            const refreshVisibleChat = () => {
+                if (document.visibilityState === "visible") void fetchMessages({ scroll: false });
+            };
+            window.addEventListener("focus", refreshVisibleChat);
+            document.addEventListener("visibilitychange", refreshVisibleChat);
             return () => {
                 window.clearInterval(fallbackPoll);
+                window.removeEventListener("focus", refreshVisibleChat);
+                document.removeEventListener("visibilitychange", refreshVisibleChat);
                 events.close();
             };
         }
@@ -378,9 +407,12 @@ function AdminChatContent() {
         };
     }, [myId, workers, load, recordWorkerActivity]);
 
-    const playAudio = (text: string, langCode: string) => {
+    const playAudio = (messageId: string, text: string, langCode: string) => {
         const currentGender = voiceGenderRef.current;
-        playPremiumAudio(text, langCode, currentGender);
+        setPlayingMessageId(messageId);
+        playPremiumAudio(text, langCode, currentGender, () => {
+            setPlayingMessageId(current => current === messageId ? null : current);
+        });
     };
 
     const handleTranscript = useCallback((transcript: string) => {
@@ -430,7 +462,7 @@ function AdminChatContent() {
             translated_text: JSON.stringify({ norm: originalText, text: originalText, pron: "", rev: "" }),
             created_at: new Date().toISOString(),
         }]);
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+        setTimeout(() => scrollMessagesToBottom("smooth"), 50);
 
         try {
             const { normalized } = await normalizeKoAsync(originalText);
@@ -754,7 +786,7 @@ function AdminChatContent() {
 
                     {/* Chat Area */}
                     <div className={`${!activeWorker ? 'hidden' : 'flex'} min-w-0 min-h-0 flex-col flex-1 bg-[#f8fafc] h-full relative`}>
-                        <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-6 md:p-8 md:pb-8 flex flex-col gap-6" style={{ backgroundImage: 'radial-gradient(circle at center, #e2e8f0 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
+                        <div ref={messagesContainerRef} className="min-h-0 flex-1 overscroll-contain overflow-y-auto p-4 pb-6 md:p-8 md:pb-8 flex flex-col gap-6" style={{ backgroundImage: 'radial-gradient(circle at center, #e2e8f0 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
                             {hasMore && (
                                 <button onClick={loadOlderMessages} disabled={loadingOlder} className="self-center px-4 py-2 text-xs font-black text-slate-400 hover:text-slate-600 bg-white/80 rounded-full border border-slate-200 tap-effect uppercase tracking-widest disabled:opacity-50">
                                     {loadingOlder ? '...' : adminLang === 'ko' ? '이전 메시지 불러오기' : adminLang === 'zh' ? '加载更多消息' : 'Load older messages'}
@@ -778,9 +810,11 @@ function AdminChatContent() {
                                                 </span>
                                                 <ChatPlayButton
                                                     onClick={() => playAudio(
+                                                        m.id,
                                                         isAdmin ? (parsed.text || m.source_text) : (parsed.text || m.source_text),
                                                         isAdmin ? (activeWorker?.preferred_lang || "ko") : "ko"
                                                     )}
+                                                    playing={playingMessageId === m.id}
                                                 />
                                             </div>
 
@@ -848,11 +882,11 @@ function AdminChatContent() {
                                     );
                                 })}
                             </AnimatePresence>
-                            <div ref={messagesEndRef} />
+                            <div aria-hidden="true" className="h-px shrink-0" />
                         </div>
 
                         {/* Input Area */}
-                        <div className="relative p-3 md:p-6 bg-white border-t border-slate-200 shrink-0 z-10 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] flex gap-2 md:gap-3 items-end">
+                        <div className="sticky bottom-0 z-40 shrink-0 p-3 md:p-6 bg-white border-t border-slate-200 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] flex gap-2 md:gap-3 items-end" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)" }}>
                             {sttError && (
                                 <p role="status" aria-live="polite" className="absolute -top-10 left-3 right-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 shadow-sm">
                                     {sttError}

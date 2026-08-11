@@ -294,8 +294,8 @@ public class ChatRepository {
             .update();
     }
 
-    public void markThreadMessagesRead(Long threadId, Long readerUserId) {
-        jdbc.sql("""
+    public int markThreadMessagesRead(Long threadId, Long readerUserId) {
+        return jdbc.sql("""
                 insert into chat_message_reads(message_id, reader_user_id)
                 select id, :readerUserId
                 from chat_messages
@@ -334,6 +334,26 @@ public class ChatRepository {
             .param("readerUserId", readerUserId)
             .query(Boolean.class)
             .single());
+    }
+
+    public int countUnreadMessages(Long userId) {
+        return jdbc.sql("""
+                select count(*)
+                from chat_messages cm
+                join chat_threads ct on ct.id = cm.thread_id
+                where (ct.worker_id = :userId or ct.admin_user_id = :userId)
+                  and ct.status <> 'ARCHIVED'
+                  and cm.sender_user_id <> :userId
+                  and not exists (
+                    select 1
+                    from chat_message_reads cmr
+                    where cmr.message_id = cm.id
+                      and cmr.reader_user_id = :userId
+                  )
+            """)
+            .param("userId", userId)
+            .query(Integer.class)
+            .single();
     }
 
     private List<String> rolesFor(Long userId) {

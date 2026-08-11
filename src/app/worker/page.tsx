@@ -9,6 +9,7 @@ import { playNotificationSound } from "@/utils/notifications";
 import BrandLogo from "@/components/BrandLogo";
 import { ensureLocalNotifyPermission } from "@/utils/native/local-notify";
 import { logoutV3 } from "@/lib/v3-auth";
+import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
 
 const workerUI: Record<string, any> = {
     ko: {
@@ -532,7 +533,6 @@ function WorkerHomeContent() {
     const [newTBMTime] = useState<string>("");
 
     // 신규 채팅 알림 관련 상태
-    const [newChatCount, setNewChatCount] = useState(0);
     const [newChatTime] = useState<string>("");
 
     const [showStopWorkModal, setShowStopWorkModal] = useState(false);
@@ -633,6 +633,7 @@ function WorkerHomeContent() {
     }, [urlLang]);
 
     const lang = profile?.preferred_lang || urlLang || "ko";
+    const newChatCount = useUnreadChatCount(profile?.id);
     const t = getUI(lang);
     const iso = isoMap[lang] || "un";
     const simpleHome = lang === "ko"
@@ -831,7 +832,7 @@ function WorkerHomeContent() {
                 {newChatCount > 0 && (
                     <div
                         className="relative overflow-hidden p-8 bg-blue-600/90 backdrop-blur-md rounded-[40px] border-blue-400 border-2 shadow-[0_0_60px_-15px_rgba(59,130,246,0.8)] cursor-pointer tap-effect animate-float z-50 transform transition-all hover:scale-[1.02]"
-                        onClick={() => { setNewChatCount(0); router.push("/worker/chat"); }}
+                        onClick={() => router.push("/worker/chat")}
                     >
                         <div className="flex items-center gap-6 relative z-10">
                             <div className="w-16 h-16 bg-white/20 rounded-3xl flex items-center justify-center text-white relative shadow-inner">

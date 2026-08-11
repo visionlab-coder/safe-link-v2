@@ -239,7 +239,7 @@ function WorkerChatContent() {
     const [text, setText] = useState("");
     const [sttError, setSttError] = useState("");
     const [isSending, setIsSending] = useState(false);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
     const processedAudioIds = useRef<Set<string>>(new Set());
     const MSG_PAGE_SIZE = 50;
     const [hasMore, setHasMore] = useState(false);
@@ -251,6 +251,7 @@ function WorkerChatContent() {
     const [activeAdmin, setActiveAdmin] = useState<AdminProfile | null>(null);
     const [siteId, setSiteId] = useState<string | null>(null);
     const [adminActivity, setAdminActivity] = useState<Record<string, number>>({});
+    const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const voiceGenderRef = useRef<'male' | 'female'>('female');
     const [showSidebar, setShowSidebar] = useState(false);
@@ -261,6 +262,12 @@ function WorkerChatContent() {
         const parsed = createdAt ? Date.parse(createdAt) : Date.now();
         const timestamp = Number.isFinite(parsed) ? parsed : Date.now();
         setAdminActivity(prev => prev[adminId] === timestamp ? prev : { ...prev, [adminId]: timestamp });
+    }, []);
+
+    const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+        const container = messagesContainerRef.current;
+        if (!container) return;
+        container.scrollTo({ top: container.scrollHeight, behavior });
     }, []);
     const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
         if (typeof window === 'undefined') return true;
@@ -275,9 +282,12 @@ function WorkerChatContent() {
         setVoiceGender(g);
     };
 
-    const playAudio = (text: string, langCode: string) => {
+    const playAudio = (messageId: string, text: string, langCode: string) => {
         const currentGender = voiceGenderRef.current;
-        playPremiumAudio(text, langCode, currentGender);
+        setPlayingMessageId(messageId);
+        playPremiumAudio(text, langCode, currentGender, () => {
+            setPlayingMessageId(current => current === messageId ? null : current);
+        });
     };
 
     const toggleVoice = () => {
@@ -287,11 +297,12 @@ function WorkerChatContent() {
     };
 
     const markMessagesRead = useCallback(async (peerId: string) => {
-        await fetch("/api/chat/messages", {
+        const response = await fetch("/api/chat/messages", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ peer_id: peerId }),
-        }).catch(() => {});
+        }).catch(() => null);
+        return response?.ok === true;
     }, []);
 
     const load = useCallback(async () => {
@@ -368,9 +379,23 @@ function WorkerChatContent() {
             setHasMore(sorted.length >= MSG_PAGE_SIZE);
             sorted.forEach(m => processedAudioIds.current.add(m.id));
 
-            void markMessagesRead(activeAdmin.id);
+            const hasUnreadIncoming = sorted.some(message =>
+                message.from_user === activeAdmin.id &&
+                message.to_user === myId &&
+                message.is_read === false
+            );
+            if (hasUnreadIncoming) {
+                void markMessagesRead(activeAdmin.id).then(marked => {
+                    if (!marked) return;
+                    setMessages(current => current.map(message =>
+                        message.from_user === activeAdmin.id && message.to_user === myId
+                            ? { ...message, is_read: true }
+                            : message
+                    ));
+                });
+            }
             if (scroll) {
-                setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 200);
+                setTimeout(() => scrollMessagesToBottom("smooth"), 200);
             }
             if (!scroll && newIncoming.length > 0) {
                 playNotificationSound();
@@ -388,12 +413,19 @@ function WorkerChatContent() {
         const fallbackPoll = window.setInterval(() => {
             void fetchMessages(false);
         }, 3000);
+        const refreshVisibleChat = () => {
+            if (document.visibilityState === "visible") void fetchMessages(false);
+        };
+        window.addEventListener("focus", refreshVisibleChat);
+        document.addEventListener("visibilitychange", refreshVisibleChat);
 
         return () => {
             window.clearInterval(fallbackPoll);
+            window.removeEventListener("focus", refreshVisibleChat);
+            document.removeEventListener("visibilitychange", refreshVisibleChat);
             events.close();
         };
-    }, [myId, activeAdmin, siteId, markMessagesRead, recordAdminActivity]); // lang 제거: 언어 변경 시 채널 재생성 불필요
+    }, [myId, activeAdmin, siteId, markMessagesRead, recordAdminActivity, scrollMessagesToBottom]); // lang 제거: 언어 변경 시 채널 재생성 불필요
 
     // 🆕 Global Message Monitor (For Unread Notifications)
     const unreadAdminSeenRef = useRef<Set<string>>(new Set());
@@ -454,7 +486,7 @@ function WorkerChatContent() {
             translated_text: JSON.stringify({ text: originalText, pron: "", rev: "" }),
             created_at: new Date().toISOString(),
         }]);
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+        setTimeout(() => scrollMessagesToBottom("smooth"), 50);
 
         try {
             let translated = originalText;
@@ -546,7 +578,7 @@ function WorkerChatContent() {
 
     return (
         <RoleGuard allowedRole="worker">
-            <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+            <div className="h-dvh min-h-0 overflow-hidden bg-slate-50 text-slate-900 flex flex-col font-sans">
                 <header className="safe-area-sticky-top sticky z-50 bg-white border-b border-slate-200 px-4 py-4 flex items-center justify-between shadow-sm">
                     <div className="flex items-center gap-3">
                         <button onClick={() => activeAdmin ? setActiveAdmin(null) : router.back()} className="p-2 -ml-2 rounded-full hover:bg-slate-100 transition-colors text-slate-500">
@@ -588,7 +620,7 @@ function WorkerChatContent() {
                     </div>
                 </header>
 
-                <main className="flex-1 flex w-full max-w-6xl mx-auto h-[calc(100vh-76px)] overflow-hidden relative">
+                <main className="min-h-0 flex-1 flex w-full max-w-6xl mx-auto overflow-hidden relative">
                     <div className={`${!activeAdmin || showSidebar ? 'flex' : 'hidden'} md:flex w-full md:w-80 flex-col border-r border-slate-200 bg-white p-4 overflow-y-auto shrink-0 z-30`}>
                         <div className="flex items-center justify-between mb-4 px-2">
                             <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">{t.title}</h2>
@@ -636,10 +668,10 @@ function WorkerChatContent() {
                         </div>
                     </div>
 
-                    <div className={`${!activeAdmin ? 'hidden' : 'flex'} flex-1 flex-col bg-[#f5f8fa] overflow-hidden relative`}>
+                    <div className={`${!activeAdmin ? 'hidden' : 'flex'} min-h-0 flex-1 flex-col bg-[#f5f8fa] overflow-hidden relative`}>
                         {activeAdmin ? (
                             <>
-                                <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col gap-6" style={{ backgroundImage: 'radial-gradient(circle at center, #cbd5e1 1px, transparent 1px)', backgroundSize: '32px 32px' }}>
+                                <div ref={messagesContainerRef} className="min-h-0 flex-1 overscroll-contain overflow-y-auto p-4 md:p-8 flex flex-col gap-6" style={{ backgroundImage: 'radial-gradient(circle at center, #cbd5e1 1px, transparent 1px)', backgroundSize: '32px 32px' }}>
                                     {hasMore && (
                                         <button disabled={loadingOlder} onClick={async () => {
                                             if (loadingOlder || messages.length === 0 || !activeAdmin) return;
@@ -673,14 +705,14 @@ function WorkerChatContent() {
                                                         <ChatPlayButton onClick={() => {
                                                                 if (!voiceEnabled) return;
                                                                 if (isMe) {
-                                                                    playAudio(m.source_text, lang);
+                                                                    playAudio(m.id, m.source_text, lang);
                                                                 } else {
                                                                     // 관리자 메시지: 번역문(근로자 언어)이 있으면 번역 재생, 없으면 원문(한국어) 재생
                                                                     const audioText = parsed.text || m.source_text;
                                                                     const audioLang = parsed.text ? lang : 'ko';
-                                                                    playAudio(audioText, audioLang);
+                                                                    playAudio(m.id, audioText, audioLang);
                                                                 }
-                                                            }} disabled={!voiceEnabled} />
+                                                            }} disabled={!voiceEnabled} playing={playingMessageId === m.id} />
                                                     </div>
                                                     <div className={`p-5 rounded-[32px] shadow-lg border-2 flex flex-col gap-3 ${isMe ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
 
@@ -718,9 +750,9 @@ function WorkerChatContent() {
                                             );
                                         })}
                                     </AnimatePresence>
-                                    <div ref={messagesEndRef} />
+                                    <div aria-hidden="true" className="h-px shrink-0" />
                                 </div>
-                                <div className="relative p-4 md:p-6 bg-white border-t border-slate-200 shadow-[0_-10px_30px_rgba(0,0,0,0.02)] flex gap-2 items-center">
+                                <div className="sticky bottom-0 z-40 shrink-0 p-4 md:p-6 bg-white border-t border-slate-200 shadow-[0_-10px_30px_rgba(0,0,0,0.02)] flex gap-2 items-center" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)" }}>
                                     {sttError && (
                                         <p role="status" aria-live="polite" className="absolute -top-10 left-3 right-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 shadow-sm">
                                             {sttError}

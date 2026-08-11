@@ -3,12 +3,14 @@
 type ChatPlayButtonProps = {
     onClick: () => void;
     disabled?: boolean;
+    playing?: boolean;
     label?: string;
 };
 
 export default function ChatPlayButton({
     onClick,
     disabled = false,
+    playing = false,
     label = "메시지 음성으로 듣기",
 }: ChatPlayButtonProps) {
     return (
@@ -16,17 +18,21 @@ export default function ChatPlayButton({
             type="button"
             onClick={onClick}
             disabled={disabled}
-            aria-label={label}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white p-0 leading-none text-blue-500 shadow-sm transition-colors hover:text-blue-600 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
+            aria-label={playing ? "음성 재생 중" : label}
+            aria-pressed={playing}
+            className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border p-0 leading-none shadow-sm transition-colors disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300 ${playing ? "border-blue-500 bg-blue-500 text-white" : "border-slate-200 bg-white text-blue-500 hover:text-blue-600"}`}
         >
-            <svg
-                aria-hidden="true"
-                className="block h-4 w-4 translate-x-px"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-            >
-                <path d="M8 5v14l11-7z" />
-            </svg>
+            {playing ? (
+                <span aria-hidden="true" className="inline-flex h-4 items-center justify-center gap-0.5">
+                    <span className="h-2 w-0.5 animate-pulse rounded-full bg-current" />
+                    <span className="h-4 w-0.5 animate-pulse rounded-full bg-current [animation-delay:120ms]" />
+                    <span className="h-3 w-0.5 animate-pulse rounded-full bg-current [animation-delay:240ms]" />
+                </span>
+            ) : (
+                <svg aria-hidden="true" className="block h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5 6 9H3v6h3l5 4V5Zm4.5 4.5a4 4 0 0 1 0 5M18 7a7 7 0 0 1 0 10" />
+                </svg>
+            )}
         </button>
     );
 }
