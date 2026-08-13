@@ -1,6 +1,9 @@
 name: Deploy SQ Link V3 production
 
 on:
+  push:
+    branches:
+      - refactor/v3-commercialization-20260710
   workflow_dispatch:
 
 concurrency:
