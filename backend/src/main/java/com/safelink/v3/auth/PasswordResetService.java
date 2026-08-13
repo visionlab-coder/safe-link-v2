@@ -24,13 +24,15 @@ public class PasswordResetService {
     private final UserAccountRepository users;
     private final PasswordEncoder passwordEncoder;
     private final AuditService audit;
+    private final PasswordResetNotifier notifier;
     private final SecureRandom secureRandom = new SecureRandom();
 
-    public PasswordResetService(JdbcClient jdbc, UserAccountRepository users, PasswordEncoder passwordEncoder, AuditService audit) {
+    public PasswordResetService(JdbcClient jdbc, UserAccountRepository users, PasswordEncoder passwordEncoder, AuditService audit, PasswordResetNotifier notifier) {
         this.jdbc = jdbc;
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.audit = audit;
+        this.notifier = notifier;
     }
 
     @Transactional
@@ -57,7 +59,11 @@ public class PasswordResetService {
             .param("requestedIp", ipAddress)
             .param("expiresAt", Timestamp.from(expiresAt))
             .update();
-        audit.record(account.get().id(), null, "auth.password_reset.request", "user", String.valueOf(account.get().id()), "ALLOWED", "token_created", Map.of("ip", ipAddress));
+        var delivery = notifier.send(users.findPasswordResetContact(account.get().id()), rawToken);
+        audit.record(account.get().id(), null, "auth.password_reset.request", "user", String.valueOf(account.get().id()),
+            delivery.delivered() ? "ALLOWED" : "DENIED",
+            delivery.delivered() ? "reset_notice_delivered" : delivery.failureCode(),
+            Map.of("ip", ipAddress, "emailAttempted", delivery.emailAttempted(), "smsAttempted", delivery.smsAttempted()));
         return new ResetRequestResult(rawToken, true);
     }
 

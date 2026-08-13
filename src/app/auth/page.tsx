@@ -21,7 +21,7 @@ function sanitizeAuthError(msg: string): string {
   if (m.includes("api key") || m.includes("apikey") || m.includes("unauthorized") || m.includes("authentication")) {
     return "서버 연결 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
   }
-  if (m.includes("invalid login") || m.includes("invalid credentials") || m.includes("wrong password") || m.includes("v3_login_failed_401")) {
+  if (m.includes("invalid login") || m.includes("invalid credentials") || m.includes("invalid_credentials") || m.includes("wrong password") || m.includes("v3_login_failed_401")) {
     return "이메일 또는 비밀번호가 올바르지 않습니다.";
   }
   if (m.includes("already registered") || m.includes("already exists") || m.includes("duplicate") || m.includes("email_already_registered")) {
@@ -100,20 +100,20 @@ function BgOrbs() {
 
 // ─── Shared panel styles ───────────────────────────────────────────────────
 const glassCard: React.CSSProperties = {
-  background: "rgba(10,11,20,0.92)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  background: "rgba(255,255,255,0.96)",
+  border: "1px solid #d9e1ea",
   backdropFilter: "blur(28px)",
   WebkitBackdropFilter: "blur(28px)",
   borderRadius: 24,
-  boxShadow: "0 32px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)",
+  boxShadow: "0 18px 42px rgba(16,42,67,0.14)",
 };
 const accentLine: React.CSSProperties = {
   height: 1,
-  background: "linear-gradient(90deg, transparent, rgba(59,130,246,0.5), transparent)",
+  background: "linear-gradient(90deg, transparent, #0b5ed7, transparent)",
 };
 const fieldBox: React.CSSProperties = {
-  background: "rgba(255,255,255,0.03)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  background: "#f8fafc",
+  border: "1px solid #cdd6e2",
   borderRadius: 12,
   transition: "border-color 0.2s",
 };
@@ -308,7 +308,7 @@ function AuthContent() {
   // ── SCREEN 1: LANGUAGE SELECTION ──────────────────────────────────────────
   if (mode === "lang") {
     return (
-      <main className="min-h-screen flex items-center justify-center p-4 overflow-hidden relative" style={{ background: "#050508" }}>
+      <main className="auth-light min-h-screen flex items-center justify-center p-4 overflow-hidden relative" style={{ background: "#eef3f8" }}>
         <BgOrbs />
         <div className="w-full max-w-[400px] relative z-10" style={glassCard}>
           <div style={accentLine} />
@@ -316,6 +316,13 @@ function AuthContent() {
             {/* Header */}
             <div className="text-center mb-7">
               <BrandLogo compact={false} className="mb-4 justify-center" imageClassName="max-w-[250px]" />
+              <div className="relative mb-4 h-28 overflow-hidden rounded-2xl border border-[#cdd6e2]">
+                <picture>
+                  <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/access.webp" />
+                  <Image src="/images/mobile-v3/website/access.webp" alt="SAFE-LINK access" fill className="object-cover" priority />
+                </picture>
+                <div className="absolute inset-0 bg-gradient-to-t from-[#071b36]/50 to-transparent" />
+              </div>
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-4"
                 style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.18)" }}>
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
@@ -347,7 +354,7 @@ function AuthContent() {
                     }}>
                     <div className="w-9 h-6 rounded-md overflow-hidden shadow-md"
                       style={{ border: "1px solid rgba(255,255,255,0.12)" }}>
-                      <Image src={`https://flagcdn.com/w80/${l.iso}.png`} alt={l.name}
+                      <Image src={`/flags/${l.iso}.png`} alt={l.name}
                         width={36} height={24} className="w-full h-full object-cover" unoptimized />
                     </div>
                     <span className="text-[9px] font-bold text-center leading-tight transition-colors duration-200"
@@ -375,7 +382,7 @@ function AuthContent() {
 
   // ── SCREENS 2-4 (role / worker / admin) ──────────────────────────────────
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-5 overflow-hidden relative" style={{ background: "#050508" }}>
+    <main className="auth-light min-h-screen flex flex-col items-center justify-center p-5 overflow-hidden relative" style={{ background: "#eef3f8" }}>
       <BgOrbs />
       <div className="w-full max-w-[380px] relative z-10">
 
@@ -390,7 +397,7 @@ function AuthContent() {
             <button onClick={() => setMode("lang")}
               className="mt-3 min-h-11 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs text-slate-400 hover:text-slate-200 transition-all duration-200 hover:bg-white/5"
               style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-              <Image src={`https://flagcdn.com/w40/${selectedLangObj.iso}.png`}
+              <Image src={`/flags/${selectedLangObj.iso}.png`}
                 alt={selectedLangObj.name} width={16} height={11} className="rounded-sm" unoptimized />
               <span className="font-medium">{selectedLangObj.name}</span>
               <span className="text-slate-600">· {t.changeLang}</span>
@@ -398,14 +405,11 @@ function AuthContent() {
           )}
         </div>
 
-        <div className="relative mb-5 h-32 w-full overflow-hidden rounded-3xl border border-white/10 shadow-2xl">
-          <Image
-            src="/images/safelink-pages/auth-login-secure.png"
-            alt="Secure SAFE-LINK login"
-            fill
-            className="object-cover"
-            priority
-          />
+        <div className="relative mb-5 h-32 w-full overflow-hidden rounded-3xl border border-[#cdd6e2] shadow-lg">
+          <picture>
+            <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/access.webp" />
+            <Image src="/images/mobile-v3/website/access.webp" alt="SAFE-LINK access" fill className="object-cover" priority />
+          </picture>
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/5 to-transparent" />
         </div>
 
@@ -672,7 +676,7 @@ function AuthContent() {
 export default function AuthPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#050508" }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#eef3f8" }}>
         <div className="w-6 h-6 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
       </div>
     }>

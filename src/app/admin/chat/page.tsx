@@ -594,7 +594,7 @@ function AdminChatContent() {
                 className="h-dvh min-h-0 overflow-hidden bg-slate-50 text-slate-900 font-sans flex flex-col selection:bg-blue-200"
                 style={{ borderBottomWidth: 0 }}
             >
-                <header className="safe-area-sticky-top sticky z-50 shrink-0 bg-white border-b border-slate-200 px-4 md:px-6 py-3 md:py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between shadow-sm">
+                <header className="concept-page-header safe-area-sticky-top sticky z-50 shrink-0 flex-wrap">
                     <div className="flex min-w-0 items-center gap-4">
                         <button onClick={() => { if (activeWorker) setActiveWorker(null); else router.back(); }} className="p-2 -ml-2 rounded-full hover:bg-slate-100 transition-colors tap-effect text-slate-500 relative">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -675,12 +675,10 @@ function AdminChatContent() {
                         <div className="mb-6 z-10 sticky top-0 bg-slate-50/90 backdrop-blur-md pb-4 pt-2 border-b border-slate-100">
                             <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-4">{t.title}</h2>
                             <div className="relative mb-4 h-28 w-full overflow-hidden rounded-2xl border border-slate-200">
-                                <Image
-                                    src="/images/safelink-pages/ai-glossary-communication.png"
-                                    alt="AI translation communication"
-                                    fill
-                                    className="object-cover"
-                                />
+                                <picture>
+                                    <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/translate.webp" />
+                                    <Image src="/images/mobile-v3/website/translate.webp" alt="AI translation communication" fill className="object-cover" />
+                                </picture>
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />
                             </div>
                             <div className="relative">

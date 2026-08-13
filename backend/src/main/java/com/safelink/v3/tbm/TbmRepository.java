@@ -46,6 +46,10 @@ public class TbmRepository {
     }
 
     public List<NoticeRow> listForDate(boolean global, Set<Long> siteIds, Long requestedSiteId, Instant start, Instant end, int limit) {
+        return listForDatePage(global, siteIds, requestedSiteId, start, end, null, limit);
+    }
+
+    public List<NoticeRow> listForDatePage(boolean global, Set<Long> siteIds, Long requestedSiteId, Instant start, Instant end, Long cursor, int limit) {
         if (!global && (siteIds == null || siteIds.isEmpty())) {
             return List.of();
         }
@@ -63,13 +67,17 @@ public class TbmRepository {
                 where t.created_at >= :start
                   and t.created_at < :end
                   %s
+                  %s
                 order by t.created_at desc, t.id desc
                 limit :limit
-            """.formatted(siteClause))
+            """.formatted(cursor == null ? "" : "and t.id < :cursor", siteClause))
             .param("start", Timestamp.from(start))
             .param("end", Timestamp.from(end))
             .param("limit", limit);
 
+        if (cursor != null) {
+            statement = statement.param("cursor", cursor);
+        }
         if (requestedSiteId != null) {
             statement = statement.param("requestedSiteId", requestedSiteId);
         } else if (!global) {

@@ -33,7 +33,7 @@ const noiseLabels: Record<string, string> = {
  * 🟢 Tier 3: 현장 환경 제어 에이전트 (Ambient Device Agent)
  * 스마트폰의 마이크와 환경광 상태를 스니핑하여 프론트엔드 환경을 자율적으로 조절합니다.
  */
-export default function SwarmAgentHUD({ lang = "ko" }: { lang?: string }) {
+export default function SwarmAgentHUD({ lang = "ko", placement = "default" }: { lang?: string; placement?: "default" | "worker-home" }) {
     const [isActive, setIsActive] = useState(false);
     const [noiseLevel, setNoiseLevel] = useState(0); // 0 ~ 100 퍼센트에지
     const [isNoisy, setIsNoisy] = useState(false);
@@ -152,7 +152,9 @@ export default function SwarmAgentHUD({ lang = "ko" }: { lang?: string }) {
                     exit={{ opacity: 0, scale: 0.9, y: 20 }}
                     style={{
                         insetInlineEnd: "calc(env(safe-area-inset-right, 0px) + 1rem)",
-                        bottom: "calc(env(safe-area-inset-bottom, 0px) + 4.25rem)",
+                        bottom: placement === "worker-home"
+                            ? "calc(env(safe-area-inset-bottom, 0px) + 7rem)"
+                            : "calc(env(safe-area-inset-bottom, 0px) + 4.25rem)",
                     }}
                     className={`fixed z-[100] w-56 rounded-2xl p-3 shadow-2xl border-2 backdrop-blur-xl transition-colors duration-500
                         ${isNoisy ? 'bg-red-900/90 border-red-500 text-white' : 'bg-slate-900/80 border-slate-700 text-slate-100'}
@@ -225,7 +227,9 @@ export default function SwarmAgentHUD({ lang = "ko" }: { lang?: string }) {
                     aria-label={`${noiseLabel} ${isActive ? "ON" : "open"}`}
                     style={{
                         insetInlineEnd: "calc(env(safe-area-inset-right, 0px) + 1rem)",
-                        bottom: "calc(env(safe-area-inset-bottom, 0px) + 4.25rem)",
+                        bottom: placement === "worker-home"
+                            ? "calc(env(safe-area-inset-bottom, 0px) + 7rem)"
+                            : "calc(env(safe-area-inset-bottom, 0px) + 4.25rem)",
                     }}
                     className={`fixed z-[100] h-10 max-w-[11rem] whitespace-nowrap rounded-full border px-3 leading-none shadow-xl backdrop-blur-md transition-colors
                         ${isActive ? 'bg-emerald-900/90 border-emerald-500/50 text-emerald-400' : 'bg-slate-900/90 border-slate-700 text-slate-400 hover:text-white'}`}

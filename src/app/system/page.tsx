@@ -289,7 +289,7 @@ const systemUI: Record<string, any> = {
 // ──────────────────────────────────────────────────────────────
 function LoadingScreen() {
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-blue-400">
+        <div className="console-light min-h-screen flex flex-col items-center justify-center bg-slate-950 text-blue-600">
             <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mb-4" />
             <p className="animate-pulse tracking-widest font-bold text-sm">권한 확인 중...</p>
         </div>
@@ -588,32 +588,12 @@ export default function SystemAdminPage() {
 
     return (
         <RoleGuard allowedRole="system">
-            <div className="min-h-screen bg-[#030308] text-white font-sans overflow-x-hidden relative">
+            <div className="console-light min-h-screen bg-[#030308] text-white font-sans overflow-x-hidden relative">
                 {/* Animated Background Gradients */}
                 <div className="fixed inset-0 overflow-hidden pointer-events-none">
                     <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-900/20 blur-[120px] rounded-full animate-pulse" />
                     <div className="absolute bottom-[0%] right-[0%] w-[50%] h-[50%] bg-purple-900/10 blur-[150px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
                 </div>
-
-                <button
-                    type="button"
-                    aria-label="시스템 메뉴 열기"
-                    onClick={() => setIsSidebarOpen(true)}
-                    className={`safe-area-fixed-corner-top fixed z-40 md:hidden w-11 h-11 rounded-2xl border border-white/10 bg-slate-950/80 backdrop-blur-xl text-white items-center justify-center shadow-xl shadow-black/30 ${isSidebarOpen ? "hidden" : "flex"}`}
-                >
-                    <Menu className="w-5 h-5" />
-                </button>
-
-                {isSidebarCollapsed && (
-                    <button
-                        type="button"
-                        aria-label="시스템 메뉴 열기"
-                        onClick={() => setIsSidebarCollapsed(false)}
-                        className="safe-area-fixed-corner-top fixed z-40 hidden md:flex w-11 h-11 rounded-2xl border border-white/10 bg-slate-950/80 backdrop-blur-xl text-white items-center justify-center shadow-xl shadow-black/30"
-                    >
-                        <Menu className="w-5 h-5" />
-                    </button>
-                )}
 
                 {isSidebarOpen && (
                     <button
@@ -626,19 +606,19 @@ export default function SystemAdminPage() {
 
                 {/* Sidebar */}
                 <aside className={`safe-area-fixed-rail fixed left-0 top-0 bottom-0 w-64 bg-slate-950/90 md:bg-slate-950/50 backdrop-blur-xl border-r border-white/5 z-50 flex flex-col p-6 transition-transform duration-300 ease-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} ${isSidebarCollapsed ? "md:-translate-x-full" : "md:translate-x-0"}`}>
-                    <div className="flex items-center gap-3 mb-10 px-2">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <div className="flex items-center gap-2 mb-10 px-1">
+                        <div className="w-10 h-10 shrink-0 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
                             <Shield className="w-6 h-6 text-white" />
                         </div>
-                        <div className="min-w-0">
-                            <h1 className="text-xl font-black tracking-tighter italic uppercase text-gradient">{t.title}</h1>
-                            <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase">{t.rootAccess}</p>
+                        <div className="min-w-0 flex-1">
+                            <h1 className="whitespace-nowrap text-lg font-black tracking-tighter italic uppercase text-gradient">{t.title}</h1>
+                            <p className="truncate whitespace-nowrap text-[9px] text-slate-500 font-bold tracking-wider uppercase">{t.rootAccess}</p>
                         </div>
                         <button
                             type="button"
                             aria-label="시스템 메뉴 닫기"
                             onClick={() => setIsSidebarOpen(false)}
-                            className="ml-auto md:hidden w-9 h-9 rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 flex items-center justify-center transition-all"
+                            className="ml-auto md:hidden w-9 h-9 shrink-0 rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 flex items-center justify-center transition-all"
                         >
                             <X className="w-4 h-4" />
                         </button>
@@ -646,7 +626,7 @@ export default function SystemAdminPage() {
                             type="button"
                             aria-label="시스템 메뉴 접기"
                             onClick={() => setIsSidebarCollapsed(true)}
-                            className="ml-auto hidden md:flex w-9 h-9 rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 items-center justify-center transition-all"
+                            className="ml-auto hidden md:flex w-9 h-9 shrink-0 rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 items-center justify-center transition-all"
                         >
                             <X className="w-4 h-4" />
                         </button>
@@ -721,45 +701,66 @@ export default function SystemAdminPage() {
                 </aside>
 
                 {/* Main Content */}
-                <main className={`min-h-screen px-4 pb-4 pt-20 md:p-12 transition-[margin,padding] duration-300 ${isSidebarCollapsed ? "md:ml-0 md:pl-20" : "md:ml-64"}`}>
-                    <header className="flex justify-between items-end mb-12">
-                        <motion.div
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                        >
-                            <h2 className="text-4xl font-bold tracking-tighter text-white mb-2 uppercase italic">
-                                {activeTab === 'dashboard' ? t.dashboard : activeTab === 'sites' ? t.orchestration : t.intelligence}
-                            </h2>
-                            <div className="flex items-center gap-2 text-slate-400 font-bold">
-                                <Zap className="w-4 h-4 text-amber-500" />
-                                <span>{lang === 'ko' ? `${displaySites.length}개 현장 · ${totalWorkers}명 근로자 실시간 모니터링` : `${displaySites.length} sites · ${totalWorkers} workers monitored`}</span>
+                <main className={`min-h-screen transition-[margin] duration-300 ${isSidebarCollapsed ? "md:ml-0" : "md:ml-64"}`}>
+                    <header className="concept-page-header">
+                        <div className="flex min-w-0 items-center gap-3">
+                            <button
+                                type="button"
+                                aria-label="시스템 메뉴 열기"
+                                onClick={() => setIsSidebarOpen(true)}
+                                className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 shadow-sm transition-colors hover:bg-slate-100 md:hidden ${isSidebarOpen ? "invisible pointer-events-none" : "visible"}`}
+                            >
+                                <Menu className="h-5 w-5" />
+                            </button>
+                            {isSidebarCollapsed && (
+                                <button
+                                    type="button"
+                                    aria-label="시스템 메뉴 열기"
+                                    onClick={() => setIsSidebarCollapsed(false)}
+                                    className="hidden h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 shadow-sm transition-colors hover:bg-slate-100 md:grid"
+                                >
+                                    <Menu className="h-5 w-5" />
+                                </button>
+                            )}
+                            <Image
+                                src="/brand/seowon-logo-compact-transparent.png"
+                                alt="SEOWON Since 1991"
+                                width={208}
+                                height={60}
+                                priority
+                                unoptimized
+                                className="h-auto w-[104px] shrink-0 object-contain sm:w-[124px]"
+                            />
+                            <div className="hidden h-8 w-px bg-slate-200 sm:block" />
+                            <div className="hidden min-w-0 sm:block">
+                                <p className="truncate text-sm font-black tracking-tight text-[#172033]">{t.title}</p>
+                                <p className="text-[9px] font-black uppercase tracking-widest text-blue-600">{t.rootAccess}</p>
                             </div>
-                        </motion.div>
+                        </div>
 
-                        <div className="flex items-center gap-4">
-                            {/* 시뮬레이션 모드 토글 */}
+                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                             <button
                                 onClick={() => setIsSimulation(v => !v)}
-                                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border ${
+                                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[9px] font-black uppercase tracking-widest transition-all sm:px-3 ${
                                     isSimulation
-                                        ? 'bg-violet-500/20 border-violet-500/40 text-violet-300'
-                                        : 'bg-white/5 border-white/10 text-slate-500 hover:text-white hover:bg-white/10'
+                                        ? 'border-violet-200 bg-violet-50 text-violet-600'
+                                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white hover:text-blue-600'
                                 }`}
                             >
-                                <FlaskConical className="w-3.5 h-3.5" />
-                                {isSimulation ? "시뮬레이션 ON" : "시뮬레이션"}
+                                <FlaskConical className="h-3.5 w-3.5" />
+                                <span className="hidden sm:inline">{isSimulation ? "시뮬레이션 ON" : "시뮬레이션"}</span>
                             </button>
 
-                            <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
+                            <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-1">
                                 <button
                                     onClick={() => setLang('ko')}
-                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all ${lang === 'ko' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                                    className={`rounded-md px-2.5 py-1.5 text-[9px] font-black transition-all ${lang === 'ko' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-blue-600'}`}
                                 >
                                     KO
                                 </button>
                                 <button
                                     onClick={() => setLang('en')}
-                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all ${lang === 'en' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                                    className={`rounded-md px-2.5 py-1.5 text-[9px] font-black transition-all ${lang === 'en' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-blue-600'}`}
                                 >
                                     EN
                                 </button>
@@ -767,23 +768,39 @@ export default function SystemAdminPage() {
 
                             {activeTab === 'sites' && (
                                 <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
+                                    whileHover={{ scale: 1.03 }}
+                                    whileTap={{ scale: 0.97 }}
                                     onClick={handleOpenAddModal}
-                                    className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2 shadow-xl shadow-blue-500/20 transition-all text-sm"
+                                    className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-[9px] font-black text-white shadow-sm transition-all hover:bg-blue-500"
                                 >
-                                    <Plus className="w-5 h-5" />
-                                    {t.openNewSite}
+                                    <Plus className="h-4 w-4" />
+                                    <span className="hidden sm:inline">{t.openNewSite}</span>
                                 </motion.button>
                             )}
                         </div>
                     </header>
 
-                    {/* 시뮬레이션 배너 */}
-                    <div className="relative mb-8 h-44 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
+                    <section className="admin-concept-hero relative flex min-h-[280px] w-full items-end justify-between overflow-hidden px-5 pb-7 pt-20 sm:px-8 md:min-h-[340px] md:px-12 md:pb-10">
                         <Image src="/images/safelink-pages/system-security-center.png" alt="SQ Link system security center" fill className="object-cover" priority />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-                    </div>
+                        <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+                        <motion.div
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="relative z-10 max-w-2xl"
+                        >
+                            <p className="mb-2 text-[10px] font-black tracking-[.2em] text-blue-200">SQ-LINK SYSTEM CONTROL</p>
+                            <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl">
+                                {activeTab === 'dashboard' ? t.dashboard : activeTab === 'sites' ? t.orchestration : t.intelligence}
+                            </h2>
+                            <div className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-100 sm:text-base">
+                                <Zap className="w-4 h-4 text-amber-500" />
+                                <span>{lang === 'ko' ? `${displaySites.length}개 현장 · ${totalWorkers}명 근로자 실시간 모니터링` : `${displaySites.length} sites · ${totalWorkers} workers monitored`}</span>
+                            </div>
+                        </motion.div>
+
+                    </section>
+
+                    <div className="p-4 md:p-12">
 
                     <AnimatePresence>
                         {isSimulation && (
@@ -1671,6 +1688,7 @@ export default function SystemAdminPage() {
                             </div>
                         )}
                     </AnimatePresence>
+                    </div>
                 </main>
             </div>
 

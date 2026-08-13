@@ -2,6 +2,8 @@
 import { useRouter } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
 import { ArrowLeft, Award, ChevronRight } from "lucide-react";
+import ResponsiveFeatureHero from "@/components/ResponsiveFeatureHero";
+import { visualizationSpecs } from "@/lib/visualization-specs";
 
 function StepCard({ num, title, children }: { num: number; title: string; children: React.ReactNode }) {
   return (
@@ -33,16 +35,14 @@ export default function GuideIncentivePage() {
       <div className="min-h-screen bg-gray-950 text-white p-4">
         <div className="max-w-2xl mx-auto">
 
-          <div className="flex items-center gap-3 mb-2">
+          <div className="concept-page-header">
             <button onClick={() => router.back()} className="p-2 text-gray-500 hover:text-white transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <Award className="w-6 h-6 text-yellow-400" />
-            <div>
-              <h1 className="text-xl font-bold">안전장비 인센티브</h1>
-              <p className="text-xs text-gray-500 mt-0.5">사용 가이드 · 청구항 12</p>
-            </div>
+            <span className="font-black tracking-tight text-[#063789]">SQ-LINK</span>
           </div>
+
+          <ResponsiveFeatureHero visual={{ ...visualizationSpecs.education, eyebrow: "SQ-LINK GUIDE · CLAIM 12", title: "안전장비 인센티브", description: "안전 퀴즈 성과에 따른 지급 대상 선정과 이력 관리를 안내합니다." }} />
 
           <div className="bg-yellow-900/20 border border-yellow-800/40 rounded-xl p-4 mb-6 mt-4">
             <p className="text-sm text-yellow-300 leading-relaxed">

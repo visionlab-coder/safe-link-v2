@@ -495,7 +495,7 @@ export default function GlossaryPage() {
         });
     };
 
-    const handleExport = async (mode: 'print' | 'sheets' | 'drive' = 'print') => {
+    const _handleExport = async (mode: 'print' | 'sheets' | 'drive' = 'print') => {
         if (terms.length === 0) return;
 
         const providerToken = "";
@@ -576,21 +576,19 @@ export default function GlossaryPage() {
 
     return (
         <RoleGuard allowedRole="admin">
-            <div className="min-h-screen bg-mesh text-white p-4 md:p-8 flex flex-col gap-8 pb-12 font-sans selection:bg-blue-500/30">
-                <header className="flex flex-wrap items-center justify-between gap-4 animate-float">
+            <div className="visualization-light min-h-screen p-4 md:p-8 flex flex-col gap-8 pb-12 font-sans selection:bg-blue-500/30">
+                <header className="concept-page-header flex-wrap animate-float">
                     <div className="flex items-center gap-4">
                         <button onClick={() => router.push('/admin')} className="w-12 h-12 glass rounded-2xl flex items-center justify-center text-slate-400 hover:text-white transition-all hover:-translate-x-1">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
                             </svg>
                         </button>
-                        <div className="flex flex-col">
-                            <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase text-gradient">Glossary</h1>
-                            <p className="text-slate-400 font-bold tracking-tight uppercase text-sm">현장 용어 및 표준어 관리</p>
-                        </div>
+                        <span className="text-base font-black tracking-tight text-[#063789]">SQ-LINK</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="ml-auto flex items-center gap-2">
                         <ExportMenu disabled={terms.length === 0} onExport={handleFileExport} />
+                    {/* Legacy export menu removed after consolidating the header controls.
                     <div className="relative group/export">
                         <button className="glass px-6 py-3 rounded-full text-xs font-black text-blue-400 hover:bg-blue-500/10 transition-all tap-effect uppercase tracking-widest flex items-center gap-2 shadow-xl">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2-2H7a2 2 0 00-2 2v4h12z" /></svg>
@@ -601,18 +599,21 @@ export default function GlossaryPage() {
                             <button onClick={() => handleExport('sheets')} className="w-full px-4 py-4 text-left text-[11px] font-black hover:bg-white/5 text-slate-300 transition-colors border-b border-white/5 uppercase tracking-widest flex items-center gap-2">📊 구글 스프레드시트 (CSV)</button>
                             <button onClick={() => handleExport('drive')} className="w-full px-4 py-4 text-left text-[11px] font-black hover:bg-white/5 text-slate-300 transition-colors uppercase tracking-widest flex items-center gap-2">☁️ 구글 드라이브 보관</button>
                         </div>
-                    </div>
+                    </div> */}
                     </div>
                 </header>
 
-                <div className="relative rounded-2xl overflow-hidden h-40 w-full">
-                  <Image
-                    src="/images/safelink-pages/ai-glossary-communication.png"
-                    alt="AI Glossary"
-                    fill
-                    className="object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                <div className="admin-concept-hero relative rounded-2xl overflow-hidden h-40 w-full">
+                  <picture>
+                    <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/translate.webp" />
+                    <Image src="/images/mobile-v3/website/translate.webp" alt="AI Glossary" fill className="object-cover" />
+                  </picture>
+                  <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+                  <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+                    <p className="text-[10px] font-black tracking-[.18em] text-blue-200">SQ-LINK TRANSLATION</p>
+                    <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">Glossary</h1>
+                    <p className="mt-2 text-sm font-bold text-slate-100">현장 용어 및 표준어 관리</p>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

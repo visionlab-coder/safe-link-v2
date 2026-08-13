@@ -151,29 +151,30 @@ export default function AdminIncentivePage() {
 
   return (
     <RoleGuard allowedRole="admin">
-      <div className="min-h-screen bg-gray-950 text-white p-4">
+      <div className="visualization-light min-h-screen p-4">
         <div className="max-w-3xl mx-auto">
-          <div className="flex items-center gap-3 mb-6">
-            <button onClick={() => router.back()} className="p-2 text-gray-500 hover:text-white">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <Award className="w-6 h-6 text-yellow-400" />
-            <h1 className="text-xl font-bold">안전장비 인센티브 지급</h1>
-            <span className="text-xs bg-yellow-900/50 text-yellow-400 px-2 py-0.5 rounded font-bold">청구항 12</span>
-          </div>
-
-          <div className="mb-4 flex justify-end">
+          <div className="concept-page-header">
+            <div className="flex min-w-0 items-center gap-3">
+              <button onClick={() => router.back()} className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-gray-500 hover:bg-slate-100">
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <Award className="w-6 h-6 shrink-0 text-yellow-500" />
+              <span className="whitespace-nowrap rounded bg-yellow-50 px-2 py-0.5 text-xs font-bold text-yellow-700">청구항 12</span>
+            </div>
             <ExportMenu disabled={responses.length === 0} onExport={handleExport} />
           </div>
 
-          <div className="relative rounded-2xl overflow-hidden h-40 w-full mb-4 border border-gray-800">
-            <Image
-              src="/images/safelink-pages/quiz-worker-training.png"
-              alt="Safety incentive training"
-              fill
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          <div className="admin-concept-hero relative rounded-2xl overflow-hidden h-40 w-full mb-4 border border-gray-800">
+            <picture>
+              <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/education.webp" />
+              <Image src="/images/mobile-v3/website/education.webp" alt="Safety incentive training" fill className="object-cover" />
+            </picture>
+            <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+            <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+              <p className="text-[10px] font-black tracking-[.18em] text-yellow-200">SQ-LINK INCENTIVE</p>
+              <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">안전장비 인센티브 지급</h1>
+              <p className="mt-2 text-sm font-bold text-slate-100">안전 퀴즈 성과에 따라 지급 대상과 이력을 관리합니다.</p>
+            </div>
           </div>
 
           {!selectedSession ? (

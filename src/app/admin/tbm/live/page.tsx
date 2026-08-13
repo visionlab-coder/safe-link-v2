@@ -67,12 +67,11 @@ export default function TbmLiveIndexPage() {
 
   return (
     <RoleGuard allowedRole="admin">
-      <div className="min-h-screen bg-gray-950 text-white p-4">
+      <div className="visualization-light min-h-screen p-4">
         <div className="max-w-2xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
+          <div className="concept-page-header">
             <div className="flex items-center gap-3">
               <Nfc className="w-6 h-6 text-green-400" />
-              <h1 className="text-xl font-bold">TBM NFC 참석 확인</h1>
             </div>
             <button
               onClick={() => setCreating(!creating)}
@@ -84,9 +83,17 @@ export default function TbmLiveIndexPage() {
           </div>
 
           {/* 새 세션 생성 폼 */}
-          <div className="relative mb-6 h-40 w-full overflow-hidden rounded-2xl border border-gray-800">
-            <Image src="/images/safelink-pages/tbm-briefing-field.png" alt="TBM NFC session management" fill className="object-cover" priority />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          <div className="admin-concept-hero relative mb-6 h-40 w-full overflow-hidden rounded-2xl border border-gray-800">
+            <picture>
+              <source media="(max-width: 639px)" srcSet="/images/mobile-v4/mobile/tbm/03.webp" />
+              <Image src="/images/mobile-v4/web/tbm/03.webp" alt="TBM NFC session management" fill className="object-cover" priority />
+            </picture>
+            <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+            <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+              <p className="text-[10px] font-black tracking-[.18em] text-green-200">SQ-LINK TBM NFC</p>
+              <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">TBM NFC 참석 확인</h1>
+              <p className="mt-2 text-sm font-bold text-slate-100">현장 세션을 개설하고 NFC 태그 참석 현황을 확인합니다.</p>
+            </div>
           </div>
 
           {creating && (

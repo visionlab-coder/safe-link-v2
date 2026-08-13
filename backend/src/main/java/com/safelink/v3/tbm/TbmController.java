@@ -104,6 +104,33 @@ public class TbmController {
         return new TbmListResponse(rows);
     }
 
+    @GetMapping("/notices/page")
+    public TbmPageResponse noticePage(
+        @AuthenticationPrincipal SessionPrincipal actor,
+        @RequestParam(required = false, name = "site_id") String siteId,
+        @RequestParam(required = false) String date,
+        @RequestParam(required = false) Long cursor,
+        @RequestParam(defaultValue = "100") int limit
+    ) {
+        requireTbmAdmin(actor);
+        Long requestedSiteId = cleanOptionalLong(siteId, "site_id_invalid");
+        if (requestedSiteId != null) {
+            siteGuard.requireSiteAccess(actor, requestedSiteId, "tbm.notice.list", "tbm_notice", null);
+        } else {
+            requireSiteScoped(actor);
+        }
+        LocalDate targetDate = date == null || date.isBlank() ? LocalDate.now(KST) : LocalDate.parse(date);
+        Instant start = targetDate.atStartOfDay(KST).toInstant();
+        Instant end = targetDate.plusDays(1).atStartOfDay(KST).toInstant();
+        int safeLimit = Math.max(1, Math.min(limit, 200));
+        var fetched = tbm.listForDatePage(actor.hasAnyGlobalRole(), actor.siteIds(), requestedSiteId, start, end, cursor, safeLimit + 1);
+        boolean hasMore = fetched.size() > safeLimit;
+        var page = hasMore ? fetched.subList(0, safeLimit) : fetched;
+        var rows = page.stream().map(this::toCompatNotice).toList();
+        String nextCursor = hasMore && !page.isEmpty() ? String.valueOf(page.get(page.size() - 1).id()) : null;
+        return new TbmPageResponse(rows, nextCursor, hasMore);
+    }
+
     @PostMapping("/broadcast")
     public TbmBroadcastResponse broadcast(
         @AuthenticationPrincipal SessionPrincipal actor,
@@ -398,6 +425,11 @@ public class TbmController {
     }
 
     public record TbmListResponse(List<CompatNoticeResponse> tbms) {}
+    public record TbmPageResponse(
+        List<CompatNoticeResponse> tbms,
+        @JsonProperty("next_cursor") String nextCursor,
+        @JsonProperty("has_more") boolean hasMore
+    ) {}
     public record TbmBroadcastResponse(CompatNoticeResponse tbm) {}
     public record AckListResponse(List<CompatAckResponse> acks) {}
     public record WorkerListResponse(List<CompatWorkerResponse> workers) {}

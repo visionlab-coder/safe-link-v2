@@ -35,7 +35,7 @@ type Phase = 'home' | 'waiting' | 'join' | 'chat' | 'solo-setup';
 const RED   = '#c0392b';
 const BLUE  = 'rgba(52,152,219,0.18)';
 const PAGE  = {
-  minHeight: '100vh', background: '#07070e', color: '#ede8e3',
+  minHeight: '100vh', background: '#eef3f8', color: '#172033',
   fontFamily: "'Noto Sans JP','Apple SD Gothic Neo',sans-serif",
   display: 'flex', justifyContent: 'center',
 } as const;
@@ -538,17 +538,18 @@ export default function TravelTalk() {
       <div style={{ width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '56px 28px', minHeight: '100vh' }}>
         <div
           aria-hidden="true"
+          className="travel-hero"
           style={{
             height: 150,
             width: '100%',
             borderRadius: 28,
             overflow: 'hidden',
             marginBottom: 28,
-            border: '1px solid rgba(255,255,255,0.10)',
-            backgroundImage: 'linear-gradient(to top, rgba(0,0,0,0.68), rgba(0,0,0,0.05)), url("/images/safelink-pages/travel-translation-support.png")',
+            border: '1px solid #cdd6e2',
+            backgroundImage: 'linear-gradient(to top, rgba(5,22,43,0.52), rgba(5,22,43,0.04)), url("/images/mobile-v3/website/translate.webp")',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            boxShadow: '0 24px 60px rgba(0,0,0,0.35)',
+            boxShadow: '0 18px 42px rgba(16,42,67,0.14)',
           }}
         />
         <div style={{ textAlign: 'center', marginBottom: 52 }}>

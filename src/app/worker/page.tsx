@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import { playNotificationSound } from "@/utils/notifications";
-import BrandLogo from "@/components/BrandLogo";
 import { ensureLocalNotifyPermission } from "@/utils/native/local-notify";
 import { logoutV3 } from "@/lib/v3-auth";
 import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
@@ -665,24 +664,33 @@ function WorkerHomeContent() {
 
     return (
         <RoleGuard allowedRole="worker">
-            <div className="min-h-screen bg-mesh text-white p-4 md:p-8 flex flex-col gap-8 pb-12 font-sans selection:bg-red-500/30">
+            <div className="worker-home min-h-screen bg-[#eef3f8] text-[#172033] flex flex-col pb-12 font-sans selection:bg-red-500/30">
 
                 {/* 💎 Premium Header */}
-                <header className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start animate-float">
-                    <div className="flex min-w-0 flex-col gap-1">
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                            <BrandLogo compact showProduct imageClassName="max-w-[150px]" />
+                <header className="concept-page-header flex-wrap animate-float">
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <div className="flex shrink-0 items-center gap-2">
+                            <Image
+                                src="/brand/seowon-logo-compact-transparent.png"
+                                alt="SEOWON Since 1991"
+                                width={208}
+                                height={60}
+                                priority
+                                unoptimized
+                                className="h-auto w-[104px] shrink-0 object-contain sm:w-[124px]"
+                            />
+                            <span className="hidden text-sm font-black tracking-tight text-[#063789] md:block">SQ-LINK</span>
                             <div className="flex items-center gap-1 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-full">
                                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                                 <span className="text-[10px] text-green-400 font-black tracking-widest leading-none">LIVE</span>
                             </div>
                         </div>
-                        <p className="text-slate-400 font-bold text-lg leading-tight uppercase tracking-tight">
+                        <p className="hidden min-w-0 truncate text-slate-500 font-bold text-sm leading-tight uppercase tracking-tight sm:block">
                             {profile ? t.greeting(profile.display_name || "Worker") : "Connecting..."}
                         </p>
                     </div>
-                    <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end sm:gap-3">
-                        <div className="flex shrink-0 items-center gap-3 glass px-4 py-2 rounded-full border-white/5 shadow-xl">
+                    <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                        <div className="flex shrink-0 items-center gap-2 rounded-full bg-slate-50 px-2.5 py-1.5">
                             <Image
                                 src={`https://flagcdn.com/w40/${iso}.png`}
                                 alt={lang}
@@ -691,29 +699,36 @@ function WorkerHomeContent() {
                                 className="w-8 h-5.5 object-cover rounded-sm shadow-md"
                                 unoptimized
                             />
-                            <span className="text-xs text-white font-black">{lang.toUpperCase()}</span>
+                            <span className="text-[10px] text-[#172033] font-black">{lang.toUpperCase()}</span>
                         </div>
-                        <div className="flex shrink-0 gap-2 sm:gap-4">
-                            <button onClick={() => router.push('/auth/setup')} className="min-h-11 inline-flex items-center whitespace-nowrap text-[10px] font-black text-blue-400 hover:text-blue-200 uppercase tracking-widest px-2 py-1 transition-colors">
-                                Profile Edit
-                            </button>
-                            <button onClick={handleSignOut} className="min-h-11 inline-flex items-center whitespace-nowrap text-[10px] font-black text-slate-500 hover:text-red-400 uppercase tracking-widest px-2 py-1 transition-colors">
-                                {t.signOut}
-                            </button>
-                        </div>
+                        <button onClick={() => router.push('/auth/setup')} className="whitespace-nowrap rounded-lg px-2 py-2 text-[9px] font-black text-blue-600 hover:bg-blue-50 uppercase tracking-widest transition-colors">
+                            프로필
+                        </button>
+                        <button onClick={handleSignOut} className="whitespace-nowrap rounded-lg px-2 py-2 text-[9px] font-black text-slate-500 hover:bg-red-50 hover:text-red-500 uppercase tracking-widest transition-colors">
+                            {t.signOut}
+                        </button>
                     </div>
+                    <p className="order-3 basis-full truncate text-xs font-bold text-slate-500 sm:hidden">
+                        {profile ? t.greeting(profile.display_name || "Worker") : "Connecting..."}
+                    </p>
                 </header>
 
                 {/* 🛑 작업중지권 (Stop Work Authority) — 긴급 버튼 */}
-                <div className="relative overflow-hidden h-40 w-full rounded-[32px] border border-white/10 shadow-2xl">
-                    <Image
-                        src="/images/safelink-pages/tbm-briefing-field.png"
-                        alt="Field worker safety briefing"
-                        fill
-                        className="object-cover"
-                        priority
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                <div className="admin-concept-hero relative overflow-hidden h-40 w-full rounded-[32px] border border-white/10 shadow-2xl">
+                    <picture>
+                        <source media="(max-width: 639px)" srcSet="/images/mobile-v4/mobile/tbm/03.webp" />
+                        <Image src="/images/mobile-v4/web/tbm/03.webp" alt="Field worker safety briefing" fill className="object-cover" priority />
+                    </picture>
+                    <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+                    <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+                        <p className="text-[10px] font-black tracking-[.18em] text-green-200">SQ-LINK FIELD SAFETY</p>
+                        <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">
+                            {lang === "ko" ? "근로자 안전 홈" : "Worker Safety Home"}
+                        </h1>
+                        <p className="mt-2 text-sm font-bold text-slate-100">
+                            {profile ? t.greeting(profile.display_name || "Worker") : "Connecting..."}
+                        </p>
+                    </div>
                 </div>
 
                 <section className="relative">
@@ -996,17 +1011,8 @@ function WorkerHomeContent() {
                     </button>
                 </section>
 
-                {/* 🛡️ Footer Brand */}
-                <footer className="mt-auto flex flex-col items-center gap-4 py-6">
-                    <div className="flex items-center gap-2 opacity-20">
-                        <BrandLogo compact imageClassName="max-w-[120px]" />
-                        <span className="font-black text-xl italic text-white uppercase tracking-tighter">SQ Link OS</span>
-                    </div>
-                    <p className="text-[10px] font-black text-slate-700 tracking-[0.4em] uppercase">{t.safeWork}</p>
-                </footer>
-
                 {/* 🤖 Tier 3 Ambient Edge Agent */}
-                <SwarmAgentHUD lang={lang} />
+                <SwarmAgentHUD lang={lang} placement="worker-home" />
 
             </div>
         </RoleGuard>

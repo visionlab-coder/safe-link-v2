@@ -189,29 +189,27 @@ export default function AdminNfcHubPage() {
 
   return (
     <RoleGuard allowedRole="admin">
-      <main className="min-h-screen bg-gray-950 text-white p-6">
+      <main className="visualization-light min-h-screen p-6">
         <section className="max-w-2xl mx-auto">
+          <div className="concept-page-header">
+            <span className="font-black tracking-tight text-[#063789]">SQ-LINK</span>
+          </div>
           <div className="mb-8">
-            <div className="flex items-center gap-3 mb-2">
-              <Nfc className="w-7 h-7 text-green-400" />
-              <h1 className="text-2xl font-bold">NFC 관리</h1>
-            </div>
-            <p className="text-gray-400 text-sm">
-              NFC 카드 발급, TBM 참석 확인, 일일 안전일지, 현장 확인코드를 관리합니다.
-            </p>
-            <div className="relative rounded-2xl overflow-hidden h-40 w-full mt-4">
-              <Image
-                src="/images/safelink-pages/nfc-qr-field-scan.png"
-                alt="NFC Field Scan"
-                fill
-                className="object-cover"
-                priority
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+            <div className="admin-concept-hero relative rounded-2xl overflow-hidden h-40 w-full mt-4">
+              <picture>
+                <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/nfc-qr.webp" />
+                <Image src="/images/mobile-v3/website/nfc-qr.webp" alt="NFC Field Scan" fill className="object-cover" priority />
+              </picture>
+              <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+              <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+                <p className="text-[10px] font-black tracking-[.18em] text-green-200">SQ-LINK NFC</p>
+                <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">NFC 관리</h1>
+                <p className="mt-2 text-sm font-bold text-slate-100">카드 발급, TBM 참석, 안전일지와 현장 확인코드를 관리합니다.</p>
+              </div>
             </div>
           </div>
 
-          <div className="mb-5 bg-gray-900 border border-gray-800 rounded-xl p-4">
+          <div id="nfc-site-section" className="mb-5 bg-white border border-[#d9e1ea] rounded-xl p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-xs text-gray-500">내 현장</p>

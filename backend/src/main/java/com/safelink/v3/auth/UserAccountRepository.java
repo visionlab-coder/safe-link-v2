@@ -84,6 +84,13 @@ public class UserAccountRepository {
             .optional();
     }
 
+    public PasswordResetContact findPasswordResetContact(Long userId) {
+        return jdbc.sql("select email, phone from users where id = :userId")
+            .param("userId", userId)
+            .query((rs, rowNum) -> new PasswordResetContact(rs.getString("email"), rs.getString("phone")))
+            .single();
+    }
+
     public List<UserAccount> findWorkerQuickLoginCandidates(String initials, String phoneLast4) {
         return jdbc.sql("""
                 select distinct u.id, u.email, u.display_name, u.preferred_language, u.account_status
@@ -401,4 +408,5 @@ public class UserAccountRepository {
     }
 
     public record SiteOption(Long siteId, String name, String siteCode) {}
+    public record PasswordResetContact(String email, String phone) {}
 }

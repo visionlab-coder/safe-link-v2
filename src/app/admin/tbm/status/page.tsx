@@ -236,7 +236,7 @@ function TBMStatusPageContent() {
         });
     };
 
-    const handleExport = async (mode: 'print' | 'sheets' | 'drive' = 'print') => {
+    const _handleExport = async (mode: 'print' | 'sheets' | 'drive' = 'print') => {
         if (!latestTBM) return;
 
         const providerToken = "";
@@ -507,25 +507,24 @@ function TBMStatusPageContent() {
 
     return (
         <RoleGuard allowedRole="admin">
-            <div className="min-h-screen bg-mesh text-slate-50 flex flex-col font-sans selection:bg-blue-500/30">
-                <header className="safe-area-sticky-top sticky z-50 glass border-b border-white/5 px-6 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors tap-effect text-slate-400">
+            <div className="visualization-light min-h-screen text-slate-900 flex flex-col font-sans selection:bg-blue-500/30">
+                <header className="concept-page-header safe-area-sticky-top sticky z-50 flex-wrap sm:flex-nowrap">
+                    <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                        <button onClick={() => router.back()} className="-ml-2 grid h-10 w-10 shrink-0 place-items-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 tap-effect">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
                             </svg>
                         </button>
-                        <div className="flex flex-col">
+                        <div className="flex min-w-0 items-center gap-2">
                             <div className="flex items-center gap-2">
-                                <span className="text-xl font-black tracking-tight text-white uppercase italic">SQ Link</span>
+                                <span className="truncate text-lg font-black tracking-tight text-[#063789] uppercase sm:text-xl">SQ Link</span>
                                 <span className="px-2 py-0.5 bg-blue-500 text-[10px] font-black rounded text-white tracking-widest uppercase">Admin</span>
                             </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="ml-auto flex shrink-0 items-center gap-2 [&_.group\/export>button]:h-10 [&_.group\/export>button]:rounded-lg [&_.group\/export>button]:border [&_.group\/export>button]:border-slate-200 [&_.group\/export>button]:bg-slate-50 [&_.group\/export>button]:px-3 [&_.group\/export>button]:py-0 [&_.group\/export>button]:text-xs [&_.group\/export>button]:text-slate-600 hover:[&_.group\/export>button]:bg-slate-100">
                         <ExportMenu disabled={!latestTBM || workers.length === 0} onExport={handleFileExport} />
-                        {/* 내보내기 드롭다운 스타일 버튼 */}
-                        <div className="relative group/export">
+                        {/* Legacy export menu removed after consolidating the header controls.
                             <button className="glass px-5 py-2 rounded-full text-xs font-black text-blue-400 hover:bg-blue-500/10 transition-all tap-effect uppercase tracking-widest flex items-center gap-2">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2-2H7a2 2 0 00-2 2v4h12z" /></svg>
                                 내보내기
@@ -535,30 +534,25 @@ function TBMStatusPageContent() {
                                 <button onClick={() => handleExport('sheets')} className="w-full px-4 py-3 text-left text-[10px] font-black hover:bg-white/5 text-slate-300 transition-colors border-b border-white/5 uppercase tracking-widest">📊 구글 스프레드시트 (CSV)</button>
                                 <button onClick={() => handleExport('drive')} className="w-full px-4 py-3 text-left text-[10px] font-black hover:bg-white/5 text-slate-300 transition-colors uppercase tracking-widest">☁️ 구글 드라이브 보관</button>
                             </div>
-                        </div>
-                        <button onClick={() => load()} className="glass px-5 py-2 rounded-full text-xs font-black text-slate-400 hover:text-white transition-all tap-effect uppercase tracking-widest">
+                        </div> */}
+                        <button onClick={() => load()} className="h-10 whitespace-nowrap rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-black tracking-wide text-slate-600 transition-colors hover:bg-slate-100 tap-effect sm:px-4">
                             {t.refreshBtn}
                         </button>
                     </div>
                 </header>
 
                 <main className="flex-1 flex flex-col p-4 md:p-8 gap-8 max-w-3xl mx-auto w-full pb-20">
-                    <div className="flex flex-col gap-2">
-                        <h2 className="text-4xl font-black text-white text-gradient tracking-tighter uppercase">{t.title}</h2>
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                            <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">{t.status}</p>
+                    <div className="admin-concept-hero relative overflow-hidden h-40 w-full rounded-2xl border border-white/10">
+                        <picture>
+                            <source media="(max-width: 639px)" srcSet="/images/mobile-v4/mobile/tbm/03.webp" />
+                            <Image src="/images/mobile-v4/web/tbm/03.webp" alt="TBM status monitoring" fill className="object-cover" />
+                        </picture>
+                        <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+                        <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+                            <p className="flex items-center gap-2 text-[10px] font-black tracking-[.18em] text-green-200"><span className="h-2 w-2 rounded-full bg-green-400" />{t.status}</p>
+                            <h2 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h2>
+                            <p className="mt-2 text-sm font-bold text-slate-100">근로자 확인 및 서명 현황을 실시간으로 확인합니다.</p>
                         </div>
-                    </div>
-
-                    <div className="relative overflow-hidden h-40 w-full rounded-2xl border border-white/10">
-                        <Image
-                            src="/images/safelink-pages/tbm-briefing-field.png"
-                            alt="TBM status monitoring"
-                            fill
-                            className="object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                     </div>
 
                     {!loading && totalCount > 0 && (

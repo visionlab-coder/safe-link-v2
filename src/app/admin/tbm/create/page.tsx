@@ -333,8 +333,8 @@ function AdminTBMCreateContent() {
 
     return (
         <RoleGuard allowedRole="admin">
-            <div className="min-h-screen bg-mesh text-white font-sans flex flex-col selection:bg-blue-500/30">
-                <header className="safe-area-sticky-top sticky z-50 glass border-b border-white/5 px-6 py-4 flex items-center justify-between">
+            <div className="visualization-light min-h-screen font-sans flex flex-col selection:bg-blue-500/30">
+                <header className="concept-page-header safe-area-sticky-top sticky z-50">
                     <div className="flex items-center gap-4">
                         <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors tap-effect text-slate-400">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -366,22 +366,20 @@ function AdminTBMCreateContent() {
                     </div>
                 </header>
 
-                <div className="relative overflow-hidden h-40 w-full">
-                  <Image
-                    src="/images/safelink-pages/tbm-briefing-field.png"
-                    alt="TBM Field Briefing"
-                    fill
-                    className="object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                <div className="admin-concept-hero relative overflow-hidden h-40 w-full">
+                  <picture>
+                    <source media="(max-width: 639px)" srcSet="/images/mobile-v4/mobile/tbm/03.webp" />
+                    <Image src="/images/mobile-v4/web/tbm/03.webp" alt="TBM Field Briefing" fill className="object-cover" />
+                  </picture>
+                  <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+                  <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+                    <p className="text-[10px] font-black tracking-[.18em] text-blue-200">SQ-LINK TBM</p>
+                    <h2 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h2>
+                    <p className="mt-2 text-sm font-bold text-slate-100">{t.subtitle}</p>
+                  </div>
                 </div>
 
                 <main className="flex-1 flex flex-col p-4 md:p-8 gap-8 max-w-3xl mx-auto w-full pb-20">
-                    <div className="flex flex-col gap-2">
-                        <h2 className="text-4xl font-black text-white text-gradient tracking-tighter uppercase">{t.title}</h2>
-                        <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">{t.subtitle}</p>
-                    </div>
-
                     <section className="glass rounded-[40px] p-8 border-white/10 shadow-2xl relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 blur-[60px] rounded-full -mr-16 -mt-16 group-hover:bg-purple-500/20 transition-all duration-1000" />
                         <div className="flex justify-between items-center mb-6">
@@ -397,7 +395,7 @@ function AdminTBMCreateContent() {
                             <input
                                 value={briefingCategory}
                                 onChange={(e) => setBriefingCategory(e.target.value)}
-                                placeholder="카테고리 (예: 거푸집, 배근, 타설) — 비워두면 전체"
+                                placeholder="카테고리 (예: 거푸집, 배근, 타설)"
                                 className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white placeholder-slate-700 focus:outline-none focus:border-purple-500/40"
                             />
                         </div>

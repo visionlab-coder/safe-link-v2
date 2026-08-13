@@ -27,6 +27,8 @@ dependencies {
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation(platform("software.amazon.awssdk:bom:2.25.70"))
     implementation("software.amazon.awssdk:s3")
+    implementation("software.amazon.awssdk:sesv2")
+    implementation("software.amazon.awssdk:sns")
     runtimeOnly("org.postgresql:postgresql")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")

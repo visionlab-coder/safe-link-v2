@@ -2,6 +2,8 @@
 import { useRouter } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
 import { ArrowLeft, BarChart3, Shield, Users, PenLine, AlertTriangle, Link, Mic, ChevronRight } from "lucide-react";
+import ResponsiveFeatureHero from "@/components/ResponsiveFeatureHero";
+import { visualizationSpecs } from "@/lib/visualization-specs";
 
 function StepCard({ num, title, children }: { num: number; title: string; children: React.ReactNode }) {
   return (
@@ -47,16 +49,14 @@ export default function GuideEsgPage() {
       <div className="min-h-screen bg-gray-950 text-white p-4">
         <div className="max-w-2xl mx-auto">
 
-          <div className="flex items-center gap-3 mb-2">
+          <div className="concept-page-header">
             <button onClick={() => router.back()} className="p-2 text-gray-500 hover:text-white transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <BarChart3 className="w-6 h-6 text-emerald-400" />
-            <div>
-              <h1 className="text-xl font-bold">ESG 안전 리포트</h1>
-              <p className="text-xs text-gray-500 mt-0.5">사용 가이드 · 청구항 24</p>
-            </div>
+            <span className="font-black tracking-tight text-[#063789]">SQ-LINK</span>
           </div>
+
+          <ResponsiveFeatureHero visual={{ ...visualizationSpecs.esg, eyebrow: "SQ-LINK GUIDE · CLAIM 24", title: "ESG 안전 리포트", description: "안전 활동 집계부터 ESG 지표 확인과 보고서 출력까지 안내합니다." }} />
 
           <div className="bg-emerald-900/20 border border-emerald-800/40 rounded-xl p-4 mb-6 mt-4">
             <p className="text-sm text-emerald-300 leading-relaxed">

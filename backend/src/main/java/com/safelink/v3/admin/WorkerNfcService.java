@@ -71,6 +71,20 @@ public class WorkerNfcService {
     }
 
     public WorkerListResponse list(SessionPrincipal actor, String requestedSiteId, String q, boolean activeOnly, int limit) {
+        int safeLimit = Math.max(1, Math.min(limit <= 0 ? 50 : limit, 200));
+        return new WorkerListResponse(queryWorkers(actor, requestedSiteId, q, activeOnly, null, safeLimit));
+    }
+
+    public WorkerPageResponse listPage(SessionPrincipal actor, String requestedSiteId, String q, boolean activeOnly, Long cursor, int limit) {
+        int safeLimit = Math.max(1, Math.min(limit <= 0 ? 100 : limit, 200));
+        List<WorkerResponse> fetched = queryWorkers(actor, requestedSiteId, q, activeOnly, cursor, safeLimit + 1);
+        boolean hasMore = fetched.size() > safeLimit;
+        List<WorkerResponse> workers = hasMore ? List.copyOf(fetched.subList(0, safeLimit)) : fetched;
+        String nextCursor = hasMore && !workers.isEmpty() ? workers.get(workers.size() - 1).id() : null;
+        return new WorkerPageResponse(workers, nextCursor, hasMore);
+    }
+
+    private List<WorkerResponse> queryWorkers(SessionPrincipal actor, String requestedSiteId, String q, boolean activeOnly, Long cursor, int limit) {
         Long siteId = parseOptionalLong(requestedSiteId);
         if (siteId == null && !actor.hasAnyGlobalRole()) {
             if (actor.siteIds().isEmpty()) {
@@ -82,7 +96,6 @@ public class WorkerNfcService {
             siteGuard.requireGlobalOrSiteAdmin(actor, siteId, "admin.worker.list", "site", String.valueOf(siteId));
         }
 
-        int safeLimit = Math.max(1, Math.min(limit <= 0 ? 50 : limit, 200));
         String search = cleanSearch(q);
         String sql = """
             select u.id,
@@ -102,6 +115,7 @@ public class WorkerNfcService {
             left join worker_profiles wp on wp.user_id = u.id
             where u.account_status = 'ACTIVE'
             """ + (siteId == null ? "" : " and sm.site_id = :siteId\n")
+            + (cursor == null ? "" : " and u.id < :cursor\n")
             + (activeOnly ? " and coalesce(wp.is_active, true) = true\n" : "")
             + (search.isBlank() ? "" : """
               and (
@@ -112,11 +126,12 @@ public class WorkerNfcService {
             """)
             + " order by u.id desc limit :limit";
 
-        var spec = jdbc.sql(sql).param("limit", safeLimit);
+        var spec = jdbc.sql(sql).param("limit", limit);
         if (siteId != null) spec = spec.param("siteId", siteId);
+        if (cursor != null) spec = spec.param("cursor", cursor);
         if (!search.isBlank()) spec = spec.param("search", "%" + search + "%");
 
-        return new WorkerListResponse(spec.query((rs, rowNum) -> new WorkerResponse(
+        return spec.query((rs, rowNum) -> new WorkerResponse(
             String.valueOf(rs.getLong("id")),
             rs.getString("worker_code"),
             rs.getString("full_name"),
@@ -131,7 +146,7 @@ public class WorkerNfcService {
             null,
             null,
             null
-        )).list());
+        )).list();
     }
 
     @Transactional
@@ -1627,6 +1642,11 @@ public class WorkerNfcService {
     }
 
     public record WorkerListResponse(List<WorkerResponse> workers) {}
+    public record WorkerPageResponse(
+        List<WorkerResponse> workers,
+        @JsonProperty("next_cursor") String nextCursor,
+        @JsonProperty("has_more") boolean hasMore
+    ) {}
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record WorkerResponse(

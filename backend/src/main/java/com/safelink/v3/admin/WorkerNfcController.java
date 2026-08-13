@@ -64,6 +64,18 @@ public class WorkerNfcController {
         return service.list(actor, siteId, q, !"0".equals(active), limit);
     }
 
+    @GetMapping("/api/v1/admin/workers/page")
+    public WorkerNfcService.WorkerPageResponse listWorkerPage(
+        @AuthenticationPrincipal SessionPrincipal actor,
+        @RequestParam(name = "site_id", required = false) String siteId,
+        @RequestParam(name = "q", required = false) String q,
+        @RequestParam(name = "active", required = false, defaultValue = "1") String active,
+        @RequestParam(name = "cursor", required = false) Long cursor,
+        @RequestParam(name = "limit", required = false, defaultValue = "100") int limit
+    ) {
+        return service.listPage(actor, siteId, q, !"0".equals(active), cursor, limit);
+    }
+
     @PostMapping("/api/v1/admin/workers")
     public WorkerResponse createWorker(@AuthenticationPrincipal SessionPrincipal actor, @RequestBody CreateWorkerRequest request) {
         return service.create(actor, request);

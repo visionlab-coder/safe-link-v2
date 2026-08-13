@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import HQCommandSwarm from "@/components/agents/HQCommandSwarm";
 import SwarmVisualizer from "@/components/agents/SwarmVisualizer";
 import { logoutV3 } from "@/lib/v3-auth";
+import Image from "next/image";
 
 function ControlDashboardContent() {
     const router = useRouter();
@@ -36,36 +37,43 @@ function ControlDashboardContent() {
 
     return (
         <RoleGuard allowedRole="hq">
-            <div className="min-h-screen bg-slate-950 text-white p-4 md:p-8 flex flex-col gap-8 pb-12 font-sans selection:bg-indigo-500/30">
+            <div className="console-light min-h-screen bg-slate-950 text-white flex flex-col pb-12 font-sans selection:bg-indigo-500/30">
 
                 {/* 💎 Premium Header */}
-                <header className="flex justify-between items-start animate-float">
-                    <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2 mb-1">
-                            <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase text-gradient bg-gradient-to-r from-indigo-400 to-purple-500">SQ Link</h1>
+                <header className="concept-page-header animate-float">
+                    <div className="min-w-0 flex-1 flex flex-col gap-1">
+                        <div className="flex min-w-0 items-center gap-2 mb-1">
+                            <h1 className="shrink-0 whitespace-nowrap text-lg font-black tracking-tight text-[#063789] uppercase sm:text-xl">SQ-LINK</h1>
                             <div className="flex items-center gap-1 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full">
                                 <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                                 <span className="text-[10px] text-indigo-400 font-black tracking-widest leading-none">HQ CONTROL</span>
                             </div>
                         </div>
-                        <p className="text-slate-400 font-bold text-lg leading-tight uppercase tracking-tight">
+                        <p className="text-slate-500 font-bold text-xs leading-tight uppercase tracking-tight">
                             {currentUser ? `Welcome, ${currentUser.name}` : "Authenticating..."}
                         </p>
                     </div>
-                    <div className="flex flex-col items-end gap-3">
-                        <div className="px-4 py-2 glass rounded-full border border-indigo-500/20 shadow-xl text-xs font-black tracking-widest uppercase text-indigo-400">
+                    <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
+                        <div className="whitespace-nowrap rounded-full bg-indigo-50 px-2 py-1.5 text-[9px] font-black tracking-wide uppercase text-indigo-600 sm:px-3 sm:py-2 sm:text-[10px] sm:tracking-widest">
                             HQ Admin
                         </div>
-                        <button onClick={handleSignOut} className="text-[10px] font-black text-slate-500 hover:text-red-400 uppercase tracking-widest py-1 transition-colors">
+                        <button onClick={handleSignOut} className="rounded-lg px-2 py-2 text-[10px] font-black text-slate-500 hover:bg-red-50 hover:text-red-500 uppercase tracking-widest transition-colors">
                             Sign out
                         </button>
                     </div>
                 </header>
 
-                <div className="flex flex-col gap-2 relative mt-4">
-                    <h2 className="text-5xl font-black text-white text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-600 tracking-tighter uppercase">Integrated Dashboard</h2>
-                    <p className="text-slate-500 font-bold tracking-tight uppercase text-sm">Monitor overall site status and download evidence logs.</p>
+                <div className="admin-concept-hero relative flex min-h-[280px] w-full items-end overflow-hidden px-5 pb-8 sm:px-8 md:min-h-[340px] md:px-12 md:pb-10">
+                    <Image src="/images/mobile-v3/website/dashboard.webp" alt="HQ integrated dashboard" fill className="object-cover" priority />
+                    <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+                    <div className="relative z-10 max-w-2xl">
+                        <p className="text-[10px] font-black tracking-[.2em] text-indigo-200">SQ-LINK HQ CONTROL</p>
+                        <h2 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">Integrated Dashboard</h2>
+                        <p className="mt-2 text-sm font-bold text-slate-100">Monitor overall site status and download evidence logs.</p>
+                    </div>
                 </div>
+
+                <div className="flex flex-col gap-8 p-4 md:p-8">
 
                 {/* 🤖 Tier 1: HQ Command Swarm Intelligence */}
                 <HQCommandSwarm lang={currentUser?.prefLang || 'ko'} />
@@ -131,12 +139,7 @@ function ControlDashboardContent() {
                     </section>
                 </div>
 
-                <footer className="mt-auto flex flex-col items-center gap-4 py-8">
-                    <div className="flex items-center gap-2 opacity-10">
-                        <div className="w-10 h-10 rounded-xl bg-white/20" />
-                        <span className="font-black text-2xl italic text-white uppercase tracking-tighter">HQ Console</span>
-                    </div>
-                </footer>
+                </div>
             </div>
         </RoleGuard>
     );
@@ -144,7 +147,7 @@ function ControlDashboardContent() {
 
 export default function ControlDashboard() {
     return (
-        <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
+        <Suspense fallback={<div className="console-light min-h-screen bg-slate-950" />}>
             <ControlDashboardContent />
         </Suspense>
     );

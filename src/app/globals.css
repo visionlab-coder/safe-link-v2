@@ -86,6 +86,378 @@ body {
   border-top-width: 0;
 }
 
+/* Local admin visualization preview: retain the existing action cards but
+ * present the area below the supplied mock in the same light visual system. */
+.admin-light-cards > .glass {
+  background: #fff !important;
+  border-color: #d9e1ea !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 10px 28px rgba(16, 42, 67, .10) !important;
+}
+
+.admin-light-cards .rounded-2xl {
+  border-radius: 0.75rem !important;
+}
+
+.admin-light-cards > .glass .text-white {
+  color: #172033 !important;
+}
+
+.admin-light-cards > .glass .text-slate-400,
+.admin-light-cards > .glass .text-slate-500 {
+  color: #526076 !important;
+}
+
+/*
+ * 관리자 전 화면 공통 디자인.
+ * /admin에서 확정한 밝은 운영 콘솔 팔레트와 카드 밀도를 하위 화면에도
+ * 적용하되, 상태색·주요 액션 버튼·기능별 레이아웃은 그대로 유지한다.
+ */
+.admin-concept-theme {
+  min-height: 100vh;
+  background: #eef3f8;
+  color: #172033;
+}
+
+.admin-concept-theme .bg-gray-950,
+.admin-concept-theme .bg-slate-950,
+.admin-concept-theme .bg-mesh,
+.admin-concept-theme .bg-\[\#070710\] {
+  background: #eef3f8 !important;
+}
+
+.admin-concept-theme header {
+  border-color: #d9e1ea !important;
+  background: rgba(255, 255, 255, 0.97) !important;
+  color: #172033 !important;
+  box-shadow: 0 4px 18px rgba(16, 42, 67, 0.08) !important;
+  backdrop-filter: blur(18px);
+}
+
+.admin-concept-theme header .text-white,
+.admin-concept-theme header .text-slate-200,
+.admin-concept-theme header .text-slate-300 {
+  color: #172033 !important;
+}
+
+.admin-concept-theme .glass,
+.admin-concept-theme .bg-gray-900,
+.admin-concept-theme .bg-gray-800,
+.admin-concept-theme .bg-slate-900,
+.admin-concept-theme .bg-slate-800,
+.admin-concept-theme .bg-white\/5 {
+  border-color: #d9e1ea !important;
+  background: #fff !important;
+  color: #172033 !important;
+}
+
+.admin-concept-theme section.glass,
+.admin-concept-theme main > section,
+.admin-concept-theme main [class*="rounded-"][class*="border"] {
+  box-shadow: 0 10px 28px rgba(16, 42, 67, 0.1);
+}
+
+.admin-concept-theme section.glass {
+  border-radius: 0.75rem !important;
+}
+
+.admin-concept-theme .text-white,
+.admin-concept-theme .text-slate-200,
+.admin-concept-theme .text-slate-300 {
+  color: #172033 !important;
+}
+
+.admin-concept-theme .text-gradient:not(.admin-concept-hero *) {
+  background: none !important;
+  color: #172033 !important;
+  -webkit-text-fill-color: #172033 !important;
+}
+
+.admin-concept-theme .text-gray-400,
+.admin-concept-theme .text-gray-500,
+.admin-concept-theme .text-slate-400,
+.admin-concept-theme .text-slate-500,
+.admin-concept-theme .text-slate-600 {
+  color: #526076 !important;
+}
+
+.admin-concept-theme input,
+.admin-concept-theme select,
+.admin-concept-theme textarea {
+  border-color: #cdd6e2 !important;
+  background: #fff !important;
+  color: #172033 !important;
+}
+
+.admin-concept-theme input::placeholder,
+.admin-concept-theme textarea::placeholder {
+  color: #8a97a8 !important;
+}
+
+.admin-concept-theme button[class*="bg-blue-"][class*="text-white"],
+.admin-concept-theme button[class*="bg-indigo-"][class*="text-white"],
+.admin-concept-theme button[class*="bg-purple-"][class*="text-white"],
+.admin-concept-theme button[class*="bg-red-"][class*="text-white"],
+.admin-concept-theme button[class*="bg-emerald-"][class*="text-white"],
+.admin-concept-theme button[class*="bg-gradient-"][class*="text-white"] {
+  color: #fff !important;
+}
+
+.admin-concept-theme button[class*="bg-gradient-"] .text-white,
+.admin-concept-theme button[class*="bg-red-"] .text-white,
+.admin-concept-theme button[class*="bg-blue-"] .text-white,
+.admin-concept-theme [class*="bg-red-600"] > .text-white,
+.admin-concept-theme [class*="bg-blue-600"] > .text-white {
+  color: #fff !important;
+}
+
+.worker-concept-theme > * {
+  background-color: #eef3f8 !important;
+}
+
+.worker-concept-theme section.glass {
+  border-radius: 0.75rem !important;
+}
+
+.worker-concept-theme .worker-home {
+  gap: 0 !important;
+  padding: 0 0 3rem !important;
+}
+
+.worker-concept-theme .worker-home > header {
+  padding: 0.75rem 1rem;
+}
+
+.worker-concept-theme .worker-home > :not(header):not(.admin-concept-hero):not(.safe-area-overlay):not(.fixed) {
+  margin-right: 1rem;
+  margin-left: 1rem;
+  margin-top: 2rem;
+}
+
+@media (min-width: 768px) {
+  .worker-concept-theme .worker-home > header {
+    padding-right: 2rem;
+    padding-left: 2rem;
+  }
+
+  .worker-concept-theme .worker-home > :not(header):not(.admin-concept-hero):not(.safe-area-overlay):not(.fixed) {
+    margin-right: 2rem;
+    margin-left: 2rem;
+  }
+}
+
+.admin-concept-theme .admin-concept-hero {
+  min-height: 14rem;
+  width: 100vw !important;
+  max-width: none !important;
+  margin-right: calc(50% - 50vw) !important;
+  margin-left: calc(50% - 50vw) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #172033 !important;
+  box-shadow: none !important;
+}
+
+/* 관리자·근로자 기능 화면의 헤더 위치와 높이를 한 기준으로 맞춘다. */
+.concept-page-header {
+  display: flex;
+  min-height: 4.25rem;
+  width: 100vw;
+  max-width: none;
+  margin-right: calc(50% - 50vw);
+  margin-left: calc(50% - 50vw);
+  padding: .75rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  border-bottom: 1px solid #d9e1ea !important;
+  background: rgba(255, 255, 255, .97) !important;
+  box-shadow: 0 4px 18px rgba(16, 42, 67, .08) !important;
+}
+
+.concept-page-header > * {
+  min-width: 0;
+}
+
+@media (min-width: 640px) {
+  .concept-page-header {
+    padding-right: 2rem;
+    padding-left: 2rem;
+  }
+}
+
+.admin-concept-theme .admin-concept-hero [class*="bg-gradient-"] {
+  background-color: transparent !important;
+}
+
+.admin-concept-theme .admin-concept-hero .text-white,
+.admin-concept-theme .admin-concept-hero h1,
+.admin-concept-theme .admin-concept-hero h2,
+.admin-concept-theme .admin-concept-hero p {
+  color: #fff !important;
+}
+
+/* Mock 기반 밝은 운영 화면. 기존 이벤트 컴포넌트는 유지하고 시각 체계만 통일한다. */
+.visualization-light {
+  background: #eef3f8 !important;
+  color: #172033;
+}
+
+.visualization-light .glass {
+  background: #fff !important;
+  border-color: #d9e1ea !important;
+  box-shadow: 0 10px 28px rgba(16, 42, 67, .10) !important;
+}
+
+.visualization-light .glass h1,
+.visualization-light .glass h2,
+.visualization-light .glass h3,
+.visualization-light .glass h4 {
+  color: #172033 !important;
+}
+
+.visualization-light .glass p {
+  color: #526076;
+}
+
+/* 로그인/본인 확인 화면의 밝은 목업 테마. 인증 이벤트에는 영향을 주지 않는다. */
+.auth-light .text-white { color: #172033 !important; }
+.auth-light .text-slate-700, .auth-light .text-slate-600, .auth-light .text-slate-500 { color: #526076 !important; }
+.auth-light input { color: #172033 !important; }
+.auth-light input::placeholder { color: #8a97a8 !important; }
+.auth-light button[style*="rgba(255,255,255"] { background: #f8fafc !important; border-color: #d9e1ea !important; }
+
+/* 목업 대상 기능 화면의 공통 밝은 베이스. 각 화면의 API·폼·버튼 동작은 그대로 유지한다. */
+.visualization-light { background: #eef3f8 !important; color: #172033 !important; }
+.visualization-light .bg-gray-950, .visualization-light .bg-slate-950, .visualization-light .bg-\[\#070710\], .visualization-light .bg-mesh { background: #eef3f8 !important; }
+.visualization-light .bg-gray-900, .visualization-light .bg-gray-800, .visualization-light .bg-slate-900, .visualization-light .bg-slate-800, .visualization-light .bg-white\/5 { background: #ffffff !important; }
+.visualization-light .border-gray-800, .visualization-light .border-gray-700, .visualization-light .border-white\/5, .visualization-light .border-white\/10 { border-color: #d9e1ea !important; }
+.visualization-light .text-white { color: #172033 !important; }
+.visualization-light .text-gray-400, .visualization-light .text-gray-500, .visualization-light .text-slate-400, .visualization-light .text-slate-500, .visualization-light .text-slate-600 { color: #526076 !important; }
+.visualization-light input, .visualization-light select, .visualization-light textarea { background: #ffffff !important; border-color: #cdd6e2 !important; color: #172033 !important; }
+
+/*
+ * ROOT/HQ 콘솔 공통 밝은 테마.
+ * 기존 컴포넌트의 기능과 상태 색상은 유지하고, 어두운 배경·카드·본문 색만
+ * 밝은 운영 콘솔 팔레트로 치환한다. /system과 /control 루트에서만 적용된다.
+ */
+.console-light {
+  color: #172033 !important;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(37, 99, 235, 0.10), transparent 30rem),
+    radial-gradient(circle at 96% 12%, rgba(124, 58, 237, 0.07), transparent 28rem),
+    #f3f6fa !important;
+}
+
+.console-light .glass,
+.console-light [class*="bg-slate-950"],
+.console-light [class*="bg-slate-900"],
+.console-light [class*="bg-slate-800"],
+.console-light [class*="bg-gray-950"],
+.console-light [class*="bg-gray-900"],
+.console-light [class*="bg-[#0d0d15]"] {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+  border-color: #d8e1ec !important;
+  box-shadow: 0 12px 32px rgba(30, 55, 85, 0.08);
+}
+
+.console-light [class*="bg-black/"][class*="rounded"] {
+  background-color: #f7f9fc !important;
+  border-color: #d8e1ec !important;
+}
+
+.console-light [class*="from-slate-900"],
+.console-light [class*="from-slate-950"] {
+  --tw-gradient-from: #ffffff var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position) !important;
+}
+
+.console-light [class*="to-slate-900"],
+.console-light [class*="to-slate-950"] {
+  --tw-gradient-to: #edf2f7 var(--tw-gradient-to-position) !important;
+}
+
+.console-light .text-white,
+.console-light [class*="text-slate-200"],
+.console-light [class*="text-slate-300"] {
+  color: #172033 !important;
+}
+
+.console-light [class*="text-slate-400"],
+.console-light [class*="text-slate-500"],
+.console-light [class*="text-slate-600"] {
+  color: #5d6b7e !important;
+}
+
+.console-light [class*="text-indigo-100"] {
+  color: #334155 !important;
+}
+
+.console-light [class*="border-white/"],
+.console-light [class*="border-slate-7"],
+.console-light [class*="border-slate-8"] {
+  border-color: #d8e1ec !important;
+}
+
+.console-light input,
+.console-light select,
+.console-light textarea {
+  color: #172033 !important;
+  background-color: #ffffff !important;
+  border-color: #cbd6e3 !important;
+}
+
+.console-light input::placeholder,
+.console-light textarea::placeholder {
+  color: #8a97a8 !important;
+}
+
+/* 강조 버튼과 브랜드 배지는 밝은 바탕에서도 흰 글자를 유지한다. */
+.console-light [class*="bg-blue-"][class*="text-white"],
+.console-light [class*="bg-indigo-"][class*="text-white"],
+.console-light [class*="bg-violet-"][class*="text-white"],
+.console-light [class*="bg-red-"][class*="text-white"],
+.console-light [class*="bg-emerald-"][class*="text-white"],
+.console-light [class*="from-blue-"] .text-white,
+.console-light [class*="from-indigo-"] .text-white {
+  color: #ffffff !important;
+}
+
+.console-light .text-gradient {
+  background-image: linear-gradient(135deg, #172033, #2563eb);
+}
+
+.console-light .admin-concept-hero [class*="bg-gradient-"] {
+  --tw-gradient-from: rgb(2 6 23 / 0.85) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgb(2 6 23 / 0.15) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), rgb(2 6 23 / 0.50) var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+  background-color: transparent !important;
+}
+
+.console-light .admin-concept-hero h1,
+.console-light .admin-concept-hero h2,
+.console-light .admin-concept-hero p,
+.console-light .admin-concept-hero .text-white,
+.console-light .admin-concept-hero .text-slate-100,
+.console-light .admin-concept-hero .text-blue-200 {
+  color: #fff !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+
+.console-light aside {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-color: #d8e1ec !important;
+  box-shadow: 12px 0 34px rgba(30, 55, 85, 0.08);
+}
+
+.console-light ::-webkit-scrollbar-thumb {
+  background: #c5d0dc;
+}
+
+@media (max-width: 639px) {
+  .travel-hero { background-image: linear-gradient(to top, rgba(5,22,43,0.52), rgba(5,22,43,0.04)), url("/images/mobile-v3/android/translate.webp") !important; }
+}
+
 /*
  * iOS Safari/WKWebView는 16px보다 작은 폼 요소에 포커스하면 화면을
  * 자동 확대한다. 모바일에서만 폼 글자 크기를 보정해 배율과 가로 위치가

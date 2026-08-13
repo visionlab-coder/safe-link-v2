@@ -229,26 +229,31 @@ export default function QRDistributionPage() {
 
     return (
         <RoleGuard allowedRole="admin">
-            <main className="min-h-screen bg-[#070710] text-white p-4 sm:p-6 md:p-12 font-sans">
+            <main className="visualization-light min-h-screen p-4 sm:p-6 md:p-12 font-sans">
                 <div className="max-w-6xl mx-auto flex flex-col gap-10">
 
                     {/* Header */}
-                    <header className="flex items-center gap-3 sm:gap-6">
+                    <header className="concept-page-header">
                         <button
                             onClick={() => router.back()}
                             className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 glass rounded-2xl flex items-center justify-center text-slate-400 hover:text-white transition-all shadow-lg active:scale-90"
                         >
                             <ArrowLeft className="w-6 h-6" />
                         </button>
-                        <div className="min-w-0 flex-1">
-                            <h1 className="whitespace-nowrap text-2xl sm:text-4xl font-black italic tracking-tighter text-white uppercase text-gradient">Access Center</h1>
-                            <p className="text-slate-500 font-bold tracking-tight uppercase text-xs sm:text-sm">QR 배포 · NFC 카드 발급 통합</p>
-                        </div>
+                        <span className="text-base font-black tracking-tight text-[#063789]">SQ-LINK</span>
                     </header>
 
-                    <div className="relative h-44 w-full overflow-hidden rounded-[36px] border border-white/10 shadow-2xl">
-                        <Image src="/images/safelink-pages/nfc-qr-field-scan.png" alt="QR and NFC access center" fill className="object-cover" priority />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                    <div className="admin-concept-hero relative h-44 w-full overflow-hidden rounded-[36px] border border-white/10 shadow-2xl">
+                        <picture>
+                            <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/nfc-qr.webp" />
+                            <Image src="/images/mobile-v3/website/nfc-qr.webp" alt="QR and NFC access center" fill className="object-cover" priority />
+                        </picture>
+                        <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+                        <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+                            <p className="text-[10px] font-black tracking-[.18em] text-blue-200">SQ-LINK ACCESS</p>
+                            <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">Access Center</h1>
+                            <p className="mt-2 text-sm font-bold text-slate-100">QR 배포 · NFC 카드 발급 통합</p>
+                        </div>
                     </div>
 
                     {/* Site Binding */}

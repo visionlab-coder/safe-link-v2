@@ -224,8 +224,8 @@ function AdminLiveContent() {
 
     return (
         <RoleGuard allowedRole="admin">
-            <div className="min-h-screen bg-mesh text-white font-sans flex flex-col selection:bg-blue-500/30">
-                <header className="safe-area-sticky-top sticky z-50 glass border-b border-white/5 px-6 py-4 flex items-center justify-between">
+            <div className="visualization-light min-h-screen font-sans flex flex-col selection:bg-blue-500/30">
+                <header className="concept-page-header safe-area-sticky-top sticky z-50">
                     <div className="flex items-center gap-4">
                         <button onClick={() => { if (isLive) handleStopBroadcast(); router.back(); }} className="p-2 -ml-2 rounded-full hover:bg-white/5 tap-effect text-slate-400">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -256,14 +256,17 @@ function AdminLiveContent() {
                     </div>
                 </header>
 
-                <div className="relative overflow-hidden h-40 w-full">
-                  <Image
-                    src="/images/safelink-pages/live-field-monitoring.png"
-                    alt="Live Field Monitoring"
-                    fill
-                    className="object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                <div className="admin-concept-hero relative overflow-hidden h-40 w-full">
+                  <picture>
+                    <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/live.webp" />
+                    <Image src="/images/mobile-v3/website/live.webp" alt="Live Field Monitoring" fill className="object-cover" />
+                  </picture>
+                  <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+                  <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+                    <p className="text-[10px] font-black tracking-[.18em] text-blue-200">SQ-LINK LIVE</p>
+                    <h2 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">실시간 동시통역</h2>
+                    <p className="mt-2 text-sm font-bold text-slate-100">말하면 근로자 스마트폰에서 번역된 음성이 자동 재생됩니다.</p>
+                  </div>
                 </div>
 
                 <main className="flex-1 flex flex-col p-4 md:p-8 gap-6 max-w-3xl mx-auto w-full pb-20">
@@ -273,10 +276,6 @@ function AdminLiveContent() {
                                 <svg className="w-20 h-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
                                 </svg>
-                            </div>
-                            <div className="text-center">
-                                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">실시간 동시통역</h2>
-                                <p className="text-slate-500 font-bold mt-2">말하면 근로자 스마트폰에서 자동으로 번역된 음성이 재생됩니다</p>
                             </div>
                             <button
                                 onClick={handleStartBroadcast}

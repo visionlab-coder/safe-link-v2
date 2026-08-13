@@ -44,7 +44,13 @@ export PATH="$JAVA_HOME/bin:$PATH"
 - 최초 ROOT bootstrap 1회 실행 시에만: `SAFE_LINK_ROOT_BOOTSTRAP_ENABLED`, `SAFE_LINK_ROOT_BOOTSTRAP_EMAIL`, `SAFE_LINK_ROOT_BOOTSTRAP_PASSWORD`, `SAFE_LINK_ROOT_BOOTSTRAP_TOKEN`, `SAFE_LINK_ROOT_BOOTSTRAP_CONFIRM_TOKEN`
 - Object Storage 활성화 시 필수: `SAFE_LINK_STORAGE_BUCKET`, `SAFE_LINK_STORAGE_REGION`, `SAFE_LINK_STORAGE_ENDPOINT`, `SAFE_LINK_STORAGE_ACCESS_KEY`, `SAFE_LINK_STORAGE_SECRET_KEY`
 - 외부 AI vendor 호출 활성화 전 필수: provider API key, 사용량 제한, 비용 정책 값
+- 비밀번호 재설정 이메일 사용 시: `SAFE_LINK_PASSWORD_RESET_EMAIL_ENABLED=true`, `SAFE_LINK_PASSWORD_RESET_EMAIL_FROM`, `SAFE_LINK_PASSWORD_RESET_AWS_REGION` 및 실행 IAM의 `ses:SendEmail`
+- 비밀번호 재설정 SMS 사용 시: `SAFE_LINK_PASSWORD_RESET_SMS_ENABLED=true`, `SAFE_LINK_PASSWORD_RESET_AWS_REGION` 및 실행 IAM의 `sns:Publish`
+- 재설정 링크 공개 주소: `SAFE_LINK_PUBLIC_APP_URL` (운영 기본값 `https://app.safe-link.co.kr`)
+- 개인정보 보존·삭제 정책 승인 후 계정 탈퇴 활성화: `SAFE_LINK_ACCOUNT_DELETION_ENABLED=true` (기본값 `false`)
 - 프론트엔드 API base URL: `NEXT_PUBLIC_SAFE_LINK_API_BASE_URL`
+
+운영에서는 `SAFE_LINK_PASSWORD_RESET_EXPOSE_TOKEN`을 반드시 `false`로 유지한다. SES 발신 주소/도메인 검증, SES sandbox 해제 여부, SNS SMS 월 지출 한도를 확인한 뒤 실제 발송을 활성화한다.
 
 ## 최초 ROOT Bootstrap
 
@@ -96,6 +102,17 @@ curl http://localhost:8080/actuator/health/storage
 - Spring Boot worker registration API: `/api/v1/sites/{siteId}/workers`
 - Next.js auth 영역의 Supabase readable-cookie fallback 제거
 - Secret 기반 최초 ROOT bootstrap runner
+- AWS SES/SNS 기반 비밀번호 재설정 안내와 30분·1회용 재설정 토큰
+- 탈퇴 즉시 로그인·역할·현장 권한을 해제하고 개인정보를 가명 처리하는 계정 삭제 API
+- ROOT 전용 데이터 보존정책 조회 및 Object Storage 만료 파일 dry-run/삭제 API
+- 근로자·TBM 목록의 200건 단위 커서 페이징 API
+
+## 대량 목록 페이징
+
+- 근로자: `GET /api/v1/admin/workers/page?limit=200&cursor={next_cursor}`
+- TBM: `GET /api/v1/tbm/compat/notices/page?site_id={siteId}&date=YYYY-MM-DD&limit=200&cursor={next_cursor}`
+
+응답의 `has_more=true`인 동안 `next_cursor`를 다음 요청에 전달한다. 기존 목록 API 응답은 호환성을 위해 변경하지 않았다.
 
 ## 아직 남은 일
 

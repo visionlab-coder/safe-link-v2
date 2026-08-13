@@ -140,13 +140,10 @@ export default function AdminWorkersPage() {
     <RoleGuard allowedRole="admin">
       <div className="min-h-screen bg-gray-950 text-white p-4">
         <div className="max-w-3xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
+          <div className="concept-page-header flex-wrap sm:flex-nowrap">
             <div className="flex items-center gap-3">
               <Users className="w-6 h-6 text-blue-400" />
-              <div>
-                <h1 className="text-xl font-bold">NFC 근로자 관리</h1>
-                {adminSiteId && <p className="text-xs text-gray-500 font-mono">{adminSiteId}</p>}
-              </div>
+              {adminSiteId && <p className="text-xs text-gray-500 font-mono">{adminSiteId}</p>}
             </div>
             <div className="flex items-center gap-2">
               <ExportMenu disabled={workers.length === 0} onExport={handleExport} />
@@ -160,14 +157,17 @@ export default function AdminWorkersPage() {
             </div>
           </div>
 
-          <div className="relative rounded-2xl overflow-hidden h-40 w-full mb-4">
-            <Image
-              src="/images/safelink-pages/workers-roster-check.png"
-              alt="Workers Roster"
-              fill
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          <div className="admin-concept-hero relative rounded-2xl overflow-hidden h-40 w-full mb-4">
+            <picture>
+              <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/onboarding.webp" />
+              <Image src="/images/mobile-v3/website/onboarding.webp" alt="Workers Roster" fill className="object-cover" />
+            </picture>
+            <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+            <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+              <p className="text-[10px] font-black tracking-[.18em] text-blue-200">SQ-LINK WORKERS</p>
+              <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">NFC 근로자 관리</h1>
+              <p className="mt-2 text-sm font-bold text-slate-100">근로자 등록 정보와 NFC 카드 발급 상태를 관리합니다.</p>
+            </div>
           </div>
 
           <form onSubmit={handleSearch} className="flex gap-2 mb-4">

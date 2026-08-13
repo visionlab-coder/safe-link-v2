@@ -238,7 +238,7 @@ function SiteQrEntryInner() {
 
   if (status === "logout_confirm") {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-5 bg-gray-950 px-6">
+      <main className="visualization-light flex min-h-screen flex-col items-center justify-center gap-5 px-6">
         <CheckCircle className="h-16 w-16 text-emerald-400" />
         <div className="text-center">
           <h1 className="text-xl font-bold text-white">SQ Link 활성 중 / Active</h1>
@@ -265,7 +265,7 @@ function SiteQrEntryInner() {
 
   if (status === "loading") {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-950 px-6">
+      <main className="visualization-light flex min-h-screen flex-col items-center justify-center gap-4 px-6">
         <Loader2 className="h-10 w-10 animate-spin text-blue-400" />
         <p className="text-sm text-gray-300">{text.siteLoading}</p>
       </main>
@@ -274,7 +274,7 @@ function SiteQrEntryInner() {
 
   if (status === "blocked") {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-5 bg-gray-950 px-6">
+      <main className="visualization-light flex min-h-screen flex-col items-center justify-center gap-5 px-6">
         <CheckCircle className="h-16 w-16 text-gray-400" />
         <div className="text-center">
           <h1 className="text-xl font-bold text-white">{text.blockedTitle}</h1>
@@ -285,7 +285,7 @@ function SiteQrEntryInner() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 px-5 py-6 text-white">
+    <main className="visualization-light min-h-screen px-5 py-6">
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-md flex-col">
         <header className="mb-5">
           <div className="flex items-center gap-3">
@@ -307,7 +307,10 @@ function SiteQrEntryInner() {
         </header>
 
         <div className="relative mb-5 h-36 w-full overflow-hidden rounded-2xl border border-gray-800 shadow-2xl">
-          <Image src="/images/safelink-pages/qr-guest-entry.png" alt="QR guest worker entry" fill className="object-cover" priority />
+          <picture>
+            <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/onboarding.webp" />
+            <Image src="/images/mobile-v3/website/onboarding.webp" alt="QR guest worker entry" fill className="object-cover" priority />
+          </picture>
           <div className="absolute inset-0 bg-gradient-to-t from-black/65 to-transparent" />
         </div>
 

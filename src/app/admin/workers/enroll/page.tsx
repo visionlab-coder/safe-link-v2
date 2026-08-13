@@ -3,9 +3,11 @@
 import { Suspense, useEffect, useState } from "react";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, CheckCircle, Eraser, Nfc, ScanLine, UserPlus } from "lucide-react";
+import { AlertCircle, CheckCircle, Eraser, Nfc, ScanLine } from "lucide-react";
 import { detectNfcSupport, eraseNfcTag, NfcError, readNfcUrl, writeNfcUrl } from "@/utils/nfc/web-nfc";
 import Image from "next/image";
+import VisualizationScreenLayout from "@/components/VisualizationScreenLayout";
+import { visualizationSpecs } from "@/lib/visualization-specs";
 
 type Step = "form" | "ready" | "writing" | "reading" | "erasing" | "done" | "erased" | "error";
 
@@ -364,19 +366,13 @@ function WorkerEnrollInner() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-4">
+    <div className="min-h-screen bg-[#eef3f8] p-4 text-[#111827] md:p-8">
       <div className="max-w-lg mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <UserPlus className="w-6 h-6 text-blue-400" />
-          <h1 className="text-xl font-bold">{existingWorkerId ? "근로자 NFC 카드 재발급" : "근로자 NFC 카드 발급"}</h1>
-        </div>
-
-        <div className="relative mb-6 h-40 w-full overflow-hidden rounded-2xl border border-gray-800">
-          <Image src="/images/safelink-pages/nfc-card-naming.png" alt="Worker NFC card naming" fill className="object-cover" priority />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <VisualizationScreenLayout
+          visual={visualizationSpecs.onboarding}
+          action={<button type="submit" form="worker-enroll-form">{existingWorkerId ? "근로자 카드 재발급" : "신규 근로자 등록"}</button>}
+        >
+        <form id="worker-enroll-form" onSubmit={handleSubmit} className="space-y-4">
           {!existingWorkerId && (
             <>
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
@@ -478,6 +474,7 @@ function WorkerEnrollInner() {
             </div>
           )}
         </form>
+        </VisualizationScreenLayout>
       </div>
     </div>
   );

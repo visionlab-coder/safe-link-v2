@@ -2,6 +2,8 @@
 import { useRouter } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
 import { ArrowLeft, Wifi, CheckCircle, AlertCircle, ChevronRight } from "lucide-react";
+import ResponsiveFeatureHero from "@/components/ResponsiveFeatureHero";
+import { visualizationSpecs } from "@/lib/visualization-specs";
 
 function StepCard({ num, title, children }: { num: number; title: string; children: React.ReactNode }) {
   return (
@@ -52,16 +54,14 @@ export default function GuideNfcPage() {
         <div className="max-w-2xl mx-auto">
 
           {/* 헤더 */}
-          <div className="flex items-center gap-3 mb-2">
+          <div className="concept-page-header">
             <button onClick={() => router.back()} className="p-2 text-gray-500 hover:text-white transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <Wifi className="w-6 h-6 text-cyan-400" />
-            <div>
-              <h1 className="text-xl font-bold">NFC 근로자 관리</h1>
-              <p className="text-xs text-gray-500 mt-0.5">사용 가이드 · 청구항 1-5</p>
-            </div>
+            <span className="font-black tracking-tight text-[#063789]">SQ-LINK</span>
           </div>
+
+          <ResponsiveFeatureHero visual={{ ...visualizationSpecs.nfcQr, eyebrow: "SQ-LINK GUIDE · CLAIMS 1–5", title: "NFC 근로자 관리", description: "근로자 등록부터 NFC 카드 발급과 TBM 참석 확인까지 안내합니다." }} />
 
           {/* 개요 */}
           <div className="bg-cyan-900/20 border border-cyan-800/40 rounded-xl p-4 mb-6 mt-4">

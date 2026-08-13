@@ -76,6 +76,14 @@ safe-link:
     max-sessions-per-user: ${SAFE_LINK_MAX_SESSIONS_PER_USER:5}
   password-reset:
     expose-token: ${SAFE_LINK_PASSWORD_RESET_EXPOSE_TOKEN:false}
+    delivery:
+      email-enabled: ${SAFE_LINK_PASSWORD_RESET_EMAIL_ENABLED:false}
+      sms-enabled: ${SAFE_LINK_PASSWORD_RESET_SMS_ENABLED:false}
+      aws-region: ${SAFE_LINK_PASSWORD_RESET_AWS_REGION:ap-northeast-2}
+      email-from: ${SAFE_LINK_PASSWORD_RESET_EMAIL_FROM:}
+      public-app-url: ${SAFE_LINK_PUBLIC_APP_URL:https://app.safe-link.co.kr}
+  account-deletion:
+    enabled: ${SAFE_LINK_ACCOUNT_DELETION_ENABLED:false}
   root-bootstrap:
     enabled: ${SAFE_LINK_ROOT_BOOTSTRAP_ENABLED:false}
     email: ${SAFE_LINK_ROOT_BOOTSTRAP_EMAIL:}

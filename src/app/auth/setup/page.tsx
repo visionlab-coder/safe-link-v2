@@ -843,6 +843,17 @@ function SetupContent() {
             </AnimatePresence>
           </div>
         </div>
+        {!isMasterEmail && (
+          <div className="mt-5 text-center">
+            <button
+              type="button"
+              onClick={() => router.push("/account/delete")}
+              className="min-h-11 px-3 text-xs font-bold text-slate-600 underline decoration-slate-700 underline-offset-4 transition-colors hover:text-red-400"
+            >
+              계정 탈퇴
+            </button>
+          </div>
+        )}
       </div>
     </main>
   );

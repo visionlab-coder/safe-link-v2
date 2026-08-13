@@ -58,10 +58,10 @@ export default function SystemHealthCheck() {
     const StatusItem = ({ label, itemStatus }: { label: string, itemStatus?: { status: string, message: string } }) => {
         const isOk = itemStatus?.status === 'ok';
         return (
-            <div className="flex items-center justify-between p-3 glass rounded-2xl border border-white/5 bg-white/5">
+            <div className="flex items-center justify-between rounded-xl border border-[#e1e8f0] bg-[#f8fafc] p-3">
                 <div className="flex items-center gap-3">
                     <div className={`w-2 h-2 rounded-full ${isOk ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-red-500 animate-pulse'}`} />
-                    <span className="text-xs font-black tracking-widest text-slate-300 uppercase">{label}</span>
+                    <span className="text-xs font-black tracking-widest text-slate-700 uppercase">{label}</span>
                 </div>
                 <div className="flex items-center gap-2">
                     {isOk ? (
@@ -85,25 +85,25 @@ export default function SystemHealthCheck() {
         <motion.section
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass rounded-[32px] p-6 border-white/10 shadow-2xl bg-black/20 flex flex-col gap-4"
+            className="flex flex-col gap-4 rounded-xl border border-[#d9e1ea] bg-white p-6 shadow-[0_10px_28px_rgba(16,42,67,.10)]"
         >
             <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 glass rounded-xl flex items-center justify-center text-blue-400">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e9f2ff] text-blue-600">
                         <Activity className="w-6 h-6" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-black text-white tracking-tight italic uppercase">시스템 상태</h3>
-                        <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase">30초마다 자동 점검 · 핵심 서비스 가용성</p>
+                        <h3 className="text-lg font-black tracking-tight text-slate-900 uppercase">시스템 상태</h3>
+                        <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">30초마다 자동 점검 · 핵심 서비스 가용성</p>
                     </div>
                 </div>
                 <button
                     onClick={() => checkHealth()}
                     disabled={loading}
-                    className="p-2 hover:bg-white/10 rounded-full transition-colors group"
+                    className="group rounded-full p-2 transition-colors hover:bg-slate-100"
                     title="수동 재점검"
                 >
-                    <RefreshCw className={`w-4 h-4 text-slate-400 group-hover:text-white ${loading ? 'animate-spin' : ''}`} />
+                    <RefreshCw className={`h-4 w-4 text-slate-400 group-hover:text-slate-800 ${loading ? 'animate-spin' : ''}`} />
                 </button>
             </div>
 
@@ -123,7 +123,7 @@ export default function SystemHealthCheck() {
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-2xl"
+                        className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl"
                     >
                         <p className="text-[11px] text-amber-400 font-bold leading-relaxed">
                             ⚠️ 일부 서비스 연결 지연 중 · 현장 기능에는 영향 없으며 30초 후 자동 재점검됩니다.

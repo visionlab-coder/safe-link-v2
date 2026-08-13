@@ -199,8 +199,8 @@ function AdminQuizContent() {
 
   return (
     <RoleGuard allowedRole="admin">
-      <div className="min-h-screen bg-mesh text-white font-sans flex flex-col selection:bg-blue-500/30">
-        <header className="safe-area-sticky-top sticky z-50 glass border-b border-white/5 px-6 py-4 flex items-center gap-4">
+      <div className="visualization-light min-h-screen font-sans flex flex-col selection:bg-blue-500/30">
+        <header className="concept-page-header safe-area-sticky-top sticky z-50">
           <button
             onClick={() => router.back()}
             className="p-2 -ml-2 rounded-full hover:bg-white/5 tap-effect text-slate-400"
@@ -226,14 +226,17 @@ function AdminQuizContent() {
           )}
         </header>
 
-        <div className="relative overflow-hidden h-40 w-full">
-          <Image
-            src="/images/safelink-pages/quiz-worker-training.png"
-            alt="Safety Quiz"
-            fill
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+        <div className="admin-concept-hero relative overflow-hidden h-40 w-full">
+          <picture>
+            <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/education.webp" />
+            <Image src="/images/mobile-v3/website/education.webp" alt="Safety Quiz" fill className="object-cover" />
+          </picture>
+          <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+          <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+            <p className="text-[10px] font-black tracking-[.18em] text-purple-200">SQ-LINK EDUCATION</p>
+            <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">Safety Quiz</h1>
+            <p className="mt-2 text-sm font-bold text-slate-100">TBM 내용을 기반으로 안전 이해도를 확인합니다.</p>
+          </div>
         </div>
 
         <main className="flex-1 flex flex-col p-4 md:p-8 gap-6 max-w-3xl mx-auto w-full pb-20">

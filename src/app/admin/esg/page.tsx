@@ -247,25 +247,27 @@ export default function AdminEsgPage() {
 
   return (
     <RoleGuard allowedRole="admin">
-      <div className="min-h-screen bg-gray-950 text-white p-4">
+      <div className="visualization-light min-h-screen p-4">
         <div className="max-w-3xl mx-auto">
-          <div className="flex items-center gap-3 mb-6">
+          <div className="concept-page-header">
             <button onClick={() => router.back()} className="p-2 text-gray-500 hover:text-white">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <BarChart3 className="w-6 h-6 text-emerald-400" />
-            <h1 className="text-xl font-bold">ESG 안전 리포트</h1>
             <span className="text-xs bg-emerald-900/50 text-emerald-400 px-2 py-0.5 rounded font-bold">청구항 24</span>
           </div>
 
-          <div className="relative rounded-2xl overflow-hidden h-40 w-full mb-4">
-            <Image
-              src="/images/safelink-pages/esg-safety-report.png"
-              alt="ESG Safety Report"
-              fill
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          <div className="admin-concept-hero relative rounded-2xl overflow-hidden h-40 w-full mb-4">
+            <picture>
+              <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/esg.webp" />
+              <Image src="/images/mobile-v3/website/esg.webp" alt="ESG Safety Report" fill className="object-cover" />
+            </picture>
+            <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+            <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+              <p className="text-[10px] font-black tracking-[.18em] text-emerald-200">SQ-LINK ESG</p>
+              <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">ESG 안전 리포트</h1>
+              <p className="mt-2 text-sm font-bold text-slate-100">TBM·서약·작업중지 데이터를 기반으로 안전 지표를 집계합니다.</p>
+            </div>
           </div>
 
           <div className="bg-gray-800 rounded-2xl p-4 mb-4 border border-gray-700 flex flex-col gap-3">

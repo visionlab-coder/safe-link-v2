@@ -114,19 +114,13 @@ export default function AdminNfcDailyLogsPage() {
 
   return (
     <RoleGuard allowedRole="admin">
-      <main className="min-h-screen bg-gray-950 text-white p-4">
+      <main className="visualization-light min-h-screen p-4">
         <section className="max-w-5xl mx-auto">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-5">
+          <div className="concept-page-header flex-wrap">
             <div className="flex items-center gap-3">
               <ClipboardList className="w-6 h-6 text-green-400" />
-              <div>
-                <h1 className="text-xl font-bold">NFC 일일 안전일지</h1>
-                <p className="text-xs text-gray-500">
-                  퇴근 태깅 시 자동 업로드된 출결 및 TBM 서명 기록
-                </p>
-              </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
               <ExportMenu disabled={logs.length === 0} onExport={handleExport} />
               <div className="relative">
                 <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -148,14 +142,17 @@ export default function AdminNfcDailyLogsPage() {
             </div>
           </div>
 
-          <div className="relative mb-5 h-40 w-full overflow-hidden rounded-2xl border border-gray-800">
-            <Image
-              src="/images/safelink-pages/nfc-qr-field-scan.png"
-              alt="NFC daily safety logs"
-              fill
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          <div className="admin-concept-hero relative mb-5 h-40 w-full overflow-hidden rounded-2xl border border-gray-800">
+            <picture>
+              <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/diary.webp" />
+              <Image src="/images/mobile-v3/website/diary.webp" alt="NFC daily safety logs" fill className="object-cover" />
+            </picture>
+            <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+            <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+              <p className="text-[10px] font-black tracking-[.18em] text-green-200">SQ-LINK DAILY LOG</p>
+              <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">NFC 일일 안전일지</h1>
+              <p className="mt-2 text-sm font-bold text-slate-100">퇴근 태깅 시 자동 업로드된 출결 및 TBM 서명 기록</p>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3 mb-4">

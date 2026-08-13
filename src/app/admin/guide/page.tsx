@@ -1,7 +1,9 @@
 "use client";
 import { useRouter } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
-import { ArrowLeft, BookOpen, Wifi, Award, BarChart3, ChevronRight } from "lucide-react";
+import { ArrowLeft, Wifi, Award, BarChart3, ChevronRight } from "lucide-react";
+import ResponsiveFeatureHero from "@/components/ResponsiveFeatureHero";
+import { visualizationSpecs } from "@/lib/visualization-specs";
 
 const GUIDES = [
   {
@@ -46,15 +48,15 @@ export default function AdminGuidePage() {
     <RoleGuard allowedRole="admin">
       <div className="min-h-screen bg-gray-950 text-white p-4">
         <div className="max-w-2xl mx-auto">
-          <div className="flex items-center gap-3 mb-8">
+          <div className="concept-page-header">
             <button onClick={() => router.back()} className="p-2 text-gray-500 hover:text-white transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <BookOpen className="w-6 h-6 text-blue-400" />
-            <div>
-              <h1 className="text-xl font-bold">기능 사용 가이드</h1>
-              <p className="text-xs text-gray-500 mt-0.5">처음 담당하는 직원을 위한 단계별 안내</p>
-            </div>
+            <span className="font-black tracking-tight text-[#063789]">SQ-LINK</span>
+          </div>
+
+          <div className="mb-6">
+            <ResponsiveFeatureHero visual={{ ...visualizationSpecs.documents, eyebrow: "SQ-LINK GUIDE", title: "기능 사용 가이드", description: "처음 담당하는 직원을 위한 단계별 안내" }} />
           </div>
 
           <div className="space-y-4">

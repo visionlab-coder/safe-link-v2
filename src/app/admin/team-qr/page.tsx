@@ -6,6 +6,7 @@ import { ArrowLeft, Download, Hammer, RefreshCw } from "lucide-react";
 import RoleGuard from "@/components/RoleGuard";
 import { TRADE_LABEL, type TradeType } from "@/lib/roles";
 import { QRCodeCanvas } from "qrcode.react";
+import Image from "next/image";
 
 // 🆕 2026-06-09 — 사이트+공종 QR 생성 페이지
 //
@@ -107,27 +108,37 @@ export default function TeamQrPage() {
 
     return (
         <RoleGuard allowedRole="admin">
-            <main className="min-h-screen bg-[#070710] text-white p-6 md:p-12 font-sans">
+            <main className="visualization-light min-h-screen p-6 md:p-12 font-sans">
                 <div className="max-w-3xl mx-auto flex flex-col gap-8">
                     {/* Header */}
-                    <header className="flex items-center gap-4">
+                    <header className="concept-page-header">
                         <button
                             onClick={() => router.back()}
                             className="w-11 h-11 glass rounded-2xl flex items-center justify-center text-slate-400 hover:text-white transition-all"
                         >
                             <ArrowLeft className="w-5 h-5" />
                         </button>
-                        <div>
-                            <h1 className="text-2xl md:text-3xl font-black tracking-tight">팀별 QR 생성</h1>
-                            <p className="text-slate-400 text-sm mt-1">
+                        <span className="text-base font-black tracking-tight text-[#063789]">SQ-LINK</span>
+                    </header>
+
+                    <div className="admin-concept-hero relative h-44 w-full overflow-hidden">
+                        <picture>
+                            <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/nfc-qr.webp" />
+                            <Image src="/images/mobile-v3/website/nfc-qr.webp" alt="팀별 QR 생성" fill className="object-cover" priority />
+                        </picture>
+                        <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+                        <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+                            <p className="text-[10px] font-black tracking-[.18em] text-blue-200">SQ-LINK TEAM ACCESS</p>
+                            <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">팀별 QR 생성</h1>
+                            <p className="mt-2 text-sm font-bold text-slate-100">
                                 {isTeamLeader
                                     ? "본인 현장과 공종이 자동 설정됩니다. QR 스캔 시 근로자가 자동 배속됩니다."
                                     : isGlobalAdmin
-                                      ? "현장과 공종을 선택해 팀별 QR 을 생성합니다."
-                                      : "본인 현장의 공종을 선택해 팀별 QR 을 생성합니다."}
+                                      ? "현장과 공종을 선택해 팀별 QR을 생성합니다."
+                                      : "본인 현장의 공종을 선택해 팀별 QR을 생성합니다."}
                             </p>
                         </div>
-                    </header>
+                    </div>
 
                     {/* 본인 정보 */}
                     <section className="glass rounded-3xl p-6 border border-white/10 flex flex-col gap-4">

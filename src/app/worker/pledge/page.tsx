@@ -101,7 +101,7 @@ export default function WorkerPledgePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="visualization-light min-h-screen flex items-center justify-center">
         <Loader className="w-8 h-8 text-blue-400 animate-spin" />
       </div>
     );
@@ -110,7 +110,7 @@ export default function WorkerPledgePage() {
   if (done) {
     return (
       <RoleGuard allowedRole="worker">
-        <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-6 px-6">
+        <div className="visualization-light min-h-screen flex flex-col items-center justify-center gap-6 px-6">
           <div className="w-24 h-24 rounded-full bg-green-500/20 flex items-center justify-center">
             <CheckCircle className="w-14 h-14 text-green-400" />
           </div>
@@ -131,21 +131,29 @@ export default function WorkerPledgePage() {
 
   return (
     <RoleGuard allowedRole="worker">
-      <div className="min-h-screen bg-mesh text-white font-sans flex flex-col">
-        <header className="flex items-center gap-4 p-4 border-b border-white/5">
+      <div className="visualization-light min-h-screen font-sans flex flex-col">
+        <header className="concept-page-header">
           <button onClick={() => router.back()} className="p-2 text-slate-400 hover:text-white">
             <ArrowLeft className="w-5 h-5" />
           </button>
+          <span className="text-base font-black tracking-tight text-[#063789]">SQ-LINK</span>
           <div className="flex items-center gap-2">
             <PenLine className="w-5 h-5 text-blue-400" />
-            <h1 className="text-lg font-black italic uppercase text-gradient">{t.title}</h1>
           </div>
         </header>
 
         <main className="flex-1 flex flex-col gap-6 p-4 pb-24 max-w-lg mx-auto w-full">
-          <div className="relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
-            <Image src="/images/safelink-pages/tbm-briefing-field.png" alt="TBM safety pledge" fill className="object-cover" priority />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+          <div className="admin-concept-hero relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
+            <picture>
+              <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/documents.webp" />
+              <Image src="/images/mobile-v3/website/documents.webp" alt="TBM safety pledge" fill className="object-cover" priority />
+            </picture>
+            <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+            <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+              <p className="text-[10px] font-black tracking-[.18em] text-blue-200">SQ-LINK PLEDGE</p>
+              <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
+              <p className="mt-2 text-sm font-bold text-slate-100">안전 서약 내용을 확인하고 서명합니다.</p>
+            </div>
           </div>
 
           <section className="glass rounded-[32px] p-6 border-white/10 flex flex-col gap-3">

@@ -244,23 +244,28 @@ export default function WorkerVisionPage() {
 
     return (
         <RoleGuard allowedRole="worker">
-            <div className="min-h-screen bg-mesh text-white p-4 md:p-8 flex flex-col gap-6 pb-12 font-sans">
+            <div className="visualization-light min-h-screen p-4 md:p-8 flex flex-col gap-6 pb-12 font-sans">
                 {/* Header */}
-                <header className="flex items-center gap-4">
+                <header className="concept-page-header">
                     <button onClick={() => router.push("/worker")} className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors tap-effect text-slate-400">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
                         </svg>
                     </button>
-                    <div>
-                        <h1 className="text-2xl font-black tracking-tight uppercase italic text-gradient">{t.title}</h1>
-                        <p className="text-slate-500 text-xs font-bold">{t.subtitle}</p>
-                    </div>
+                    <span className="text-base font-black tracking-tight text-[#063789]">SQ-LINK</span>
                 </header>
 
-                <div className="relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
-                    <Image src="/images/safelink-pages/live-field-monitoring.png" alt="AI safety vision check" fill className="object-cover" priority />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                <div className="admin-concept-hero relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
+                    <picture>
+                        <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/live.webp" />
+                        <Image src="/images/mobile-v3/website/live.webp" alt="AI safety vision check" fill className="object-cover" priority />
+                    </picture>
+                    <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+                    <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+                        <p className="text-[10px] font-black tracking-[.18em] text-purple-200">SQ-LINK VISION</p>
+                        <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
+                        <p className="mt-2 text-sm font-bold text-slate-100">{t.subtitle}</p>
+                    </div>
                 </div>
 
                 {!imagePreview && !isCameraOpen && (

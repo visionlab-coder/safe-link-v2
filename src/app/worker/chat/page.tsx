@@ -592,7 +592,7 @@ function WorkerChatContent() {
                 className="h-dvh min-h-0 overflow-hidden bg-slate-50 text-slate-900 flex flex-col font-sans"
                 style={{ borderBottomWidth: 0 }}
             >
-                <header className="safe-area-sticky-top sticky z-50 bg-white border-b border-slate-200 px-4 py-4 flex items-center justify-between shadow-sm">
+                <header className="concept-page-header safe-area-sticky-top sticky z-50">
                     <div className="flex items-center gap-3">
                         <button onClick={() => activeAdmin ? setActiveAdmin(null) : router.back()} className="p-2 -ml-2 rounded-full hover:bg-slate-100 transition-colors text-slate-500">
                             <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
@@ -640,7 +640,10 @@ function WorkerChatContent() {
                             <QrCode className="w-5 h-5 text-slate-400" />
                         </div>
                         <div className="relative mb-4 h-28 w-full overflow-hidden rounded-2xl border border-slate-200">
-                            <Image src="/images/safelink-pages/ai-glossary-communication.png" alt="Worker translation chat" fill className="object-cover" />
+                            <picture>
+                                <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/translate.webp" />
+                                <Image src="/images/mobile-v3/website/translate.webp" alt="Worker translation chat" fill className="object-cover" />
+                            </picture>
                             <div className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />
                         </div>
                         <div className="flex flex-col gap-2">

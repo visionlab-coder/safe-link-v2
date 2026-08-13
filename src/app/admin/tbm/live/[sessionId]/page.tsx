@@ -190,7 +190,7 @@ export default function TbmLiveSessionPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="visualization-light min-h-screen flex items-center justify-center">
         <p className="text-gray-500">로딩 중...</p>
       </div>
     );
@@ -200,14 +200,11 @@ export default function TbmLiveSessionPage() {
 
   return (
     <RoleGuard allowedRole="admin">
-      <div className="min-h-screen bg-gray-950 text-white">
+      <div className="visualization-light min-h-screen">
         {/* 헤더 */}
-        <div className="bg-gray-900 border-b border-gray-800 px-4 py-3">
-          <div className="max-w-2xl mx-auto flex items-center justify-between">
-            <div>
-              <h1 className="font-bold text-white">{session?.title || "TBM NFC 참석"}</h1>
-              <p className="text-xs text-gray-500">{session?.site_id} · {attendance.length}명 참석</p>
-            </div>
+        <div className="concept-page-header">
+          <div className="flex w-full items-center justify-between">
+            <p className="font-black tracking-tight text-[#063789]">SQ-LINK</p>
             {isActive && (
               <button onClick={handleCloseSession} className="bg-red-800 hover:bg-red-700 text-red-100 text-xs px-3 py-1.5 rounded-lg transition-colors">
                 세션 종료
@@ -218,9 +215,17 @@ export default function TbmLiveSessionPage() {
 
         <div className="max-w-2xl mx-auto p-4 space-y-4">
           {/* 스캔 영역 */}
-          <div className="relative h-40 w-full overflow-hidden rounded-2xl border border-gray-800">
-            <Image src="/images/safelink-pages/tbm-briefing-field.png" alt="Live TBM attendance scan" fill className="object-cover" priority />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          <div className="admin-concept-hero relative h-40 w-full overflow-hidden rounded-2xl border border-gray-800">
+            <picture>
+              <source media="(max-width: 639px)" srcSet="/images/mobile-v4/mobile/tbm/03.webp" />
+              <Image src="/images/mobile-v4/web/tbm/03.webp" alt="Live TBM attendance scan" fill className="object-cover" priority />
+            </picture>
+            <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+            <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+              <p className="text-[10px] font-black tracking-[.18em] text-green-200">SQ-LINK TBM NFC</p>
+              <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{session?.title || "TBM NFC 참석"}</h1>
+              <p className="mt-2 text-sm font-bold text-slate-100">{session?.site_id} · {attendance.length}명 참석</p>
+            </div>
           </div>
 
           {isActive && (

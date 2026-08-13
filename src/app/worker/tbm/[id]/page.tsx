@@ -354,10 +354,10 @@ function WorkerTBMDetailContent() {
 
     return (
         <RoleGuard allowedRole="worker">
-            <div className="min-h-screen bg-mesh text-slate-50 flex flex-col font-sans selection:bg-red-500/30">
+            <div className="visualization-light min-h-screen text-slate-900 flex flex-col font-sans selection:bg-red-500/30">
 
                 {/* 💎 Header */}
-                <header className="safe-area-sticky-top sticky z-50 glass border-b border-white/5 px-4 md:px-8 py-4 flex items-center justify-between">
+                <header className="concept-page-header safe-area-sticky-top sticky z-50">
                     <div className="flex items-center gap-4">
                         <button onClick={handleBack} className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors tap-effect text-slate-400">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -431,9 +431,17 @@ function WorkerTBMDetailContent() {
                     ) : (
                         <>
                             {/* 🚨 NEW TBM ARRIVED ALERT */}
-                            <div className="relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
-                                <Image src="/images/safelink-pages/tbm-briefing-field.png" alt="TBM worker briefing" fill className="object-cover" priority />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                            <div className="admin-concept-hero relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
+                                <picture>
+                                    <source media="(max-width: 639px)" srcSet="/images/mobile-v4/mobile/tbm/03.webp" />
+                                    <Image src="/images/mobile-v4/web/tbm/03.webp" alt="TBM worker briefing" fill className="object-cover" priority />
+                                </picture>
+                                <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+                                <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+                                    <p className="text-[10px] font-black tracking-[.18em] text-red-200">SQ-LINK TBM</p>
+                                    <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
+                                    <p className="mt-2 text-sm font-bold text-slate-100">{new Date(tbm.created_at).toLocaleDateString(preferredLang === "ko" ? "ko-KR" : "en-US", { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                                </div>
                             </div>
 
                             {hasNewTBM && (
@@ -448,13 +456,7 @@ function WorkerTBMDetailContent() {
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 blur-[60px] rounded-full -mr-16 -mt-16 group-hover:bg-red-500/20 transition-all duration-1000" />
 
 
-                                <div className="flex justify-between items-start mb-10">
-                                    <div className="flex flex-col gap-1">
-                                        <h2 className="text-4xl font-black text-white text-gradient tracking-tight">{t.title}</h2>
-                                        <p className="text-slate-500 font-bold text-sm tracking-widest uppercase">
-                                            {new Date(tbm.created_at).toLocaleDateString(preferredLang === "ko" ? "ko-KR" : "en-US", { month: 'long', day: 'numeric', year: 'numeric' })}
-                                        </p>
-                                    </div>
+                                <div className="flex justify-end items-start mb-10">
                                     <div className="w-14 h-14 glass rounded-2xl flex items-center justify-center text-red-500 shadow-lg border-red-500/20">
                                         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />

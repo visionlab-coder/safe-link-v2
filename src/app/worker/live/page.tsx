@@ -310,8 +310,8 @@ export default function WorkerLivePage() {
 
     return (
         <RoleGuard allowedRole="worker">
-            <div className="h-screen bg-mesh text-white font-sans flex flex-col overflow-hidden">
-                <header className="safe-area-sticky-top sticky z-50 glass border-b border-white/5 px-6 py-4 flex items-center justify-between">
+            <div className="visualization-light h-screen font-sans flex flex-col overflow-hidden">
+                <header className="concept-page-header safe-area-sticky-top sticky z-50">
                     <div className="flex items-center gap-3">
                         <button onClick={() => router.push("/worker")} className="p-2 -ml-2 rounded-full hover:bg-white/5 tap-effect text-slate-400">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -341,9 +341,17 @@ export default function WorkerLivePage() {
                 </header>
 
                 <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 md:p-8 flex flex-col gap-4">
-                    <div className="relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl shrink-0">
-                        <Image src="/images/safelink-pages/live-field-monitoring.png" alt="Live field monitoring" fill className="object-cover" priority />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                    <div className="admin-concept-hero relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl shrink-0">
+                        <picture>
+                            <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/live.webp" />
+                            <Image src="/images/mobile-v3/website/live.webp" alt="Live field monitoring" fill className="object-cover" priority />
+                        </picture>
+                        <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+                        <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+                            <p className="text-[10px] font-black tracking-[.18em] text-green-200">SQ-LINK LIVE</p>
+                            <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
+                            <p className="mt-2 text-sm font-bold text-slate-100">관리자의 안전 안내를 선택한 언어로 실시간 전달합니다.</p>
+                        </div>
                     </div>
 
                     {subtitles.length === 0 && (

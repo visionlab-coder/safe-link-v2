@@ -128,9 +128,12 @@ export default function RoleGuard({
 
     if (!isAuthorized) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-blue-400">
-                <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mb-4" />
-                <p className="animate-pulse tracking-widest font-bold">안전하게 로그인 확인 중입니다...</p>
+            <div className="min-h-screen flex flex-col items-center justify-center bg-[#f3f6fa] px-6 text-blue-700">
+                <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-[28px] border border-blue-100 bg-white shadow-[0_16px_40px_rgba(37,99,235,.12)]">
+                    <div className="h-10 w-10 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin" />
+                </div>
+                <p className="font-black tracking-tight text-[#172033]">안전하게 로그인 확인 중입니다...</p>
+                <p className="mt-2 text-xs font-bold tracking-widest text-slate-500">SAFE-LINK SECURE ACCESS</p>
             </div>
         );
     }

@@ -156,7 +156,7 @@ export default function WorkerQuizPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="visualization-light min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Brain className="w-12 h-12 text-purple-400 animate-pulse" />
           <p className="text-gray-400 text-sm">{t.waiting}</p>
@@ -167,24 +167,27 @@ export default function WorkerQuizPage() {
 
   return (
     <RoleGuard allowedRole="worker">
-      <div className="min-h-screen bg-mesh text-white p-4 md:p-8 flex flex-col gap-6 pb-24 font-sans">
-        <header className="flex items-center gap-4">
+      <div className="visualization-light min-h-screen p-4 md:p-8 flex flex-col gap-6 pb-24 font-sans">
+        <header className="concept-page-header">
           <button onClick={() => router.push("/worker")} className="p-2 -ml-2 rounded-full hover:bg-white/5 tap-effect text-slate-400">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 className="text-2xl font-black tracking-tight uppercase italic text-gradient">{t.title}</h1>
+          <span className="text-base font-black tracking-tight text-[#063789]">SQ-LINK</span>
         </header>
 
-        <div className="relative overflow-hidden h-40 w-full rounded-[32px] border border-white/10 shadow-2xl">
-          <Image
-            src="/images/safelink-pages/quiz-worker-training.png"
-            alt="Worker safety quiz"
-            fill
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+        <div className="admin-concept-hero relative overflow-hidden h-40 w-full rounded-[32px] border border-white/10 shadow-2xl">
+          <picture>
+            <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/education.webp" />
+            <Image src="/images/mobile-v3/website/education.webp" alt="Worker safety quiz" fill className="object-cover" />
+          </picture>
+          <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+          <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+            <p className="text-[10px] font-black tracking-[.18em] text-amber-200">SQ-LINK EDUCATION</p>
+            <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
+            <p className="mt-2 text-sm font-bold text-slate-100">오늘의 안전교육 내용을 퀴즈로 확인합니다.</p>
+          </div>
         </div>
 
         {!quizResponse && (

@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import { MapPin } from "lucide-react";
 import SiteAgentBriefing from "@/components/agents/SiteAgentBriefing";
 import SystemHealthCheck from "@/components/SystemHealthCheck";
-import BrandLogo from "@/components/BrandLogo";
+import ResponsiveFeatureHero from "@/components/ResponsiveFeatureHero";
 import { logoutV3 } from "@/lib/v3-auth";
 import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
 
@@ -196,107 +196,92 @@ function AdminDashboardContent() {
 
     return (
         <RoleGuard allowedRole="admin">
-            <div className="min-h-screen bg-mesh text-white p-4 md:p-8 flex flex-col gap-8 pb-12 font-sans selection:bg-blue-500/30">
+            <div className="min-h-screen bg-[#eef3f8] text-white flex flex-col pb-12 font-sans selection:bg-blue-500/30">
 
-                {/* 💎 Premium Header */}
-                <header className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start animate-float">
-                    <div className="flex min-w-0 flex-col gap-1">
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                            <BrandLogo compact showProduct imageClassName="max-w-[160px]" />
-                            <div className="flex items-center gap-1 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
-                                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                                <span className="text-[10px] text-blue-400 font-black tracking-widest leading-none">FIELD UNIT</span>
+                <header className="w-full border-y border-slate-200 bg-white shadow-sm">
+                    <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:flex-nowrap sm:px-8">
+                        <Image
+                            src="/brand/seowon-logo-compact-transparent.png"
+                            alt="SEOWON Since 1991"
+                            width={208}
+                            height={60}
+                            priority
+                            unoptimized
+                            className="h-auto w-[112px] shrink-0 object-contain sm:w-[132px]"
+                        />
+
+                        <div className="hidden h-8 w-px shrink-0 bg-slate-200 sm:block" />
+
+                        <div className="order-3 flex min-w-0 basis-full flex-wrap items-center gap-2 sm:order-none sm:flex-1 sm:basis-auto">
+                            <p className="min-w-0 truncate text-xs font-bold text-slate-600 sm:text-sm">
+                                {currentUser ? t.greeting(currentUser.name) : "Authenticating..."}
+                                {currentUser?.title && <span className="ml-1 text-slate-400">[{currentUser.title}]</span>}
+                            </p>
+                            <div className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1">
+                                <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+                                <span className="text-[8px] font-black tracking-widest text-blue-600">FIELD UNIT</span>
                             </div>
                             {siteName && (
-                                <div className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
-                                    <MapPin className="w-2.5 h-2.5 text-amber-500" />
-                                    <span className="text-[10px] text-amber-500 font-black tracking-widest">{siteName}</span>
+                                <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1">
+                                    <MapPin className="h-2.5 w-2.5 text-amber-600" />
+                                    <span className="text-[8px] font-black tracking-widest text-amber-600">{siteName}</span>
                                 </div>
                             )}
                         </div>
-                        <p className="text-slate-400 font-bold text-lg leading-tight uppercase tracking-tight">
-                            {currentUser ? t.greeting(currentUser.name) : "Authenticating..."}
-                            {currentUser?.title && <span className="text-slate-600 ml-2">[{currentUser.title}]</span>}
-                        </p>
-                    </div>
-                    <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end sm:gap-3">
-                        <div className={`shrink-0 whitespace-nowrap px-3 py-2 sm:px-4 glass rounded-full border border-white/5 shadow-xl text-xs font-black tracking-widest uppercase ${currentUser?.role === 'HQ_ADMIN' ? 'text-blue-400 border-blue-500/20' : 'text-amber-400 border-amber-500/20'
-                            }`}>
-                            {roleDisplay}
-                        </div>
-                        <div className="flex shrink-0 gap-2 sm:gap-4">
-                            <button onClick={() => router.push('/auth/setup')} className="min-h-11 inline-flex items-center whitespace-nowrap text-[10px] font-black text-blue-500 hover:text-blue-400 uppercase tracking-widest px-2 py-1 transition-colors">
-                                Profile Edit
+
+                        <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+                            <div className={`hidden whitespace-nowrap rounded-full px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest sm:block ${currentUser?.role === 'HQ_ADMIN' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
+                                {roleDisplay}
+                            </div>
+                            {(currentUser?.role === 'ROOT' || currentUser?.role === 'HQ_OFFICER') && (
+                                <button onClick={() => router.push('/system')} className="whitespace-nowrap rounded-lg bg-indigo-50 px-2.5 py-2 text-[9px] font-black text-indigo-600 transition-colors hover:bg-indigo-100">
+                                    시스템
+                                </button>
+                            )}
+                            {currentUser?.role === 'HQ_ADMIN' && (
+                                <button onClick={() => router.push('/control')} className="whitespace-nowrap rounded-lg bg-blue-50 px-2.5 py-2 text-[9px] font-black text-blue-600 transition-colors hover:bg-blue-100">
+                                    통합 관제
+                                </button>
+                            )}
+                            <button onClick={() => router.push('/auth/setup')} className="whitespace-nowrap rounded-lg px-2 py-2 text-[9px] font-black text-blue-600 transition-colors hover:bg-blue-50">
+                                프로필
                             </button>
-                            <button onClick={handleSignOut} className="min-h-11 inline-flex items-center whitespace-nowrap text-[10px] font-black text-slate-500 hover:text-red-400 uppercase tracking-widest px-2 py-1 transition-colors">
+                            <button onClick={handleSignOut} className="whitespace-nowrap rounded-lg px-2 py-2 text-[9px] font-black text-slate-500 transition-colors hover:bg-red-50 hover:text-red-500">
                                 {t.signOut}
                             </button>
+                            <span className="ml-1 shrink-0 text-base font-black tracking-tight text-[#063789] sm:ml-2 sm:text-xl">SQ-LINK</span>
                         </div>
-                        {(currentUser?.role === 'ROOT' || currentUser?.role === 'HQ_OFFICER') && (
-                            <button
-                                onClick={() => router.push('/system')}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 rounded-full text-[9px] font-black text-indigo-400 uppercase tracking-widest transition-all"
-                            >
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                                </svg>
-                                통합 시스템 모드
-                            </button>
-                        )}
-                        {(currentUser?.role === 'ROOT' || currentUser?.role === 'HQ_OFFICER') && (
-                            <button
-                                onClick={() => router.push('/system')}
-                                className="hidden"
-                            >
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                                </svg>
-                                전역 통합 관제
-                            </button>
-                        )}
-                        {currentUser?.role === 'HQ_ADMIN' && (
-                            <button onClick={() => router.push('/control')} className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 rounded-full text-[10px] font-black text-blue-300 uppercase tracking-widest transition-all mt-1 shadow-lg flex items-center gap-1.5">
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                                Enterprise Control Center
-                            </button>
-                        )}
                     </div>
                 </header>
 
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="flex flex-col gap-2 relative mt-4"
-                >
-                    <h2 className="text-5xl font-black text-white text-gradient tracking-tighter uppercase">{t.board}</h2>
-                    <p className="text-slate-500 font-bold tracking-tight uppercase text-sm">{t.boardDesc}</p>
-                </motion.div>
-
-                <div className="relative rounded-2xl overflow-hidden h-44 w-full">
-                  <Image
-                    src="/images/safelink-pages/admin-dashboard-control.png"
-                    alt="Admin Dashboard"
-                    fill
-                    className="object-cover"
-                    priority
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                <div className="w-full">
+                    <ResponsiveFeatureHero visual={{
+                        image: "dashboard",
+                        eyebrow: "CONTROL CENTER",
+                        title: "관리자 통합 현황",
+                        description: "위험과 미처리 업무를 한 화면에서 확인합니다.",
+                        metrics: [{ label: "출입 인원", value: "286명" }, { label: "TBM 완료", value: "94%" }, { label: "조치 필요", value: "7건" }],
+                        steps: [{ title: "인원 현황", description: "출입·교육 상태를 집계합니다." }, { title: "위험 확인", description: "미조치 항목을 우선 표시합니다." }, { title: "보고 준비", description: "오늘 문서를 자동으로 정리합니다." }],
+                    }} />
                 </div>
 
                 {/* 🚨 Pre-flight Health Check (Critical for Monday Demo) */}
-                <SystemHealthCheck />
+                <div className="mx-4 mt-8 sm:mx-8">
+                    <SystemHealthCheck />
+                </div>
 
                 {/* 🤖 Tier 2: Site Agent Briefing (Role-specific) */}
                 {currentUser && (
-                    <SiteAgentBriefing
-                        role={currentUser.role}
-                        siteId={siteId}
-                        lang={currentUser.prefLang}
-                    />
+                    <div className="mx-4 mt-8 sm:mx-8">
+                        <SiteAgentBriefing
+                            role={currentUser.role}
+                            siteId={siteId}
+                            lang={currentUser.prefLang}
+                        />
+                    </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
+                <div className="admin-light-cards mx-4 mt-8 grid grid-cols-1 gap-6 sm:mx-8 md:grid-cols-2">
                     {/* 📡 TBM Broadcast Card */}
                     <motion.section
                         initial={{ opacity: 0, x: -20 }}
@@ -307,7 +292,7 @@ function AdminDashboardContent() {
                         <div className="absolute top-0 right-0 w-48 h-48 bg-blue-600/10 blur-[80px] rounded-full -mr-24 -mt-24 pointer-events-none group-hover:bg-blue-600/20 transition-all duration-1000" />
 
                         <div className="flex flex-col gap-4 relative">
-                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-blue-500 mb-2">
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-blue-600 mb-2 border border-blue-100 bg-blue-50 shadow-[0_10px_24px_rgba(37,99,235,.12)]">
                                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                                 </svg>
@@ -318,7 +303,7 @@ function AdminDashboardContent() {
 
                         <button
                             onClick={() => router.push('/admin/tbm/create')}
-                            className="mt-auto w-full py-6 bg-gradient-to-br from-blue-400 to-blue-600 text-slate-950 text-xl font-black rounded-[28px] shadow-[0_20px_40px_-15px_rgba(59,130,246,0.3)] transition-all tap-effect hover:scale-[1.02]"
+                            className="mt-auto w-full py-6 bg-gradient-to-br from-blue-400 to-blue-600 text-slate-950 text-xl font-black rounded-xl shadow-[0_20px_40px_-15px_rgba(59,130,246,0.3)] transition-all tap-effect hover:scale-[1.02]"
                         >
                             {t.tbmBtn.toUpperCase()}
                         </button>
@@ -333,7 +318,7 @@ function AdminDashboardContent() {
                     >
                         <div className="absolute top-0 left-0 w-48 h-48 bg-blue-500/10 blur-[80px] rounded-full -ml-24 -mt-24 pointer-events-none group-hover:bg-blue-500/20 transition-all duration-1000" />
                         <div className="flex flex-col gap-4 relative">
-                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-blue-400 mb-2 shadow-lg relative">
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-blue-600 mb-2 border border-blue-100 bg-blue-50 shadow-[0_10px_24px_rgba(37,99,235,.12)] relative">
                                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                 </svg>
@@ -349,10 +334,10 @@ function AdminDashboardContent() {
 
                         <button
                             onClick={() => router.push('/admin/chat')}
-                            className="mt-auto w-full py-6 bg-blue-600/20 text-blue-300 hover:bg-blue-600/40 text-xl font-black rounded-[28px] flex items-center justify-center gap-3 transition-all tap-effect hover:scale-[1.02]"
+                            className="mt-auto w-full py-6 bg-gradient-to-br from-blue-400 to-blue-600 text-slate-950 text-xl font-black rounded-xl flex items-center justify-center gap-3 shadow-[0_20px_40px_-15px_rgba(59,130,246,0.3)] transition-all tap-effect hover:scale-[1.02]"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 10h8m-8 4h5m8-2a9 9 0 01-9 9 9.8 9.8 0 01-4.26-.96L3 21l1.4-3.73A8.96 8.96 0 013 12a9 9 0 1118 0z" />
                             </svg>
                             {t.chatBtn.toUpperCase()}
                         </button>
@@ -369,12 +354,12 @@ function AdminDashboardContent() {
                         <div className="absolute top-0 right-0 w-96 h-96 bg-green-500/5 blur-[120px] rounded-full -mr-48 -mt-48 transition-all group-hover:bg-green-500/10" />
 
                         <div className="flex flex-col gap-4 relative md:h-full">
-                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-green-500 mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-green-600 mb-2 border border-green-100 bg-green-50 group-hover:scale-110 transition-transform shadow-[0_10px_24px_rgba(22,163,74,.12)]">
                                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                             </div>
-                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">{t.statusTitle}</h3>
+                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">{t.statusTitle}</h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
                                 {t.statusDesc}
                             </p>
@@ -398,12 +383,12 @@ function AdminDashboardContent() {
                         <div className="absolute top-0 left-0 w-96 h-96 bg-amber-500/5 blur-[120px] rounded-full -ml-48 -mt-48 transition-all group-hover:bg-amber-500/10" />
 
                         <div className="flex flex-col gap-4 relative md:h-full">
-                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-amber-500 mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-amber-600 mb-2 border border-amber-100 bg-amber-50 group-hover:scale-110 transition-transform shadow-[0_10px_24px_rgba(217,119,6,.12)]">
                                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                                 </svg>
                             </div>
-                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">{t.glossaryTitle}</h3>
+                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">{t.glossaryTitle}</h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
                                 {t.glossaryDesc}
                             </p>
@@ -426,13 +411,13 @@ function AdminDashboardContent() {
                     >
                         <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/5 blur-[120px] rounded-full -mr-48 -mt-48 transition-all group-hover:bg-emerald-500/10" />
                         <div className="flex flex-col gap-4 relative md:h-full">
-                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-emerald-400 mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-emerald-600 mb-2 border border-emerald-100 bg-emerald-50 group-hover:scale-110 transition-transform shadow-[0_10px_24px_rgba(5,150,105,.12)]">
                                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
                             </div>
-                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">AI 엔진 · 키 설정</h3>
+                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">AI 엔진 · 키 설정</h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
                                 통번역 엔진(Google·Papago)과 API 키를 재배포 없이 즉시 교체·테스트합니다.
                             </p>
@@ -455,12 +440,12 @@ function AdminDashboardContent() {
                     >
                         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/5 blur-[120px] rounded-full -mr-48 -mt-48 transition-all group-hover:bg-indigo-500/10" />
                         <div className="flex flex-col gap-4 relative md:h-full">
-                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-indigo-400 mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-indigo-600 mb-2 border border-indigo-100 bg-indigo-50 group-hover:scale-110 transition-transform shadow-[0_10px_24px_rgba(79,70,229,.12)]">
                                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
                                 </svg>
                             </div>
-                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">Live Interpreter</h3>
+                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">Live Interpreter</h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
                                 {lang === "ko" ? "실시간 동시통역. 말하면 근로자 폰에서 자동 번역 재생." : lang === "zh" ? "实时同声传译。发言后自动翻译播放。" : "Real-time interpretation. Speak and workers hear it translated."}
                             </p>
@@ -483,12 +468,12 @@ function AdminDashboardContent() {
                     >
                         <div className="absolute top-0 left-0 w-96 h-96 bg-pink-500/5 blur-[120px] rounded-full -ml-48 -mt-48 transition-all group-hover:bg-pink-500/10" />
                         <div className="flex flex-col gap-4 relative md:h-full">
-                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-pink-400 mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-pink-600 mb-2 border border-pink-100 bg-pink-50 group-hover:scale-110 transition-transform shadow-[0_10px_24px_rgba(219,39,119,.12)]">
                                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
                                 </svg>
                             </div>
-                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">Safety Quiz</h3>
+                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">Safety Quiz</h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
                                 {lang === "ko" ? "실시간 안전 퀴즈. 근로자 이해도를 즉시 확인." : lang === "zh" ? "实时安全测验。即时确认工人理解度。" : "Live safety quiz. Check worker comprehension instantly."}
                             </p>
@@ -512,12 +497,12 @@ function AdminDashboardContent() {
                         <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500/5 blur-[120px] rounded-full -ml-48 -mt-48 transition-all group-hover:bg-purple-500/10" />
 
                         <div className="flex flex-col gap-4 relative md:h-full text-left">
-                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-purple-400 mb-2 group-hover:rotate-12 transition-transform shadow-lg">
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-purple-600 mb-2 border border-purple-100 bg-purple-50 group-hover:rotate-12 transition-transform shadow-[0_10px_24px_rgba(147,51,234,.12)]">
                                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                                 </svg>
                             </div>
-                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">Access Center</h3>
+                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">Access Center</h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
                                 Issue SQ Link access cards and fallback codes.
                             </p>
@@ -540,12 +525,12 @@ function AdminDashboardContent() {
                     >
                         <div className="absolute top-0 right-0 w-96 h-96 bg-orange-500/5 blur-[120px] rounded-full -mr-48 -mt-48 transition-all group-hover:bg-orange-500/10" />
                         <div className="flex flex-col gap-4 relative md:h-full">
-                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-orange-400 mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-orange-600 mb-2 border border-orange-100 bg-orange-50 group-hover:scale-110 transition-transform shadow-[0_10px_24px_rgba(234,88,12,.12)]">
                                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                                 </svg>
                             </div>
-                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">
+                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">
                                 {lang === "ko" ? "안전 인센티브" : lang === "zh" ? "安全激励" : "Safety Incentive"}
                             </h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
@@ -570,12 +555,12 @@ function AdminDashboardContent() {
                     >
                         <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 blur-[120px] rounded-full -mr-48 -mt-48 transition-all group-hover:bg-cyan-500/10" />
                         <div className="flex flex-col gap-4 relative md:h-full">
-                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-cyan-400 mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-cyan-600 mb-2 border border-cyan-100 bg-cyan-50 group-hover:scale-110 transition-transform shadow-[0_10px_24px_rgba(8,145,178,.12)]">
                                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
                                 </svg>
                             </div>
-                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">
+                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">
                                 {lang === "ko" ? "NFC 근로자 관리" : lang === "zh" ? "NFC工人管理" : "NFC Worker Mgmt"}
                             </h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
@@ -600,12 +585,12 @@ function AdminDashboardContent() {
                     >
                         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-400/5 blur-[120px] rounded-full -mr-48 -mt-48 transition-all group-hover:bg-blue-400/10" />
                         <div className="flex flex-col gap-4 relative md:h-full">
-                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-blue-300 mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-blue-600 mb-2 border border-blue-100 bg-blue-50 group-hover:scale-110 transition-transform shadow-[0_10px_24px_rgba(37,99,235,.12)]">
                                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                                 </svg>
                             </div>
-                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">
+                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">
                                 {lang === "ko" ? "기능 사용 가이드" : lang === "zh" ? "功能使用指南" : "Feature Guide"}
                             </h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
@@ -630,12 +615,12 @@ function AdminDashboardContent() {
                     >
                         <div className="absolute top-0 left-0 w-96 h-96 bg-emerald-500/5 blur-[120px] rounded-full -ml-48 -mt-48 transition-all group-hover:bg-emerald-500/10" />
                         <div className="flex flex-col gap-4 relative md:h-full">
-                            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center text-emerald-400 mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-emerald-600 mb-2 border border-emerald-100 bg-emerald-50 group-hover:scale-110 transition-transform shadow-[0_10px_24px_rgba(5,150,105,.12)]">
                                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                                 </svg>
                             </div>
-                            <h3 className="text-3xl font-black text-white text-gradient uppercase italic">
+                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">
                                 {lang === "ko" ? "ESG 안전 리포트" : lang === "zh" ? "ESG安全报告" : "ESG Safety Report"}
                             </h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
@@ -654,13 +639,6 @@ function AdminDashboardContent() {
                     </motion.section>
                 </div>
 
-                {/* 🛡️ Footer Brand */}
-                <footer className="mt-auto flex flex-col items-center gap-4 py-8">
-                    <div className="flex items-center gap-2 opacity-10">
-                        <BrandLogo compact imageClassName="max-w-[140px]" />
-                        <span className="font-black text-2xl italic text-white uppercase tracking-tighter">SQ Link Console</span>
-                    </div>
-                </footer>
             </div>
         </RoleGuard>
     );
@@ -668,7 +646,15 @@ function AdminDashboardContent() {
 
 export default function AdminDashboard() {
     return (
-        <Suspense fallback={<div className="min-h-screen bg-mesh" />}>
+        <Suspense fallback={
+            <div className="min-h-screen flex flex-col items-center justify-center bg-[#f3f6fa] px-6 text-blue-700">
+                <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-xl border border-blue-100 bg-white shadow-[0_16px_40px_rgba(37,99,235,.12)]">
+                    <div className="h-10 w-10 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin" />
+                </div>
+                <p className="font-black tracking-tight text-[#172033]">관리자 화면을 준비하고 있습니다...</p>
+                <p className="mt-2 text-xs font-bold tracking-widest text-slate-500">SAFE-LINK FIELD CONSOLE</p>
+            </div>
+        }>
             <AdminDashboardContent />
         </Suspense>
     );
