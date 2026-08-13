@@ -1123,13 +1123,13 @@ export default function SystemAdminPage() {
                                 </div>
 
                                 {/* 전국 현장 현황 바 차트 */}
-                                <div className="bg-slate-900/40 border border-white/5 rounded-[40px] p-8 flex flex-col gap-6">
-                                    <div className="flex items-center justify-between">
+                                <div className="bg-slate-900/40 border border-white/5 rounded-[40px] p-5 sm:p-8 flex flex-col gap-6">
+                                    <div className="flex min-w-0 items-start justify-between gap-3">
                                         <div className="flex items-center gap-3">
                                             <MapPin className="w-5 h-5 text-blue-400" />
-                                            <h3 className="text-lg font-black uppercase tracking-tight">전국 현장 근로자 현황</h3>
+                                            <h3 className="text-base font-black uppercase tracking-tight sm:text-lg">전국 현장 근로자 현황</h3>
                                         </div>
-                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">전체 {displaySites.length}개 현장</span>
+                                        <span className="shrink-0 text-right text-[9px] font-bold text-slate-500 uppercase tracking-widest sm:text-[10px]">전체 {displaySites.length}개 현장</span>
                                     </div>
 
                                     {(loading && !isSimulation) ? (
@@ -1145,12 +1145,12 @@ export default function SystemAdminPage() {
                                             {[...displaySites]
                                                 .sort((a, b) => b.worker_count - a.worker_count)
                                                 .map((site) => (
-                                                    <div key={site.id} className="flex items-center gap-4 group">
-                                                        <div className="w-32 flex-shrink-0">
+                                                    <div key={site.id} className="group flex min-w-0 items-center gap-2 sm:gap-4">
+                                                        <div className="w-24 flex-shrink-0 sm:w-32">
                                                             <p className="text-xs font-black text-slate-300 truncate leading-tight">{site.name}</p>
                                                             <p className="text-[9px] font-bold text-slate-600 truncate">{site.address}</p>
                                                         </div>
-                                                        <div className="flex-1 relative h-8 bg-slate-800/60 rounded-2xl overflow-hidden">
+                                                        <div className="relative min-w-0 flex-1 h-8 bg-slate-800/60 rounded-2xl overflow-hidden">
                                                             <div
                                                                 className={`h-full rounded-2xl transition-all duration-700 flex items-center px-3 ${site.alert_count > 0 ? 'bg-red-500/40' : 'bg-blue-500/30'}`}
                                                                 style={{ width: `${Math.max(4, (site.worker_count / maxWorkerCount) * 100)}%` }}
@@ -1170,7 +1170,7 @@ export default function SystemAdminPage() {
                                                         </div>
                                                         <button
                                                             onClick={() => window.location.href = `/admin?site_id=${site.id}`}
-                                                            className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-[9px] font-black text-blue-400 uppercase tracking-wider flex items-center gap-1"
+                                                            className="hidden flex-shrink-0 items-center gap-1 text-[9px] font-black text-blue-400 uppercase tracking-wider opacity-0 transition-opacity group-hover:opacity-100 sm:flex"
                                                         >
                                                             입장 <ArrowRight className="w-3 h-3" />
                                                         </button>

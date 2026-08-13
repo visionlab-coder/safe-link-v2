@@ -274,6 +274,57 @@ public class OpsController {
         );
     }
 
+    /** Aggregate landing metrics for an authenticated root/HQ operator only. */
+    @GetMapping("/system/landing-summary")
+    public Map<String, Object> systemLandingSummary(@AuthenticationPrincipal SessionPrincipal actor) {
+        requireRootOrHq(actor);
+
+        int todayAuthentications = jdbc.sql("""
+                select count(distinct a.worker_id)
+                from worker_daily_access a
+                join users u on u.id = a.worker_id
+                join sites s on s.id = a.site_id
+                where a.work_date = (now() at time zone 'Asia/Seoul')::date
+                  and s.status = 'ACTIVE'
+                  and u.account_status = 'ACTIVE'
+            """)
+            .query(Integer.class)
+            .single();
+
+        int pendingApprovals = jdbc.sql("""
+                select count(*)
+                from users
+                where account_status = 'PENDING'
+            """)
+            .query(Integer.class)
+            .single();
+
+        Map<String, Object> authenticationStats = jdbc.sql("""
+                select
+                    count(*) filter (where decision = 'ALLOWED') as successful,
+                    count(*) as attempts
+                from audit_logs
+                where action in ('auth.login', 'auth.worker_quick_login')
+                  and occurred_at >= date_trunc('day', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul'
+            """)
+            .query((rs, rowNum) -> Map.<String, Object>of(
+                "successful", rs.getInt("successful"),
+                "attempts", rs.getInt("attempts")
+            ))
+            .single();
+
+        int attempts = (int) authenticationStats.get("attempts");
+        int successful = (int) authenticationStats.get("successful");
+        Double authenticationRate = attempts == 0 ? null : Math.round(successful * 1000.0 / attempts) / 10.0;
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("todayAuthentications", todayAuthentications);
+        response.put("pendingApprovals", pendingApprovals);
+        response.put("authenticationRate", authenticationRate);
+        response.put("generatedAt", Instant.now().toString());
+        return response;
+    }
+
     @GetMapping("/system/security-logs")
     public Map<String, List<Map<String, Object>>> systemSecurityLogs(@AuthenticationPrincipal SessionPrincipal actor) {
         requireRootOrHq(actor);

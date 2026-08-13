@@ -15,15 +15,33 @@ const roleText: Record<string, { admin: string; worker: string; prompt: string }
   zh: { admin: "管理员", worker: "现场工人", prompt: "选择服务" },
 };
 
+type LandingSummary = {
+  todayAuthentications: number;
+  pendingApprovals: number;
+  authenticationRate: number | null;
+};
+
+const formatCount = (value: number | undefined) => value === undefined ? "—" : `${value.toLocaleString("ko-KR")}명`;
+const formatRate = (value: number | null | undefined) => value === undefined || value === null ? "—" : `${value.toFixed(1)}%`;
+
 function LandingPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [selectedLang, setSelectedLang] = useState("ko");
   const [showRoles, setShowRoles] = useState(false);
+  const [summary, setSummary] = useState<LandingSummary | undefined>();
   const qrRole = searchParams.get("role");
   const qrSiteId = searchParams.get("site_id");
 
   useEffect(() => { if (qrRole === "admin") setShowRoles(true); }, [qrRole]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/system/landing-summary", { cache: "no-store", credentials: "include" })
+      .then((response) => response.ok ? response.json() as Promise<LandingSummary> : Promise.reject(new Error("summary_unavailable")))
+      .then((data) => { if (!cancelled) setSummary(data); })
+      .catch(() => { if (!cancelled) setSummary(undefined); });
+    return () => { cancelled = true; };
+  }, []);
 
   const text = roleText[selectedLang] || roleText.en;
   const buildAuthUrl = (role: "admin" | "worker") => {
@@ -50,7 +68,11 @@ function LandingPageInner() {
         <p className="mt-4 max-w-xl text-sm font-medium leading-6 text-[#526076]">근로자의 선호 언어와 현장 배정을 확인한 뒤, 필요한 안전 업무를 바로 시작합니다.</p>
 
         <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
-          {[['오늘 인증', '286명'], ['승인 대기', '4명'], ['인증률', '98.6%']].map(([label, value]) => <div key={label} className="rounded-lg border border-[#d9e1ea] bg-white p-3 shadow-sm"><span className="block text-[10px] font-bold text-[#758195]">{label}</span><strong className="mt-1 block text-lg font-black text-[#063789] sm:text-xl">{value}</strong></div>)}
+          {[
+            ["오늘 인증", formatCount(summary?.todayAuthentications)],
+            ["승인 대기", formatCount(summary?.pendingApprovals)],
+            ["인증률", formatRate(summary?.authenticationRate)],
+          ].map(([label, value]) => <div key={label} className="rounded-lg border border-[#d9e1ea] bg-white p-3 shadow-sm"><span className="block text-[10px] font-bold text-[#758195]">{label}</span><strong className="mt-1 block text-lg font-black text-[#063789] sm:text-xl">{value}</strong></div>)}
         </div>
 
         <div className="mt-5 rounded-xl border border-[#d9e1ea] bg-white p-4 shadow-sm sm:p-5">
