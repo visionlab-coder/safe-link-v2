@@ -38,6 +38,7 @@ import {
     CheckCircle2,
     Menu,
 } from "lucide-react";
+import { persistDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 // ──────────────────────────────────────────────────────────────
 // 시뮬레이션 데이터 — 서원토건 전국 30개 현장 기준
@@ -91,10 +92,18 @@ type GlobalConfig = {
     systemMode: 'poc' | 'production';
     alertEscalationMinutes: number;
     tbmReminderEnabled: boolean;
-    defaultLanguage: 'ko' | 'en';
+    defaultLanguage: 'ko' | 'en' | 'zh' | 'vi' | 'ru';
     emergencyContact: string;
     maintenanceMode: boolean;
 };
+
+const SYSTEM_LANGUAGE_OPTIONS = [
+    { code: 'ko', label: '한국어' },
+    { code: 'en', label: 'English' },
+    { code: 'zh', label: '中文' },
+    { code: 'vi', label: 'Tiếng Việt' },
+    { code: 'ru', label: 'Русский' },
+] as const;
 
 type PendingAdminRole = "HQ_ADMIN" | "SITE_ADMIN" | "SAFETY_MANAGER" | "VIEWER";
 
@@ -200,6 +209,19 @@ const systemUI: Record<string, any> = {
                 { label: "작업 보고서 자동 요약", active: true },
                 { label: "긴급 상황 사이렌 자동화", active: false },
             ]
+        },
+        common: {
+            fieldSafetyMode: "현장 안전관리 모드", fieldSafetyConsole: "현장 안전관리 콘솔", signOut: "로그아웃", developerMode: "개발자 모드", stable: "안정",
+            simulation: "시뮬레이션", simulationOn: "시뮬레이션 켜짐", systemControl: "SQ-LINK 시스템 관제",
+            monitoring: (sites: number, workers: number) => `${sites}개 현장 · ${workers}명 근로자 실시간 모니터링`,
+            simulationNotice: "시뮬레이션 모드 — 서원토건 전국 20개 현장 가상 데이터 표시 중 (실제 DB 아님)",
+            active: "활성 현장", registered: "등록 근로자", today: "오늘 실시", unresolved: "미해결", clear: "이상 없음",
+            accidentFreeDays: "무사고 연속일", days: "일", alertSiteExists: "알람 발생 현장 있음", stopWorkBased: "마지막 작업중지 알람 기준",
+            goal: "1000일 무사고 목표", achieved: "달성!", goalAchieved: "1000일 무사고 목표 달성", daysRemaining: "일 남음", progress: "달성",
+            tbmCompliance: "당일 TBM 이행률", totalTbmToday: (count: number) => `오늘 TBM 총 ${count}건 실시`,
+            personnel: "전국 인력 구성", worker: "근로자", safetyManager: "안전관리자", hqAdmin: "본사 관리자",
+            workforceBySite: "전국 현장 근로자 현황", allSites: (count: number) => `전체 ${count}개 현장`, noSites: "등록된 현장이 없습니다", enter: "입장",
+            alertSites: "작업중지 알람 현장", alertCount: (count: number) => `${count}건 미해결`, stopWorkCount: (count: number) => `작업중지 ${count}건`, languageSaveFailed: "언어 설정을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
         }
     },
     en: {
@@ -280,27 +302,96 @@ const systemUI: Record<string, any> = {
                 { label: "Auto Report Summary", active: true },
                 { label: "Emergency Siren Automation", active: false },
             ]
+        },
+        common: {
+            fieldSafetyMode: "Field Safety Mode", fieldSafetyConsole: "Field Safety Console", signOut: "Sign Out", developerMode: "Developer Mode", stable: "Stable",
+            simulation: "Simulation", simulationOn: "Simulation On", systemControl: "SQ-LINK SYSTEM CONTROL",
+            monitoring: (sites: number, workers: number) => `${sites} sites · ${workers} workers monitored in real time`,
+            simulationNotice: "Simulation mode — showing virtual data for 20 Seowon Engineering sites (not live DB data)",
+            active: "active", registered: "registered", today: "today", unresolved: "unresolved", clear: "clear",
+            accidentFreeDays: "Accident-free days", days: "days", alertSiteExists: "Sites with active alerts", stopWorkBased: "Based on last stop-work alert",
+            goal: "1,000-day accident-free goal", achieved: "Achieved!", goalAchieved: "1,000-day accident-free goal achieved", daysRemaining: "days remaining", progress: "complete",
+            tbmCompliance: "Today's TBM completion", totalTbmToday: (count: number) => `${count} TBMs completed today`,
+            personnel: "Workforce overview", worker: "Workers", safetyManager: "Safety managers", hqAdmin: "HQ admins",
+            workforceBySite: "Workforce by site", allSites: (count: number) => `${count} sites total`, noSites: "No registered sites", enter: "Open",
+            alertSites: "Sites with stop-work alerts", alertCount: (count: number) => `${count} unresolved`, stopWorkCount: (count: number) => `${count} stop-work alerts`, languageSaveFailed: "We could not save your language preference. Please try again.",
         }
     }
 };
 
+systemUI.zh = {
+    ...systemUI.en,
+    title: "综合系统", rootAccess: "最高访问权限", orchestration: "全局综合管控", intelligence: "系统智能控制", dashboard: "全国概览",
+    openNewSite: "新建工地", stats: { sites: "活跃工地", workers: "工人总数", tbms: "今日 TBM", alerts: "停工警报" },
+    sidebar: { dashboard: "全国概览", sites: "工地管理", data: "系统状态", ai: "AI 智能体", logs: "安全日志", configs: "全局设置" },
+    common: { ...systemUI.en.common, fieldSafetyMode: "工地安全管理模式", fieldSafetyConsole: "工地安全控制台", signOut: "退出登录", developerMode: "开发者模式", stable: "稳定", simulation: "模拟", simulationOn: "模拟已开启", systemControl: "SQ-LINK 系统控制", monitoring: (sites: number, workers: number) => `实时监控 ${sites} 个工地 · ${workers} 名工人`, simulationNotice: "模拟模式 — 正在显示 20 个工地的虚拟数据（非实际数据库）", active: "活跃", registered: "已登记", today: "今日执行", unresolved: "未处理", clear: "正常", accidentFreeDays: "连续无事故天数", days: "天", alertSiteExists: "存在警报工地", stopWorkBased: "以最后一次停工警报为准", goal: "1,000 天无事故目标", achieved: "已完成！", goalAchieved: "已达成 1,000 天无事故目标", daysRemaining: "天剩余", progress: "完成", tbmCompliance: "当日 TBM 执行率", totalTbmToday: (count: number) => `今日已执行 ${count} 次 TBM`, personnel: "全国人员构成", worker: "工人", safetyManager: "安全管理员", hqAdmin: "总部管理员", workforceBySite: "各工地工人现状", allSites: (count: number) => `共 ${count} 个工地`, noSites: "没有已登记的工地", enter: "进入", alertSites: "停工警报工地", alertCount: (count: number) => `${count} 项未处理`, stopWorkCount: (count: number) => `${count} 次停工`, languageSaveFailed: "无法保存语言设置，请稍后重试。" },
+};
+
+systemUI.vi = {
+    ...systemUI.en,
+    title: "HỆ THỐNG TÍCH HỢP", rootAccess: "QUYỀN TRUY CẬP CAO NHẤT", orchestration: "Điều phối toàn cục", intelligence: "Điều khiển thông minh", dashboard: "Tổng quan toàn quốc",
+    openNewSite: "Tạo công trường", stats: { sites: "Công trường hoạt động", workers: "Tổng công nhân", tbms: "TBM hôm nay", alerts: "Cảnh báo dừng việc" },
+    sidebar: { dashboard: "Tổng quan", sites: "Quản lý công trường", data: "Trạng thái hệ thống", ai: "Tác nhân AI", logs: "Nhật ký bảo mật", configs: "Cài đặt chung" },
+    common: { ...systemUI.en.common, fieldSafetyMode: "Chế độ an toàn công trường", fieldSafetyConsole: "Bảng điều khiển an toàn", signOut: "Đăng xuất", developerMode: "Chế độ nhà phát triển", stable: "Ổn định", simulation: "Mô phỏng", simulationOn: "Đang mô phỏng", systemControl: "ĐIỀU KHIỂN HỆ THỐNG SQ-LINK", monitoring: (sites: number, workers: number) => `Theo dõi thời gian thực ${sites} công trường · ${workers} công nhân`, simulationNotice: "Chế độ mô phỏng — đang hiển thị dữ liệu ảo của 20 công trường (không phải dữ liệu thực)", active: "hoạt động", registered: "đã đăng ký", today: "hôm nay", unresolved: "chưa xử lý", clear: "bình thường", accidentFreeDays: "Số ngày không tai nạn", days: "ngày", alertSiteExists: "Có công trường đang cảnh báo", stopWorkBased: "Dựa trên cảnh báo dừng việc gần nhất", goal: "Mục tiêu 1.000 ngày không tai nạn", achieved: "Đã đạt!", goalAchieved: "Đã đạt mục tiêu 1.000 ngày không tai nạn", daysRemaining: "ngày còn lại", progress: "hoàn thành", tbmCompliance: "Tỷ lệ TBM hôm nay", totalTbmToday: (count: number) => `Đã thực hiện ${count} TBM hôm nay`, personnel: "Cơ cấu nhân sự", worker: "Công nhân", safetyManager: "Quản lý an toàn", hqAdmin: "Quản trị viên trụ sở", workforceBySite: "Nhân sự theo công trường", allSites: (count: number) => `Tổng cộng ${count} công trường`, noSites: "Chưa có công trường được đăng ký", enter: "Mở", alertSites: "Công trường có cảnh báo dừng việc", alertCount: (count: number) => `${count} chưa xử lý`, stopWorkCount: (count: number) => `${count} cảnh báo dừng việc`, languageSaveFailed: "Không thể lưu cài đặt ngôn ngữ. Vui lòng thử lại." },
+};
+
+systemUI.ru = {
+    ...systemUI.en,
+    title: "ЕДИНАЯ СИСТЕМА", rootAccess: "МАКСИМАЛЬНЫЙ ДОСТУП", orchestration: "Глобальное управление", intelligence: "Интеллектуальное управление", dashboard: "Общий обзор",
+    openNewSite: "Создать объект", stats: { sites: "Активные объекты", workers: "Всего работников", tbms: "TBM сегодня", alerts: "Оповещения о приостановке" },
+    sidebar: { dashboard: "Обзор", sites: "Управление объектами", data: "Состояние системы", ai: "AI-агенты", logs: "Журнал безопасности", configs: "Общие настройки" },
+    common: { ...systemUI.en.common, fieldSafetyMode: "Режим безопасности объекта", fieldSafetyConsole: "Панель безопасности объекта", signOut: "Выйти", developerMode: "Режим разработчика", stable: "Стабильно", simulation: "Симуляция", simulationOn: "Симуляция включена", systemControl: "УПРАВЛЕНИЕ СИСТЕМОЙ SQ-LINK", monitoring: (sites: number, workers: number) => `Мониторинг в реальном времени: ${sites} объектов · ${workers} работников`, simulationNotice: "Режим симуляции — показ виртуальных данных 20 объектов (не реальные данные БД)", active: "активно", registered: "зарегистрировано", today: "сегодня", unresolved: "не решено", clear: "без замечаний", accidentFreeDays: "Дней без происшествий", days: "дней", alertSiteExists: "Есть объекты с оповещениями", stopWorkBased: "По последнему оповещению о приостановке", goal: "Цель: 1 000 дней без происшествий", achieved: "Достигнуто!", goalAchieved: "Цель 1 000 дней без происшествий достигнута", daysRemaining: "дней осталось", progress: "выполнено", tbmCompliance: "Выполнение TBM сегодня", totalTbmToday: (count: number) => `Сегодня выполнено TBM: ${count}`, personnel: "Состав персонала", worker: "Работники", safetyManager: "Специалисты по безопасности", hqAdmin: "Администраторы HQ", workforceBySite: "Работники по объектам", allSites: (count: number) => `Всего объектов: ${count}`, noSites: "Нет зарегистрированных объектов", enter: "Открыть", alertSites: "Объекты с остановкой работ", alertCount: (count: number) => `Не решено: ${count}`, stopWorkCount: (count: number) => `Приостановок: ${count}`, languageSaveFailed: "Не удалось сохранить настройку языка. Повторите попытку." },
+};
+
+const SYSTEM_SECTION_COPY = {
+    zh: {
+        pendingAdmins: { title: "待审批管理员", waiting: "待审批", refresh: "刷新", empty: "没有待审批的管理员账户", role: "角色", site: "工地", noSite: "选择工地", globalScope: "全局权限", approve: "批准", approving: "正在批准", loadFailed: "无法加载待审批账户", approveFailed: "审批失败", siteRequired: "工地权限角色必须先选择工地", pendingLoginBlocked: "审批前无法登录", emailMissing: "没有电子邮箱", roles: { HQ_ADMIN: "总部管理员", SITE_ADMIN: "工地管理员", SAFETY_MANAGER: "安全管理员", VIEWER: "只读" } },
+        site: { id: "工地 ID", tbmToday: "今日 TBM", alertCount: "停工", workerCount: "工人", status: "状态", operational: "正常运行", warning: "发生警报", link: "切换至工地控制台", viewAll: "查看所有工地", addTitle: "新建工地", editTitle: "修改工地信息", deleteTitle: "删除工地", deleteConfirm: "确定要删除此工地吗？相关数据也将被删除。", namePlaceholder: "输入工地名称", addrPlaceholder: "输入工地地址", save: "保存", cancel: "取消" },
+        ai: { tower: "AI 智能体指挥中心", active: "全局监控已启用", thinking: "AI 正在分析…", intervention: "手动介入", optimize: "优化神经网络路径", capabilities: "智能体能力", response: "快速响应系统", responseDesc: "AI 智能体会在 1.2 秒内检测事故征兆并报告总部。", caps: [{ label: "实时情绪分析", active: true }, { label: "即时拦截风险关键词", active: true }, { label: "自动汇总工作报告", active: true }, { label: "紧急警报自动化", active: false }] },
+    },
+    vi: {
+        pendingAdmins: { title: "Quản trị viên chờ phê duyệt", waiting: "Chờ phê duyệt", refresh: "Làm mới", empty: "Không có tài khoản quản trị viên chờ phê duyệt", role: "Vai trò", site: "Công trường", noSite: "Chọn công trường", globalScope: "Quyền toàn cục", approve: "Phê duyệt", approving: "Đang phê duyệt", loadFailed: "Không thể tải tài khoản chờ phê duyệt", approveFailed: "Phê duyệt thất bại", siteRequired: "Phải chọn công trường trước khi phê duyệt vai trò theo công trường", pendingLoginBlocked: "Không thể đăng nhập trước khi được phê duyệt", emailMissing: "Không có email", roles: { HQ_ADMIN: "Quản trị viên trụ sở", SITE_ADMIN: "Quản trị viên công trường", SAFETY_MANAGER: "Quản lý an toàn", VIEWER: "Chỉ xem" } },
+        site: { id: "ID công trường", tbmToday: "TBM hôm nay", alertCount: "Dừng việc", workerCount: "Công nhân", status: "Trạng thái", operational: "Hoạt động bình thường", warning: "Có cảnh báo", link: "Chuyển đến bảng điều khiển công trường", viewAll: "Xem tất cả công trường", addTitle: "Tạo công trường", editTitle: "Sửa thông tin công trường", deleteTitle: "Xóa công trường", deleteConfirm: "Bạn có chắc muốn xóa công trường này? Dữ liệu liên quan cũng sẽ bị xóa.", namePlaceholder: "Nhập tên công trường", addrPlaceholder: "Nhập địa chỉ công trường", save: "Lưu", cancel: "Hủy" },
+        ai: { tower: "Trung tâm chỉ huy tác nhân AI", active: "Đã bật giám sát toàn cục", thinking: "AI đang phân tích…", intervention: "Can thiệp thủ công", optimize: "Tối ưu đường dẫn mạng nơ-ron", capabilities: "Khả năng của tác nhân", response: "Hệ thống phản ứng nhanh", responseDesc: "Tác nhân AI phát hiện dấu hiệu tai nạn trong 1,2 giây và báo cáo về trụ sở.", caps: [{ label: "Phân tích cảm xúc thời gian thực", active: true }, { label: "Chặn từ khóa rủi ro tức thì", active: true }, { label: "Tự động tóm tắt báo cáo", active: true }, { label: "Tự động hóa còi báo khẩn cấp", active: false }] },
+    },
+    ru: {
+        pendingAdmins: { title: "Ожидающие одобрения администраторы", waiting: "Ожидает", refresh: "Обновить", empty: "Нет ожидающих одобрения учётных записей", role: "Роль", site: "Объект", noSite: "Выберите объект", globalScope: "Глобальные права", approve: "Одобрить", approving: "Одобрение", loadFailed: "Не удалось загрузить ожидающие учётные записи", approveFailed: "Не удалось одобрить", siteRequired: "Для роли объекта сначала выберите объект", pendingLoginBlocked: "Вход невозможен до одобрения", emailMissing: "Нет email", roles: { HQ_ADMIN: "Администратор HQ", SITE_ADMIN: "Администратор объекта", SAFETY_MANAGER: "Менеджер безопасности", VIEWER: "Только просмотр" } },
+        site: { id: "ID объекта", tbmToday: "TBM сегодня", alertCount: "Приостановка", workerCount: "Работники", status: "Статус", operational: "Работает штатно", warning: "Есть оповещение", link: "Перейти к консоли объекта", viewAll: "Все объекты", addTitle: "Создать объект", editTitle: "Изменить данные объекта", deleteTitle: "Удалить объект", deleteConfirm: "Удалить этот объект? Все связанные данные также будут удалены.", namePlaceholder: "Введите название объекта", addrPlaceholder: "Введите адрес объекта", save: "Сохранить", cancel: "Отмена" },
+        ai: { tower: "Командный центр AI-агентов", active: "Глобальный мониторинг включён", thinking: "AI анализирует…", intervention: "Ручное вмешательство", optimize: "Оптимизировать нейронные маршруты", capabilities: "Возможности агента", response: "Система быстрого реагирования", responseDesc: "AI-агент обнаруживает признаки происшествия за 1,2 секунды и сообщает в штаб.", caps: [{ label: "Анализ настроений в реальном времени", active: true }, { label: "Немедленная блокировка рискованных ключевых слов", active: true }, { label: "Автоматическое резюме отчёта", active: true }, { label: "Автоматизация экстренной сирены", active: false }] },
+    },
+} as const;
+
+for (const [language, copy] of Object.entries(SYSTEM_SECTION_COPY)) {
+    systemUI[language] = { ...systemUI[language], ...copy };
+}
+
 // ──────────────────────────────────────────────────────────────
 // 권한 검증 로딩 화면 (defense-in-depth 가드용)
 // ──────────────────────────────────────────────────────────────
-function LoadingScreen() {
+const SYSTEM_EXTRA = {
+    ko: { loading: "권한 확인 중…", menuOpen: "시스템 메뉴 열기", menuClose: "시스템 메뉴 닫기", menuCollapse: "시스템 메뉴 접기", displayLanguage: "표시 언어", audit: "보안 감사 로그", recentOnly: "최근 7일 · 최고 관리자 전용", refresh: "새로고침", allEvents: "전체 이벤트", warning: "경고", critical: "위험", time: "시간", event: "이벤트", actor: "행위자", level: "등급", noLogs: "로그 없음", info: "정보", settings: "전역 시스템 설정", sessionOnly: "브라우저 세션 저장 · 최고 관리자 전용", systemMode: "시스템 모드", pilot: "시범 운영 (POC)", production: "정식 운영 (PROD)", escalation: "알람 에스컬레이션 시간", minutes: "분", people: "명", escalationDesc: (minutes: number) => `작업중지 발생 후 ${minutes}분 내 미해제 시 본사에 자동 보고`, reminder: "TBM 리마인더", enabled: "활성화됨", disabled: "비활성화됨", reminderDesc: "오전 7:30 TBM 미실시 현장에 자동 알림", defaultLanguage: "기본 언어", emergencyContact: "긴급 연락처", phonePlaceholder: "전화번호 입력", emergencyDesc: "중대재해 발생 시 최우선 통보 연락처 (고용노동부: 1544-1350)", maintenance: "유지보수 모드", maintenanceDesc: "활성화 시 최고 관리자 외 모든 사용자 접근 차단", save: "설정 저장", saved: "저장됨" },
+    en: { loading: "Checking access…", menuOpen: "Open system menu", menuClose: "Close system menu", menuCollapse: "Collapse system menu", displayLanguage: "Display language", audit: "Security audit logs", recentOnly: "Last 7 days · super admin only", refresh: "Refresh", allEvents: "All events", warning: "Warning", critical: "Critical", time: "Time", event: "Event", actor: "Actor", level: "Level", noLogs: "No logs", info: "Info", settings: "Global system settings", sessionOnly: "Stored in this browser session · super admin only", systemMode: "System mode", pilot: "Pilot (POC)", production: "Production (PROD)", escalation: "Alert escalation time", minutes: "min", people: " people", escalationDesc: (minutes: number) => `Automatically report to HQ if unresolved after ${minutes} minutes`, reminder: "TBM reminder", enabled: "Enabled", disabled: "Disabled", reminderDesc: "Automatically notify sites without a TBM at 7:30 AM", defaultLanguage: "Default language", emergencyContact: "Emergency contact", phonePlaceholder: "Enter phone number", emergencyDesc: "Primary contact for serious incidents (Ministry of Employment and Labor: 1544-1350)", maintenance: "Maintenance mode", maintenanceDesc: "When enabled, only super administrators can access the service", save: "Save settings", saved: "Saved" },
+    zh: { loading: "正在确认权限…", menuOpen: "打开系统菜单", menuClose: "关闭系统菜单", menuCollapse: "收起系统菜单", displayLanguage: "显示语言", audit: "安全审计日志", recentOnly: "最近 7 天 · 仅限最高管理员", refresh: "刷新", allEvents: "全部事件", warning: "警告", critical: "严重", time: "时间", event: "事件", actor: "操作者", level: "等级", noLogs: "没有日志", info: "信息", settings: "全局系统设置", sessionOnly: "保存于浏览器会话 · 仅限最高管理员", systemMode: "系统模式", pilot: "试运行 (POC)", production: "正式运行 (PROD)", escalation: "警报升级时间", minutes: "分钟", escalationDesc: (minutes: number) => `停工后 ${minutes} 分钟仍未解除时自动报告总部`, reminder: "TBM 提醒", enabled: "已启用", disabled: "已禁用", reminderDesc: "上午 7:30 自动通知未执行 TBM 的工地", defaultLanguage: "默认语言", emergencyContact: "紧急联系人", phonePlaceholder: "输入电话号码", emergencyDesc: "发生重大事故时的优先通知联系人（雇佣劳动部：1544-1350）", maintenance: "维护模式", maintenanceDesc: "启用后仅最高管理员可以访问服务", save: "保存设置", saved: "已保存" },
+    vi: { loading: "Đang kiểm tra quyền truy cập…", menuOpen: "Mở menu hệ thống", menuClose: "Đóng menu hệ thống", menuCollapse: "Thu gọn menu hệ thống", displayLanguage: "Ngôn ngữ hiển thị", audit: "Nhật ký kiểm toán bảo mật", recentOnly: "7 ngày gần đây · chỉ quản trị viên cấp cao", refresh: "Làm mới", allEvents: "Tất cả sự kiện", warning: "Cảnh báo", critical: "Nghiêm trọng", time: "Thời gian", event: "Sự kiện", actor: "Người thực hiện", level: "Mức độ", noLogs: "Không có nhật ký", info: "Thông tin", settings: "Cài đặt hệ thống chung", sessionOnly: "Lưu trong phiên trình duyệt · chỉ quản trị viên cấp cao", systemMode: "Chế độ hệ thống", pilot: "Thử nghiệm (POC)", production: "Vận hành chính thức (PROD)", escalation: "Thời gian nâng mức cảnh báo", minutes: "phút", escalationDesc: (minutes: number) => `Tự động báo cáo trụ sở nếu chưa giải quyết sau ${minutes} phút`, reminder: "Nhắc TBM", enabled: "Đã bật", disabled: "Đã tắt", reminderDesc: "Tự động thông báo lúc 7:30 sáng cho công trường chưa thực hiện TBM", defaultLanguage: "Ngôn ngữ mặc định", emergencyContact: "Liên hệ khẩn cấp", phonePlaceholder: "Nhập số điện thoại", emergencyDesc: "Liên hệ ưu tiên khi xảy ra tai nạn nghiêm trọng (Bộ Việc làm và Lao động: 1544-1350)", maintenance: "Chế độ bảo trì", maintenanceDesc: "Khi bật, chỉ quản trị viên cấp cao được truy cập dịch vụ", save: "Lưu cài đặt", saved: "Đã lưu" },
+    ru: { loading: "Проверка доступа…", menuOpen: "Открыть системное меню", menuClose: "Закрыть системное меню", menuCollapse: "Свернуть системное меню", displayLanguage: "Язык интерфейса", audit: "Журнал аудита безопасности", recentOnly: "Последние 7 дней · только для главного администратора", refresh: "Обновить", allEvents: "Все события", warning: "Предупреждение", critical: "Критический", time: "Время", event: "Событие", actor: "Исполнитель", level: "Уровень", noLogs: "Нет журналов", info: "Информация", settings: "Глобальные настройки системы", sessionOnly: "Сохранено в сессии браузера · только для главного администратора", systemMode: "Режим системы", pilot: "Пилотный режим (POC)", production: "Рабочий режим (PROD)", escalation: "Время эскалации тревоги", minutes: "мин", escalationDesc: (minutes: number) => `Автоматически сообщить в штаб, если не устранено за ${minutes} мин.`, reminder: "Напоминание TBM", enabled: "Включено", disabled: "Выключено", reminderDesc: "Автоматически уведомлять объекты без TBM в 7:30", defaultLanguage: "Язык по умолчанию", emergencyContact: "Экстренный контакт", phonePlaceholder: "Введите номер телефона", emergencyDesc: "Приоритетный контакт при серьёзном происшествии (Министерство труда: 1544-1350)", maintenance: "Режим обслуживания", maintenanceDesc: "После включения доступ остаётся только у главного администратора", save: "Сохранить настройки", saved: "Сохранено" },
+} as const;
+
+function LoadingScreen({ label }: { label: string }) {
     return (
         <div className="console-light min-h-screen flex flex-col items-center justify-center bg-slate-950 text-blue-600">
             <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mb-4" />
-            <p className="animate-pulse tracking-widest font-bold text-sm">권한 확인 중...</p>
+            <p className="animate-pulse tracking-widest font-bold text-sm">{label}</p>
         </div>
     );
 }
 
 export default function SystemAdminPage() {
+    const displayLanguage = useDisplayLanguage();
     const [sites, setSites] = useState<Site[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState("dashboard");
     const [lang, setLang] = useState("ko");
+    const [languageSaving, setLanguageSaving] = useState(false);
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingSite, setEditingSite] = useState<Site | null>(null);
@@ -320,6 +411,7 @@ export default function SystemAdminPage() {
         emergencyContact: '1544-1350',
         maintenanceMode: false,
     });
+
     const [configSaved, setConfigSaved] = useState(false);
     const [aiCapsActive, setAiCapsActive] = useState([true, true, true, false]);
     const [aiActionStatus, setAiActionStatus] = useState<string | null>(null);
@@ -331,7 +423,41 @@ export default function SystemAdminPage() {
     const [approvingAdminId, setApprovingAdminId] = useState<number | null>(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-    const t = systemUI[lang];
+    const t = systemUI[lang] || systemUI.en;
+    const extra = SYSTEM_EXTRA[lang as keyof typeof SYSTEM_EXTRA] || SYSTEM_EXTRA.en;
+
+    useEffect(() => {
+        if (SYSTEM_LANGUAGE_OPTIONS.some((option) => option.code === displayLanguage)) {
+            setLang(displayLanguage);
+        }
+    }, [displayLanguage]);
+
+    const changeMyLanguage = async (nextLang: string) => {
+        if (!SYSTEM_LANGUAGE_OPTIONS.some((option) => option.code === nextLang)) return;
+        const previousLang = lang;
+        setLang(nextLang);
+        persistDisplayLanguage(nextLang);
+
+        if (!currentUser?.display_name) return;
+        setLanguageSaving(true);
+        try {
+            const response = await fetch("/api/auth/setup-profile", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ display_name: currentUser.display_name, preferred_lang: nextLang }),
+            });
+            if (!response.ok) throw new Error("language_update_failed");
+            setCurrentUser((user: any) => user ? { ...user, preferred_lang: nextLang } : user);
+        } catch {
+            // 화면 언어는 즉시 반영하되, 저장 실패 시 이전 사용자 설정으로 되돌린다.
+            setLang(previousLang);
+            persistDisplayLanguage(previousLang);
+            window.alert((systemUI[nextLang] || systemUI.en).common.languageSaveFailed);
+        } finally {
+            setLanguageSaving(false);
+        }
+    };
 
     const loadSiteOptions = useCallback(async () => {
         try {
@@ -455,7 +581,7 @@ export default function SystemAdminPage() {
             if (res.ok) {
                 const data = (await res.json()) as {
                     user?: { id: string; email: string | null };
-                    profile?: { role?: string; display_name?: string | null } | null;
+                    profile?: { role?: string; display_name?: string | null; preferred_lang?: string | null } | null;
                 };
                 if (data.user && data.profile) {
                     setCurrentUser({
@@ -463,7 +589,12 @@ export default function SystemAdminPage() {
                         email: data.user.email,
                         display_name: data.profile.display_name,
                         role: data.profile.role,
+                        preferred_lang: data.profile.preferred_lang || "ko",
                     });
+                    const savedLang = localStorage.getItem("safe-link-lang");
+                    if (!savedLang && SYSTEM_LANGUAGE_OPTIONS.some((option) => option.code === data.profile?.preferred_lang)) {
+                        setLang(data.profile.preferred_lang!);
+                    }
                 }
             }
             await fetchSites();
@@ -584,7 +715,7 @@ export default function SystemAdminPage() {
     const totalPersonnel = totalWorkers + displaySafetyOfficerCount + displayHqAdminCount;
     const daysTo1000 = displayAccidentFreeDays !== null ? Math.max(0, 1000 - displayAccidentFreeDays) : null;
 
-    if (!isVerified) return <LoadingScreen />;
+    if (!isVerified) return <LoadingScreen label={extra.loading} />;
 
     return (
         <RoleGuard allowedRole="system">
@@ -598,7 +729,7 @@ export default function SystemAdminPage() {
                 {isSidebarOpen && (
                     <button
                         type="button"
-                        aria-label="시스템 메뉴 닫기"
+                        aria-label={extra.menuClose}
                         onClick={() => setIsSidebarOpen(false)}
                         className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
                     />
@@ -616,7 +747,7 @@ export default function SystemAdminPage() {
                         </div>
                         <button
                             type="button"
-                            aria-label="시스템 메뉴 닫기"
+                            aria-label={extra.menuClose}
                             onClick={() => setIsSidebarOpen(false)}
                             className="ml-auto md:hidden w-9 h-9 shrink-0 rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 flex items-center justify-center transition-all"
                         >
@@ -624,7 +755,7 @@ export default function SystemAdminPage() {
                         </button>
                         <button
                             type="button"
-                            aria-label="시스템 메뉴 접기"
+                            aria-label={extra.menuCollapse}
                             onClick={() => setIsSidebarCollapsed(true)}
                             className="ml-auto hidden md:flex w-9 h-9 shrink-0 rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 items-center justify-center transition-all"
                         >
@@ -666,8 +797,8 @@ export default function SystemAdminPage() {
                         >
                             <HardHat className="w-5 h-5 flex-shrink-0" />
                             <div className="flex flex-col items-start">
-                                <span className="text-xs font-black tracking-tight">현장 안전관리 모드</span>
-                                <span className="text-[9px] text-amber-500/60 font-bold uppercase tracking-widest">Field Safety Console</span>
+                                <span className="text-xs font-black tracking-tight">{t.common.fieldSafetyMode}</span>
+                                <span className="text-[9px] text-amber-500/60 font-bold uppercase tracking-widest">{t.common.fieldSafetyConsole}</span>
                             </div>
                         </button>
                     </div>
@@ -687,14 +818,14 @@ export default function SystemAdminPage() {
                             onClick={handleSignOut}
                             className="w-full py-2.5 rounded-xl border border-white/5 bg-white/5 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/10 hover:text-red-400 transition-all"
                         >
-                            Sign Out
+                            {t.common.signOut}
                         </button>
 
                         <div className="p-4 bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-white/5">
-                            <p className="text-[10px] text-slate-500 font-black uppercase mb-1">Developer Mode</p>
+                            <p className="text-[10px] text-slate-500 font-black uppercase mb-1">{t.common.developerMode}</p>
                             <div className="flex items-center gap-2">
                                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                                <span className="text-xs font-bold text-slate-300">V2.0.4 - STABLE</span>
+                                <span className="text-xs font-bold text-slate-300">V2.0.4 - {t.common.stable}</span>
                             </div>
                         </div>
                     </div>
@@ -706,7 +837,7 @@ export default function SystemAdminPage() {
                         <div className="flex min-w-0 items-center gap-3">
                             <button
                                 type="button"
-                                aria-label="시스템 메뉴 열기"
+                                aria-label={extra.menuOpen}
                                 onClick={() => setIsSidebarOpen(true)}
                                 className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 shadow-sm transition-colors hover:bg-slate-100 md:hidden ${isSidebarOpen ? "invisible pointer-events-none" : "visible"}`}
                             >
@@ -715,7 +846,7 @@ export default function SystemAdminPage() {
                             {isSidebarCollapsed && (
                                 <button
                                     type="button"
-                                    aria-label="시스템 메뉴 열기"
+                                    aria-label={extra.menuOpen}
                                     onClick={() => setIsSidebarCollapsed(false)}
                                     className="hidden h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 shadow-sm transition-colors hover:bg-slate-100 md:grid"
                                 >
@@ -748,23 +879,21 @@ export default function SystemAdminPage() {
                                 }`}
                             >
                                 <FlaskConical className="h-3.5 w-3.5" />
-                                <span className="hidden sm:inline">{isSimulation ? "시뮬레이션 ON" : "시뮬레이션"}</span>
+                                <span className="hidden sm:inline">{isSimulation ? t.common.simulationOn : t.common.simulation}</span>
                             </button>
 
-                            <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-1">
-                                <button
-                                    onClick={() => setLang('ko')}
-                                    className={`rounded-md px-2.5 py-1.5 text-[9px] font-black transition-all ${lang === 'ko' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-blue-600'}`}
-                                >
-                                    KO
-                                </button>
-                                <button
-                                    onClick={() => setLang('en')}
-                                    className={`rounded-md px-2.5 py-1.5 text-[9px] font-black transition-all ${lang === 'en' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-blue-600'}`}
-                                >
-                                    EN
-                                </button>
-                            </div>
+                            <label className="sr-only" htmlFor="system-language">{extra.displayLanguage}</label>
+                            <select
+                                id="system-language"
+                                value={lang}
+                                onChange={(event) => void changeMyLanguage(event.target.value)}
+                                disabled={languageSaving || !currentUser}
+                                className="language-dropdown disabled:cursor-wait disabled:opacity-60"
+                            >
+                                {SYSTEM_LANGUAGE_OPTIONS.map((option) => (
+                                    <option key={option.code} value={option.code}>{option.label}</option>
+                                ))}
+                            </select>
 
                             {activeTab === 'sites' && (
                                 <motion.button
@@ -788,13 +917,13 @@ export default function SystemAdminPage() {
                             animate={{ opacity: 1, x: 0 }}
                             className="relative z-10 max-w-2xl"
                         >
-                            <p className="mb-2 text-[10px] font-black tracking-[.2em] text-blue-200">SQ-LINK SYSTEM CONTROL</p>
+                            <p className="mb-2 text-[10px] font-black tracking-[.2em] text-blue-200">{t.common.systemControl}</p>
                             <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl">
                                 {activeTab === 'dashboard' ? t.dashboard : activeTab === 'sites' ? t.orchestration : t.intelligence}
                             </h2>
                             <div className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-100 sm:text-base">
                                 <Zap className="w-4 h-4 text-amber-500" />
-                                <span>{lang === 'ko' ? `${displaySites.length}개 현장 · ${totalWorkers}명 근로자 실시간 모니터링` : `${displaySites.length} sites · ${totalWorkers} workers monitored`}</span>
+                                <span>{t.common.monitoring(displaySites.length, totalWorkers)}</span>
                             </div>
                         </motion.div>
 
@@ -813,7 +942,7 @@ export default function SystemAdminPage() {
                                 <div className="flex items-center gap-3 px-5 py-3 bg-violet-500/10 border border-violet-500/30 rounded-2xl">
                                     <FlaskConical className="w-4 h-4 text-violet-400 flex-shrink-0" />
                                     <p className="text-xs font-black text-violet-300">
-                                        시뮬레이션 모드 — 서원토건 전국 20개 현장 가상 데이터 표시 중 (실제 DB 아님)
+                                        {t.common.simulationNotice}
                                     </p>
                                     <button onClick={() => setIsSimulation(false)} className="ml-auto text-violet-500 hover:text-violet-300">
                                         <X className="w-4 h-4" />
@@ -831,28 +960,28 @@ export default function SystemAdminPage() {
                                 value: (loading && !isSimulation) ? "—" : displaySites.length.toString(),
                                 icon: MapPin,
                                 color: "blue",
-                                sub: lang === 'ko' ? "활성 현장" : "active",
+                                sub: t.common.active,
                             },
                             {
                                 label: t.stats.workers,
                                 value: (loading && !isSimulation) ? "—" : totalWorkers.toLocaleString(),
                                 icon: Users,
                                 color: "emerald",
-                                sub: lang === 'ko' ? "등록 근로자" : "registered",
+                                sub: t.common.registered,
                             },
                             {
                                 label: t.stats.tbms,
                                 value: (loading && !isSimulation) ? "—" : totalTbmToday.toString(),
                                 icon: ClipboardCheck,
                                 color: "purple",
-                                sub: lang === 'ko' ? "오늘 실시" : "today",
+                                sub: t.common.today,
                             },
                             {
                                 label: t.stats.alerts,
                                 value: (loading && !isSimulation) ? "—" : totalAlerts.toString(),
                                 icon: AlertTriangle,
                                 color: totalAlerts > 0 ? "red" : "slate",
-                                sub: totalAlerts > 0 ? (lang === 'ko' ? "미해결" : "unresolved") : (lang === 'ko' ? "이상 없음" : "clear"),
+                                sub: totalAlerts > 0 ? t.common.unresolved : t.common.clear,
                             },
                         ].map((stat, i) => (
                             <motion.div
@@ -888,19 +1017,19 @@ export default function SystemAdminPage() {
                                 {/* 무사고 영웅 섹션 */}
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                     {/* 무사고 연속일 */}
-                                    <div className={`lg:col-span-1 rounded-[40px] border p-8 flex flex-col items-center justify-center gap-4 relative overflow-hidden ${displayAccidentFreeDays === 0 ? 'bg-red-950/30 border-red-500/30' : 'bg-gradient-to-br from-emerald-950/40 to-slate-950/60 border-emerald-500/20'}`}>
-                                        <div className={`absolute inset-0 blur-[60px] rounded-full ${displayAccidentFreeDays === 0 ? 'bg-red-500/10' : 'bg-emerald-500/10'}`} />
+                                    <div className={`lg:col-span-1 rounded-[40px] border p-8 flex flex-col items-center justify-center gap-4 relative overflow-hidden shadow-sm ${displayAccidentFreeDays === 0 ? 'bg-red-50 border-red-200' : 'bg-gradient-to-br from-emerald-50 via-white to-teal-50 border-emerald-200'}`}>
+                                        <div className={`absolute inset-0 blur-[60px] rounded-full ${displayAccidentFreeDays === 0 ? 'bg-red-200/50' : 'bg-emerald-200/50'}`} />
                                         <div className="relative flex flex-col items-center gap-2">
                                             <Award className={`w-8 h-8 ${displayAccidentFreeDays === 0 ? 'text-red-400' : 'text-emerald-400'}`} />
-                                            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">무사고 연속일</p>
+                                            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">{t.common.accidentFreeDays}</p>
                                             <div className="flex items-end gap-2">
                                                 <span className={`text-7xl font-black tracking-tighter ${displayAccidentFreeDays === 0 ? 'text-red-400' : 'text-emerald-400'}`}>
                                                     {(loading && !isSimulation) ? "—" : displayAccidentFreeDays ?? "—"}
                                                 </span>
-                                                <span className="text-2xl font-black text-slate-500 mb-2">일</span>
+                                                <span className="text-2xl font-black text-slate-500 mb-2">{t.common.days}</span>
                                             </div>
-                                            <p className="text-[10px] text-slate-500 font-bold">
-                                                {displayAccidentFreeDays === 0 ? "알람 발생 현장 있음" : "마지막 작업중지 알람 기준"}
+                                            <p className="text-[10px] text-slate-600 font-bold">
+                                                {displayAccidentFreeDays === 0 ? t.common.alertSiteExists : t.common.stopWorkBased}
                                             </p>
                                         </div>
                                     </div>
@@ -911,20 +1040,20 @@ export default function SystemAdminPage() {
                                         <div className="bg-slate-900/40 border border-white/5 rounded-[32px] p-6 flex flex-col gap-4">
                                             <div className="flex items-center gap-2">
                                                 <TrendingUp className="w-5 h-5 text-indigo-400" />
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">1000일 무사고 목표</p>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{t.common.goal}</p>
                                             </div>
                                             {(loading && !isSimulation) || daysTo1000 === null ? (
                                                 <div className="h-12 bg-white/5 rounded-xl animate-pulse" />
                                             ) : daysTo1000 === 0 ? (
                                                 <div className="flex flex-col gap-1">
-                                                    <span className="text-3xl font-black text-amber-400">달성!</span>
-                                                    <span className="text-xs text-slate-500 font-bold">1000일 무사고 목표 달성</span>
+                                                    <span className="text-3xl font-black text-amber-400">{t.common.achieved}</span>
+                                                    <span className="text-xs text-slate-500 font-bold">{t.common.goalAchieved}</span>
                                                 </div>
                                             ) : (
                                                 <div className="flex flex-col gap-3">
                                                     <div className="flex items-end gap-2">
                                                         <span className="text-3xl font-black text-indigo-400">{daysTo1000.toLocaleString()}</span>
-                                                        <span className="text-sm font-black text-slate-500 mb-1">일 남음</span>
+                                                        <span className="text-sm font-black text-slate-500 mb-1">{t.common.daysRemaining}</span>
                                                     </div>
                                                     {/* 진행 바 */}
                                                     <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
@@ -933,7 +1062,7 @@ export default function SystemAdminPage() {
                                                             style={{ width: `${Math.min(100, ((displayAccidentFreeDays ?? 0) / 1000) * 100)}%` }}
                                                         />
                                                     </div>
-                                                    <p className="text-[10px] text-slate-600 font-bold">{((displayAccidentFreeDays ?? 0) / 10).toFixed(1)}% 달성</p>
+                                                    <p className="text-[10px] text-slate-600 font-bold">{((displayAccidentFreeDays ?? 0) / 10).toFixed(1)}% {t.common.progress}</p>
                                                 </div>
                                             )}
                                         </div>
@@ -942,7 +1071,7 @@ export default function SystemAdminPage() {
                                         <div className="bg-slate-900/40 border border-white/5 rounded-[32px] p-6 flex flex-col gap-4">
                                             <div className="flex items-center gap-2">
                                                 <ClipboardCheck className="w-5 h-5 text-purple-400" />
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">당일 TBM 이행률</p>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{t.common.tbmCompliance}</p>
                                             </div>
                                             <div className="flex flex-col gap-3">
                                                 <div className="flex items-end gap-2">
@@ -950,7 +1079,7 @@ export default function SystemAdminPage() {
                                                         {loading ? "—" : `${tbmCoverageRate}%`}
                                                     </span>
                                                     <span className="text-xs font-bold text-slate-500 mb-1">
-                                                        ({sitesWithTbm}/{sites.length}현장)
+                                                        ({sitesWithTbm}/{sites.length} {t.stats.sites})
                                                     </span>
                                                 </div>
                                                 <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
@@ -959,7 +1088,7 @@ export default function SystemAdminPage() {
                                                         style={{ width: `${tbmCoverageRate}%` }}
                                                     />
                                                 </div>
-                                                <p className="text-[10px] text-slate-600 font-bold">오늘 TBM 총 {totalTbmToday}건 실시</p>
+                                                <p className="text-[10px] text-slate-600 font-bold">{t.common.totalTbmToday(totalTbmToday)}</p>
                                             </div>
                                         </div>
 
@@ -967,7 +1096,7 @@ export default function SystemAdminPage() {
                                         <div className="sm:col-span-2 bg-slate-900/40 border border-white/5 rounded-[32px] p-6 flex flex-col gap-4">
                                             <div className="flex items-center gap-2">
                                                 <Users className="w-5 h-5 text-blue-400" />
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">전국 인력 구성</p>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{t.common.personnel}</p>
                                             </div>
                                             <div className="flex flex-col gap-3">
                                                 {/* 스택 바 */}
@@ -977,17 +1106,17 @@ export default function SystemAdminPage() {
                                                             <div
                                                                 className="h-full bg-blue-500 transition-all duration-1000"
                                                                 style={{ width: `${(totalWorkers / totalPersonnel) * 100}%` }}
-                                                                title={`근로자 ${totalWorkers}명`}
+                                                                title={`${t.common.worker} ${totalWorkers}`}
                                                             />
                                                             <div
                                                                 className="h-full bg-amber-500 transition-all duration-1000"
                                                                 style={{ width: `${(displaySafetyOfficerCount / totalPersonnel) * 100}%` }}
-                                                                title={`안전관리자 ${displaySafetyOfficerCount}명`}
+                                                                title={`${t.common.safetyManager} ${displaySafetyOfficerCount}`}
                                                             />
                                                             <div
                                                                 className="h-full bg-purple-500 transition-all duration-1000"
                                                                 style={{ width: `${(displayHqAdminCount / totalPersonnel) * 100}%` }}
-                                                                title={`본사 관리자 ${displayHqAdminCount}명`}
+                                                                title={`${t.common.hqAdmin} ${displayHqAdminCount}`}
                                                             />
                                                         </>
                                                     ) : (
@@ -997,15 +1126,15 @@ export default function SystemAdminPage() {
                                                 <div className="flex items-center gap-4 flex-wrap">
                                                     <div className="flex items-center gap-1.5">
                                                         <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                                                        <span className="text-xs font-bold text-slate-400">근로자 <span className="text-white">{totalWorkers}</span>명</span>
+                                                        <span className="text-xs font-bold text-slate-400">{t.common.worker} <span className="text-white">{totalWorkers}</span></span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
                                                         <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                                                        <span className="text-xs font-bold text-slate-400">안전관리자 <span className="text-white">{displaySafetyOfficerCount}</span>명</span>
+                                                        <span className="text-xs font-bold text-slate-400">{t.common.safetyManager} <span className="text-white">{displaySafetyOfficerCount}</span></span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
                                                         <div className="w-2.5 h-2.5 rounded-full bg-purple-500" />
-                                                        <span className="text-xs font-bold text-slate-400">본사 관리자 <span className="text-white">{displayHqAdminCount}</span>명</span>
+                                                        <span className="text-xs font-bold text-slate-400">{t.common.hqAdmin} <span className="text-white">{displayHqAdminCount}</span></span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1127,9 +1256,9 @@ export default function SystemAdminPage() {
                                     <div className="flex min-w-0 items-start justify-between gap-3">
                                         <div className="flex items-center gap-3">
                                             <MapPin className="w-5 h-5 text-blue-400" />
-                                            <h3 className="text-base font-black uppercase tracking-tight sm:text-lg">전국 현장 근로자 현황</h3>
+                                            <h3 className="text-base font-black uppercase tracking-tight sm:text-lg">{t.common.workforceBySite}</h3>
                                         </div>
-                                        <span className="shrink-0 text-right text-[9px] font-bold text-slate-500 uppercase tracking-widest sm:text-[10px]">전체 {displaySites.length}개 현장</span>
+                                        <span className="shrink-0 text-right text-[9px] font-bold text-slate-500 uppercase tracking-widest sm:text-[10px]">{t.common.allSites(displaySites.length)}</span>
                                     </div>
 
                                     {(loading && !isSimulation) ? (
@@ -1139,7 +1268,7 @@ export default function SystemAdminPage() {
                                             ))}
                                         </div>
                                     ) : displaySites.length === 0 ? (
-                                        <p className="text-slate-600 font-bold text-sm text-center py-8">등록된 현장이 없습니다</p>
+                                        <p className="text-slate-600 font-bold text-sm text-center py-8">{t.common.noSites}</p>
                                     ) : (
                                         <div className="flex flex-col gap-3">
                                             {[...displaySites]
@@ -1156,7 +1285,7 @@ export default function SystemAdminPage() {
                                                                 style={{ width: `${Math.max(4, (site.worker_count / maxWorkerCount) * 100)}%` }}
                                                             />
                                                             <div className="absolute inset-0 flex items-center px-3 gap-4">
-                                                                <span className="text-xs font-black text-white">{site.worker_count}명</span>
+                                                                <span className="text-xs font-black text-white">{site.worker_count}{lang === "ko" ? "명" : lang === "zh" ? "人" : lang === "vi" ? " người" : lang === "ru" ? " чел." : " people"}</span>
                                                                 {site.tbm_today > 0 && (
                                                                     <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">TBM {site.tbm_today}</span>
                                                                 )}
@@ -1172,7 +1301,7 @@ export default function SystemAdminPage() {
                                                             onClick={() => window.location.href = `/admin?site_id=${site.id}`}
                                                             className="hidden flex-shrink-0 items-center gap-1 text-[9px] font-black text-blue-400 uppercase tracking-wider opacity-0 transition-opacity group-hover:opacity-100 sm:flex"
                                                         >
-                                                            입장 <ArrowRight className="w-3 h-3" />
+                                                            {t.common.enter} <ArrowRight className="w-3 h-3" />
                                                         </button>
                                                     </div>
                                                 ))}
@@ -1182,24 +1311,24 @@ export default function SystemAdminPage() {
 
                                 {/* 알람 발생 현장 (있을 때만) */}
                                 {totalAlerts > 0 && !loading && (
-                                    <div className="bg-red-950/20 border border-red-500/20 rounded-[40px] p-8 flex flex-col gap-6">
+                                    <div className="rounded-[40px] border border-red-200 bg-gradient-to-br from-red-50 via-white to-amber-50 p-8 shadow-sm flex flex-col gap-6">
                                         <div className="flex items-center gap-3">
-                                            <AlertTriangle className="w-5 h-5 text-red-400 animate-pulse" />
-                                            <h3 className="text-lg font-black uppercase tracking-tight text-red-300">작업중지 알람 현장</h3>
-                                            <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-[10px] font-black rounded-full">{totalAlerts}건 미해결</span>
+                                            <AlertTriangle className="w-5 h-5 text-red-600 animate-pulse" />
+                                            <h3 className="text-lg font-black uppercase tracking-tight text-red-800">{t.common.alertSites}</h3>
+                                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-black text-red-700">{t.common.alertCount(totalAlerts)}</span>
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                             {displaySites.filter(s => s.alert_count > 0).map(site => (
                                                 <button
                                                     key={site.id}
                                                     onClick={() => window.location.href = `/admin?site_id=${site.id}`}
-                                                    className="flex items-center justify-between p-4 bg-red-900/20 border border-red-500/20 rounded-2xl hover:bg-red-900/30 transition-all text-left group"
+                                                    className="group flex items-center justify-between rounded-2xl border border-red-200 bg-white p-4 text-left shadow-sm transition-all hover:border-red-300 hover:bg-red-50"
                                                 >
                                                     <div>
-                                                        <p className="text-sm font-black text-red-300">{site.name}</p>
-                                                        <p className="text-[10px] font-bold text-red-500 mt-0.5">작업중지 {site.alert_count}건</p>
+                                                        <p className="text-sm font-black text-slate-800">{site.name}</p>
+                                                        <p className="mt-0.5 text-[10px] font-bold text-red-600">{t.common.stopWorkCount(site.alert_count)}</p>
                                                     </div>
-                                                    <ArrowRight className="w-4 h-4 text-red-400 group-hover:translate-x-1 transition-transform" />
+                                                    <ArrowRight className="w-4 h-4 text-red-600 transition-transform group-hover:translate-x-1" />
                                                 </button>
                                             ))}
                                         </div>
@@ -1309,7 +1438,7 @@ export default function SystemAdminPage() {
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -20 }}
                             >
-                                <SystemHealthCheck />
+                                <SystemHealthCheck lang={lang} />
                             </motion.div>
                         )}
 
@@ -1410,8 +1539,8 @@ export default function SystemAdminPage() {
                                             <Lock className="w-5 h-5 text-red-400" />
                                         </div>
                                         <div>
-                                            <h3 className="text-xl font-black uppercase tracking-tight">보안 감사 로그</h3>
-                                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">최근 7일 · SUPER_ADMIN 전용</p>
+                                            <h3 className="text-xl font-black uppercase tracking-tight">{extra.audit}</h3>
+                                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{extra.recentOnly}</p>
                                         </div>
                                     </div>
                                     <button
@@ -1420,15 +1549,15 @@ export default function SystemAdminPage() {
                                         className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-black text-xs uppercase tracking-widest transition-all disabled:opacity-40"
                                     >
                                         <RefreshCw className={`w-3.5 h-3.5 ${logsLoading ? 'animate-spin' : ''}`} />
-                                        새로고침
+                                        {extra.refresh}
                                     </button>
                                 </div>
 
                                 <div className="grid grid-cols-3 gap-4">
                                     {[
-                                        { label: '전체 이벤트', value: securityLogs.length, color: 'blue' },
-                                        { label: '경고', value: securityLogs.filter(l => l.severity === 'warn').length, color: 'amber' },
-                                        { label: '위험', value: securityLogs.filter(l => l.severity === 'critical').length, color: 'red' },
+                                        { label: extra.allEvents, value: securityLogs.length, color: 'blue' },
+                                        { label: extra.warning, value: securityLogs.filter(l => l.severity === 'warn').length, color: 'amber' },
+                                        { label: extra.critical, value: securityLogs.filter(l => l.severity === 'critical').length, color: 'red' },
                                     ].map(stat => (
                                         <div key={stat.label} className="bg-slate-900/40 border border-white/5 rounded-2xl p-4 flex flex-col gap-1">
                                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{stat.label}</span>
@@ -1441,10 +1570,10 @@ export default function SystemAdminPage() {
 
                                 <div className="bg-slate-900/40 border border-white/5 rounded-[32px] overflow-hidden">
                                     <div className="flex gap-4 px-6 py-3 border-b border-white/5 bg-black/20">
-                                        <span className="w-28 flex-shrink-0 text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" />시간</span>
-                                        <span className="flex-1 text-[9px] font-black uppercase tracking-widest text-slate-500">이벤트</span>
-                                        <span className="w-28 flex-shrink-0 text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1"><LogIn className="w-3 h-3" />행위자</span>
-                                        <span className="w-14 flex-shrink-0 text-[9px] font-black uppercase tracking-widest text-slate-500">등급</span>
+                                        <span className="w-28 flex-shrink-0 text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" />{extra.time}</span>
+                                        <span className="flex-1 text-[9px] font-black uppercase tracking-widest text-slate-500">{extra.event}</span>
+                                        <span className="w-28 flex-shrink-0 text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1"><LogIn className="w-3 h-3" />{extra.actor}</span>
+                                        <span className="w-14 flex-shrink-0 text-[9px] font-black uppercase tracking-widest text-slate-500">{extra.level}</span>
                                     </div>
                                     <div className="divide-y divide-white/5 max-h-[480px] overflow-y-auto">
                                         {logsLoading ? (
@@ -1452,7 +1581,7 @@ export default function SystemAdminPage() {
                                                 <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                                             </div>
                                         ) : securityLogs.length === 0 ? (
-                                            <div className="py-12 text-center text-slate-600 font-bold text-sm">로그 없음</div>
+                                            <div className="py-12 text-center text-slate-600 font-bold text-sm">{extra.noLogs}</div>
                                         ) : (
                                             securityLogs.map(log => (
                                                 <div key={log.id} className={`flex gap-4 px-6 py-3.5 hover:bg-white/5 transition-colors ${log.severity === 'critical' ? 'bg-red-950/10' : log.severity === 'warn' ? 'bg-amber-950/10' : ''}`}>
@@ -1466,7 +1595,7 @@ export default function SystemAdminPage() {
                                                         log.severity === 'warn' ? 'bg-amber-500/20 text-amber-400' :
                                                         'bg-blue-500/20 text-blue-400'
                                                     }`}>
-                                                        {log.severity === 'critical' ? '위험' : log.severity === 'warn' ? '경고' : '정보'}
+                                                        {log.severity === 'critical' ? extra.critical : log.severity === 'warn' ? extra.warning : extra.info}
                                                     </span>
                                                 </div>
                                             ))
@@ -1490,15 +1619,15 @@ export default function SystemAdminPage() {
                                         <Settings className="w-5 h-5 text-purple-400" />
                                     </div>
                                     <div>
-                                        <h3 className="text-xl font-black uppercase tracking-tight">전역 시스템 설정</h3>
-                                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">브라우저 세션 저장 · SUPER_ADMIN 전용</p>
+                                        <h3 className="text-xl font-black uppercase tracking-tight">{extra.settings}</h3>
+                                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{extra.sessionOnly}</p>
                                     </div>
                                 </div>
 
                                 <div className="flex flex-col gap-4">
                                     {/* 시스템 모드 */}
                                     <div className="bg-slate-900/40 border border-white/5 rounded-[24px] p-6 flex flex-col gap-4">
-                                        <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">시스템 모드</h4>
+                                        <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">{extra.systemMode}</h4>
                                         <div className="flex gap-3">
                                             {(['poc', 'production'] as const).map(mode => (
                                                 <button
@@ -1512,7 +1641,7 @@ export default function SystemAdminPage() {
                                                             : 'bg-white/5 border-white/10 text-slate-500 hover:text-white'
                                                     }`}
                                                 >
-                                                    {mode === 'poc' ? '시범운영 (POC)' : '정식운영 (PROD)'}
+                                                    {mode === 'poc' ? extra.pilot : extra.production}
                                                 </button>
                                             ))}
                                         </div>
@@ -1521,8 +1650,8 @@ export default function SystemAdminPage() {
                                     {/* 알람 에스컬레이션 */}
                                     <div className="bg-slate-900/40 border border-white/5 rounded-[24px] p-6 flex flex-col gap-4">
                                         <div className="flex items-center justify-between">
-                                            <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">알람 에스컬레이션 시간</h4>
-                                            <span className="text-sm font-black text-amber-400">{globalConfig.alertEscalationMinutes}분</span>
+                                            <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">{extra.escalation}</h4>
+                                            <span className="text-sm font-black text-amber-400">{globalConfig.alertEscalationMinutes}{extra.minutes}</span>
                                         </div>
                                         <input
                                             type="range"
@@ -1533,62 +1662,60 @@ export default function SystemAdminPage() {
                                             onChange={e => setGlobalConfig(c => ({ ...c, alertEscalationMinutes: Number(e.target.value) }))}
                                             className="w-full accent-amber-500"
                                         />
-                                        <p className="text-[10px] text-slate-600 font-bold">작업중지 발생 후 {globalConfig.alertEscalationMinutes}분 내 미해제 시 본사 자동 보고</p>
+                                        <p className="text-[10px] text-slate-600 font-bold">{extra.escalationDesc(globalConfig.alertEscalationMinutes)}</p>
                                     </div>
 
                                     {/* TBM 리마인더 + 기본 언어 */}
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="bg-slate-900/40 border border-white/5 rounded-[24px] p-6 flex flex-col gap-4">
-                                            <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">TBM 리마인더</h4>
+                                            <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">{extra.reminder}</h4>
                                             <button
                                                 onClick={() => setGlobalConfig(c => ({ ...c, tbmReminderEnabled: !c.tbmReminderEnabled }))}
                                                 className="flex items-center justify-between"
                                             >
-                                                <span className="text-sm font-bold text-slate-300">{globalConfig.tbmReminderEnabled ? '활성화됨' : '비활성화됨'}</span>
+                                                <span className="text-sm font-bold text-slate-300">{globalConfig.tbmReminderEnabled ? extra.enabled : extra.disabled}</span>
                                                 <div className={`w-12 h-6 rounded-full relative transition-colors ${globalConfig.tbmReminderEnabled ? 'bg-blue-500' : 'bg-slate-700'}`}>
                                                     <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${globalConfig.tbmReminderEnabled ? 'right-1' : 'left-1'}`} />
                                                 </div>
                                             </button>
-                                            <p className="text-[10px] text-slate-600 font-bold">오전 7:30 TBM 미실시 현장 자동 알림</p>
+                                            <p className="text-[10px] text-slate-600 font-bold">{extra.reminderDesc}</p>
                                         </div>
-                                        <div className="bg-slate-900/40 border border-white/5 rounded-[24px] p-6 flex flex-col gap-4">
-                                            <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2"><Globe className="w-3.5 h-3.5" />기본 언어</h4>
-                                            <div className="flex gap-2">
-                                                {(['ko', 'en'] as const).map(l => (
-                                                    <button
-                                                        key={l}
-                                                        onClick={() => setGlobalConfig(c => ({ ...c, defaultLanguage: l }))}
-                                                        className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase transition-all border ${
-                                                            globalConfig.defaultLanguage === l
-                                                                ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
-                                                                : 'bg-white/5 border-white/10 text-slate-500 hover:text-white'
-                                                        }`}
-                                                    >
-                                                        {l === 'ko' ? '한국어' : 'English'}
-                                                    </button>
+                                        <div className="rounded-[24px] border border-blue-100 bg-gradient-to-br from-white to-blue-50 p-6 shadow-sm flex flex-col gap-4">
+                                            <h4 className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-700"><Globe className="w-3.5 h-3.5 text-blue-600" />{extra.defaultLanguage}</h4>
+                                            <select
+                                                aria-label={extra.defaultLanguage}
+                                                value={globalConfig.defaultLanguage}
+                                                onChange={(event) => {
+                                                    const nextLang = event.target.value as GlobalConfig['defaultLanguage'];
+                                                    setGlobalConfig(c => ({ ...c, defaultLanguage: nextLang }));
+                                                }}
+                                                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                                            >
+                                                {SYSTEM_LANGUAGE_OPTIONS.map((option) => (
+                                                    <option key={option.code} value={option.code}>{option.label}</option>
                                                 ))}
-                                            </div>
+                                            </select>
                                         </div>
                                     </div>
 
                                     {/* 긴급 연락처 */}
                                     <div className="bg-slate-900/40 border border-white/5 rounded-[24px] p-6 flex flex-col gap-4">
-                                        <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">긴급 연락처</h4>
+                                        <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">{extra.emergencyContact}</h4>
                                         <input
                                             type="text"
                                             value={globalConfig.emergencyContact}
                                             onChange={e => setGlobalConfig(c => ({ ...c, emergencyContact: e.target.value }))}
-                                            placeholder="전화번호 입력"
+                                            placeholder={extra.phonePlaceholder}
                                             className="w-full bg-black/30 border border-white/5 rounded-2xl px-4 py-3 text-white font-bold text-sm focus:border-blue-500 focus:outline-none transition-all"
                                         />
-                                        <p className="text-[10px] text-slate-600 font-bold">중대재해 발생 시 최우선 통보 연락처 (고용노동부: 1544-1350)</p>
+                                        <p className="text-[10px] text-slate-600 font-bold">{extra.emergencyDesc}</p>
                                     </div>
 
                                     {/* 유지보수 모드 */}
                                     <div className={`border rounded-[24px] p-6 flex items-center justify-between transition-all ${globalConfig.maintenanceMode ? 'bg-red-950/20 border-red-500/30' : 'bg-slate-900/40 border-white/5'}`}>
                                         <div className="flex flex-col gap-1">
-                                            <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">유지보수 모드</h4>
-                                            <p className="text-[10px] text-slate-600 font-bold">활성화 시 SUPER_ADMIN 외 모든 사용자 접근 차단</p>
+                                            <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">{extra.maintenance}</h4>
+                                            <p className="text-[10px] text-slate-600 font-bold">{extra.maintenanceDesc}</p>
                                         </div>
                                         <button
                                             onClick={() => setGlobalConfig(c => ({ ...c, maintenanceMode: !c.maintenanceMode }))}
@@ -1598,7 +1725,7 @@ export default function SystemAdminPage() {
                                                     : 'bg-white/5 border-white/10 text-slate-500 hover:text-slate-300'
                                             }`}
                                         >
-                                            {globalConfig.maintenanceMode ? '활성화됨' : '비활성'}
+                                            {globalConfig.maintenanceMode ? extra.enabled : extra.disabled}
                                         </button>
                                     </div>
                                 </div>
@@ -1611,7 +1738,7 @@ export default function SystemAdminPage() {
                                             : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20'
                                     }`}
                                 >
-                                    {configSaved ? <><CheckCircle2 className="w-4 h-4" />저장됨</> : <><Save className="w-4 h-4" />설정 저장</>}
+                                    {configSaved ? <><CheckCircle2 className="w-4 h-4" />{extra.saved}</> : <><Save className="w-4 h-4" />{extra.save}</>}
                                 </button>
                             </motion.div>
                         )}

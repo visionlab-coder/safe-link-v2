@@ -8,6 +8,7 @@ import {
     ON_DEVICE_TTS_MODEL,
 } from "@/utils/on-device-speech";
 import { decodeRecordedAudio } from "@/utils/on-device-speech/audio";
+import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 import type {
     OnDeviceSpeechBackend,
     OnDeviceSpeechCapabilities,
@@ -56,7 +57,17 @@ const VOICES: Array<[VoiceId, string]> = [
     ["F2", "여성 2"],
 ];
 
+const SPEECH_UI: Record<string, Record<string, string>> = {
+    ko: { title:"온디바이스 STT / TTS 검증", desc:"음성 데이터를 서버로 전송하지 않고 브라우저 내부에서 인식하고 합성합니다.", backend:"권장 백엔드", available:"사용 가능", fallback:"WASM 대체", microphone:"마이크", unavailable:"사용 불가", stt:"STT 음성 인식", tts:"TTS 음성 합성", language:"언어", load:"모델 불러오기", stop:"녹음 정지", record:"녹음 시작", none:"(인식된 문장이 없습니다.)", voice:"음색", quality:"품질 단계", ultraLow:"초저지연", low:"저지연", speed:"속도", sentence:"합성 문장", loadTts:"Supertonic 모델 불러오기", generate:"온디바이스 음성 생성", seconds:"초", download:"WAV 다운로드", male1:"남성 1", male2:"남성 2", female1:"여성 1", female2:"여성 2" },
+    en: { title:"On-device STT / TTS validation", desc:"Recognize and synthesize speech in the browser without sending voice data to the server.", backend:"Recommended backend", available:"Available", fallback:"WASM fallback", microphone:"Microphone", unavailable:"Unavailable", stt:"STT speech recognition", tts:"TTS speech synthesis", language:"Language", load:"Load model", stop:"Stop recording", record:"Start recording", none:"(No speech was recognized.)", voice:"Voice", quality:"Quality steps", ultraLow:"ultra-low latency", low:"low latency", speed:"Speed", sentence:"Text to synthesize", loadTts:"Load Supertonic model", generate:"Generate on-device speech", seconds:"sec", download:"Download WAV", male1:"Male 1", male2:"Male 2", female1:"Female 1", female2:"Female 2" },
+    zh: { title:"设备端 STT / TTS 验证", desc:"无需将语音数据发送到服务器，即可在浏览器中识别和合成语音。", backend:"推荐后端", available:"可用", fallback:"WASM 替代", microphone:"麦克风", unavailable:"不可用", stt:"STT 语音识别", tts:"TTS 语音合成", language:"语言", load:"加载模型", stop:"停止录音", record:"开始录音", none:"（未识别到语句。）", voice:"音色", quality:"质量步骤", ultraLow:"超低延迟", low:"低延迟", speed:"速度", sentence:"合成文本", loadTts:"加载 Supertonic 模型", generate:"生成设备端语音", seconds:"秒", download:"下载 WAV", male1:"男声 1", male2:"男声 2", female1:"女声 1", female2:"女声 2" },
+    vi: { title:"Xác minh STT / TTS trên thiết bị", desc:"Nhận dạng và tổng hợp giọng nói trong trình duyệt mà không gửi dữ liệu giọng nói đến máy chủ.", backend:"Hậu cần đề xuất", available:"Khả dụng", fallback:"Dùng WASM", microphone:"Micro", unavailable:"Không khả dụng", stt:"Nhận dạng giọng nói STT", tts:"Tổng hợp giọng nói TTS", language:"Ngôn ngữ", load:"Tải mô hình", stop:"Dừng ghi âm", record:"Bắt đầu ghi âm", none:"(Không nhận dạng được câu nói.)", voice:"Giọng", quality:"Mức chất lượng", ultraLow:"độ trễ cực thấp", low:"độ trễ thấp", speed:"Tốc độ", sentence:"Văn bản tổng hợp", loadTts:"Tải mô hình Supertonic", generate:"Tạo giọng nói trên thiết bị", seconds:"giây", download:"Tải WAV", male1:"Nam 1", male2:"Nam 2", female1:"Nữ 1", female2:"Nữ 2" },
+    ru: { title:"Проверка STT / TTS на устройстве", desc:"Распознавание и синтез речи выполняются в браузере без передачи голосовых данных на сервер.", backend:"Рекомендуемый бэкенд", available:"Доступно", fallback:"Режим WASM", microphone:"Микрофон", unavailable:"Недоступно", stt:"Распознавание речи STT", tts:"Синтез речи TTS", language:"Язык", load:"Загрузить модель", stop:"Остановить запись", record:"Начать запись", none:"(Речь не распознана.)", voice:"Голос", quality:"Качество", ultraLow:"сверхнизкая задержка", low:"низкая задержка", speed:"Скорость", sentence:"Текст для синтеза", loadTts:"Загрузить модель Supertonic", generate:"Создать речь на устройстве", seconds:"сек", download:"Скачать WAV", male1:"Мужской 1", male2:"Мужской 2", female1:"Женский 1", female2:"Женский 2" },
+};
+
 export default function OnDeviceSpeechPage() {
+    const displayLanguage = useDisplayLanguage();
+    const t = SPEECH_UI[displayLanguage] ?? SPEECH_UI.en;
     const sttWorkerRef = useRef<Worker | null>(null);
     const ttsWorkerRef = useRef<Worker | null>(null);
     const recorderRef = useRef<MediaRecorder | null>(null);
@@ -65,7 +76,7 @@ export default function OnDeviceSpeechPage() {
     const audioUrlRef = useRef<string | null>(null);
 
     const [capabilities, setCapabilities] = useState<OnDeviceSpeechCapabilities | null>(null);
-    const [language, setLanguage] = useState("ko");
+    const [language, setLanguage] = useState(displayLanguage);
 
     const [sttStatus, setSttStatus] = useState<OnDeviceSpeechStatus>("checking");
     const [sttMessage, setSttMessage] = useState("실행 환경을 확인하고 있습니다.");
@@ -88,6 +99,12 @@ export default function OnDeviceSpeechPage() {
     } | null>(null);
 
     const backend = capabilities?.recommendedBackend ?? "wasm";
+
+    useEffect(() => {
+        if (LANGUAGES.some(([code]) => code === displayLanguage)) {
+            setLanguage(displayLanguage);
+        }
+    }, [displayLanguage]);
 
     useEffect(() => {
         const detected = detectOnDeviceSpeechCapabilities();
@@ -260,16 +277,16 @@ export default function OnDeviceSpeechPage() {
             <div className="mx-auto max-w-5xl">
                 <header className="border-b border-emerald-900/70 pb-5">
                     <p className="text-xs font-semibold text-emerald-400">SQ Link AI LAB</p>
-                    <h1 className="mt-2 text-2xl font-bold sm:text-3xl">온디바이스 STT / TTS 검증</h1>
+                    <h1 className="mt-2 text-2xl font-bold sm:text-3xl">{t.title}</h1>
                     <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-                        음성 데이터의 서버 전송 없이 브라우저 내부에서 인식하고 합성합니다.
+                        {t.desc}
                     </p>
                 </header>
 
                 <section className="mt-6 grid gap-3 sm:grid-cols-3">
-                    <StatusItem label="권장 백엔드" value={backend.toUpperCase()} active={Boolean(capabilities?.supported)} />
-                    <StatusItem label="WebGPU" value={capabilities?.webGpu ? "사용 가능" : "WASM 대체"} active={Boolean(capabilities?.webGpu)} />
-                    <StatusItem label="마이크" value={capabilities?.mediaDevices ? "사용 가능" : "사용 불가"} active={Boolean(capabilities?.mediaDevices)} />
+                    <StatusItem label={t.backend} value={backend.toUpperCase()} active={Boolean(capabilities?.supported)} />
+                    <StatusItem label="WebGPU" value={capabilities?.webGpu ? t.available : t.fallback} active={Boolean(capabilities?.webGpu)} />
+                    <StatusItem label={t.microphone} value={capabilities?.mediaDevices ? t.available : t.unavailable} active={Boolean(capabilities?.mediaDevices)} />
                 </section>
 
                 {capabilities?.warnings.map((warning) => (
@@ -278,22 +295,22 @@ export default function OnDeviceSpeechPage() {
 
                 <div className="mt-8 grid gap-6 lg:grid-cols-2">
                     <section className="border border-slate-800 bg-[#0b1713] p-5">
-                        <PanelHeader title="STT 음성 인식" detail={`${ON_DEVICE_STT_MODEL.id} · Apache-2.0`} icon="stt" />
-                        <LanguageSelect language={language} setLanguage={setLanguage} disabled={recording || sttBusy || ttsBusy} />
+                        <PanelHeader title={t.stt} detail={`${ON_DEVICE_STT_MODEL.id} · Apache-2.0`} icon="stt" />
+                        <LanguageSelect label={t.language} language={language} setLanguage={setLanguage} disabled={recording || sttBusy || ttsBusy} />
 
                         <div className="mt-4">
                             {sttStatus !== "ready" && !recording ? (
                                 <ActionButton onClick={loadSttModel} disabled={!capabilities?.supported || sttBusy}>
                                     {sttBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                                    모델 불러오기
+                                    {t.load}
                                 </ActionButton>
                             ) : recording ? (
                                 <ActionButton onClick={() => { recorderRef.current?.stop(); setRecording(false); }} danger>
-                                    <Square className="h-4 w-4" /> 녹음 정지
+                                    <Square className="h-4 w-4" /> {t.stop}
                                 </ActionButton>
                             ) : (
                                 <ActionButton onClick={startRecording} disabled={!capabilities?.supported || sttStatus !== "ready"}>
-                                    <Mic className="h-4 w-4" /> 녹음 시작
+                                    <Mic className="h-4 w-4" /> {t.record}
                                 </ActionButton>
                             )}
                         </div>
@@ -301,43 +318,43 @@ export default function OnDeviceSpeechPage() {
                         <StatusBox message={sttMessage} progress={sttProgress} recording={recording} />
                         {sttResult && (
                             <div className="mt-4 border-l-2 border-emerald-500 bg-emerald-950/30 p-4">
-                                <p className="leading-7">{sttResult.transcript || "(인식된 문장이 없습니다.)"}</p>
+                                <p className="leading-7">{sttResult.transcript || t.none}</p>
                                 <p className="mt-3 text-xs text-slate-500">{sttResult.processingMs.toLocaleString()}ms · {sttResult.backend.toUpperCase()}</p>
                             </div>
                         )}
                     </section>
 
                     <section className="border border-slate-800 bg-[#0b1713] p-5">
-                        <PanelHeader title="TTS 음성 합성" detail={`${ON_DEVICE_TTS_MODEL.id} · OpenRAIL-M`} icon="tts" />
-                        <LanguageSelect language={language} setLanguage={setLanguage} disabled={ttsBusy || recording} />
+                        <PanelHeader title={t.tts} detail={`${ON_DEVICE_TTS_MODEL.id} · OpenRAIL-M`} icon="tts" />
+                        <LanguageSelect label={t.language} language={language} setLanguage={setLanguage} disabled={ttsBusy || recording} />
 
                         <div className="mt-4 grid grid-cols-2 gap-3">
-                            <Control label="음색">
+                            <Control label={t.voice}>
                                 <select value={voiceId} onChange={(event) => setVoiceId(event.target.value as VoiceId)} disabled={ttsBusy} className="control">
-                                    {VOICES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                                    {VOICES.map(([id]) => <option key={id} value={id}>{t[{ M1: "male1", M2: "male2", F1: "female1", F2: "female2" }[id]]}</option>)}
                                 </select>
                             </Control>
-                            <Control label={`품질 단계 ${qualitySteps} ${qualitySteps === 2 ? "· 초저지연" : qualitySteps <= 4 ? "· 저지연" : ""}`}>
+                            <Control label={`${t.quality} ${qualitySteps} ${qualitySteps === 2 ? `· ${t.ultraLow}` : qualitySteps <= 4 ? `· ${t.low}` : ""}`}>
                                 <input type="range" min={2} max={8} value={qualitySteps} onChange={(event) => setQualitySteps(Number(event.target.value))} disabled={ttsBusy} className="w-full" />
                             </Control>
                         </div>
 
-                        <Control label={`속도 ${speed.toFixed(2)}`}>
+                        <Control label={`${t.speed} ${speed.toFixed(2)}`}>
                             <input type="range" min={0.9} max={1.5} step={0.05} value={speed} onChange={(event) => setSpeed(Number(event.target.value))} disabled={ttsBusy} className="w-full" />
                         </Control>
 
-                        <Control label="합성 문장">
+                        <Control label={t.sentence}>
                             <textarea value={ttsText} onChange={(event) => setTtsText(event.target.value)} rows={4} disabled={ttsBusy} className="control resize-none leading-6" />
                         </Control>
 
                         {ttsStatus !== "ready" ? (
                             <ActionButton onClick={loadTtsModel} disabled={!capabilities?.supported || ttsBusy}>
                                 {ttsBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                                Supertonic 모델 불러오기
+                                {t.loadTts}
                             </ActionButton>
                         ) : (
                             <ActionButton onClick={synthesize} disabled={!ttsText.trim() || ttsBusy}>
-                                <Volume2 className="h-4 w-4" /> 온디바이스 음성 생성
+                                <Volume2 className="h-4 w-4" /> {t.generate}
                             </ActionButton>
                         )}
 
@@ -346,8 +363,8 @@ export default function OnDeviceSpeechPage() {
                             <div className="mt-4 border border-sky-900 bg-sky-950/20 p-3">
                                 <audio controls src={audioUrl} className="w-full" />
                                 <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-400">
-                                    <span>{ttsStats?.duration.toFixed(2)}초 · {ttsStats?.processingMs.toLocaleString()}ms · {ttsStats?.backend.toUpperCase()}</span>
-                                    <a href={audioUrl} download="sq-link-supertonic.wav" className="font-bold text-sky-300">WAV 다운로드</a>
+                                    <span>{ttsStats?.duration.toFixed(2)} {t.seconds} · {ttsStats?.processingMs.toLocaleString()}ms · {ttsStats?.backend.toUpperCase()}</span>
+                                    <a href={audioUrl} download="sq-link-supertonic.wav" className="font-bold text-sky-300">{t.download}</a>
                                 </div>
                             </div>
                         )}
@@ -376,9 +393,9 @@ function PanelHeader({ title, detail, icon }: { title: string; detail: string; i
     );
 }
 
-function LanguageSelect({ language, setLanguage, disabled }: { language: string; setLanguage: (value: string) => void; disabled: boolean }) {
+function LanguageSelect({ label, language, setLanguage, disabled }: { label: string; language: string; setLanguage: (value: string) => void; disabled: boolean }) {
     return (
-        <Control label="언어">
+        <Control label={label}>
             <select value={language} onChange={(event) => setLanguage(event.target.value)} disabled={disabled} className="control">
                 {LANGUAGES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
             </select>

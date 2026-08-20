@@ -12,6 +12,7 @@ import {
 } from "@/lib/roles";
 import { getV3CurrentUser, setupProfileV3 } from "@/lib/v3-auth";
 import type { V3Role } from "@/lib/v3-role-contract";
+import { persistDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 type RoleKey = SetupRoleKey | "";
 type ColorKey = "blue" | "amber" | "green" | "purple" | "indigo";
@@ -40,7 +41,7 @@ const T: Record<string, Record<string, string>> = {
     rememberMe: "이 기기에서 자동 로그인",
     rememberDesc: "다음부터 앱 실행 시 자동으로 로그인됩니다",
     completeTitle: "등록 완료!", completeDesc: "이제 SAFE-LINK를 사용할 준비가 되었습니다.",
-    startBtn: "SAFE-LINK 시작하기",
+    startBtn: "SAFE-LINK 시작하기", adminAccountWorker: "관리자 권한 계정은 근로자 역할을 선택할 수 없습니다.", romanizing: "영문 이름을 자동 변환 중입니다...", saveFailed: "프로필 저장에 실패했습니다. 잠시 후 다시 시도해주세요.",
   },
   en: {
     pgTitle: "Profile Setup", editTitle: "Profile Settings",
@@ -63,7 +64,7 @@ const T: Record<string, Record<string, string>> = {
     rememberMe: "Auto-login on this device",
     rememberDesc: "Will log in automatically next time you open the app",
     completeTitle: "Setup Complete!", completeDesc: "You are ready to use SAFE-LINK.",
-    startBtn: "Start SAFE-LINK",
+    startBtn: "Start SAFE-LINK", adminAccountWorker: "An administrator account cannot select the worker role.", romanizing: "Converting the name to Roman letters...", saveFailed: "We could not save the profile. Please try again shortly.",
   },
   vi: {
     pgTitle: "Đăng ký thông tin", editTitle: "Cài đặt hồ sơ",
@@ -86,7 +87,7 @@ const T: Record<string, Record<string, string>> = {
     rememberMe: "Tự động đăng nhập trên thiết bị này",
     rememberDesc: "Lần sau sẽ tự động đăng nhập khi mở ứng dụng",
     completeTitle: "Hoàn thành!", completeDesc: "Bạn đã sẵn sàng sử dụng SAFE-LINK.",
-    startBtn: "Bắt đầu SAFE-LINK",
+    startBtn: "Bắt đầu SAFE-LINK", adminAccountWorker: "Tài khoản quản trị không thể chọn vai trò công nhân.", romanizing: "Đang chuyển tên sang chữ La-tinh...", saveFailed: "Không thể lưu hồ sơ. Vui lòng thử lại sau.",
   },
   zh: {
     pgTitle: "注册基本信息", editTitle: "个人资料设置",
@@ -109,7 +110,7 @@ const T: Record<string, Record<string, string>> = {
     rememberMe: "在此设备上自动登录",
     rememberDesc: "下次打开应用时将自动登录",
     completeTitle: "注册完成！", completeDesc: "您已准备好使用SAFE-LINK。",
-    startBtn: "开始使用SAFE-LINK",
+    startBtn: "开始使用SAFE-LINK", adminAccountWorker: "管理员账户不能选择工人角色。", romanizing: "正在转换英文姓名...", saveFailed: "无法保存个人资料，请稍后重试。",
   },
   th: {
     pgTitle: "ลงทะเบียนข้อมูล", editTitle: "ตั้งค่าโปรไฟล์",
@@ -132,7 +133,30 @@ const T: Record<string, Record<string, string>> = {
     rememberMe: "เข้าสู่ระบบอัตโนมัติ",
     rememberDesc: "ครั้งถัดไปจะเข้าสู่ระบบโดยอัตโนมัติ",
     completeTitle: "ลงทะเบียนเสร็จสิ้น!", completeDesc: "คุณพร้อมใช้งาน SAFE-LINK แล้ว",
-    startBtn: "เริ่มใช้งาน SAFE-LINK",
+    startBtn: "เริ่มใช้งาน SAFE-LINK", adminAccountWorker: "บัญชีผู้ดูแลไม่สามารถเลือกบทบาทคนงานได้", romanizing: "กำลังแปลงชื่อเป็นอักษรโรมัน...", saveFailed: "ไม่สามารถบันทึกโปรไฟล์ได้ โปรดลองอีกครั้งภายหลัง",
+  },
+  ru: {
+    pgTitle: "Регистрация данных", editTitle: "Настройка профиля",
+    step1Title: "Роль и основные данные", step2Title: "Сведения об объекте", step3Title: "Автовход",
+    step1Desc: "Введите имя и выберите роль на объекте.", step2Desc: "Укажите объект и вид работ.",
+    step3Desc: "Настройте автоматический вход и начните работу.",
+    nameTitle: "Полное имя", langTitle: "Родной язык",
+    tradeTitle: "Вид работ (например, опалубка, арматура)", posTitle: "Должность",
+    siteTitle: "Код или название объекта", roleTitle: "Роль на объекте",
+    site_manager: "Руководитель объекта", site_manager_desc: "Создание и рассылка TBM, управление работниками (только 1)",
+    safety_officer: "Специалист по безопасности", safety_officer_desc: "Проверка безопасности и мониторинг TBM",
+    gongmu: "Администратор строительства", gongmu_desc: "Управление договорами, расчётами и документами",
+    worker: "Работник объекта", worker_desc: "Получение TBM, подпись и общение с администраторами",
+    hq_officer: "Отдел безопасности HQ", hq_officer_desc: "Единое управление и мониторинг всех объектов",
+    save: "Завершить и начать",
+    err: "Заполните все поля корректно!",
+    adminLimit: "Руководитель объекта уже зарегистрирован. Выберите другую роль.",
+    alreadySet: "Уже зарегистрирован",
+    next: "Далее →", prev: "← Назад",
+    rememberMe: "Автовход на этом устройстве",
+    rememberDesc: "При следующем запуске вход будет выполнен автоматически",
+    completeTitle: "Регистрация завершена!", completeDesc: "Всё готово к использованию SAFE-LINK.",
+    startBtn: "Открыть SAFE-LINK", adminAccountWorker: "Учётная запись администратора не может выбрать роль работника.", romanizing: "Имя преобразуется в латиницу...", saveFailed: "Не удалось сохранить профиль. Повторите попытку позже.",
   },
 };
 const getT = (lang: string) => T[lang] || T.en;
@@ -199,19 +223,19 @@ function BgOrbs() {
 }
 
 const glassCard: React.CSSProperties = {
-  background:"rgba(12,13,22,0.88)",
-  border:"1px solid rgba(255,255,255,0.07)",
+  background:"rgba(255,255,255,0.96)",
+  border:"1px solid #dbe5f0",
   backdropFilter:"blur(24px)",
   WebkitBackdropFilter:"blur(24px)",
   borderRadius:20,
 };
 const accentLine: React.CSSProperties = {
   height:1,
-  background:"linear-gradient(90deg,transparent,rgba(59,130,246,0.45),transparent)",
+  background:"linear-gradient(90deg,transparent,rgba(37,99,235,0.65),transparent)",
 };
 const fieldBox: React.CSSProperties = {
-  background:"rgba(255,255,255,0.04)",
-  border:"1px solid rgba(255,255,255,0.08)",
+  background:"#f8fafc",
+  border:"1px solid #dbe5f0",
   borderRadius:10,
 };
 
@@ -232,9 +256,9 @@ function StepIndicator({ step, t }: { step: Step; t: Record<string, string> }) {
                 width: 28,
                 height: 28,
                 borderRadius: "50%",
-                background: step > s.num ? "#10B981" : step === s.num ? "#3B82F6" : "rgba(255,255,255,0.05)",
-                border: `1px solid ${step > s.num ? "#10B981" : step === s.num ? "#3B82F6" : "rgba(255,255,255,0.1)"}`,
-                color: step >= s.num ? "#fff" : "#475569",
+                background: step > s.num ? "#10B981" : step === s.num ? "#2563EB" : "#f1f5f9",
+                border: `1px solid ${step > s.num ? "#10B981" : step === s.num ? "#2563EB" : "#cbd5e1"}`,
+                color: step >= s.num ? "#fff" : "#64748b",
                 boxShadow: step === s.num ? "0 0 14px rgba(59,130,246,0.45)" : "none",
               }}
             >
@@ -242,7 +266,7 @@ function StepIndicator({ step, t }: { step: Step; t: Record<string, string> }) {
             </div>
             <span
               className="max-w-[60px] truncate text-center text-[8px] font-bold leading-tight transition-colors"
-              style={{ color: step === s.num ? "#93C5FD" : step > s.num ? "#10B981" : "#334155" }}
+              style={{ color: step === s.num ? "#2563EB" : step > s.num ? "#059669" : "#64748b" }}
             >
               {s.label}
             </span>
@@ -250,7 +274,7 @@ function StepIndicator({ step, t }: { step: Step; t: Record<string, string> }) {
           {idx < 2 && (
             <div
               className="mb-3.5 mx-1.5 h-px flex-1 transition-all duration-300"
-              style={{ background: step > s.num ? "#10B981" : "rgba(255,255,255,0.06)" }}
+              style={{ background: step > s.num ? "#10B981" : "#cbd5e1" }}
             />
           )}
         </div>
@@ -262,8 +286,9 @@ function StepIndicator({ step, t }: { step: Step; t: Record<string, string> }) {
 function SetupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const displayLanguage = useDisplayLanguage();
 
-  const urlLang = searchParams.get("lang") || "ko";
+  const urlLang = searchParams.get("lang") || displayLanguage;
   const t = getT(urlLang);
   const initSiteId = searchParams.get("site_id") || "";
 
@@ -379,7 +404,7 @@ function SetupContent() {
     }
 
     if ((isMasterEmail || isHQAuthorized) && role === "worker") {
-      alert("관리자 권한 계정은 근로자 역할을 선택할 수 없습니다.");
+      alert(t.adminAccountWorker);
       setRole(isMasterEmail ? "root" : "hq_officer");
       return;
     }
@@ -416,6 +441,7 @@ function SetupContent() {
       } else {
         localStorage.setItem("safe-link-remember", "false");
       }
+      persistDisplayLanguage(language);
       sessionStorage.setItem("safe-link-session-active", "true");
 
       const serverRole = pickDefaultV3Role(user.roles);
@@ -424,7 +450,7 @@ function SetupContent() {
         : getDefaultRouteForProfileRole(getProfileRoleFromSetupRole(role));
       window.location.href = `${redirectPath}?lang=${language}`;
     } catch {
-      alert("프로필 저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      alert(t.saveFailed);
       setLoading(false);
     }
   }, [
@@ -444,7 +470,9 @@ function SetupContent() {
     selectedSiteId,
     siteCode,
     t.adminLimit,
+    t.adminAccountWorker,
     t.err,
+    t.saveFailed,
     title,
     trade,
   ]);
@@ -459,22 +487,22 @@ function SetupContent() {
   ];
 
   const colorMap: Record<ColorKey, { border: string; bg: string; text: string; activeBg: string }> = {
-    blue:   { border:"rgba(59,130,246,0.5)",  bg:"rgba(59,130,246,0.08)",  activeBg:"rgba(59,130,246,0.15)",  text:"#93C5FD" },
-    amber:  { border:"rgba(245,158,11,0.5)",  bg:"rgba(245,158,11,0.08)",  activeBg:"rgba(245,158,11,0.15)",  text:"#FCD34D" },
-    green:  { border:"rgba(34,197,94,0.5)",   bg:"rgba(34,197,94,0.08)",   activeBg:"rgba(34,197,94,0.15)",   text:"#6EE7B7" },
-    purple: { border:"rgba(168,85,247,0.5)",  bg:"rgba(168,85,247,0.08)",  activeBg:"rgba(168,85,247,0.15)",  text:"#D8B4FE" },
-    indigo: { border:"rgba(99,102,241,0.5)",  bg:"rgba(99,102,241,0.08)",  activeBg:"rgba(99,102,241,0.15)",  text:"#A5B4FC" },
+    blue:   { border:"#60a5fa", bg:"#f8fbff", activeBg:"#eff6ff", text:"#1d4ed8" },
+    amber:  { border:"#fbbf24", bg:"#fffdf7", activeBg:"#fffbeb", text:"#b45309" },
+    green:  { border:"#4ade80", bg:"#f7fef9", activeBg:"#ecfdf5", text:"#047857" },
+    purple: { border:"#c084fc", bg:"#fdfaff", activeBg:"#faf5ff", text:"#7e22ce" },
+    indigo: { border:"#818cf8", bg:"#fafaff", activeBg:"#eef2ff", text:"#4338ca" },
   };
 
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden p-5" style={{ background:"#050508" }}>
+    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#eef3f8] p-5">
       <BgOrbs />
       <div className="relative z-10 w-full max-w-[380px]">
         <div className="mb-5 text-center">
-          <h1 className="text-[28px] font-black leading-none tracking-tighter text-white">
-            SAFE<span style={{ color:"#60A5FA" }}>-LINK</span>
+          <h1 className="text-[28px] font-black leading-none tracking-tighter text-[#172033]">
+            SAFE<span style={{ color:"#2563EB" }}>-LINK</span>
           </h1>
-          <p className="mt-1 text-[9px] uppercase tracking-[0.4em] text-slate-700">
+          <p className="mt-1 text-[9px] uppercase tracking-[0.4em] text-slate-500">
             {isEditMode ? t.editTitle : t.pgTitle}
           </p>
         </div>
@@ -520,8 +548,8 @@ function SetupContent() {
                           className="rounded-xl p-3 text-left font-bold transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-20"
                           style={{
                             background: isSelected ? c.activeBg : c.bg,
-                            border:`1px solid ${isSelected ? c.border : "rgba(255,255,255,0.06)"}`,
-                            boxShadow: isSelected ? `0 0 18px ${glow}` : "none",
+                            border:`1px solid ${isSelected ? c.border : "#dbe5f0"}`,
+                            boxShadow: isSelected ? `0 8px 18px ${glow}` : "none",
                           }}
                         >
                           <div className="mb-0.5 flex items-center justify-between">
@@ -536,7 +564,7 @@ function SetupContent() {
                           <span className="block text-[11px] font-black" style={{ color: isSelected ? c.text : "#64748B" }}>
                             {t[key as string] || key}
                           </span>
-                          <p className="mt-0.5 text-[9px] leading-tight" style={{ color:"#334155" }}>
+                          <p className="mt-0.5 text-[9px] leading-tight" style={{ color:"#64748B" }}>
                             {t[`${key as string}_desc`]}
                           </p>
                         </button>
@@ -555,13 +583,13 @@ function SetupContent() {
                         value={name}
                         onChange={(event) => setName(event.target.value)}
                         onBlur={handleNameBlur}
-                        className="w-full bg-transparent px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-700"
+                        className="w-full bg-transparent px-4 py-3.5 text-sm text-slate-800 outline-none placeholder:text-slate-400"
                       />
                     </div>
                     {romanizing && (
                       <p className="ml-1 mt-1.5 flex animate-pulse items-center gap-1 text-[10px]" style={{ color:"#60A5FA" }}>
                         <span className="inline-block h-2 w-2 animate-ping rounded-full bg-blue-400" />
-                        영문 이름 자동 변환 중...
+                        {t.romanizing}
                       </p>
                     )}
                   </div>
@@ -574,11 +602,11 @@ function SetupContent() {
                       <select
                         value={language}
                         onChange={(event) => setLanguage(event.target.value)}
-                        className="w-full appearance-none bg-transparent px-4 py-3.5 text-sm text-white outline-none"
-                        style={{ color:"#F1F5F9" }}
+                        className="w-full appearance-none bg-transparent px-4 py-3.5 text-sm text-slate-800 outline-none"
+                        style={{ color:"#1e293b" }}
                       >
                         {languages.map((lang) => (
-                          <option key={lang.code} value={lang.code} style={{ background:"#0d0e18" }}>
+                          <option key={lang.code} value={lang.code} style={{ background:"#fff" }}>
                             {lang.name}
                           </option>
                         ))}
@@ -629,14 +657,14 @@ function SetupContent() {
                               const found = siteList.find((site) => site.id === id);
                               setSiteCode(found?.name ?? "");
                             }}
-                            className="w-full appearance-none bg-transparent px-4 py-3.5 text-sm text-white outline-none"
-                            style={{ color: selectedSiteId ? "#F1F5F9" : "#475569" }}
+                            className="w-full appearance-none bg-transparent px-4 py-3.5 text-sm text-slate-800 outline-none"
+                            style={{ color: selectedSiteId ? "#1e293b" : "#64748b" }}
                           >
-                            <option value="" style={{ background:"#0d0e18" }}>
+                            <option value="" style={{ background:"#fff" }}>
                               {language === "ko" ? "현장을 선택하세요" : "Select a site"}
                             </option>
                             {siteList.map((site) => (
-                              <option key={site.id} value={site.id} style={{ background:"#0d0e18" }}>
+                              <option key={site.id} value={site.id} style={{ background:"#fff" }}>
                                 {site.name}
                               </option>
                             ))}
@@ -655,7 +683,7 @@ function SetupContent() {
                           placeholder={t.siteTitle}
                           value={siteCode}
                           onChange={(event) => setSiteCode(event.target.value)}
-                          className="w-full bg-transparent px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-700"
+                          className="w-full bg-transparent px-4 py-3.5 text-sm text-slate-800 outline-none placeholder:text-slate-400"
                         />
                       </div>
                     )}
@@ -673,7 +701,7 @@ function SetupContent() {
                             placeholder="010-0000-0000"
                             value={phone}
                             onChange={(event) => setPhone(event.target.value)}
-                            className="w-full bg-transparent px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-700"
+                            className="w-full bg-transparent px-4 py-3.5 text-sm text-slate-800 outline-none placeholder:text-slate-400"
                           />
                         </div>
                       </div>
@@ -687,7 +715,7 @@ function SetupContent() {
                             placeholder={t.tradeTitle}
                             value={trade}
                             onChange={(event) => setTrade(event.target.value)}
-                            className="w-full bg-transparent px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-700"
+                            className="w-full bg-transparent px-4 py-3.5 text-sm text-slate-800 outline-none placeholder:text-slate-400"
                           />
                         </div>
                         <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -701,9 +729,9 @@ function SetupContent() {
                                 onClick={() => setTrade(chipValue)}
                                 className="rounded-lg px-2.5 py-1 text-[10px] font-bold transition-all duration-200"
                                 style={{
-                                  background: isSelected ? "#2563EB" : "rgba(255,255,255,0.04)",
-                                  border:`1px solid ${isSelected ? "#3B82F6" : "rgba(255,255,255,0.07)"}`,
-                                  color: isSelected ? "#fff" : "#64748B",
+                                  background: isSelected ? "#2563EB" : "#fff",
+                                  border:`1px solid ${isSelected ? "#3B82F6" : "#dbe5f0"}`,
+                                  color: isSelected ? "#fff" : "#475569",
                                 }}
                               >
                                 {displayLabel}
@@ -724,7 +752,7 @@ function SetupContent() {
                           placeholder={t.posTitle}
                           value={title}
                           onChange={(event) => setTitle(event.target.value)}
-                          className="w-full bg-transparent px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-700"
+                          className="w-full bg-transparent px-4 py-3.5 text-sm text-slate-800 outline-none placeholder:text-slate-400"
                         />
                       </div>
                     </div>
@@ -734,7 +762,7 @@ function SetupContent() {
                     <button
                       onClick={() => setStep(1)}
                       className="rounded-xl px-5 py-3.5 text-sm font-black transition-all active:scale-95"
-                      style={{ background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", color:"#94A3B8" }}
+                      style={{ background:"#f8fafc", border:"1px solid #dbe5f0", color:"#475569" }}
                     >
                       {t.prev}
                     </button>
@@ -765,12 +793,12 @@ function SetupContent() {
                   transition={{ duration:0.22 }}
                   className="flex flex-col gap-4"
                 >
-                  <div className="flex items-center gap-3 rounded-xl p-4" style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)" }}>
+                  <div className="flex items-center gap-3 rounded-xl p-4" style={{ background:"#f8fafc", border:"1px solid #dbe5f0" }}>
                     <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-2xl" style={{ background:"rgba(59,130,246,0.1)", border:"1px solid rgba(59,130,246,0.2)" }}>
                       {role === "worker" ? "👷" : role === "safety_officer" ? "🦺" : role === "site_manager" ? "🏗️" : role === "root" ? "💎" : "🏢"}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-black text-white">{name || "—"}</p>
+                      <p className="truncate text-sm font-black text-slate-800">{name || "—"}</p>
                       <p className="mt-0.5 truncate text-[11px]" style={{ color:"#64748B" }}>
                         {t[role as string] || role} · {siteCode || "—"}
                       </p>
@@ -784,15 +812,15 @@ function SetupContent() {
 
                   <label
                     className="flex cursor-pointer select-none items-center gap-3.5 rounded-xl p-4 transition-all duration-200"
-                    style={{ background:"rgba(59,130,246,0.06)", border:`2px solid ${rememberMe ? "rgba(59,130,246,0.3)" : "rgba(255,255,255,0.07)"}` }}
+                    style={{ background:"#f8fbff", border:`2px solid ${rememberMe ? "#93c5fd" : "#dbe5f0"}` }}
                     onClick={() => setRememberMe((value) => !value)}
                   >
                     <div className="relative flex-shrink-0" style={{ width:48, height:26 }}>
-                      <div className="h-full w-full rounded-full transition-all duration-300" style={{ background: rememberMe ? "#3B82F6" : "rgba(255,255,255,0.1)" }} />
+                      <div className="h-full w-full rounded-full transition-all duration-300" style={{ background: rememberMe ? "#3B82F6" : "#cbd5e1" }} />
                       <div className="absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-lg transition-all duration-300" style={{ left: rememberMe ? 24 : 2 }} />
                     </div>
                     <div className="flex-1">
-                      <span className="block text-sm font-black text-white">{t.rememberMe}</span>
+                      <span className="block text-sm font-black text-slate-800">{t.rememberMe}</span>
                       <span className="mt-0.5 block text-[10px]" style={{ color:"#475569" }}>{t.rememberDesc}</span>
                     </div>
                     {rememberMe && (
@@ -821,7 +849,7 @@ function SetupContent() {
                     <button
                       onClick={() => setStep(2)}
                       className="rounded-xl px-5 py-3.5 text-sm font-black transition-all active:scale-95"
-                      style={{ background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", color:"#94A3B8" }}
+                      style={{ background:"#f8fafc", border:"1px solid #dbe5f0", color:"#475569" }}
                     >
                       {t.prev}
                     </button>
@@ -862,7 +890,7 @@ function SetupContent() {
 export default function SetupProfilePage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center" style={{ background:"#050508" }}>
+      <div className="flex min-h-screen items-center justify-center bg-[#eef3f8]">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500/30 border-t-blue-500" />
       </div>
     }>

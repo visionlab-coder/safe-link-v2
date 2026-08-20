@@ -4,6 +4,23 @@ import RoleGuard from "@/components/RoleGuard";
 import { ArrowLeft, BarChart3, Shield, Users, PenLine, AlertTriangle, Link, Mic, ChevronRight } from "lucide-react";
 import ResponsiveFeatureHero from "@/components/ResponsiveFeatureHero";
 import { visualizationSpecs } from "@/lib/visualization-specs";
+import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+
+const GUIDE_ESG_UI: Record<string, { title: string; description: string; intro: string; open: string }> = {
+  ko: { title: "ESG 안전 리포트", description: "안전 활동 집계부터 ESG 지표 확인과 보고서 출력까지 안내합니다.", intro: "현장의 TBM 참석·서약·작업중지·장비 지급 실적을 ESG 지표로 자동 집계합니다. 발주처·본사 보고용 JSON 파일로 내보내기 가능합니다.", open: "ESG 안전 리포트 바로가기" },
+  en: { title: "ESG Safety Report", description: "Learn how to aggregate safety activity, review ESG indicators, and export reports.", intro: "TBM attendance, pledges, stop-work requests, and equipment issuance are automatically aggregated as ESG indicators. Export a JSON file for clients and headquarters.", open: "Open ESG Safety Report" },
+  zh: { title: "ESG 安全报告", description: "了解如何汇总安全活动、查看 ESG 指标并导出报告。", intro: "现场 TBM 参与、承诺、停工请求和设备发放会自动汇总为 ESG 指标，可导出供发包方和总部使用的 JSON 文件。", open: "打开 ESG 安全报告" },
+  vi: { title: "Báo cáo an toàn ESG", description: "Hướng dẫn tổng hợp hoạt động an toàn, kiểm tra chỉ số ESG và xuất báo cáo.", intro: "Tham dự TBM, cam kết, yêu cầu dừng việc và cấp thiết bị được tổng hợp tự động thành chỉ số ESG. Có thể xuất tệp JSON cho chủ đầu tư và trụ sở.", open: "Mở báo cáo an toàn ESG" },
+  ru: { title: "Отчёт ESG по безопасности", description: "Узнайте, как собрать данные по безопасности, проверить показатели ESG и выгрузить отчёт.", intro: "Участие в TBM, обязательства, запросы на остановку работ и выдача оборудования автоматически собираются в показатели ESG. Можно выгрузить JSON для заказчика и головного офиса.", open: "Открыть отчёт ESG" },
+};
+
+const ESG_GUIDE_LABELS: Record<string, Record<string, string>> = {
+  ko: { cycle:"권장 운영 주기", sitePeriod:"현장 및 기간 선택", report:"리포트 생성", score:"ESG 점수 해석", export:"JSON 내보내기 (발주처·본사 보고)", faq:"자주 묻는 질문", site:"현장 선택", period:"기간 설정 예시", result:"결과 예시", file:"파일명 형식" },
+  en: { cycle:"Recommended operating cycle", sitePeriod:"Select site and period", report:"Generate report", score:"Interpret ESG score", export:"Export JSON (client and HQ report)", faq:"Frequently asked questions", site:"Select worksite", period:"Period examples", result:"Sample result", file:"File name format" },
+  zh: { cycle:"建议运营周期", sitePeriod:"选择现场和期间", report:"生成报告", score:"解读 ESG 分数", export:"导出 JSON（发包方和总部报告）", faq:"常见问题", site:"选择现场", period:"期间设置示例", result:"结果示例", file:"文件名格式" },
+  vi: { cycle:"Chu kỳ vận hành khuyến nghị", sitePeriod:"Chọn công trường và thời gian", report:"Tạo báo cáo", score:"Diễn giải điểm ESG", export:"Xuất JSON (báo cáo chủ đầu tư và trụ sở)", faq:"Câu hỏi thường gặp", site:"Chọn công trường", period:"Ví dụ thiết lập thời gian", result:"Ví dụ kết quả", file:"Định dạng tên tệp" },
+  ru: { cycle:"Рекомендуемый цикл работы", sitePeriod:"Выбор объекта и периода", report:"Создание отчёта", score:"Интерпретация оценки ESG", export:"Экспорт JSON (отчёт для заказчика и HQ)", faq:"Частые вопросы", site:"Выбор объекта", period:"Примеры периода", result:"Пример результата", file:"Формат имени файла" },
+};
 
 function StepCard({ num, title, children }: { num: number; title: string; children: React.ReactNode }) {
   return (
@@ -43,6 +60,9 @@ const colorBarMap: Record<string, string> = {
 
 export default function GuideEsgPage() {
   const router = useRouter();
+  const lang = useDisplayLanguage();
+  const t = GUIDE_ESG_UI[lang] || GUIDE_ESG_UI.en;
+  const labels = ESG_GUIDE_LABELS[lang] || ESG_GUIDE_LABELS.en;
 
   return (
     <RoleGuard allowedRole="admin">
@@ -56,18 +76,16 @@ export default function GuideEsgPage() {
             <span className="font-black tracking-tight text-[#063789]">SQ-LINK</span>
           </div>
 
-          <ResponsiveFeatureHero visual={{ ...visualizationSpecs.esg, eyebrow: "SQ-LINK GUIDE · CLAIM 24", title: "ESG 안전 리포트", description: "안전 활동 집계부터 ESG 지표 확인과 보고서 출력까지 안내합니다." }} />
+          <ResponsiveFeatureHero visual={{ ...visualizationSpecs.esg, eyebrow: "SQ-LINK GUIDE · CLAIM 24", title: t.title, description: t.description }} />
 
           <div className="bg-emerald-900/20 border border-emerald-800/40 rounded-xl p-4 mb-6 mt-4">
             <p className="text-sm text-emerald-300 leading-relaxed">
-              현장의 TBM 참석·서약·작업중지·장비 지급 실적을
-              <strong className="text-white"> ESG 지표</strong>로 자동 집계합니다.
-              발주처·본사 보고용 JSON 파일로 내보내기 가능합니다.
+              {t.intro}
             </p>
           </div>
 
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
-            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-3">권장 운영 주기</p>
+            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-3">{labels.cycle}</p>
             <div className="space-y-1.5">
               {[
                 ["매월 1일",  "공무/안전관리자", "전월 리포트 생성 → JSON 저장"],
@@ -85,13 +103,13 @@ export default function GuideEsgPage() {
 
           <div className="space-y-4">
 
-            <StepCard num={1} title="현장 및 기간 선택">
+            <StepCard num={1} title={labels.sitePeriod}>
               <p className="text-xs text-gray-500 mb-3">
                 경로: <span className="text-emerald-400 font-mono">관리자 → ESG 안전 리포트</span>
               </p>
               <div className="bg-gray-800 rounded-xl p-4 space-y-3">
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">현장 선택</p>
+                  <p className="text-xs text-gray-500 mb-1">{labels.site}</p>
                   <div className="bg-gray-700 rounded-lg px-3 py-2 text-sm text-white">
                     SW-001 서원 인천계양 현장
                   </div>
@@ -107,7 +125,7 @@ export default function GuideEsgPage() {
               </div>
 
               <div className="mt-4">
-                <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-2">기간 설정 예시</p>
+                <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-2">{labels.period}</p>
                 <div className="space-y-1.5">
                   {[
                     ["전월 월간", "2026-04-01", "2026-04-30"],
@@ -124,13 +142,13 @@ export default function GuideEsgPage() {
               </div>
             </StepCard>
 
-            <StepCard num={2} title="리포트 생성">
+            <StepCard num={2} title={labels.report}>
               <p className="text-sm text-gray-300 mb-4">
                 현장과 기간 선택 후 <strong className="text-white">[리포트 생성]</strong> 버튼 클릭 (약 2~3초 소요)
               </p>
 
               <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-3">
-                결과 예시 — 2026년 4월 인천계양 현장
+                {labels.result} — 2026-04
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {EXAMPLE_STATS.map(({ icon: Icon, label, value, sub, rate, color }) => (
@@ -161,7 +179,7 @@ export default function GuideEsgPage() {
               </div>
             </StepCard>
 
-            <StepCard num={3} title="ESG 점수 해석">
+            <StepCard num={3} title={labels.score}>
               <div className="bg-gray-800 rounded-xl p-4 mb-4">
                 <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-2">ESG 점수 계산</p>
                 <div className="space-y-2">
@@ -201,12 +219,12 @@ export default function GuideEsgPage() {
               </div>
             </StepCard>
 
-            <StepCard num={4} title="JSON 내보내기 (발주처·본사 보고)">
+            <StepCard num={4} title={labels.export}>
               <p className="text-sm text-gray-300 mb-3">
                 리포트 생성 후 <strong className="text-white">[📥 JSON]</strong> 버튼 클릭 → 파일 자동 다운로드
               </p>
               <div className="bg-gray-800 rounded-xl p-3 mb-3">
-                <p className="text-xs text-gray-500 mb-1">파일명 형식</p>
+                <p className="text-xs text-gray-500 mb-1">{labels.file}</p>
                 <p className="text-xs font-mono text-white">esg_report_[현장ID]_2026-04-01_2026-04-30.json</p>
               </div>
               <div className="bg-gray-800 rounded-xl p-3 font-mono text-xs text-gray-300 overflow-x-auto">
@@ -231,7 +249,7 @@ export default function GuideEsgPage() {
             </StepCard>
 
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-              <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-3">자주 묻는 질문</p>
+              <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-3">{labels.faq}</p>
               <div className="space-y-4">
                 {[
                   { q: "리포트가 비어 있어요.", a: "현장과 기간 선택 후 [리포트 생성] 버튼을 눌러야 집계됩니다." },
@@ -251,7 +269,7 @@ export default function GuideEsgPage() {
               className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-4 rounded-2xl transition-colors"
             >
               <BarChart3 className="w-4 h-4" />
-              ESG 안전 리포트 바로가기
+              {t.open}
               <ChevronRight className="w-4 h-4" />
             </button>
 

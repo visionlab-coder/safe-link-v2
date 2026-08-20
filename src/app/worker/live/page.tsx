@@ -5,6 +5,7 @@ import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { playPremiumAudio, VoiceGender } from "@/utils/tts";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
+import { persistDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 interface Subtitle {
     id: string;
@@ -37,9 +38,20 @@ const i18n: Record<string, Record<string, string>> = {
 };
 const getT = (lang: string) => i18n[lang] || i18n["en"];
 
+const LIVE_COMMON: Record<string, Record<string, string>> = {
+    ko: { info:"관리자의 안전 안내를 선택한 언어로 실시간 전달합니다.", myVoice:"내 음성", manager:"관리자", stop:"말하기 중지", speak:"관리자에게 말하기", wait:"관리자 대기 중" },
+    en: { info:"Safety guidance from the administrator is delivered live in your selected language.", myVoice:"My voice", manager:"Manager", stop:"STOP SPEAKING", speak:"SPEAK TO MANAGER", wait:"WAITING FOR MANAGER" },
+    zh: { info:"管理员的安全指导将以您选择的语言实时传达。", myVoice:"我的语音", manager:"管理员", stop:"停止说话", speak:"向管理员说话", wait:"等待管理员" },
+    vi: { info:"Hướng dẫn an toàn của quản trị viên được truyền trực tiếp bằng ngôn ngữ bạn chọn.", myVoice:"Giọng nói của tôi", manager:"Quản trị viên", stop:"DỪNG NÓI", speak:"NÓI VỚI QUẢN TRỊ VIÊN", wait:"ĐANG CHỜ QUẢN TRỊ VIÊN" },
+    ru: { info:"Указания по безопасности от администратора передаются в реальном времени на выбранном языке.", myVoice:"Мой голос", manager:"Администратор", stop:"ОСТАНОВИТЬ РЕЧЬ", speak:"ГОВОРИТЬ С АДМИНИСТРАТОРОМ", wait:"ОЖИДАНИЕ АДМИНИСТРАТОРА" },
+};
+const LIVE_LOCALES: Record<string, string> = { ko:"ko-KR", en:"en-US", zh:"zh-CN", vi:"vi-VN", ru:"ru-RU" };
+
 export default function WorkerLivePage() {
     const router = useRouter();
-    const [lang, setLang] = useState("ko");
+    const lang = useDisplayLanguage();
+    const common = LIVE_COMMON[lang] || LIVE_COMMON.en;
+    const locale = LIVE_LOCALES[lang] || LIVE_LOCALES.en;
     const [gender] = useState<VoiceGender>("female");
     const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
     const [isConnected, setIsConnected] = useState(false);
@@ -138,7 +150,7 @@ export default function WorkerLivePage() {
         }
         const saved = await saveRes.json() as { id: string };
 
-        const time = new Date().toLocaleTimeString("ko-KR", {
+        const time = new Date().toLocaleTimeString(locale, {
             hour: "2-digit",
             minute: "2-digit",
             second: "2-digit",
@@ -151,7 +163,7 @@ export default function WorkerLivePage() {
             time,
             role: "worker",
         }]);
-    }, [activeAdminId, authReady]);
+    }, [activeAdminId, authReady, locale]);
 
     const {
         isRecording,
@@ -188,7 +200,7 @@ export default function WorkerLivePage() {
             };
             if (data.user?.id) {
                 const preferredLang = data.profile?.preferred_lang || "ko";
-                setLang(preferredLang);
+                persistDisplayLanguage(preferredLang);
                 langRef.current = preferredLang;
                 setAuthReady({
                     profileId: data.user.id,
@@ -223,7 +235,7 @@ export default function WorkerLivePage() {
             if (lastRenderedRef.current.text === cleanTextKo && now - lastRenderedRef.current.at < 10_000) return;
             lastRenderedRef.current = { text: cleanTextKo, at: now };
             setIsConnected(true);
-            const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const time = new Date().toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             const myLang = langRef.current;
 
             const addSubAndScroll = (sub: Subtitle, ttsText?: string) => {
@@ -304,7 +316,7 @@ export default function WorkerLivePage() {
             cancelled = true;
             events.close();
         };
-    }, [authReady, processQueue]);
+    }, [authReady, processQueue, locale]);
 
     const t = getT(lang);
 
@@ -350,7 +362,7 @@ export default function WorkerLivePage() {
                         <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
                             <p className="text-[10px] font-black tracking-[.18em] text-green-200">SQ-LINK LIVE</p>
                             <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
-                            <p className="mt-2 text-sm font-bold text-slate-100">관리자의 안전 안내를 선택한 언어로 실시간 전달합니다.</p>
+                            <p className="mt-2 text-sm font-bold text-slate-100">{common.info}</p>
                         </div>
                     </div>
 
@@ -384,7 +396,7 @@ export default function WorkerLivePage() {
                             <span className={`text-[10px] font-black uppercase tracking-widest ${
                                 sub.role === "worker" ? "text-emerald-400" : "text-blue-400"
                             }`}>
-                                {sub.role === "worker" ? "My voice" : "Manager"}
+                                {sub.role === "worker" ? common.myVoice : common.manager}
                             </span>
                             <p className="text-2xl font-black text-white leading-snug">{sub.translated}</p>
                             {lang !== 'ko' && sub.reverseTranslated && (
@@ -417,12 +429,12 @@ export default function WorkerLivePage() {
                                     className="h-3.5 w-3.5 shrink-0 rounded-full bg-white shadow-[0_0_14px_rgba(255,255,255,0.75)] transition-transform duration-75"
                                     style={{ transform: `scale(${0.85 + Math.min(1, audioLevel) * 1.8})` }}
                                 />
-                                <span>STOP SPEAKING</span>
+                                <span>{common.stop}</span>
                             </>
                         ) : activeAdminId ? (
-                            "SPEAK TO MANAGER"
+                            common.speak
                         ) : (
-                            "WAITING FOR MANAGER"
+                            common.wait
                         )}
                     </button>
                     <button onClick={() => router.push("/worker")} className="px-6 py-4 glass rounded-2xl border-white/10 text-slate-400 font-black tap-effect text-center">

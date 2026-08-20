@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 import RoleGuard from "@/components/RoleGuard";
 import ExportMenu from "@/components/ExportMenu";
 import { exportData, type ExportFormat } from "@/utils/export-files";
@@ -27,6 +28,14 @@ type EsgMetricRow = {
   metric: string;
   value: string | number;
   detail: string;
+};
+
+const ESG_UI: Record<string, Record<string, string>> = {
+  ko: { claim:"청구항 24", title:"ESG 안전 리포트", desc:"TBM·서약·작업중지 데이터를 기반으로 안전 지표를 집계합니다.", loading:"현장 로딩 중...", from:"시작일", to:"종료일", generate:"리포트 생성", tbm:"TBM 세션", attendance:"참석", certification:"이수 인증률", pledge:"안전 서약", signed:"서명 완료", stopWork:"작업중지 요청", resolved:"해결", total:"총", audit:"감사 체인 기록", interpretation:"실시간 통역", multilingual:"다국어 세션", equipment:"안전장비 지급", score:"ESG 종합 점수", noReport:"현장과 기간을 선택 후 리포트를 생성하세요", venn:"안전 지표 교차 집계", average:"교차 평균", category:"분류", metric:"지표", value:"값", detail:"상세", people:"명", cases:"건", auditHash:"SHA-256 해시 체인", formula:"TBM 인증률(40) + 서약 서명률(30) + 작업중지 해결률(20) + 세션 실시(10)" },
+  en: { claim:"Claim 24", title:"ESG Safety Report", desc:"Aggregate safety indicators from TBM, pledge, and stop-work data.", loading:"Loading sites...", from:"From", to:"To", generate:"Generate report", tbm:"TBM sessions", attendance:"Attendance", certification:"Certification rate", pledge:"Safety pledges", signed:"Signed", stopWork:"Stop-work requests", resolved:"Resolved", total:"Total", audit:"Audit-chain records", interpretation:"Live interpretation", multilingual:"Multilingual sessions", equipment:"Safety equipment grants", score:"ESG score", noReport:"Select a site and period, then generate a report.", venn:"Safety indicator overlap", average:"Overlap average", category:"Category", metric:"Metric", value:"Value", detail:"Detail", people:"people", cases:"cases", auditHash:"SHA-256 hash chain", formula:"TBM certification (40) + pledge signatures (30) + stop-work resolution (20) + session execution (10)" },
+  zh: { claim:"权利要求 24", title:"ESG 安全报告", desc:"基于 TBM、承诺和停工数据汇总安全指标。", loading:"正在加载工地...", from:"开始日期", to:"结束日期", generate:"生成报告", tbm:"TBM 次数", attendance:"参与人数", certification:"认证率", pledge:"安全承诺", signed:"已签名", stopWork:"停工请求", resolved:"已解决", total:"总计", audit:"审计链记录", interpretation:"实时口译", multilingual:"多语言会话", equipment:"安全设备发放", score:"ESG 综合评分", noReport:"请选择工地和期间后生成报告。", venn:"安全指标交叉汇总", average:"交叉平均值", category:"类别", metric:"指标", value:"数值", detail:"详情", people:"人", cases:"件", auditHash:"SHA-256 哈希链", formula:"TBM 认证率 (40) + 承诺签署率 (30) + 停工解决率 (20) + 会话执行 (10)" },
+  vi: { claim:"Yêu cầu 24", title:"Báo cáo an toàn ESG", desc:"Tổng hợp chỉ số an toàn từ dữ liệu TBM, cam kết và dừng việc.", loading:"Đang tải công trường...", from:"Từ ngày", to:"Đến ngày", generate:"Tạo báo cáo", tbm:"Phiên TBM", attendance:"Tham gia", certification:"Tỷ lệ chứng nhận", pledge:"Cam kết an toàn", signed:"Đã ký", stopWork:"Yêu cầu dừng việc", resolved:"Đã xử lý", total:"Tổng", audit:"Hồ sơ chuỗi kiểm toán", interpretation:"Phiên dịch trực tiếp", multilingual:"Phiên đa ngôn ngữ", equipment:"Cấp thiết bị an toàn", score:"Điểm ESG", noReport:"Chọn công trường và thời gian rồi tạo báo cáo.", venn:"Tổng hợp chỉ số an toàn", average:"Trung bình giao nhau", category:"Danh mục", metric:"Chỉ số", value:"Giá trị", detail:"Chi tiết", people:"người", cases:"trường hợp", auditHash:"Chuỗi băm SHA-256", formula:"Xác nhận TBM (40) + chữ ký cam kết (30) + xử lý dừng việc (20) + thực hiện phiên (10)" },
+  ru: { claim:"Пункт 24", title:"Отчёт ESG по безопасности", desc:"Сводные показатели безопасности на основе данных TBM, обязательств и остановок работ.", loading:"Загрузка объектов...", from:"С даты", to:"По дату", generate:"Создать отчёт", tbm:"Сессии TBM", attendance:"Участники", certification:"Уровень сертификации", pledge:"Обязательства по безопасности", signed:"Подписано", stopWork:"Запросы остановки работ", resolved:"Решено", total:"Всего", audit:"Записи цепочки аудита", interpretation:"Онлайн-перевод", multilingual:"Многоязычные сессии", equipment:"Выдача средств защиты", score:"Оценка ESG", noReport:"Выберите объект и период, затем создайте отчёт.", venn:"Пересечение показателей безопасности", average:"Среднее пересечение", category:"Категория", metric:"Показатель", value:"Значение", detail:"Подробности", people:"чел.", cases:"случаев", auditHash:"Хеш-цепочка SHA-256", formula:"Подтверждение TBM (40) + подписи обязательств (30) + решение остановки работ (20) + проведение сессии (10)" },
 };
 
 function StatCard({
@@ -73,7 +82,7 @@ function StatCard({
   );
 }
 
-function VennDiagram({ report }: { report: EsgReport }) {
+function VennDiagram({ report, t }: { report: EsgReport; t: Record<string, string> }) {
   const tbm = Math.round(report.tbm.certificationRate * 100);
   const pledge = Math.round(report.pledges.signatureRate * 100);
   const stopWork =
@@ -86,8 +95,8 @@ function VennDiagram({ report }: { report: EsgReport }) {
     <div className="mt-4 bg-gray-900 rounded-2xl p-5 border border-gray-800">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Safety Venn</p>
-          <h2 className="text-lg font-black text-white">TBM · 서약 · 작업중지 교차 집계</h2>
+          <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">ESG</p>
+          <h2 className="text-lg font-black text-white">{t.venn}</h2>
         </div>
         <p className="text-3xl font-black text-emerald-400">{overlap}%</p>
       </div>
@@ -97,15 +106,15 @@ function VennDiagram({ report }: { report: EsgReport }) {
           <span className="text-3xl font-black text-blue-100">{tbm}%</span>
         </div>
         <div className="absolute right-0 top-0 w-[150px] h-[150px] rounded-full bg-emerald-500/30 border border-emerald-400/50 flex flex-col items-center justify-center gap-0.5">
-          <span className="text-[10px] text-emerald-300 font-bold">서약</span>
+          <span className="text-[10px] text-emerald-300 font-bold">{t.pledge}</span>
           <span className="text-3xl font-black text-emerald-100">{pledge}%</span>
         </div>
         <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-[150px] h-[150px] rounded-full bg-amber-500/30 border border-amber-400/50 flex flex-col items-center justify-center gap-0.5">
-          <span className="text-[10px] text-amber-300 font-bold">작업중지</span>
+          <span className="text-[10px] text-amber-300 font-bold">{t.stopWork}</span>
           <span className="text-3xl font-black text-amber-100">{stopWork}%</span>
         </div>
         <div className="absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 bg-gray-950/95 border border-white/20 rounded-xl px-3 py-2 text-center z-10 shadow-xl">
-          <p className="text-[10px] text-gray-400 font-bold">교차 평균</p>
+          <p className="text-[10px] text-gray-400 font-bold">{t.average}</p>
           <p className="text-xl font-black text-white">{overlap}%</p>
         </div>
       </div>
@@ -115,6 +124,9 @@ function VennDiagram({ report }: { report: EsgReport }) {
 
 export default function AdminEsgPage() {
   const router = useRouter();
+  const lang = useDisplayLanguage();
+  const t = ESG_UI[lang] || ESG_UI.en;
+  const locale = ({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[lang] || "en-US";
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState("");
   const [from, setFrom] = useState(() => {
@@ -170,46 +182,46 @@ export default function AdminEsgPage() {
 
   const buildExportRows = (current: EsgReport): EsgMetricRow[] => [
     {
-      category: "TBM",
-      metric: "TBM 세션",
+      category: t.tbm,
+      metric: t.tbm,
       value: current.tbm.totalSessions,
-      detail: `참석 ${current.tbm.totalAttendance}명`,
+      detail: `${t.attendance} ${current.tbm.totalAttendance}`,
     },
     {
-      category: "TBM",
-      metric: "TBM 인증률",
+      category: t.tbm,
+      metric: t.certification,
       value: `${Math.round(current.tbm.certificationRate * 100)}%`,
-      detail: `${Math.round(current.tbm.certificationRate * current.tbm.totalAttendance)} / ${current.tbm.totalAttendance}명`,
+      detail: `${Math.round(current.tbm.certificationRate * current.tbm.totalAttendance)} / ${current.tbm.totalAttendance} ${t.people}`,
     },
     {
-      category: "서약",
-      metric: "안전서약",
+      category: t.pledge,
+      metric: t.pledge,
       value: current.pledges.totalPledges,
-      detail: `서명 완료 ${current.pledges.signedCount}건, 서명률 ${Math.round(current.pledges.signatureRate * 100)}%`,
+      detail: `${t.signed} ${current.pledges.signedCount}, ${Math.round(current.pledges.signatureRate * 100)}%`,
     },
     {
-      category: "작업중지",
-      metric: "작업중지 개입",
+      category: t.stopWork,
+      metric: t.stopWork,
       value: current.stopWork.totalIncidents,
-      detail: `해결 ${current.stopWork.resolvedCount} / 총 ${current.stopWork.totalIncidents}`,
+      detail: `${t.resolved} ${current.stopWork.resolvedCount} / ${t.total} ${current.stopWork.totalIncidents}`,
     },
     {
-      category: "감사",
-      metric: "감사체인 이벤트",
+      category: t.audit,
+      metric: t.audit,
       value: current.auditChain.totalEvents,
-      detail: "SHA-256 리포트 무결성 기록",
+      detail: t.auditHash,
     },
     {
-      category: "통역",
-      metric: "라이브 통역 세션",
+      category: t.interpretation,
+      metric: t.interpretation,
       value: current.interpretation.totalSessions ?? "-",
-      detail: "기간 내 라이브 통역 집계",
+      detail: t.multilingual,
     },
     {
-      category: "장비",
-      metric: "안전장비 지급",
+      category: t.equipment,
+      metric: t.equipment,
       value: current.safetyEquipment.totalGrants,
-      detail: "퀴즈/인센티브 기반 지급 건수",
+      detail: t.equipment,
     },
   ];
 
@@ -225,20 +237,20 @@ export default function AdminEsgPage() {
   const handleExport = async (format: ExportFormat) => {
     if (!report) return;
     await exportData(format, {
-      title: "ESG 안전 리포트",
-      subtitle: `${report.period.from} ~ ${report.period.to} / 자동 집계`,
+      title: t.title,
+      subtitle: `${report.period.from} ~ ${report.period.to}`,
       filename: `esg_safety_report_${report.siteId}_${report.period.from}_${report.period.to}`,
       summary: [
-        { label: "ESG 종합 점수", value: `${esgScore}/100` },
-        { label: "TBM 인증률", value: `${Math.round(report.tbm.certificationRate * 100)}%` },
-        { label: "서약 서명률", value: `${Math.round(report.pledges.signatureRate * 100)}%` },
-        { label: "작업중지 해결", value: `${report.stopWork.resolvedCount}/${report.stopWork.totalIncidents}` },
+        { label: t.score, value: `${esgScore}/100` },
+        { label: t.certification, value: `${Math.round(report.tbm.certificationRate * 100)}%` },
+        { label: t.pledge, value: `${Math.round(report.pledges.signatureRate * 100)}%` },
+        { label: t.stopWork, value: `${report.stopWork.resolvedCount}/${report.stopWork.totalIncidents}` },
       ],
       columns: [
-        { key: "category", label: "구분" },
-        { key: "metric", label: "지표" },
-        { key: "value", label: "값" },
-        { key: "detail", label: "상세" },
+        { key: "category", label: t.category },
+        { key: "metric", label: t.metric },
+        { key: "value", label: t.value },
+        { key: "detail", label: t.detail },
       ],
       rows: buildExportRows(report),
       raw: report,
@@ -254,7 +266,7 @@ export default function AdminEsgPage() {
               <ArrowLeft className="w-5 h-5" />
             </button>
             <BarChart3 className="w-6 h-6 text-emerald-400" />
-            <span className="text-xs bg-emerald-900/50 text-emerald-400 px-2 py-0.5 rounded font-bold">청구항 24</span>
+            <span className="text-xs bg-emerald-900/50 text-emerald-400 px-2 py-0.5 rounded font-bold">{t.claim}</span>
           </div>
 
           <div className="admin-concept-hero relative rounded-2xl overflow-hidden h-40 w-full mb-4">
@@ -265,14 +277,14 @@ export default function AdminEsgPage() {
             <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
             <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
               <p className="text-[10px] font-black tracking-[.18em] text-emerald-200">SQ-LINK ESG</p>
-              <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">ESG 안전 리포트</h1>
-              <p className="mt-2 text-sm font-bold text-slate-100">TBM·서약·작업중지 데이터를 기반으로 안전 지표를 집계합니다.</p>
+              <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
+              <p className="mt-2 text-sm font-bold text-slate-100">{t.desc}</p>
             </div>
           </div>
 
           <div className="bg-gray-800 rounded-2xl p-4 mb-4 border border-gray-700 flex flex-col gap-3">
             {loadingSites ? (
-              <p className="text-sm text-gray-500">현장 로딩 중...</p>
+              <p className="text-sm text-gray-500">{t.loading}</p>
             ) : (
               <select
                 value={selectedSiteId}
@@ -286,7 +298,7 @@ export default function AdminEsgPage() {
             )}
             <div className="flex gap-2">
               <div className="flex-1">
-                <label className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-1 block">From</label>
+                <label className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-1 block">{t.from}</label>
                 <input
                   type="date"
                   value={from}
@@ -295,7 +307,7 @@ export default function AdminEsgPage() {
                 />
               </div>
               <div className="flex-1">
-                <label className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-1 block">To</label>
+                <label className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-1 block">{t.to}</label>
                 <input
                   type="date"
                   value={to}
@@ -311,7 +323,7 @@ export default function AdminEsgPage() {
                 className="flex-1 flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-gray-700 text-white font-bold py-2.5 rounded-xl text-sm transition-colors"
               >
                 {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                리포트 생성
+                {t.generate}
               </button>
               <ExportMenu disabled={!report} includeJson onExport={handleExport} />
             </div>
@@ -327,54 +339,54 @@ export default function AdminEsgPage() {
                 <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">
                   {report.period.from} ~ {report.period.to}
                 </p>
-                <p className="text-xs text-gray-600">{new Date(report.generatedAt).toLocaleString("ko-KR")}</p>
+                <p className="text-xs text-gray-600">{new Date(report.generatedAt).toLocaleString(locale)}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <StatCard
                   icon={Shield}
-                  label="TBM 세션"
+                  label={t.tbm}
                   value={report.tbm.totalSessions}
-                  sub={`참석 ${report.tbm.totalAttendance}명`}
+                  sub={`${t.attendance} ${report.tbm.totalAttendance}`}
                   color="blue"
                   rate={report.tbm.certificationRate}
                 />
                 <StatCard
                   icon={Users}
-                  label="이수 인증율"
+                  label={t.certification}
                   value={`${(report.tbm.certificationRate * 100).toFixed(0)}%`}
-                  sub={`${Math.round(report.tbm.certificationRate * report.tbm.totalAttendance)} / ${report.tbm.totalAttendance}명`}
+                  sub={`${Math.round(report.tbm.certificationRate * report.tbm.totalAttendance)} / ${report.tbm.totalAttendance} ${t.people}`}
                   color="green"
                   rate={report.tbm.certificationRate}
                 />
                 <StatCard
                   icon={PenLine}
-                  label="안전 서약"
+                  label={t.pledge}
                   value={report.pledges.totalPledges}
-                  sub={`서명 완료 ${report.pledges.signedCount}건`}
+                  sub={`${t.signed} ${report.pledges.signedCount}`}
                   color="purple"
                   rate={report.pledges.signatureRate}
                 />
                 <StatCard
                   icon={AlertTriangle}
-                  label="작업중지 요청"
+                  label={t.stopWork}
                   value={report.stopWork.totalIncidents}
-                  sub={`해결 ${report.stopWork.resolvedCount} / 총 ${report.stopWork.totalIncidents}`}
+                  sub={`${t.resolved} ${report.stopWork.resolvedCount} / ${t.total} ${report.stopWork.totalIncidents}`}
                   color="red"
                   rate={report.stopWork.totalIncidents > 0 ? report.stopWork.resolvedCount / report.stopWork.totalIncidents : 1}
                 />
                 <StatCard
                   icon={Link}
-                  label="감사 체인 기록"
+                  label={t.audit}
                   value={report.auditChain.totalEvents}
-                  sub="SHA-256 해시 체인"
+                  sub={t.auditHash}
                   color="yellow"
                 />
                 <StatCard
                   icon={Mic}
-                  label="실시간 통역"
+                  label={t.interpretation}
                   value={report.interpretation.totalSessions ?? "—"}
-                  sub="다국어 세션"
+                  sub={t.multilingual}
                   color="cyan"
                 />
               </div>
@@ -385,16 +397,16 @@ export default function AdminEsgPage() {
                     <Shield className="w-5 h-5 text-yellow-400" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">안전장비 지급</p>
-                    <p className="text-2xl font-black text-yellow-400">{report.safetyEquipment.totalGrants}건</p>
+                    <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">{t.equipment}</p>
+                    <p className="text-2xl font-black text-yellow-400">{report.safetyEquipment.totalGrants} {t.cases}</p>
                   </div>
                 </div>
               )}
 
-              <VennDiagram report={report} />
+              <VennDiagram report={report} t={t} />
 
               <div className="mt-4 bg-gray-900 rounded-xl p-4 border border-gray-800">
-                <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-2">ESG 종합 점수</p>
+                <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-2">{t.score}</p>
                 <div className="flex items-end gap-2">
                   <span className="text-4xl font-black text-emerald-400">
                     {Math.round(
@@ -406,7 +418,7 @@ export default function AdminEsgPage() {
                   </span>
                   <span className="text-gray-500 text-lg font-bold mb-1">/ 100</span>
                 </div>
-                <p className="text-xs text-gray-600 mt-1">TBM인증률(40) + 서약서명률(30) + 작업중지해결률(20) + 세션실시(10)</p>
+                <p className="text-xs text-gray-600 mt-1">{t.formula}</p>
               </div>
             </>
           )}
@@ -414,7 +426,7 @@ export default function AdminEsgPage() {
           {!report && !loading && (
             <div className="text-center py-16 text-gray-600">
               <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p className="font-bold">현장과 기간을 선택 후 리포트를 생성하세요</p>
+              <p className="font-bold">{t.noReport}</p>
             </div>
           )}
         </div>

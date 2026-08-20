@@ -1,5 +1,15 @@
 "use client";
 
+import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+
+const PLAY_LABELS: Record<string, { idle: string; playing: string }> = {
+    ko: { idle: "메시지를 음성으로 듣기", playing: "음성 재생 중" },
+    en: { idle: "Listen to message", playing: "Playing audio" },
+    zh: { idle: "朗读消息", playing: "正在播放语音" },
+    vi: { idle: "Nghe tin nhắn", playing: "Đang phát âm thanh" },
+    ru: { idle: "Прослушать сообщение", playing: "Воспроизведение аудио" },
+};
+
 type ChatPlayButtonProps = {
     onClick: () => void;
     disabled?: boolean;
@@ -11,14 +21,16 @@ export default function ChatPlayButton({
     onClick,
     disabled = false,
     playing = false,
-    label = "메시지 음성으로 듣기",
+    label,
 }: ChatPlayButtonProps) {
+    const language = useDisplayLanguage();
+    const text = PLAY_LABELS[language] ?? PLAY_LABELS.en;
     return (
         <button
             type="button"
             onClick={onClick}
             disabled={disabled}
-            aria-label={playing ? "음성 재생 중" : label}
+            aria-label={playing ? text.playing : label ?? text.idle}
             aria-pressed={playing}
             className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border p-0 leading-none shadow-sm transition-colors disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300 ${playing ? "border-blue-500 bg-blue-500 text-white" : "border-slate-200 bg-white text-blue-500 hover:text-blue-600"}`}
         >

@@ -4,6 +4,23 @@ import RoleGuard from "@/components/RoleGuard";
 import { ArrowLeft, Wifi, CheckCircle, AlertCircle, ChevronRight } from "lucide-react";
 import ResponsiveFeatureHero from "@/components/ResponsiveFeatureHero";
 import { visualizationSpecs } from "@/lib/visualization-specs";
+import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+
+const GUIDE_NFC_UI: Record<string, { title: string; description: string; overview: string; open: string }> = {
+  ko: { title: "NFC 근로자 관리", description: "근로자 등록부터 NFC 카드 발급과 TBM 참석 확인까지 안내합니다.", overview: "근로자에게 NFC 스티커 한 장을 발급하면 이후 모든 TBM 참석이 태그 1회로 자동 기록됩니다. 회원가입이나 QR 스캔 없이 운영할 수 있습니다.", open: "NFC 근로자 관리 바로가기" },
+  en: { title: "NFC Worker Management", description: "Learn worker registration, NFC card issuance, and TBM attendance confirmation.", overview: "Once a worker receives an NFC sticker, all later TBM attendance is recorded with one tap. It works without sign-up or QR scanning.", open: "Open NFC Worker Management" },
+  zh: { title: "NFC 工人管理", description: "了解工人登记、NFC 卡发放和 TBM 参与确认。", overview: "向工人发放一张 NFC 贴纸后，之后的所有 TBM 参与只需一次刷卡即可自动记录，无需注册或扫描二维码。", open: "打开 NFC 工人管理" },
+  vi: { title: "Quản lý công nhân NFC", description: "Hướng dẫn đăng ký công nhân, cấp thẻ NFC và xác nhận tham dự TBM.", overview: "Khi công nhân nhận một nhãn NFC, mọi lần tham dự TBM sau đó được tự động ghi lại chỉ với một lần chạm, không cần đăng ký hoặc quét QR.", open: "Mở quản lý công nhân NFC" },
+  ru: { title: "Управление работниками NFC", description: "Регистрация работников, выдача NFC-карт и подтверждение участия в TBM.", overview: "После выдачи работнику NFC-метки каждое последующее участие в TBM автоматически фиксируется одним касанием — без регистрации и QR-сканирования.", open: "Открыть управление работниками NFC" },
+};
+
+const NFC_STEP_TITLES: Record<string, string[]> = {
+  ko: ["근로자 신규 등록", "NFC 스티커 발급", "TBM NFC 세션 운영", "스티커 재발급 (분실·훼손)"],
+  en: ["Register a new worker", "Issue an NFC sticker", "Run a TBM NFC session", "Reissue a sticker (lost or damaged)"],
+  zh: ["登记新工人", "发放 NFC 标签", "运行 TBM NFC 会话", "补发标签（遗失或损坏）"],
+  vi: ["Đăng ký công nhân mới", "Cấp nhãn NFC", "Vận hành phiên TBM NFC", "Cấp lại nhãn (mất hoặc hỏng)"],
+  ru: ["Регистрация нового работника", "Выдача NFC-метки", "Проведение TBM NFC-сессии", "Перевыпуск метки (утеря или повреждение)"],
+};
 
 function StepCard({ num, title, children }: { num: number; title: string; children: React.ReactNode }) {
   return (
@@ -47,6 +64,9 @@ function TapResult({ icon, label, desc, color }: { icon: "ok" | "warn" | "err"; 
 
 export default function GuideNfcPage() {
   const router = useRouter();
+  const lang = useDisplayLanguage();
+  const t = GUIDE_NFC_UI[lang] || GUIDE_NFC_UI.en;
+  const steps = NFC_STEP_TITLES[lang] || NFC_STEP_TITLES.en;
 
   return (
     <RoleGuard allowedRole="admin">
@@ -61,14 +81,12 @@ export default function GuideNfcPage() {
             <span className="font-black tracking-tight text-[#063789]">SQ-LINK</span>
           </div>
 
-          <ResponsiveFeatureHero visual={{ ...visualizationSpecs.nfcQr, eyebrow: "SQ-LINK GUIDE · CLAIMS 1–5", title: "NFC 근로자 관리", description: "근로자 등록부터 NFC 카드 발급과 TBM 참석 확인까지 안내합니다." }} />
+          <ResponsiveFeatureHero visual={{ ...visualizationSpecs.nfcQr, eyebrow: "SQ-LINK GUIDE · CLAIMS 1–5", title: t.title, description: t.description }} />
 
           {/* 개요 */}
           <div className="bg-cyan-900/20 border border-cyan-800/40 rounded-xl p-4 mb-6 mt-4">
             <p className="text-sm text-cyan-300 leading-relaxed">
-              근로자에게 NFC 스티커 한 장을 발급하면, 이후 모든 TBM 참석이
-              <strong className="text-white"> 태그 1회</strong>로 자동 기록됩니다.
-              회원가입·QR 스캔 없이 운영 가능합니다.
+              {t.overview}
             </p>
           </div>
 
@@ -93,7 +111,7 @@ export default function GuideNfcPage() {
           <div className="space-y-4">
 
             {/* Step 1 */}
-            <StepCard num={1} title="근로자 신규 등록">
+            <StepCard num={1} title={steps[0]}>
               <p className="text-xs text-gray-500 mb-3">
                 경로: <span className="text-cyan-400 font-mono">관리자 → 근로자 등록</span>
               </p>
@@ -133,7 +151,7 @@ export default function GuideNfcPage() {
             </StepCard>
 
             {/* Step 2 */}
-            <StepCard num={2} title="NFC 스티커 발급">
+            <StepCard num={2} title={steps[1]}>
               <p className="text-xs text-gray-500 mb-3">등록 완료 후 바로 이어서 진행</p>
               <ol className="space-y-3">
                 {[
@@ -156,7 +174,7 @@ export default function GuideNfcPage() {
             </StepCard>
 
             {/* Step 3 */}
-            <StepCard num={3} title="TBM NFC 세션 운영">
+            <StepCard num={3} title={steps[2]}>
               <p className="text-xs text-gray-500 mb-3">
                 경로: <span className="text-cyan-400 font-mono">관리자 → NFC 허브</span>
               </p>
@@ -180,7 +198,7 @@ export default function GuideNfcPage() {
             </StepCard>
 
             {/* Step 4 */}
-            <StepCard num={4} title="스티커 재발급 (분실·훼손)">
+            <StepCard num={4} title={steps[3]}>
               <p className="text-xs text-gray-500 mb-3">
                 경로: <span className="text-cyan-400 font-mono">관리자 → 근로자 목록 → 해당 근로자 → 재발급</span>
               </p>
@@ -240,7 +258,7 @@ export default function GuideNfcPage() {
               className="w-full flex items-center justify-center gap-2 bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-4 rounded-2xl transition-colors"
             >
               <Wifi className="w-4 h-4" />
-              NFC 근로자 관리 바로가기
+              {t.open}
               <ChevronRight className="w-4 h-4" />
             </button>
 

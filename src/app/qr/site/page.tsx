@@ -81,6 +81,14 @@ const ERROR_MESSAGES: Record<QrLanguageCode, Record<string, string>> = {
   hi: {},
 };
 
+const CHECKOUT_TEXT: Partial<Record<QrLanguageCode, Record<string, string>>> = {
+  ko: { active:"SQ Link 활성 중", checkedIn:"이미 입장됨", processing:"퇴근 처리 중...", checkout:"퇴근하기" },
+  en: { active:"SQ Link is active", checkedIn:"Already checked in", processing:"Checking out...", checkout:"Check out" },
+  zh: { active:"SQ Link 已启用", checkedIn:"已入场", processing:"正在办理下班...", checkout:"下班" },
+  vi: { active:"SQ Link đang hoạt động", checkedIn:"Đã vào công trường", processing:"Đang xử lý ra về...", checkout:"Ra về" },
+  ru: { active:"SQ Link активен", checkedIn:"Вход уже выполнен", processing:"Оформление ухода...", checkout:"Отметить уход" },
+};
+
 function errorMessage(lang: QrLanguageCode, code: string) {
   return ERROR_MESSAGES[lang]?.[code] ?? ERROR_MESSAGES.en[code] ?? ERROR_MESSAGES.ko[code] ?? code;
 }
@@ -102,6 +110,7 @@ function SiteQrEntryInner() {
 
   const language = useMemo(() => findQrLanguageByCode(selectedLang), [selectedLang]);
   const text = useMemo(() => getQrEntryText(selectedLang), [selectedLang]);
+  const checkoutText = CHECKOUT_TEXT[selectedLang] || CHECKOUT_TEXT.en!;
 
   useEffect(() => {
     localStorage.setItem("safe-link-lang", language.lang);
@@ -241,8 +250,8 @@ function SiteQrEntryInner() {
       <main className="visualization-light flex min-h-screen flex-col items-center justify-center gap-5 px-6">
         <CheckCircle className="h-16 w-16 text-emerald-400" />
         <div className="text-center">
-          <h1 className="text-xl font-bold text-white">SQ Link 활성 중 / Active</h1>
-          <p className="mt-2 text-sm leading-6 text-gray-400">이미 입장됨 · Already checked in</p>
+          <h1 className="text-xl font-bold text-white">{checkoutText.active}</h1>
+          <p className="mt-2 text-sm leading-6 text-gray-400">{checkoutText.checkedIn}</p>
         </div>
         <button
           type="button"
@@ -253,10 +262,10 @@ function SiteQrEntryInner() {
           {checkingOut ? (
             <>
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              퇴근 처리 중... / Checking out...
+              {checkoutText.processing}
             </>
           ) : (
-            "퇴근하기 / Check Out"
+            checkoutText.checkout
           )}
         </button>
       </main>

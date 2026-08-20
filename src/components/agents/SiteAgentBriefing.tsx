@@ -4,11 +4,20 @@ import { useEffect, useState } from "react";
 import { Bot, Sparkles, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+const BRIEFING_UI: Record<string, { title: string; active: string; details: string; personas: Record<string, string> }> = {
+    ko: { title: "AI 현장 브리핑", active: "활성", details: "상세 분석", personas: { HQ_ADMIN: "현장 지휘 보조", SAFETY_OFFICER: "안전 점검 보조", default: "운영 보조" } },
+    en: { title: "AI Site Briefing", active: "ACTIVE", details: "Detailed analytics", personas: { HQ_ADMIN: "Site Commander", SAFETY_OFFICER: "Safety Auditor", default: "Operations Assistant" } },
+    zh: { title: "AI 现场简报", active: "运行中", details: "详细分析", personas: { HQ_ADMIN: "现场指挥助手", SAFETY_OFFICER: "安全检查助手", default: "运营助手" } },
+    vi: { title: "Báo cáo hiện trường AI", active: "ĐANG HOẠT ĐỘNG", details: "Phân tích chi tiết", personas: { HQ_ADMIN: "Trợ lý chỉ huy công trường", SAFETY_OFFICER: "Trợ lý kiểm tra an toàn", default: "Trợ lý vận hành" } },
+    ru: { title: "AI-брифинг по объекту", active: "АКТИВНО", details: "Подробная аналитика", personas: { HQ_ADMIN: "Помощник руководителя объекта", SAFETY_OFFICER: "Помощник по проверке безопасности", default: "Операционный помощник" } },
+};
+
 /**
  * 🟡 Site Agent Briefing UI (Tier 2)
  * 관리자 역할에 맞춰 AI 참모가 실시간 브리핑을 제공합니다.
  */
 export default function SiteAgentBriefing({ role, siteId, lang = "ko" }: { role: string, siteId?: string | null, lang?: string }) {
+    const t = BRIEFING_UI[lang] || BRIEFING_UI.en;
     const [briefing, setBriefing] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -33,9 +42,7 @@ export default function SiteAgentBriefing({ role, siteId, lang = "ko" }: { role:
         fetchBriefing();
     }, [role, siteId, lang]);
 
-    const personaName =
-        role === 'HQ_ADMIN' ? 'Site Commander' :
-            role === 'SAFETY_OFFICER' ? 'Safety Auditor' : 'Ops Assistant';
+    const personaName = t.personas[role] || t.personas.default;
 
     return (
         <motion.div
@@ -51,10 +58,10 @@ export default function SiteAgentBriefing({ role, siteId, lang = "ko" }: { role:
                         <Bot className="w-7 h-7" />
                     </div>
                     <div>
-                        <h4 className="text-xs font-black text-blue-400 uppercase tracking-[0.2em] leading-none mb-1">AI Agent Briefing</h4>
+                        <h4 className="text-xs font-black text-blue-600 uppercase tracking-[0.2em] leading-none mb-1">{t.title}</h4>
                         <div className="flex items-center gap-1.5">
                             <span className="text-xl font-black italic tracking-tight text-slate-900">{personaName}</span>
-                            <div className="bg-emerald-500/20 px-1.5 py-0.5 rounded text-[8px] font-black text-emerald-400 border border-emerald-500/30 animate-pulse">ACTIVE</div>
+                            <div className="bg-emerald-50 px-1.5 py-0.5 rounded text-[8px] font-black text-emerald-600 border border-emerald-200 animate-pulse">{t.active}</div>
                         </div>
                     </div>
                 </div>
@@ -88,7 +95,7 @@ export default function SiteAgentBriefing({ role, siteId, lang = "ko" }: { role:
 
             <div className="mt-5 flex justify-end">
                 <button className="min-h-11 flex items-center gap-1 px-2 text-[10px] font-black text-slate-500 hover:text-blue-400 transition-colors uppercase tracking-widest">
-                    Detailed Analytics <ChevronRight className="w-3 h-3" />
+                        {t.details} <ChevronRight className="w-3 h-3" />
                 </button>
             </div>
         </motion.div>

@@ -3,6 +3,15 @@
 import { Download, FileJson, FileSpreadsheet, FileText, Printer } from "lucide-react";
 import type { ElementType } from "react";
 import type { ExportFormat } from "@/utils/export-files";
+import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+
+const EXPORT_LABELS: Record<string, string> = {
+  ko: "내보내기",
+  en: "Export",
+  zh: "导出",
+  vi: "Xuất",
+  ru: "Экспорт",
+};
 
 type ExportMenuProps = {
   disabled?: boolean;
@@ -18,6 +27,8 @@ const OPTIONS: Array<{ format: ExportFormat; label: string; icon: ElementType }>
 ];
 
 export default function ExportMenu({ disabled, onExport, includeJson = false }: ExportMenuProps) {
+  const language = useDisplayLanguage();
+  const exportLabel = EXPORT_LABELS[language] ?? EXPORT_LABELS.en;
   const options = includeJson ? [...OPTIONS, { format: "json" as const, label: "JSON", icon: FileJson }] : OPTIONS;
 
   return (
@@ -28,7 +39,7 @@ export default function ExportMenu({ disabled, onExport, includeJson = false }: 
         className="flex shrink-0 items-center gap-2 whitespace-nowrap bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-gray-100 font-bold py-2.5 px-4 rounded-xl text-sm transition-colors"
       >
         <Download className="w-4 h-4" />
-        내보내기
+        {exportLabel}
       </button>
       {!disabled && (
         <div className="absolute right-0 mt-2 w-44 bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl opacity-0 invisible group-hover/export:opacity-100 group-hover/export:visible transition-all z-[80] overflow-hidden">

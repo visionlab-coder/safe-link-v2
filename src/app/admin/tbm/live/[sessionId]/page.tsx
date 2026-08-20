@@ -13,6 +13,15 @@ import Image from "next/image";
 import { Nfc, Square, RefreshCw, CheckCircle, Users, AlertTriangle, Brain } from "lucide-react";
 import { NfcScanner, detectNfcSupport, NfcError } from "@/utils/nfc/web-nfc";
 import { NFC_BASE_URL } from "@/utils/nfc/constants";
+import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+
+const LIVE_SESSION_UI: Record<string, Record<string, string>> = {
+  ko: { unsupported:"이 기기는 NFC를 지원하지 않습니다. Android Chrome이 필요합니다.", failed:"처리 실패", scanError:"스캔 오류", error:"오류 발생", closeConfirm:"세션을 종료하시겠습니까?", loading:"로딩 중...", close:"세션 종료", fallback:"TBM NFC 참석", people:"명 참석", startHint:"스캔 시작 후 근로자가 스티커를 가까이 대면 자동 확인됩니다.", start:"스캔 시작", waiting:"스캔 대기 중", stop:"중지", checked:"① 참석 대기 등록 완료", certifyHint:"TBM 종료 후 다시 스캔 → 이수 인증", certified:"② 이수 인증 완료", already:"이미 이수 인증 완료됨", closed:"종료된 세션입니다.", attendees:"참석자", none:"아직 참석자가 없습니다.", complete:"이수완료", pending:"대기중", quiz:"AI 안전 퀴즈", quizSent:"퀴즈가 근로자 모국어로 발송되었습니다.", quizDesc:"TBM 발화 내용에서 AI가 퀴즈를 자동 생성하여 근로자 모국어로 발송합니다.", generating:"퀴즈 생성 중...", sendQuiz:"AI 퀴즈 생성 및 발송", list:"세션 목록" },
+  en: { unsupported:"This device does not support NFC. Android Chrome is required.", failed:"Processing failed", scanError:"Scan error", error:"An error occurred", closeConfirm:"Close this session?", loading:"Loading...", close:"Close session", fallback:"TBM NFC attendance", people:"attendees", startHint:"After starting the scan, attendance is confirmed automatically when a worker holds a sticker close.", start:"Start scan", waiting:"Waiting to scan", stop:"Stop", checked:"① Attendance recorded", certifyHint:"Scan again after TBM ends to certify completion", certified:"② Completion certified", already:"Already certified", closed:"This session is closed.", attendees:"Attendees", none:"No attendees yet.", complete:"Completed", pending:"Pending", quiz:"AI Safety Quiz", quizSent:"The quiz was sent in each worker’s native language.", quizDesc:"AI creates a quiz from TBM speech and sends it in each worker’s native language.", generating:"Generating quiz...", sendQuiz:"Generate and send AI quiz", list:"Session list" },
+  zh: { unsupported:"此设备不支持 NFC，需要 Android Chrome。", failed:"处理失败", scanError:"扫描错误", error:"发生错误", closeConfirm:"要结束此会话吗？", loading:"正在加载...", close:"结束会话", fallback:"TBM NFC 参与", people:"人参与", startHint:"开始扫描后，工人将贴纸靠近即可自动确认参与。", start:"开始扫描", waiting:"等待扫描", stop:"停止", checked:"① 已记录参与", certifyHint:"TBM 结束后再次扫描以认证完成", certified:"② 已认证完成", already:"已完成认证", closed:"此会话已结束。", attendees:"参与者", none:"暂无参与者。", complete:"已完成", pending:"等待中", quiz:"AI 安全测验", quizSent:"测验已按工人母语发送。", quizDesc:"AI 会根据 TBM 语音自动生成测验并按工人母语发送。", generating:"正在生成测验...", sendQuiz:"生成并发送 AI 测验", list:"会话列表" },
+  vi: { unsupported:"Thiết bị này không hỗ trợ NFC. Cần Android Chrome.", failed:"Xử lý thất bại", scanError:"Lỗi quét", error:"Đã xảy ra lỗi", closeConfirm:"Kết thúc phiên này?", loading:"Đang tải...", close:"Kết thúc phiên", fallback:"Điểm danh TBM NFC", people:"người tham dự", startHint:"Sau khi bắt đầu quét, điểm danh được xác nhận tự động khi công nhân đưa nhãn lại gần.", start:"Bắt đầu quét", waiting:"Đang chờ quét", stop:"Dừng", checked:"① Đã ghi nhận tham dự", certifyHint:"Quét lại sau khi TBM kết thúc để chứng nhận hoàn thành", certified:"② Đã chứng nhận hoàn thành", already:"Đã chứng nhận", closed:"Phiên này đã kết thúc.", attendees:"Người tham dự", none:"Chưa có người tham dự.", complete:"Hoàn thành", pending:"Đang chờ", quiz:"Câu hỏi an toàn AI", quizSent:"Câu hỏi đã gửi bằng tiếng mẹ đẻ của công nhân.", quizDesc:"AI tạo câu hỏi từ lời nói TBM và gửi bằng tiếng mẹ đẻ của mỗi công nhân.", generating:"Đang tạo câu hỏi...", sendQuiz:"Tạo và gửi câu hỏi AI", list:"Danh sách phiên" },
+  ru: { unsupported:"Это устройство не поддерживает NFC. Требуется Android Chrome.", failed:"Ошибка обработки", scanError:"Ошибка сканирования", error:"Произошла ошибка", closeConfirm:"Завершить эту сессию?", loading:"Загрузка...", close:"Завершить сессию", fallback:"Участие TBM NFC", people:"участников", startHint:"После начала сканирования участие подтверждается автоматически, когда работник подносит метку.", start:"Начать сканирование", waiting:"Ожидание сканирования", stop:"Остановить", checked:"① Участие записано", certifyHint:"После окончания TBM отсканируйте снова для сертификации", certified:"② Завершение подтверждено", already:"Уже подтверждено", closed:"Эта сессия завершена.", attendees:"Участники", none:"Пока нет участников.", complete:"Завершено", pending:"Ожидание", quiz:"ИИ-тест по безопасности", quizSent:"Тест отправлен на родном языке каждого работника.", quizDesc:"ИИ создаёт тест по речи TBM и отправляет его на родном языке работника.", generating:"Создание теста...", sendQuiz:"Создать и отправить ИИ-тест", list:"Список сессий" },
+};
 
 interface AttendanceRecord {
   id: string;
@@ -43,6 +52,8 @@ type ScanState = "idle" | "scanning" | "checked_in" | "certified" | "already_cer
 export default function TbmLiveSessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const router = useRouter();
+  const lang = useDisplayLanguage();
+  const t = LIVE_SESSION_UI[lang] || LIVE_SESSION_UI.en;
 
   const [session, setSession] = useState<Session | null>(null);
   const [attendance, setAttendance] = useState<AttendanceWithWorker[]>([]);
@@ -76,7 +87,7 @@ export default function TbmLiveSessionPage() {
 
   const startScan = async () => {
     if (!nfcSupport.supported) {
-      setScanError("이 기기는 NFC를 지원하지 않습니다. Android Chrome이 필요합니다.");
+      setScanError(t.unsupported);
       return;
     }
 
@@ -117,7 +128,7 @@ export default function TbmLiveSessionPage() {
           // 2.5초 후 scanning 상태로 복귀
           setTimeout(() => setScanState("scanning"), 2500);
         } else {
-          setScanError(data.error || "처리 실패");
+          setScanError(data.error || t.failed);
           setScanState("error");
           setTimeout(() => { setScanState("scanning"); setScanError(""); }, 3000);
         }
@@ -128,7 +139,7 @@ export default function TbmLiveSessionPage() {
       if (err instanceof NfcError && err.code === "aborted") {
         setScanState("idle");
       } else {
-        setScanError(err instanceof Error ? err.message : "스캔 오류");
+        setScanError(err instanceof Error ? err.message : t.scanError);
         setScanState("error");
       }
     }
@@ -171,14 +182,14 @@ export default function TbmLiveSessionPage() {
 
       setQuizSent(true);
     } catch (err) {
-      setQuizError(err instanceof Error ? err.message : "오류 발생");
+      setQuizError(err instanceof Error ? err.message : t.error);
     } finally {
       setQuizGenerating(false);
     }
   };
 
   const handleCloseSession = async () => {
-    if (!confirm("세션을 종료하시겠습니까?")) return;
+    if (!confirm(t.closeConfirm)) return;
     await fetch(`/api/nfc/tbm-session/${sessionId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -191,7 +202,7 @@ export default function TbmLiveSessionPage() {
   if (loading) {
     return (
       <div className="visualization-light min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">로딩 중...</p>
+        <p className="text-gray-500">{t.loading}</p>
       </div>
     );
   }
@@ -207,7 +218,7 @@ export default function TbmLiveSessionPage() {
             <p className="font-black tracking-tight text-[#063789]">SQ-LINK</p>
             {isActive && (
               <button onClick={handleCloseSession} className="bg-red-800 hover:bg-red-700 text-red-100 text-xs px-3 py-1.5 rounded-lg transition-colors">
-                세션 종료
+                {t.close}
               </button>
             )}
           </div>
@@ -223,8 +234,8 @@ export default function TbmLiveSessionPage() {
             <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
             <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
               <p className="text-[10px] font-black tracking-[.18em] text-green-200">SQ-LINK TBM NFC</p>
-              <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{session?.title || "TBM NFC 참석"}</h1>
-              <p className="mt-2 text-sm font-bold text-slate-100">{session?.site_id} · {attendance.length}명 참석</p>
+              <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{session?.title || t.fallback}</h1>
+              <p className="mt-2 text-sm font-bold text-slate-100">{session?.site_id} · {attendance.length} {t.people}</p>
             </div>
           </div>
 
@@ -249,11 +260,11 @@ export default function TbmLiveSessionPage() {
               {scanState === "idle" && (
                 <>
                   <p className="text-gray-400 text-sm mb-4">
-                    {nfcSupport.supported ? "스캔 시작 후 근로자가 스티커를 가까이 대면 자동 확인됩니다." : "이 기기는 NFC를 지원하지 않습니다."}
+                    {nfcSupport.supported ? t.startHint : t.unsupported}
                   </p>
                   {nfcSupport.supported && (
                     <button onClick={startScan} className="bg-green-600 hover:bg-green-500 px-8 py-3 rounded-xl font-medium text-white transition-colors">
-                      스캔 시작
+                      {t.start}
                     </button>
                   )}
                 </>
@@ -261,10 +272,10 @@ export default function TbmLiveSessionPage() {
 
               {scanState === "scanning" && (
                 <>
-                  <p className="text-green-300 font-medium mb-1">스캔 대기 중</p>
-                  <p className="text-gray-400 text-sm mb-4">근로자가 스티커를 가까이 대면 자동으로 참석 확인됩니다.</p>
+                  <p className="text-green-300 font-medium mb-1">{t.waiting}</p>
+                  <p className="text-gray-400 text-sm mb-4">{t.startHint}</p>
                   <button onClick={stopScan} className="flex items-center gap-2 mx-auto bg-gray-700 hover:bg-gray-600 px-6 py-2.5 rounded-xl text-sm transition-colors">
-                    <Square className="w-4 h-4" /> 중지
+                    <Square className="w-4 h-4" /> {t.stop}
                   </button>
                 </>
               )}
@@ -273,8 +284,8 @@ export default function TbmLiveSessionPage() {
                 <>
                   <p className="text-blue-200 font-bold text-lg">{lastWorker.name}</p>
                   <p className="text-blue-400 text-sm">{lastWorker.code} · {lastWorker.nationality}</p>
-                  <p className="text-blue-300 text-base font-semibold mt-1">① 참석 대기 등록 완료</p>
-                  <p className="text-blue-500 text-xs mt-1">TBM 종료 후 다시 스캔 → 이수 인증</p>
+                  <p className="text-blue-300 text-base font-semibold mt-1">{t.checked}</p>
+                  <p className="text-blue-500 text-xs mt-1">{t.certifyHint}</p>
                 </>
               )}
 
@@ -283,21 +294,21 @@ export default function TbmLiveSessionPage() {
                   <CheckCircle className="w-12 h-12 text-green-300 mx-auto mb-2" />
                   <p className="text-green-300 font-bold text-lg">{lastWorker.name}</p>
                   <p className="text-green-500 text-sm">{lastWorker.code} · {lastWorker.nationality}</p>
-                  <p className="text-green-300 text-base font-semibold mt-1">② 이수 인증 완료</p>
+                  <p className="text-green-300 text-base font-semibold mt-1">{t.certified}</p>
                 </>
               )}
 
               {scanState === "already_certified" && lastWorker && (
                 <>
                   <p className="text-yellow-300 font-bold">{lastWorker.name}</p>
-                  <p className="text-yellow-500 text-sm">이미 이수 인증 완료됨</p>
+                  <p className="text-yellow-500 text-sm">{t.already}</p>
                 </>
               )}
 
               {scanState === "error" && (
                 <>
                   <AlertTriangle className="w-10 h-10 text-red-400 mx-auto mb-2" />
-                  <p className="text-red-300 text-sm">{scanError || "오류가 발생했습니다."}</p>
+                  <p className="text-red-300 text-sm">{scanError || t.error}</p>
                 </>
               )}
             </div>
@@ -307,7 +318,7 @@ export default function TbmLiveSessionPage() {
           {!isActive && (
             <div className="bg-gray-800 rounded-2xl p-6 text-center border border-gray-700">
               <CheckCircle className="w-12 h-12 text-gray-500 mx-auto mb-3" />
-              <p className="text-gray-400">종료된 세션입니다. 총 {attendance.length}명 참석.</p>
+              <p className="text-gray-400">{t.closed} {attendance.length} {t.people}.</p>
             </div>
           )}
 
@@ -316,7 +327,7 @@ export default function TbmLiveSessionPage() {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-gray-400" />
-                <h2 className="font-medium">참석자 ({attendance.length}명)</h2>
+                <h2 className="font-medium">{t.attendees} ({attendance.length})</h2>
               </div>
               <button onClick={fetchSession} className="p-1.5 text-gray-500 hover:text-gray-300 transition-colors">
                 <RefreshCw className="w-4 h-4" />
@@ -324,7 +335,7 @@ export default function TbmLiveSessionPage() {
             </div>
 
             {attendance.length === 0 ? (
-              <p className="text-center text-gray-600 py-8 text-sm">아직 참석자가 없습니다.</p>
+              <p className="text-center text-gray-600 py-8 text-sm">{t.none}</p>
             ) : (
               <div className="space-y-2">
                 {[...attendance].reverse().map((a, idx) => (
@@ -347,11 +358,11 @@ export default function TbmLiveSessionPage() {
                           ? "bg-green-800 text-green-300"
                           : "bg-blue-900 text-blue-300"
                       }`}>
-                        {(a as AttendanceWithWorker).is_certified ? "이수완료" : "대기중"}
+                        {(a as AttendanceWithWorker).is_certified ? t.complete : t.pending}
                       </span>
                     </div>
                     <span className="text-gray-500 text-xs shrink-0">
-                      {new Date(a.tapped_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                      {new Date(a.tapped_at).toLocaleTimeString(({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[lang] || "en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                     </span>
                   </div>
                 ))}
@@ -364,20 +375,20 @@ export default function TbmLiveSessionPage() {
             <div className="bg-gray-800 rounded-2xl p-4 border border-gray-700">
               <div className="flex items-center gap-2 mb-3">
                 <Brain className="w-5 h-5 text-purple-400" />
-                <h3 className="font-medium text-white">AI 안전 퀴즈</h3>
+                <h3 className="font-medium text-white">{t.quiz}</h3>
               </div>
               {quizSent ? (
-                <p className="text-green-400 text-sm font-medium">퀴즈가 근로자 모국어로 발송되었습니다.</p>
+                <p className="text-green-400 text-sm font-medium">{t.quizSent}</p>
               ) : (
                 <>
-                  <p className="text-gray-400 text-sm mb-3">TBM 발화 내용에서 AI가 퀴즈를 자동 생성하여 근로자 모국어로 발송합니다.</p>
+                  <p className="text-gray-400 text-sm mb-3">{t.quizDesc}</p>
                   {quizError && <p className="text-red-400 text-xs mb-2">{quizError}</p>}
                   <button
                     onClick={handleGenerateAndSendQuiz}
                     disabled={quizGenerating}
                     className="w-full py-3 bg-purple-700 hover:bg-purple-600 disabled:bg-gray-700 text-white text-sm font-bold rounded-xl transition-colors"
                   >
-                    {quizGenerating ? "퀴즈 생성 중..." : "AI 퀴즈 생성 & 발송"}
+                    {quizGenerating ? t.generating : t.sendQuiz}
                   </button>
                 </>
               )}
@@ -385,7 +396,7 @@ export default function TbmLiveSessionPage() {
           )}
 
           <button onClick={() => router.push("/admin/tbm/live")} className="text-gray-500 hover:text-gray-300 text-sm transition-colors">
-            ← 세션 목록
+            ← {t.list}
           </button>
         </div>
       </div>

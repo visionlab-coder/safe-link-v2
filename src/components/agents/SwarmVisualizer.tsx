@@ -20,10 +20,18 @@ interface SwarmStatus {
  * 🌌 Swarm Visualizer (Phase 4)
  * 2,500개 이상의 에이전트 노드를 고성능으로 시각화하여 대규모 군집을 증명합니다.
  */
-export default function SwarmVisualizer() {
+export default function SwarmVisualizer({ lang = "ko" }: { lang?: string }) {
     const [data, setData] = useState<SwarmStatus | null>(null);
     const [loading, setLoading] = useState(true);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const copy = {
+        ko: { title: "실시간 군집 모니터", subtitle: "실시간 자율 마이크로 에이전트 흐름", nodes: "활성 군집 노드", health: "군집 상태", optimal: "정상", loading: "군집을 초기화하고 있습니다…", persona: "활성 담당", task: "처리 작업", risk: "위험 감지", logic: "자율 판단 로직 작동 중" },
+        en: { title: "LIVE SWARM MONITOR", subtitle: "Real-time Autonomous Micro-Agent Feed", nodes: "Active Swarm Nodes", health: "Swarm Health", optimal: "OPTIMAL", loading: "Initializing Neural Swarm...", persona: "Active Persona", task: "Processing Task", risk: "Risk Detected", logic: "Autonomous Decision Logic Engaged" },
+        zh: { title: "实时集群监控", subtitle: "实时自主微型代理流", nodes: "活动集群节点", health: "集群健康度", optimal: "正常", loading: "正在初始化神经集群…", persona: "活跃负责人", task: "处理任务", risk: "风险检测", logic: "自主判断逻辑运行中" },
+        vi: { title: "Theo dõi cụm trực tiếp", subtitle: "Luồng tác nhân vi mô tự động thời gian thực", nodes: "Nút cụm đang hoạt động", health: "Tình trạng cụm", optimal: "TỐT", loading: "Đang khởi tạo cụm thần kinh…", persona: "Nhân sự đang hoạt động", task: "Tác vụ xử lý", risk: "Phát hiện rủi ro", logic: "Đang vận hành logic tự quyết" },
+        ru: { title: "Мониторинг кластера", subtitle: "Поток автономных микроагентов в реальном времени", nodes: "Активные узлы кластера", health: "Состояние кластера", optimal: "НОРМА", loading: "Инициализация нейронного кластера…", persona: "Активный исполнитель", task: "Задача обработки", risk: "Обнаружен риск", logic: "Логика автономного принятия решений активна" },
+    } as const;
+    const t = copy[lang as keyof typeof copy] || copy.en;
 
     useEffect(() => {
         const fetchData = async () => {
@@ -101,21 +109,21 @@ export default function SwarmVisualizer() {
                         <Activity className="w-6 h-6 animate-pulse" />
                     </div>
                     <div>
-                        <h3 className="text-2xl font-black text-white italic leading-tight">LIVE SWARM MONITOR</h3>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Real-time Autonomous Micro-Agent Feed</p>
+                        <h3 className="text-2xl font-black text-white italic leading-tight">{t.title}</h3>
+                        <p className="text-[10px] text-slate-500 font-bold tracking-widest">{t.subtitle}</p>
                     </div>
                 </div>
 
                 <div className="flex gap-6">
                     <div className="text-right">
-                        <div className="text-[10px] text-slate-500 font-black uppercase">Active Swarm Nodes</div>
+                        <div className="text-[10px] text-slate-500 font-black">{t.nodes}</div>
                         <div className="text-2xl font-black text-emerald-400 font-mono tracking-tighter">
                             {data?.activeSwarmNodes || '0'} / {data?.totalSwarmNodes || '0'}
                         </div>
                     </div>
                     <div className="text-right">
-                        <div className="text-[10px] text-slate-500 font-black uppercase">Swarm Health</div>
-                        <div className="text-2xl font-black text-blue-400 font-mono tracking-tighter italic">OPTIMAL</div>
+                        <div className="text-[10px] text-slate-500 font-black">{t.health}</div>
+                        <div className="text-2xl font-black text-blue-400 font-mono tracking-tighter italic">{t.optimal}</div>
                     </div>
                 </div>
             </div>
@@ -132,7 +140,7 @@ export default function SwarmVisualizer() {
                     <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                         <div className="flex flex-col items-center gap-4">
                             <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                            <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest animate-pulse">Initializing Neural Swarm...</span>
+                            <span className="text-[10px] font-black text-emerald-400 tracking-widest animate-pulse">{t.loading}</span>
                         </div>
                     </div>
                 )}
@@ -141,19 +149,19 @@ export default function SwarmVisualizer() {
             <div className="mt-6 flex flex-wrap gap-4 items-center">
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Active Persona</span>
+                    <span className="text-[10px] font-bold text-slate-400">{t.persona}</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-blue-500" />
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Processing Task</span>
+                    <span className="text-[10px] font-bold text-slate-400">{t.task}</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Risk Detected</span>
+                    <span className="text-[10px] font-bold text-slate-400">{t.risk}</span>
                 </div>
                 <div className="ml-auto flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full border border-white/5">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                    <span className="text-[10px] font-black text-slate-300 uppercase italic">Autonomous Decision Logic Engaged</span>
+                    <span className="text-[10px] font-black text-slate-300 italic">{t.logic}</span>
                 </div>
             </div>
         </section>

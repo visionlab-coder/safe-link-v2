@@ -5,15 +5,6 @@ export const runtime = "nodejs";
 const SAFE_LINK_V3_API_BASE_URL =
   process.env.SAFE_LINK_INTERNAL_API_BASE_URL || process.env.NEXT_PUBLIC_SAFE_LINK_API_BASE_URL || "http://localhost:8080";
 
-function readCookieValue(cookieHeader: string, name: string): string | null {
-  const prefix = `${name}=`;
-  return cookieHeader
-    .split(";")
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(prefix))
-    ?.slice(prefix.length) ?? null;
-}
-
 function mergeSetCookie(cookieHeader: string, setCookie: string | null): string {
   if (!setCookie) return cookieHeader;
   const firstPair = setCookie.split(";")[0]?.trim();
@@ -31,17 +22,26 @@ function mergeSetCookie(cookieHeader: string, setCookie: string | null): string 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = await req.text();
   let cookie = req.headers.get("cookie") ?? "";
-  let csrf = req.headers.get("x-xsrf-token") ?? readCookieValue(cookie, "XSRF-TOKEN");
-
-  if (!csrf) {
+  // 로그인 직후에는 session fixation 방어로 서버 세션이 교체될 수 있다.
+  // 브라우저에 남은 이전 XSRF 토큰을 재사용하면 403이 될 수 있으므로,
+  // profile 변경 전에는 현재 세션용 토큰을 항상 새로 받아 사용한다.
+  let csrf: string | null = null;
+  try {
     const csrfResponse = await fetch(`${SAFE_LINK_V3_API_BASE_URL}/api/v1/auth/csrf`, {
       headers: cookie ? { cookie } : undefined,
       cache: "no-store",
     });
+    if (!csrfResponse.ok) {
+      return NextResponse.json({ error: "csrf_unavailable" }, { status: 503 });
+    }
     const csrfBody = (await csrfResponse.json().catch(() => ({}))) as { token?: string };
     csrf = csrfBody.token ?? null;
     cookie = mergeSetCookie(cookie, csrfResponse.headers.get("set-cookie"));
+  } catch {
+    return NextResponse.json({ error: "auth_unreachable" }, { status: 503 });
   }
+
+  if (!csrf) return NextResponse.json({ error: "csrf_unavailable" }, { status: 503 });
 
   const upstream = await fetch(`${SAFE_LINK_V3_API_BASE_URL}/api/v1/auth/setup-profile`, {
     method: "POST",

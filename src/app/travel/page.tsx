@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { playPremiumAudio, VoiceGender } from '@/utils/tts';
 import { useCloudSTT } from '@/hooks/useCloudSTT';
+import { useDisplayLanguage } from '@/hooks/useDisplayLanguage';
 
 const LANGS: Record<string, { label: string; flag: string; stt: string }> = {
   ko: { label: '한국어', flag: '🇰🇷', stt: 'ko-KR' },
@@ -12,6 +13,16 @@ const LANGS: Record<string, { label: string; flag: string; stt: string }> = {
   zh: { label: '中文',    flag: '🇨🇳', stt: 'zh-CN' },
   vi: { label: 'Việt',   flag: '🇻🇳', stt: 'vi-VN' },
 };
+
+const TRAVEL_UI = {
+  ko: { bridge: '언어의 벽을 넘어서', myLanguage: '내 언어', start: '새 대화 시작', solo: '폰 하나로 대화', enter: '입장', noInstall: '앱 설치 없이 브라우저만으로 바로 연결', partnerLanguage: '상대방 언어를 선택하세요', selectLanguage: '언어를 선택해주세요', back: '← 돌아가기', tapFlag: '국기를 누르면 바로 연결됩니다', showQr: '이 화면을 상대방에게 보여주세요', codeEntry: '또는 코드로 직접 입력', waiting: '상대방 스캔 대기 중', male: '♂ 남성', female: '♀ 여성', simultaneous: '동시 통역', conversation: '대화', learning: '학습', quick: '빠른', interpreting: '동시 통역 중', microphoneStarting: '마이크를 시작하는 중…', partnerSpeaking: '상대방이 말하는 중', startConversation: '버튼을 눌러 대화를 시작하세요', autoTranslate: '말하면 자동으로 번역됩니다', learningHint: '한글 발음과 역번역을 표시합니다', learningSub: '상대방 언어를 따라 읽을 수 있습니다', translating: '번역 중', textInput: '직접 입력', listening: '◉ 듣는 중', meSpeak: '나 · 말하기', partner: '상대', tapToSpeak: '탭해서 말하기', pauseMic: '마이크 일시 중지', restartMic: '마이크 재시작', replay: '다시 듣기', pronunciation: '발음', reverseTranslation: '역번역' },
+  en: { bridge: 'Beyond language barriers', myLanguage: 'My language', start: 'Start a conversation', solo: 'One-phone conversation', enter: 'Join', noInstall: 'Connect instantly in your browser — no app required', partnerLanguage: "Select your partner's language", selectLanguage: 'Select your language', back: '← Back', tapFlag: 'Tap a flag to connect immediately', showQr: 'Show this screen to your partner', codeEntry: 'Or enter the code directly', waiting: 'Waiting for your partner to scan', male: '♂ Male', female: '♀ Female', simultaneous: 'Simultaneous', conversation: 'Conversation', learning: 'Learning', quick: 'Quick', interpreting: 'Simultaneous interpreting', microphoneStarting: 'Starting microphone…', partnerSpeaking: 'Partner is speaking', startConversation: 'Tap the button to start a conversation', autoTranslate: 'Speak to translate automatically', learningHint: 'Korean pronunciation and back-translation are shown', learningSub: "You can read along in your partner's language", translating: 'Translating', textInput: 'Type a message', listening: '◉ Listening', meSpeak: 'Me · Speak', partner: 'Partner', tapToSpeak: 'Tap to speak', pauseMic: 'Pause microphone', restartMic: 'Restart microphone', replay: 'Play again', pronunciation: 'Pronunciation', reverseTranslation: 'Back translation' },
+  zh: { bridge: '跨越语言障碍', myLanguage: '我的语言', start: '开始对话', solo: '单手机对话', enter: '进入', noInstall: '无需安装应用，直接在浏览器连接', partnerLanguage: '请选择对方语言', selectLanguage: '请选择您的语言', back: '← 返回', tapFlag: '点击国旗即可连接', showQr: '请向对方展示此页面', codeEntry: '或直接输入代码', waiting: '等待对方扫描', male: '♂ 男', female: '♀ 女', simultaneous: '同声传译', conversation: '对话', learning: '学习', quick: '快速', interpreting: '同声传译中', microphoneStarting: '正在启动麦克风…', partnerSpeaking: '对方正在说话', startConversation: '点击按钮开始对话', autoTranslate: '说话即可自动翻译', learningHint: '显示韩语发音和回译', learningSub: '可跟读对方语言', translating: '正在翻译', textInput: '直接输入', listening: '◉ 聆听中', meSpeak: '我 · 说话', partner: '对方', tapToSpeak: '点击说话', pauseMic: '暂停麦克风', restartMic: '重新启动麦克风', replay: '再次播放', pronunciation: '发音', reverseTranslation: '回译' },
+  vi: { bridge: 'Vượt qua rào cản ngôn ngữ', myLanguage: 'Ngôn ngữ của tôi', start: 'Bắt đầu trò chuyện', solo: 'Trò chuyện bằng một điện thoại', enter: 'Tham gia', noInstall: 'Kết nối ngay trên trình duyệt, không cần cài ứng dụng', partnerLanguage: 'Chọn ngôn ngữ của đối tác', selectLanguage: 'Chọn ngôn ngữ của bạn', back: '← Quay lại', tapFlag: 'Chạm vào cờ để kết nối ngay', showQr: 'Hãy cho đối tác xem màn hình này', codeEntry: 'Hoặc nhập mã trực tiếp', waiting: 'Đang chờ đối tác quét mã', male: '♂ Nam', female: '♀ Nữ', simultaneous: 'Phiên dịch đồng thời', conversation: 'Hội thoại', learning: 'Học tập', quick: 'Nhanh', interpreting: 'Đang phiên dịch đồng thời', microphoneStarting: 'Đang khởi động micrô…', partnerSpeaking: 'Đối tác đang nói', startConversation: 'Nhấn nút để bắt đầu trò chuyện', autoTranslate: 'Nói để dịch tự động', learningHint: 'Hiển thị phát âm tiếng Hàn và dịch ngược', learningSub: 'Bạn có thể đọc theo ngôn ngữ của đối tác', translating: 'Đang dịch', textInput: 'Nhập trực tiếp', listening: '◉ Đang nghe', meSpeak: 'Tôi · Nói', partner: 'Đối tác', tapToSpeak: 'Chạm để nói', pauseMic: 'Tạm dừng micrô', restartMic: 'Khởi động lại micrô', replay: 'Phát lại', pronunciation: 'Phát âm', reverseTranslation: 'Dịch ngược' },
+  ru: { bridge: 'Без языковых барьеров', myLanguage: 'Мой язык', start: 'Начать разговор', solo: 'Разговор на одном телефоне', enter: 'Войти', noInstall: 'Подключайтесь сразу в браузере — приложение не требуется', partnerLanguage: 'Выберите язык собеседника', selectLanguage: 'Выберите ваш язык', back: '← Назад', tapFlag: 'Нажмите на флаг для подключения', showQr: 'Покажите этот экран собеседнику', codeEntry: 'Или введите код вручную', waiting: 'Ожидание сканирования собеседником', male: '♂ Мужской', female: '♀ Женский', simultaneous: 'Синхронный перевод', conversation: 'Диалог', learning: 'Обучение', quick: 'Быстро', interpreting: 'Идёт синхронный перевод', microphoneStarting: 'Запуск микрофона…', partnerSpeaking: 'Собеседник говорит', startConversation: 'Нажмите кнопку, чтобы начать разговор', autoTranslate: 'Говорите для автоматического перевода', learningHint: 'Показываются корейское произношение и обратный перевод', learningSub: 'Можно повторять за языком собеседника', translating: 'Перевод', textInput: 'Введите сообщение', listening: '◉ Слушаю', meSpeak: 'Я · Говорить', partner: 'Собеседник', tapToSpeak: 'Нажмите, чтобы говорить', pauseMic: 'Приостановить микрофон', restartMic: 'Перезапустить микрофон', replay: 'Повторить', pronunciation: 'Произношение', reverseTranslation: 'Обратный перевод' },
+} as const;
+
+type TravelUi = (typeof TRAVEL_UI)[keyof typeof TRAVEL_UI];
 
 interface Message {
   id: number;
@@ -41,11 +52,11 @@ const PAGE  = {
 } as const;
 
 /* ─── 재생 버튼 ─── */
-function PlayBtn({ text, lang, onPlay }: { text: string; lang: string; onPlay: (t: string, l: string) => void }) {
+function PlayBtn({ text, lang, onPlay, label }: { text: string; lang: string; onPlay: (t: string, l: string) => void; label: string }) {
   return (
     <button
       onClick={() => onPlay(text, lang)}
-      title="다시 듣기"
+      title={label}
       style={{
         background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)',
         borderRadius: 6, color: 'rgba(255,255,255,0.45)', fontSize: 12,
@@ -56,9 +67,10 @@ function PlayBtn({ text, lang, onPlay }: { text: string; lang: string; onPlay: (
 }
 
 /* ─── 메시지 버블 컴포넌트 ─── */
-function MsgBubble({ msg, isKorean, learningMode, onPlay }: {
+function MsgBubble({ msg, isKorean, learningMode, onPlay, ui }: {
   msg: Message; isKorean: boolean; learningMode: boolean;
   onPlay: (text: string, lang: string) => void;
+  ui: TravelUi;
 }) {
   const hasPron = isKorean && learningMode && msg.pronunciation;
   const hasRev  = isKorean && learningMode && msg.reverse_translated;
@@ -70,18 +82,18 @@ function MsgBubble({ msg, isKorean, learningMode, onPlay }: {
           {msg.original}
           <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.12)', fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ flex: 1 }}>{msg.translated}</span>
-            <PlayBtn text={msg.translated} lang={msg.targetLang} onPlay={onPlay} />
+            <PlayBtn text={msg.translated} lang={msg.targetLang} onPlay={onPlay} label={ui.replay} />
           </div>
           {(hasPron || hasRev) && (
             <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
               {hasPron && (
                 <div style={{ fontSize: 11, color: 'rgba(100,180,255,0.8)', marginBottom: 2 }}>
-                  <span style={{ opacity: 0.6 }}>발음 </span>{msg.pronunciation}
+                  <span style={{ opacity: 0.6 }}>{ui.pronunciation} </span>{msg.pronunciation}
                 </div>
               )}
               {hasRev && (
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>
-                  <span style={{ opacity: 0.6 }}>역번역 </span>{msg.reverse_translated}
+                  <span style={{ opacity: 0.6 }}>{ui.reverseTranslation} </span>{msg.reverse_translated}
                 </div>
               )}
             </div>
@@ -99,22 +111,22 @@ function MsgBubble({ msg, isKorean, learningMode, onPlay }: {
         <div style={{ maxWidth: '82%', borderRadius: '20px 20px 20px 4px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.07)', padding: '12px 16px' }}>
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{ flex: 1 }}>{msg.original}</span>
-            <PlayBtn text={msg.original} lang={msg.lang} onPlay={onPlay} />
+            <PlayBtn text={msg.original} lang={msg.lang} onPlay={onPlay} label={ui.replay} />
           </div>
           <div style={{ fontSize: 15, lineHeight: 1.65, color: '#ede8e3', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ flex: 1 }}>{msg.translated}</span>
-            <PlayBtn text={msg.translated} lang={msg.targetLang} onPlay={onPlay} />
+            <PlayBtn text={msg.translated} lang={msg.targetLang} onPlay={onPlay} label={ui.replay} />
           </div>
           {(hasPron || hasRev) && (
             <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
               {hasPron && (
                 <div style={{ fontSize: 11, color: 'rgba(100,180,255,0.75)', marginBottom: 3 }}>
-                  <span style={{ opacity: 0.6 }}>발음 </span>{msg.pronunciation}
+                  <span style={{ opacity: 0.6 }}>{ui.pronunciation} </span>{msg.pronunciation}
                 </div>
               )}
               {hasRev && (
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>
-                  <span style={{ opacity: 0.6 }}>역번역 </span>{msg.reverse_translated}
+                  <span style={{ opacity: 0.6 }}>{ui.reverseTranslation} </span>{msg.reverse_translated}
                 </div>
               )}
             </div>
@@ -131,7 +143,7 @@ function MsgBubble({ msg, isKorean, learningMode, onPlay }: {
       <div style={{ maxWidth: '82%', borderRadius: '20px 20px 20px 4px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.07)', padding: '12px 16px' }}>
         <div style={{ fontSize: 15, lineHeight: 1.65, color: '#ede8e3', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ flex: 1 }}>{msg.translated}</span>
-          <PlayBtn text={msg.translated} lang={msg.targetLang} onPlay={onPlay} />
+          <PlayBtn text={msg.translated} lang={msg.targetLang} onPlay={onPlay} label={ui.replay} />
         </div>
         <div style={{ marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{msg.original}</div>
       </div>
@@ -184,6 +196,8 @@ function Toggle({ on, onToggle, labelOn, labelOff, color = RED }: {
 
 /* ════════ 메인 컴포넌트 ════════ */
 export default function TravelTalk() {
+  const displayLanguage = useDisplayLanguage();
+  const ui = TRAVEL_UI[displayLanguage as keyof typeof TRAVEL_UI] || TRAVEL_UI.en;
   const [phase, setPhase]             = useState<Phase>('home');
   const [myLang, setMyLang]           = useState('ko');
   const [roomCode, setRoomCode]       = useState('');
@@ -555,10 +569,10 @@ export default function TravelTalk() {
         <div style={{ textAlign: 'center', marginBottom: 52 }}>
           <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 16 }}>SQ Link</p>
           <h1 style={{ fontSize: 40, fontWeight: 200, letterSpacing: -2, margin: 0, lineHeight: 1.1 }}>Travel Talk</h1>
-          <p style={{ fontSize: 12, color: '#4a4a5a', marginTop: 10, letterSpacing: 2 }}>言葉の壁を越えて · 언어의 벽을 넘어서</p>
+          <p style={{ fontSize: 12, color: '#4a4a5a', marginTop: 10, letterSpacing: 2 }}>{ui.bridge}</p>
         </div>
 
-        <p style={{ fontSize: 10, color: '#444', letterSpacing: 3, marginBottom: 12, textTransform: 'uppercase' }}>My Language</p>
+        <p style={{ fontSize: 10, color: '#444', letterSpacing: 3, marginBottom: 12, textTransform: 'uppercase' }}>{ui.myLanguage}</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, marginBottom: 32 }}>
           {Object.entries(LANGS).map(([code, info]) => (
             <button key={code} onClick={() => setMyLang(code)} style={{
@@ -576,7 +590,7 @@ export default function TravelTalk() {
 
         {/* 2폰 모드 */}
         <button onClick={createRoom} style={{ width: '100%', padding: 18, background: RED, border: 'none', borderRadius: 16, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 10 }}>
-          새 대화 시작 &nbsp;·&nbsp; 新しい会話を始める
+          {ui.start}
         </button>
 
         {/* 1폰 solo 모드 */}
@@ -587,7 +601,7 @@ export default function TravelTalk() {
           borderRadius: 16, color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 700,
           cursor: 'pointer',
         }}>
-          📱 폰 하나로 대화 &nbsp;·&nbsp; 1台で会話
+          📱 {ui.solo}
         </button>
 
         <div style={{ display: 'flex', gap: 8 }}>
@@ -596,11 +610,11 @@ export default function TravelTalk() {
             onKeyDown={e => e.key === 'Enter' && joinRoom(inputCode, myLang)}
             style={{ flex: 1, padding: '15px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, color: '#ede8e3', fontSize: 26, textAlign: 'center', letterSpacing: 12, outline: 'none' }}
           />
-          <button onClick={() => joinRoom(inputCode, myLang)} disabled={inputCode.length < 4} style={{ padding: '15px 22px', background: inputCode.length === 4 ? 'rgba(192,57,43,0.75)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, color: '#fff', fontSize: 13, cursor: inputCode.length === 4 ? 'pointer' : 'default', whiteSpace: 'nowrap' }}>입장</button>
+          <button onClick={() => joinRoom(inputCode, myLang)} disabled={inputCode.length < 4} style={{ padding: '15px 22px', background: inputCode.length === 4 ? 'rgba(192,57,43,0.75)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, color: '#fff', fontSize: 13, cursor: inputCode.length === 4 ? 'pointer' : 'default', whiteSpace: 'nowrap' }}>{ui.enter}</button>
         </div>
 
         <p style={{ marginTop: 48, textAlign: 'center', fontSize: 11, color: '#2a2a3a', lineHeight: 2.2 }}>
-          앱 설치 불필요 · アプリ不要<br />브라우저만으로 즉시 연결
+          {ui.noInstall}
         </p>
       </div>
       <style>{`*{box-sizing:border-box;margin:0;padding:0}input::placeholder{color:#333}`}</style>
@@ -614,9 +628,7 @@ export default function TravelTalk() {
         <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 40 }}>SQ Link · TRAVEL TALK</p>
 
         <div style={{ marginBottom: 40, lineHeight: 2.6 }}>
-          <p style={{ fontSize: 16, color: '#ede8e3', fontWeight: 300 }}>상대방 언어를 선택하세요</p>
-          <p style={{ fontSize: 14, color: '#888' }}>相手の言語を選んでください</p>
-          <p style={{ fontSize: 13, color: '#666' }}>Select partner&apos;s language</p>
+          <p style={{ fontSize: 16, color: '#ede8e3', fontWeight: 300 }}>{ui.partnerLanguage}</p>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: 48 }}>
@@ -637,7 +649,7 @@ export default function TravelTalk() {
 
         <button onClick={() => setPhase('home')} style={{
           fontSize: 12, color: '#444', background: 'none', border: 'none', cursor: 'pointer',
-        }}>← 돌아가기</button>
+        }}>{ui.back}</button>
       </div>
       <style>{`*{box-sizing:border-box;margin:0;padding:0}`}</style>
     </div>
@@ -649,10 +661,7 @@ export default function TravelTalk() {
       <div style={{ width: '100%', maxWidth: 420, padding: '0 28px', textAlign: 'center' }}>
         <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 40 }}>SQ Link · TRAVEL TALK</p>
         <div style={{ marginBottom: 40, lineHeight: 2.6 }}>
-          <p style={{ fontSize: 16, color: '#ede8e3', fontWeight: 300 }}>언어를 선택해주세요</p>
-          <p style={{ fontSize: 14, color: '#888' }}>言語を選択してください</p>
-          <p style={{ fontSize: 13, color: '#666' }}>Select your language</p>
-          <p style={{ fontSize: 13, color: '#555' }}>请选择语言 · Chọn ngôn ngữ</p>
+          <p style={{ fontSize: 16, color: '#ede8e3', fontWeight: 300 }}>{ui.selectLanguage}</p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: 48 }}>
           {Object.entries(LANGS).map(([code, info]) => (
@@ -667,7 +676,7 @@ export default function TravelTalk() {
             </button>
           ))}
         </div>
-        <p style={{ fontSize: 11, color: '#2a2a3a' }}>국기를 누르면 즉시 연결됩니다 · タップで即接続</p>
+        <p style={{ fontSize: 11, color: '#2a2a3a' }}>{ui.tapFlag}</p>
       </div>
       <style>{`*{box-sizing:border-box;margin:0;padding:0}`}</style>
     </div>
@@ -682,7 +691,7 @@ export default function TravelTalk() {
           <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 16 }}>SQ Link · TRAVEL TALK</p>
 
           <div style={{ marginBottom: 20, padding: '14px 18px', background: 'rgba(192,57,43,0.07)', border: '1px solid rgba(192,57,43,0.2)', borderRadius: 16 }}>
-            <p style={{ fontSize: 14, color: '#e74c3c', fontWeight: 700, marginBottom: 10 }}>📷 이 화면을 상대방에게 보여주세요</p>
+            <p style={{ fontSize: 14, color: '#e74c3c', fontWeight: 700, marginBottom: 10 }}>📷 {ui.showQr}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, lineHeight: 1.8 }}>
               <span style={{ color: '#ccc' }}>🇯🇵 QRコードをスキャンしてください</span>
               <span style={{ color: '#ccc' }}>🇺🇸 Please scan this QR code</span>
@@ -696,13 +705,13 @@ export default function TravelTalk() {
               <QRCodeSVG value={qrUrl} size={200} fgColor="#07070e" bgColor="#ffffff" />
             </div>
           )}
-          <p style={{ fontSize: 11, color: '#3a3a4a', marginBottom: 12 }}>또는 코드로 직접 입력 · または番号を入力</p>
+          <p style={{ fontSize: 11, color: '#3a3a4a', marginBottom: 12 }}>{ui.codeEntry}</p>
           <div style={{ background: 'rgba(192,57,43,0.07)', border: '1px solid rgba(192,57,43,0.22)', borderRadius: 20, padding: '16px 40px', marginBottom: 28, display: 'inline-block' }}>
             <span style={{ fontSize: 64, fontWeight: 100, letterSpacing: 14, color: '#e74c3c' }}>{roomCode}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, color: '#444', fontSize: 12 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: RED, display: 'inline-block', animation: 'blink 1.4s infinite' }} />
-            상대방 스캔 대기 중 · 待機中
+            {ui.waiting}
           </div>
         </div>
         <style>{`@keyframes blink{0%,100%{opacity:1}50%{opacity:0.15}}*{box-sizing:border-box;margin:0;padding:0}`}</style>
@@ -755,8 +764,8 @@ export default function TravelTalk() {
           <Toggle
             on={voiceGender === 'male'}
             onToggle={() => setVoiceGender(g => g === 'female' ? 'male' : 'female')}
-            labelOn="♂ 남자"
-            labelOff="♀ 여자"
+            labelOn={ui.male}
+            labelOff={ui.female}
             color="#5dade2"
           />
 
@@ -773,8 +782,8 @@ export default function TravelTalk() {
                   if (isRecording) toggleSTT();
                 }
               }}
-              labelOn="동시통역"
-              labelOff="대화"
+              labelOn={ui.simultaneous}
+              labelOff={ui.conversation}
               color={RED}
             />
           )}
@@ -784,8 +793,8 @@ export default function TravelTalk() {
             <Toggle
               on={learningMode}
               onToggle={() => setLearningMode(v => !v)}
-              labelOn="학습"
-              labelOff="빠른"
+              labelOn={ui.learning}
+              labelOff={ui.quick}
               color="#f39c12"
             />
           )}
@@ -796,7 +805,7 @@ export default function TravelTalk() {
           <div style={{ padding: '5px 14px', background: 'rgba(192,57,43,0.07)', borderBottom: '1px solid rgba(192,57,43,0.15)', display: 'flex', alignItems: 'center', gap: 7, fontSize: 11 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: isRecording ? RED : '#444', animation: isRecording ? 'blink 1s infinite' : 'none', display: 'inline-block' }} />
             <span style={{ color: isRecording ? '#e74c3c' : '#555' }}>
-              {isRecording ? '동시통역 중 · 同時通訳中' : '마이크 시작 중...'}
+              {isRecording ? ui.interpreting : ui.microphoneStarting}
             </span>
           </div>
         )}
@@ -806,7 +815,7 @@ export default function TravelTalk() {
           <div style={{ padding: '4px 14px', background: 'rgba(46,204,113,0.07)', borderBottom: '1px solid rgba(46,204,113,0.15)', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2ecc71', animation: 'blink 0.8s infinite', display: 'inline-block' }} />
             <span style={{ color: '#2ecc71' }}>
-              {LANGS[pLang]?.flag} 상대방이 말하는 중 · {pLang === 'ja' ? '相手が話しています' : pLang === 'zh' ? '对方正在说话' : pLang === 'vi' ? 'Đối phương đang nói' : 'Partner speaking...'}
+              {LANGS[pLang]?.flag} {ui.partnerSpeaking}
             </span>
           </div>
         )}
@@ -818,23 +827,23 @@ export default function TravelTalk() {
               <p style={{ fontSize: 34, marginBottom: 16 }}>💬</p>
               <p style={{ fontSize: 12, lineHeight: 2.4, color: '#2e2e3e' }}>
                 {soloMode
-                  ? `${LANGS[myLang]?.flag} 나 → ${LANGS[pLang]?.flag} 상대 버튼을 눌러 말하세요`
+                  ? `${LANGS[myLang]?.flag} ${ui.meSpeak} → ${LANGS[pLang]?.flag} ${ui.partner} · ${ui.tapToSpeak}`
                   : isSim
-                    ? '말하면 자동으로 번역됩니다 · 話すと自動翻訳'
-                    : '버튼을 눌러 대화를 시작하세요 · タップして話す'
+                    ? ui.autoTranslate
+                    : ui.startConversation
                 }
               </p>
               {isKorean && learningMode && (
                 <div style={{ marginTop: 16, padding: '10px 14px', background: BLUE, borderRadius: 12, fontSize: 11, color: 'rgba(100,180,255,0.7)', lineHeight: 2 }}>
-                  한글 발음 · 역번역 자동 표시<br />
-                  <span style={{ opacity: 0.6 }}>상대방 언어를 따라 읽을 수 있습니다</span>
+                  {ui.learningHint}<br />
+                  <span style={{ opacity: 0.6 }}>{ui.learningSub}</span>
                 </div>
               )}
             </div>
           )}
 
           {messages.map(msg => (
-            <MsgBubble key={msg.id} msg={msg} isKorean={isKorean} learningMode={learningMode} onPlay={speakTTS} />
+            <MsgBubble key={msg.id} msg={msg} isKorean={isKorean} learningMode={learningMode} onPlay={speakTTS} ui={ui} />
           ))}
 
           {translating && (
@@ -842,7 +851,7 @@ export default function TravelTalk() {
               {[0, 1, 2].map(i => (
                 <span key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: RED, display: 'inline-block', animation: `dot 1s ${i * 0.2}s infinite` }} />
               ))}
-              번역 중 · 翻訳中
+              {ui.translating}
             </div>
           )}
           <div ref={bottomRef} />
@@ -853,7 +862,7 @@ export default function TravelTalk() {
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             <input value={inputText} onChange={e => setInputText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && sendMessage(inputText)}
-              placeholder="직접 입력 · テキスト入力"
+              placeholder={ui.textInput}
               style={{ flex: 1, padding: '13px 15px', background: 'rgba(255,255,255,0.055)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 14, color: '#ede8e3', fontSize: 14, outline: 'none' }}
             />
             <button onClick={() => sendMessage(inputText)} style={{ padding: '13px 17px', background: inputText.trim() ? RED : 'rgba(255,255,255,0.04)', border: 'none', borderRadius: 14, color: '#fff', fontSize: 20, cursor: 'pointer' }}>↑</button>
@@ -880,7 +889,7 @@ export default function TravelTalk() {
                 }}>
                 <span style={{ fontSize: 20 }}>{LANGS[myLang]?.flag}</span>
                 <span style={{ fontSize: 11 }}>
-                  {soloTurn === 'mine' && isRecording ? '◉ 듣는 중' : '나 · 말하기'}
+                  {soloTurn === 'mine' && isRecording ? ui.listening : ui.meSpeak}
                 </span>
               </button>
 
@@ -902,7 +911,7 @@ export default function TravelTalk() {
                 }}>
                 <span style={{ fontSize: 20 }}>{LANGS[pLang]?.flag}</span>
                 <span style={{ fontSize: 11 }}>
-                  {soloTurn === 'partner' && isRecording ? '◉ 듣는 중' : `상대 · ${LANGS[pLang]?.label}`}
+                  {soloTurn === 'partner' && isRecording ? ui.listening : `${ui.partner} · ${LANGS[pLang]?.label}`}
                 </span>
               </button>
             </div>
@@ -919,8 +928,8 @@ export default function TravelTalk() {
             }}>
               <span style={{ fontSize: 20 }}>{isRecording ? '◉' : '🎙'}</span>
               {isRecording
-                ? `듣는 중 · 聞いています (${voiceGender === 'female' ? '♀' : '♂'})`
-                : `${LANGS[myLang]?.flag} 탭해서 말하기 · タップして話す`}
+                ? `${ui.listening} (${voiceGender === 'female' ? '♀' : '♂'})`
+                : `${LANGS[myLang]?.flag} ${ui.tapToSpeak}`}
             </button>
           ) : (
             /* ── 2폰 동시통역 모드 ── */
@@ -930,7 +939,7 @@ export default function TravelTalk() {
               border: '1px solid rgba(255,255,255,0.07)',
               borderRadius: 12, color: '#444', fontSize: 11, cursor: 'pointer',
             }}>
-              {isRecording ? '마이크 일시 중지 · マイク一時停止' : '마이크 재시작 · マイク再開'}
+              {isRecording ? ui.pauseMic : ui.restartMic}
             </button>
           )}
         </div>

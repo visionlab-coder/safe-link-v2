@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Activity, Mic, MicOff, ShieldAlert } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 type AgentStatus = "waiting" | "warning" | "normal" | "monitoring" | "permission" | "stopped";
 
@@ -33,13 +34,15 @@ const noiseLabels: Record<string, string> = {
  * 🟢 Tier 3: 현장 환경 제어 에이전트 (Ambient Device Agent)
  * 스마트폰의 마이크와 환경광 상태를 스니핑하여 프론트엔드 환경을 자율적으로 조절합니다.
  */
-export default function SwarmAgentHUD({ lang = "ko", placement = "default" }: { lang?: string; placement?: "default" | "worker-home" }) {
+export default function SwarmAgentHUD({ lang, placement = "default" }: { lang?: string; placement?: "default" | "worker-home" }) {
+    const displayLanguage = useDisplayLanguage();
+    const activeLanguage = lang ?? displayLanguage;
     const [isActive, setIsActive] = useState(false);
     const [noiseLevel, setNoiseLevel] = useState(0); // 0 ~ 100 퍼센트에지
     const [isNoisy, setIsNoisy] = useState(false);
     const [agentStatus, setAgentStatus] = useState<AgentStatus>("waiting");
     const [isMinimized, setIsMinimized] = useState(true);
-    const noiseLabel = noiseLabels[lang] || noiseLabels.en;
+    const noiseLabel = noiseLabels[activeLanguage] || noiseLabels.en;
     const agentMessage = agentStatus === "permission"
         ? "MIC · PERMISSION"
         : `${noiseLabel} · ${agentStatus === "warning" ? "HIGH" : agentStatus === "normal" ? "OK" : agentStatus === "monitoring" ? "ON" : agentStatus === "stopped" ? "OFF" : "READY"}`;

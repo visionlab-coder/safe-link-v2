@@ -5,23 +5,25 @@ import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import SignatureCanvas from "react-signature-canvas";
 import { PenLine, CheckCircle, RotateCcw, ArrowLeft, Loader } from "lucide-react";
+import { persistDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 const PLEDGE_KO = "본인은 오늘 TBM 안전 교육 내용을 충분히 이해하였으며, 작업 중 안전 수칙을 반드시 준수할 것을 서약합니다.";
 
-const i18n: Record<string, { title: string; pledge: string; sign: string; clear: string; submit: string; success: string; back: string; loading: string; already: string }> = {
-  ko: { title: "TBM 안전 서약", pledge: PLEDGE_KO, sign: "아래에 서명해주세요", clear: "지우기", submit: "서명 제출", success: "서약 완료", back: "돌아가기", loading: "처리 중...", already: "이미 서약하셨습니다" },
-  en: { title: "TBM SAFETY PLEDGE", pledge: "I fully understand today's TBM safety briefing and pledge to comply with all safety regulations during work.", sign: "Please sign below", clear: "Clear", submit: "Submit Signature", success: "Pledge Complete", back: "Back", loading: "Processing...", already: "Already pledged" },
-  zh: { title: "TBM 安全承诺", pledge: "本人已充分理解今日TBM安全教育内容，承诺在工作中严格遵守安全规定。", sign: "请在下方签名", clear: "清除", submit: "提交签名", success: "承诺完成", back: "返回", loading: "处理中...", already: "已完成承诺" },
-  vi: { title: "CAM KẾT AN TOÀN TBM", pledge: "Tôi đã hiểu đầy đủ nội dung an toàn TBM hôm nay và cam kết tuân thủ các quy định an toàn trong khi làm việc.", sign: "Vui lòng ký bên dưới", clear: "Xóa", submit: "Gửi chữ ký", success: "Hoàn thành cam kết", back: "Quay lại", loading: "Đang xử lý...", already: "Đã cam kết" },
-  th: { title: "คำมั่นสัญญา TBM", pledge: "ฉันเข้าใจเนื้อหาการอบรม TBM วันนี้อย่างครบถ้วนและสัญญาว่าจะปฏิบัติตามกฎความปลอดภัย", sign: "กรุณาเซ็นชื่อด้านล่าง", clear: "ลบ", submit: "ส่งลายเซ็น", success: "ลงนามเรียบร้อย", back: "กลับ", loading: "กำลังดำเนินการ...", already: "ลงนามแล้ว" },
-  id: { title: "JANJI KESELAMATAN TBM", pledge: "Saya telah memahami sepenuhnya materi TBM hari ini dan berjanji untuk mematuhi semua peraturan keselamatan.", sign: "Tanda tangan di bawah", clear: "Hapus", submit: "Kirim Tanda Tangan", success: "Janji Selesai", back: "Kembali", loading: "Memproses...", already: "Sudah berjanji" },
+const i18n: Record<string, { title: string; pledge: string; sign: string; clear: string; submit: string; success: string; back: string; loading: string; already: string; description: string; content: string; todayContent: string; hint: string; missingSite: string; submitFailed: string; recorded: string }> = {
+  ko: { title: "TBM 안전 서약", pledge: PLEDGE_KO, sign: "아래에 서명해주세요", clear: "지우기", submit: "서명 제출", success: "서약 완료", back: "돌아가기", loading: "처리 중...", already: "이미 서약하셨습니다", description:"안전 서약 내용을 확인하고 서명합니다.", content:"서약 내용", todayContent:"오늘의 TBM 내용", hint:"손가락 또는 펜으로 서명하세요", missingSite:"현장 정보가 없습니다. 관리자에게 문의하세요.", submitFailed:"제출 실패", recorded:"서명이 블록체인 감사 체인에 기록되었습니다" },
+  en: { title: "TBM SAFETY PLEDGE", pledge: "I fully understand today's TBM safety briefing and pledge to comply with all safety regulations during work.", sign: "Please sign below", clear: "Clear", submit: "Submit Signature", success: "Pledge Complete", back: "Back", loading: "Processing...", already: "Already pledged", description:"Review the safety pledge and sign it.", content:"Pledge", todayContent:"Today’s TBM content", hint:"Sign with your finger or a pen", missingSite:"Site information is unavailable. Please contact an administrator.", submitFailed:"Submission failed", recorded:"Your signature has been recorded in the blockchain audit chain" },
+  zh: { title: "TBM 安全承诺", pledge: "本人已充分理解今日TBM安全教育内容，承诺在工作中严格遵守安全规定。", sign: "请在下方签名", clear: "清除", submit: "提交签名", success: "承诺完成", back: "返回", loading: "处理中...", already: "已完成承诺", description:"请确认安全承诺内容并签名。", content:"承诺内容", todayContent:"今日 TBM 内容", hint:"请用手指或笔签名", missingSite:"没有现场信息。请联系管理员。", submitFailed:"提交失败", recorded:"签名已记录到区块链审计链中" },
+  vi: { title: "CAM KẾT AN TOÀN TBM", pledge: "Tôi đã hiểu đầy đủ nội dung an toàn TBM hôm nay và cam kết tuân thủ các quy định an toàn trong khi làm việc.", sign: "Vui lòng ký bên dưới", clear: "Xóa", submit: "Gửi chữ ký", success: "Hoàn thành cam kết", back: "Quay lại", loading: "Đang xử lý...", already: "Đã cam kết", description:"Xem nội dung cam kết an toàn và ký tên.", content:"Nội dung cam kết", todayContent:"Nội dung TBM hôm nay", hint:"Ký bằng ngón tay hoặc bút", missingSite:"Không có thông tin công trường. Hãy liên hệ quản trị viên.", submitFailed:"Gửi thất bại", recorded:"Chữ ký đã được ghi vào chuỗi kiểm toán blockchain" },
+  ru: { title: "ОБЯЗАТЕЛЬСТВО ПО БЕЗОПАСНОСТИ TBM", pledge: "Я полностью понял содержание сегодняшнего инструктажа TBM и обязуюсь соблюдать все правила безопасности во время работы.", sign: "Поставьте подпись ниже", clear: "Очистить", submit: "Отправить подпись", success: "Обязательство подтверждено", back: "Назад", loading: "Обработка...", already: "Обязательство уже подтверждено", description:"Ознакомьтесь с обязательством по безопасности и поставьте подпись.", content:"Содержание обязательства", todayContent:"Содержание TBM на сегодня", hint:"Поставьте подпись пальцем или стилусом", missingSite:"Нет информации об объекте. Обратитесь к администратору.", submitFailed:"Ошибка отправки", recorded:"Подпись записана в цепочку аудита блокчейна" },
+  th: { title: "คำมั่นสัญญา TBM", pledge: "ฉันเข้าใจเนื้อหาการอบรม TBM วันนี้อย่างครบถ้วนและสัญญาว่าจะปฏิบัติตามกฎความปลอดภัย", sign: "กรุณาเซ็นชื่อด้านล่าง", clear: "ลบ", submit: "ส่งลายเซ็น", success: "ลงนามเรียบร้อย", back: "กลับ", loading: "กำลังดำเนินการ...", already: "ลงนามแล้ว", description:"ตรวจสอบคำมั่นสัญญาด้านความปลอดภัยและลงนาม", content:"เนื้อหาคำมั่นสัญญา", todayContent:"เนื้อหา TBM วันนี้", hint:"ลงนามด้วยนิ้วหรือปากกา", missingSite:"ไม่มีข้อมูลหน้างาน โปรดติดต่อผู้ดูแล", submitFailed:"ส่งไม่สำเร็จ", recorded:"ลายเซ็นถูกบันทึกในห่วงโซ่การตรวจสอบบล็อกเชน" },
+  id: { title: "JANJI KESELAMATAN TBM", pledge: "Saya telah memahami sepenuhnya materi TBM hari ini dan berjanji untuk mematuhi semua peraturan keselamatan.", sign: "Tanda tangan di bawah", clear: "Hapus", submit: "Kirim Tanda Tangan", success: "Janji Selesai", back: "Kembali", loading: "Memproses...", already: "Sudah berjanji", description:"Tinjau janji keselamatan dan tanda tangani.", content:"Isi janji", todayContent:"Materi TBM hari ini", hint:"Tanda tangani dengan jari atau pena", missingSite:"Informasi lokasi tidak tersedia. Hubungi administrator.", submitFailed:"Pengiriman gagal", recorded:"Tanda tangan dicatat di rantai audit blockchain" },
 };
 const getT = (lang: string) => i18n[lang] ?? i18n["en"];
 
 export default function WorkerPledgePage() {
   const router = useRouter();
   const sigRef = useRef<SignatureCanvas>(null);
-  const [lang, setLang] = useState("ko");
+  const lang = useDisplayLanguage();
   const [siteId, setSiteId] = useState("");
   const [tbmContent, setTbmContent] = useState("");
   const [loading, setLoading] = useState(true);
@@ -41,7 +43,7 @@ export default function WorkerPledgePage() {
         profile?: { preferred_lang?: string | null; site_id?: string | null };
       };
       if (cancelled) return;
-      setLang(me.profile?.preferred_lang ?? "ko");
+      persistDisplayLanguage(me.profile?.preferred_lang ?? "ko");
       setSiteId(me.profile?.site_id ?? "");
 
       const tbmRes = await fetch("/api/tbm/today?limit=1", { cache: "no-store" });
@@ -70,7 +72,7 @@ export default function WorkerPledgePage() {
 
   const handleSubmit = async () => {
     if (!sigRef.current || sigRef.current.isEmpty()) return;
-    if (!siteId) { alert("현장 정보가 없습니다. 관리자에게 문의하세요."); return; }
+    if (!siteId) { alert(t.missingSite); return; }
     setSubmitting(true);
     try {
       const signatureData = sigRef.current.toDataURL("image/png");
@@ -92,7 +94,7 @@ export default function WorkerPledgePage() {
         setDone(true);
       } else {
         const data = await res.json() as { error?: string };
-        alert(`제출 실패: ${data.error ?? "unknown"}`);
+        alert(`${t.submitFailed}: ${data.error ?? "unknown"}`);
       }
     } finally {
       setSubmitting(false);
@@ -116,7 +118,7 @@ export default function WorkerPledgePage() {
           </div>
           <p className="text-white text-2xl font-black text-center">{t.success}</p>
           <p className="text-gray-500 text-sm text-center">
-            서명이 블록체인 감사 체인에 기록되었습니다
+            {t.recorded}
           </p>
           <button
             onClick={() => router.push("/worker")}
@@ -152,16 +154,16 @@ export default function WorkerPledgePage() {
             <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
               <p className="text-[10px] font-black tracking-[.18em] text-blue-200">SQ-LINK PLEDGE</p>
               <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
-              <p className="mt-2 text-sm font-bold text-slate-100">안전 서약 내용을 확인하고 서명합니다.</p>
+              <p className="mt-2 text-sm font-bold text-slate-100">{t.description}</p>
             </div>
           </div>
 
           <section className="glass rounded-[32px] p-6 border-white/10 flex flex-col gap-3">
-            <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">서약 내용</p>
+            <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">{t.content}</p>
             <p className="text-base font-bold text-white leading-relaxed">{t.pledge}</p>
             {tbmContent && (
               <div className="mt-2 p-4 bg-white/5 rounded-2xl border border-white/5">
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">오늘의 TBM 내용</p>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{t.todayContent}</p>
                 <p className="text-sm text-slate-400 leading-relaxed">{tbmContent}</p>
               </div>
             )}
@@ -184,7 +186,7 @@ export default function WorkerPledgePage() {
               />
             </div>
             {empty && (
-              <p className="text-center text-slate-600 text-xs">손가락 또는 펜으로 서명하세요</p>
+              <p className="text-center text-slate-600 text-xs">{t.hint}</p>
             )}
           </section>
 

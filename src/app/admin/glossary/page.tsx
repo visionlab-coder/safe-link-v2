@@ -8,6 +8,15 @@ import { normalizeKoAsync, clearGlossaryCache } from "@/utils/normalize";
 import { motion, AnimatePresence } from "framer-motion";
 import ExportMenu from "@/components/ExportMenu";
 import { exportData, type ExportFormat } from "@/utils/export-files";
+import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+
+const GLOSSARY_UI: Record<string, Record<string, string>> = {
+    ko: { title:"용어집", desc:"현장 용어 및 표준어 관리", add:"새 용어 추가", slang:"은어 (현장 용어)", standard:"표준어", category:"카테고리", save:"추가/수정하기", saving:"저장 중...", bulk:"일괄 가져오기", drop:"여기에 놓으세요!", attach:"📎 엑셀 파일 첨부", drag:"클릭하거나 파일을 끌어다 놓으세요", columns:"A열: 은어 | B열: 표준어 | C열: 카테고리(선택) · 헤더 행 자동 건너뜀", other:"다른 방법으로 가져오기 (웹 URL · 텍스트 붙여넣기)", fetching:"가져오는 중", fetch:"웹 가져오기", preview:"붙여넣은 내용 미리보기", cancel:"취소", test:"표준어 변환 테스트", testDesc:"새로 추가한 단어가 잘 변환되는지 테스트해 보세요.", testBtn:"변환 테스트", registered:"등록된 용어 목록", refresh:"새로고침", loading:"데이터를 불러오는 중입니다...", added:"신규 추가", duplicate:"중복", missing:"누락", error:"오류", noSlang:"은어 없음", count:"개", row:"행", skipped:"자동 제외됨", skippedMissing:"건너뜀", new:"신규", excluding:"제외", edit:"수정", deactivate:"비활성화", activate:"활성화", delete:"완전 삭제", none:"등록된 용어가 없습니다.", slangExample:"예: 공구리", standardExample:"예: 콘크리트", pasteExample:"현장용어, 표준어, 분류\n오함마, 대형 망치, 도구" },
+    en: { title:"Glossary", desc:"Manage site terms and standard terms", add:"Add term", slang:"Slang (site term)", standard:"Standard term", category:"Category", save:"Add / update", saving:"Saving...", bulk:"Bulk import", drop:"Drop files here!", attach:"📎 Attach Excel file", drag:"Click or drag files here", columns:"Column A: slang | B: standard term | C: category (optional) · Header row is skipped", other:"Other import methods (web URL · paste text)", fetching:"Fetching...", fetch:"Fetch web page", preview:"Preview pasted content", cancel:"Cancel", test:"Standard-term conversion test", testDesc:"Test whether newly added words are converted correctly.", testBtn:"Test conversion", registered:"Registered terms", refresh:"Refresh", loading:"Loading data...", added:"Added", duplicate:"Duplicate", missing:"Missing", error:"Error", noSlang:"No slang", count:"items", row:"Row", skipped:"removed automatically", skippedMissing:"skipped", new:"New", excluding:"excluded", edit:"Edit", deactivate:"Deactivate", activate:"Activate", delete:"Delete permanently", none:"No terms are registered.", slangExample:"e.g. concrete slang", standardExample:"e.g. concrete", pasteExample:"site term, standard term, category\njackhammer, large hammer, tool" },
+    zh: { title:"术语表", desc:"管理现场术语和标准术语", add:"添加术语", slang:"俗语（现场用语）", standard:"标准术语", category:"分类", save:"添加/修改", saving:"正在保存...", bulk:"批量导入", drop:"请放在这里！", attach:"📎 附加 Excel 文件", drag:"点击或拖放文件到这里", columns:"A列：俗语 | B列：标准术语 | C列：分类（可选）· 自动跳过表头", other:"其他导入方式（网页 URL · 粘贴文本）", fetching:"正在获取", fetch:"获取网页", preview:"预览粘贴内容", cancel:"取消", test:"标准术语转换测试", testDesc:"测试新添加的词是否能正确转换。", testBtn:"测试转换", registered:"已登记术语", refresh:"刷新", loading:"正在加载数据...", added:"新增", duplicate:"重复", missing:"缺失", error:"错误", noSlang:"无俗语" },
+    vi: { title:"Bảng thuật ngữ", desc:"Quản lý thuật ngữ công trường và thuật ngữ chuẩn", add:"Thêm thuật ngữ", slang:"Tiếng lóng (công trường)", standard:"Thuật ngữ chuẩn", category:"Danh mục", save:"Thêm / sửa", saving:"Đang lưu...", bulk:"Nhập hàng loạt", drop:"Thả tệp ở đây!", attach:"📎 Đính kèm tệp Excel", drag:"Nhấp hoặc kéo thả tệp vào đây", columns:"Cột A: tiếng lóng | B: thuật ngữ chuẩn | C: danh mục (tùy chọn) · Tự động bỏ hàng tiêu đề", other:"Cách nhập khác (URL web · dán văn bản)", fetching:"Đang lấy dữ liệu", fetch:"Lấy trang web", preview:"Xem trước nội dung đã dán", cancel:"Hủy", test:"Kiểm tra chuyển đổi thuật ngữ chuẩn", testDesc:"Kiểm tra xem từ mới thêm có được chuyển đổi đúng không.", testBtn:"Kiểm tra chuyển đổi", registered:"Thuật ngữ đã đăng ký", refresh:"Làm mới", loading:"Đang tải dữ liệu...", added:"Đã thêm", duplicate:"Trùng lặp", missing:"Thiếu", error:"Lỗi", noSlang:"Không có tiếng lóng" },
+    ru: { title:"Глоссарий", desc:"Управление терминами объекта и стандартными терминами", add:"Добавить термин", slang:"Сленг (термин объекта)", standard:"Стандартный термин", category:"Категория", save:"Добавить / изменить", saving:"Сохранение...", bulk:"Массовый импорт", drop:"Перетащите файл сюда!", attach:"📎 Прикрепить Excel-файл", drag:"Нажмите или перетащите файлы сюда", columns:"Столбец A: сленг | B: стандартный термин | C: категория (необязательно) · Строка заголовка пропускается", other:"Другие способы импорта (веб-URL · вставка текста)", fetching:"Загрузка", fetch:"Загрузить веб-страницу", preview:"Предпросмотр вставленного текста", cancel:"Отмена", test:"Проверка преобразования терминов", testDesc:"Проверьте корректность преобразования новых слов.", testBtn:"Проверить", registered:"Зарегистрированные термины", refresh:"Обновить", loading:"Загрузка данных...", added:"Добавлено", duplicate:"Дубликат", missing:"Отсутствует", error:"Ошибка", noSlang:"Нет сленга" },
+};
 
 type GlossaryTerm = {
     id: number;
@@ -35,6 +44,18 @@ type ImportRowResult = {
 };
 
 const VALID_CATEGORIES = ["시설", "자재", "도구", "장비", "작업", "검사", "설비", "구조", "안전", "인원", "상태", "단위", "행정", "기타"];
+
+const CATEGORY_LABELS: Record<string, Record<string, string>> = {
+    ko: { "시설":"시설", "자재":"자재", "도구":"도구", "장비":"장비", "작업":"작업", "검사":"검사", "설비":"설비", "구조":"구조", "안전":"안전", "인원":"인원", "상태":"상태", "단위":"단위", "행정":"행정", "기타":"기타" },
+    en: { "시설":"Facility", "자재":"Material", "도구":"Tool", "장비":"Equipment", "작업":"Work", "검사":"Inspection", "설비":"Installation", "구조":"Structure", "안전":"Safety", "인원":"Personnel", "상태":"Status", "단위":"Unit", "행정":"Administration", "기타":"Other" },
+    zh: { "시설":"设施", "자재":"材料", "도구":"工具", "장비":"设备", "작업":"作业", "검사":"检查", "설비":"装置", "구조":"结构", "안전":"安全", "인원":"人员", "상태":"状态", "단위":"单位", "행정":"行政", "기타":"其他" },
+    vi: { "시설":"Cơ sở", "자재":"Vật liệu", "도구":"Dụng cụ", "장비":"Thiết bị", "작업":"Công việc", "검사":"Kiểm tra", "설비":"Lắp đặt", "구조":"Kết cấu", "안전":"An toàn", "인원":"Nhân sự", "상태":"Trạng thái", "단위":"Đơn vị", "행정":"Hành chính", "기타":"Khác" },
+    ru: { "시설":"Объект", "자재":"Материал", "도구":"Инструмент", "장비":"Оборудование", "작업":"Работа", "검사":"Проверка", "설비":"Установка", "구조":"Конструкция", "안전":"Безопасность", "인원":"Персонал", "상태":"Статус", "단위":"Единица", "행정":"Администрирование", "기타":"Другое" },
+};
+
+function categoryLabel(category: string, language: string) {
+    return (CATEGORY_LABELS[language] ?? CATEGORY_LABELS.en)[category] ?? category;
+}
 
 const HEADER_KEYWORDS = ["용어", "은어", "현장용어", "표준어", "standard", "slang", "category", "분류", "카테고리"];
 
@@ -87,6 +108,8 @@ function rowsFromText(text: string, source: string): PreviewRow[] {
 
 export default function GlossaryPage() {
     const router = useRouter();
+    const lang = useDisplayLanguage();
+    const t = { ...GLOSSARY_UI.en, ...(GLOSSARY_UI[lang] || {}) };
     const [terms, setTerms] = useState<GlossaryTerm[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -611,8 +634,8 @@ export default function GlossaryPage() {
                   <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
                   <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
                     <p className="text-[10px] font-black tracking-[.18em] text-blue-200">SQ-LINK TRANSLATION</p>
-                    <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">Glossary</h1>
-                    <p className="mt-2 text-sm font-bold text-slate-100">현장 용어 및 표준어 관리</p>
+                    <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
+                    <p className="mt-2 text-sm font-bold text-slate-100">{t.desc}</p>
                   </div>
                 </div>
 
@@ -623,52 +646,41 @@ export default function GlossaryPage() {
                         <section className="glass rounded-[32px] p-6 border-white/10 shadow-3xl flex flex-col gap-6">
                             <h2 className="text-xl font-black text-white italic tracking-tight uppercase flex items-center gap-2">
                                 <div className="w-1 h-6 bg-blue-500 rounded-full" />
-                                새 용어 추가
+                                {t.add}
                             </h2>
                             <form onSubmit={handleAddTerm} className="flex flex-col gap-4">
                                 <div className="flex flex-col gap-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-2">은어 (현장 용어)</label>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-2">{t.slang}</label>
                                     <input
                                         type="text"
                                         value={newSlang}
                                         onChange={e => setNewSlang(e.target.value)}
-                                        placeholder="예: 공구리"
+                                        placeholder={t.slangExample}
                                         className="w-full bg-slate-900/50 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 font-medium"
                                         required
                                     />
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-2">표준어</label>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-2">{t.standard}</label>
                                     <input
                                         type="text"
                                         value={newStandard}
                                         onChange={e => setNewStandard(e.target.value)}
-                                        placeholder="예: 콘크리트"
+                                        placeholder={t.standardExample}
                                         className="w-full bg-slate-900/50 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 font-medium"
                                         required
                                     />
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-2">카테고리</label>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-2">{t.category}</label>
                                     <select
                                         value={newCategory}
                                         onChange={e => setNewCategory(e.target.value)}
                                         className="w-full bg-slate-900/50 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 font-bold appearance-none"
                                     >
-                                        <option value="시설">시설</option>
-                                        <option value="자재">자재</option>
-                                        <option value="도구">도구</option>
-                                        <option value="장비">장비</option>
-                                        <option value="작업">작업</option>
-                                        <option value="검사">검사</option>
-                                        <option value="설비">설비</option>
-                                        <option value="구조">구조</option>
-                                        <option value="안전">안전</option>
-                                        <option value="인원">인원</option>
-                                        <option value="상태">상태</option>
-                                        <option value="단위">단위</option>
-                                        <option value="행정">행정</option>
-                                        <option value="기타">기타</option>
+                                        {VALID_CATEGORIES.map(category => (
+                                            <option key={category} value={category}>{categoryLabel(category, lang)}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <button
@@ -676,7 +688,7 @@ export default function GlossaryPage() {
                                     disabled={isSubmitting}
                                     className="w-full py-5 bg-gradient-to-br from-blue-500 to-blue-700 text-white font-black rounded-2xl shadow-lg mt-2 disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] transition-transform"
                                 >
-                                    {isSubmitting ? "저장 중..." : "추가/수정하기"}
+                                    {isSubmitting ? t.saving : t.save}
                                 </button>
                             </form>
                         </section>
@@ -685,7 +697,7 @@ export default function GlossaryPage() {
                         <section className="glass rounded-[32px] p-6 border-white/10 shadow-3xl flex flex-col gap-5">
                             <h2 className="text-xl font-black text-white italic tracking-tight uppercase flex items-center gap-2">
                                 <div className="w-1 h-6 bg-green-500 rounded-full" />
-                                일괄 가져오기
+                                {t.bulk}
                             </h2>
 
                             {/* 파일 첨부 버튼 — 가장 눈에 띄게 상단 배치 */}
@@ -702,9 +714,9 @@ export default function GlossaryPage() {
                                 </svg>
                                 <div className="text-center">
                                     <p className="text-sm font-black text-green-300">
-                                        {isDragging ? "여기에 놓으세요!" : "📎 엑셀 파일 첨부"}
+                                        {isDragging ? t.drop : t.attach}
                                     </p>
-                                    <p className="text-xs text-slate-500 mt-1">클릭하거나 파일을 끌어다 놓으세요</p>
+                                    <p className="text-xs text-slate-500 mt-1">{t.drag}</p>
                                     <p className="text-[10px] text-slate-600 mt-1">.xlsx · .xls · .csv · .docx</p>
                                 </div>
                                 <input
@@ -717,7 +729,7 @@ export default function GlossaryPage() {
                             </div>
 
                             <p className="text-xs text-slate-600 font-bold leading-relaxed text-center">
-                                A열: 은어 &nbsp;|&nbsp; B열: 표준어 &nbsp;|&nbsp; C열: 카테고리(선택) · 헤더 행 자동 건너뜀
+                                {t.columns}
                             </p>
 
                             {/* 다른 방법: 웹 URL / 텍스트 붙여넣기 */}
@@ -726,7 +738,7 @@ export default function GlossaryPage() {
                                     <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                                     </svg>
-                                    다른 방법으로 가져오기 (웹 URL · 텍스트 붙여넣기)
+                                    {t.other}
                                 </summary>
                                 <div className="flex flex-col gap-3 mt-3">
                                     <div className="flex gap-2">
@@ -742,13 +754,13 @@ export default function GlossaryPage() {
                                             disabled={isFetchingUrl || !webUrl.trim()}
                                             className="shrink-0 px-4 py-3 bg-green-600/20 text-green-300 hover:bg-green-600/35 disabled:opacity-40 rounded-xl text-xs font-black transition-colors"
                                         >
-                                            {isFetchingUrl ? "가져오는 중" : "웹 가져오기"}
+                                            {isFetchingUrl ? t.fetching : t.fetch}
                                         </button>
                                     </div>
                                     <textarea
                                         value={pasteText}
                                         onChange={e => setPasteText(e.target.value)}
-                                        placeholder={"현장용어, 표준어, 분류\n오함마, 대형 망치, 도구"}
+                                        placeholder={t.pasteExample}
                                         className="w-full h-24 bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-green-500/50 resize-none"
                                     />
                                     <button
@@ -757,7 +769,7 @@ export default function GlossaryPage() {
                                         disabled={!pasteText.trim()}
                                         className="w-full py-3 bg-white/5 text-slate-300 hover:bg-white/10 disabled:opacity-40 rounded-xl text-xs font-black transition-colors"
                                     >
-                                        붙여넣은 내용 미리보기
+                                        {t.preview}
                                     </button>
                                 </div>
                             </details>
@@ -771,12 +783,12 @@ export default function GlossaryPage() {
 
                             {importStatus && (
                                 <div className="bg-green-900/30 border border-green-700/40 rounded-xl px-4 py-3 text-sm font-bold space-y-1">
-                                    <p className="text-green-300">✅ {importStatus.ok}개 신규 추가 완료</p>
+                                            <p className="text-green-300">✅ {importStatus.ok} {t.added}</p>
                                     {importStatus.dup > 0 && (
-                                        <p className="text-yellow-400">⏭ {importStatus.dup}개 중복 — 자동 제외됨</p>
+                                        <p className="text-yellow-400">⏭ {importStatus.dup} {t.count} {t.duplicate} — {t.skipped}</p>
                                     )}
                                     {importStatus.invalid > 0 && (
-                                        <p className="text-red-400">❌ {importStatus.invalid}개 누락 — 건너뜀</p>
+                                        <p className="text-red-400">❌ {importStatus.invalid} {t.count} {t.missing} — {t.skippedMissing}</p>
                                     )}
                                     {importStatus.rows.some(row => row.status !== "INSERTED") && (
                                         <div className="mt-2 max-h-32 overflow-y-auto rounded-lg border border-white/10 bg-black/20 px-3 py-2 space-y-1">
@@ -784,7 +796,7 @@ export default function GlossaryPage() {
                                                 .filter(row => row.status !== "INSERTED")
                                                 .map(row => (
                                                     <p key={`${row.row}-${row.status}`} className={row.status === "INVALID" ? "text-red-300" : "text-yellow-300"}>
-                                                        {row.row}행 · {row.status === "INVALID" ? "오류" : "중복"} · {row.slang || "은어 없음"}
+                                                        {t.row} {row.row} · {row.status === "INVALID" ? t.error : t.duplicate} · {row.slang || t.noSlang}
                                                         {row.reason ? ` (${row.reason})` : ""}
                                                     </p>
                                                 ))}
@@ -804,16 +816,16 @@ export default function GlossaryPage() {
                                         <div className="flex items-center justify-between">
                                             <div className="flex gap-2 flex-wrap">
                                                 <span className="text-[11px] bg-green-900/40 text-green-400 border border-green-700/40 px-2 py-0.5 rounded-full font-bold">
-                                                    🟢 신규 {newCount}
+                                                    🟢 {t.new} {newCount}
                                                 </span>
                                                 {dupCount > 0 && (
                                                     <span className="text-[11px] bg-yellow-900/40 text-yellow-400 border border-yellow-700/40 px-2 py-0.5 rounded-full font-bold">
-                                                        🟡 중복 {dupCount}
+                                                        🟡 {t.duplicate} {dupCount}
                                                     </span>
                                                 )}
                                                 {badCount > 0 && (
                                                     <span className="text-[11px] bg-red-900/40 text-red-400 border border-red-700/40 px-2 py-0.5 rounded-full font-bold">
-                                                        🔴 누락 {badCount}
+                                                        🔴 {t.missing} {badCount}
                                                     </span>
                                                 )}
                                             </div>
@@ -821,7 +833,7 @@ export default function GlossaryPage() {
                                                 onClick={() => setPreview([])}
                                                 className="text-xs text-slate-500 hover:text-red-400 transition-colors"
                                             >
-                                                취소
+                                        {t.cancel}
                                             </button>
                                         </div>
 
@@ -848,9 +860,9 @@ export default function GlossaryPage() {
                                                         <span className={`flex-1 truncate ${isDup || isBad ? "text-slate-600" : "text-white"}`}>
                                                             {row.standard || "—"}
                                                         </span>
-                                                        <span className="text-slate-700 w-12 text-right shrink-0">{row.category}</span>
-                                                        {isDup && <span className="text-[10px] text-yellow-600 shrink-0">중복</span>}
-                                                        {isBad && <span className="text-[10px] text-red-600 shrink-0">누락</span>}
+                                                        <span className="text-slate-700 w-12 text-right shrink-0">{categoryLabel(row.category, lang)}</span>
+                                                        {isDup && <span className="text-[10px] text-yellow-600 shrink-0">{t.duplicate}</span>}
+                                                        {isBad && <span className="text-[10px] text-red-600 shrink-0">{t.missing}</span>}
                                                     </div>
                                                 );
                                             })}
@@ -861,7 +873,7 @@ export default function GlossaryPage() {
                                             disabled={isImporting || newCount === 0}
                                             className="w-full py-4 bg-gradient-to-br from-green-500 to-green-700 text-white font-black rounded-2xl shadow-lg disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] transition-transform"
                                         >
-                                            {isImporting ? "저장 중..." : `신규 ${newCount}개 추가 (중복 ${dupCount}개 제외)`}
+                                            {isImporting ? t.saving : `${t.new} ${newCount} ${t.count} ${t.added} (${t.duplicate} ${dupCount} ${t.count} ${t.excluding})`}
                                         </button>
                                     </div>
                                 );
@@ -872,21 +884,21 @@ export default function GlossaryPage() {
                         <section className="glass rounded-[32px] p-6 border-white/10 shadow-3xl flex flex-col gap-4">
                             <h2 className="text-xl font-black text-white italic tracking-tight uppercase flex items-center gap-2">
                                 <div className="w-1 h-6 bg-purple-500 rounded-full" />
-                                표준어 변환 테스트
+                                {t.test}
                             </h2>
-                            <p className="text-sm font-bold text-slate-400">새로 추가한 단어가 잘 변환되는지 테스트해 보세요.</p>
+                            <p className="text-sm font-bold text-slate-400">{t.testDesc}</p>
                             <div className="flex flex-col gap-3">
                                 <textarea
                                     value={testInput}
                                     onChange={e => setTestInput(e.target.value)}
-                                    placeholder="여기다가 야리끼리로 철근 공구리 치고 시마이 합시다 쳐보세요"
+                                    placeholder={t.testDesc}
                                     className="w-full h-24 bg-slate-900/50 border border-white/10 rounded-2xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-purple-500/50 resize-none font-medium"
                                 />
                                 <button
                                     onClick={handleTestNormalize}
                                     className="py-3 bg-purple-600/20 text-purple-300 hover:bg-purple-600/40 font-black rounded-xl transition-colors tracking-wider"
                                 >
-                                    변환 테스트
+                                    {t.testBtn}
                                 </button>
                             </div>
                             {testResult && (
@@ -902,10 +914,10 @@ export default function GlossaryPage() {
                         <div className="flex justify-between items-center px-2 flex-shrink-0 mb-2">
                             <h2 className="text-2xl font-black text-white italic tracking-tight uppercase flex items-center gap-3">
                                 <div className="w-1.5 h-8 bg-amber-500 rounded-full" />
-                                등록된 용어 목록
-                                <span className="text-xs max-w-min px-3 py-1 bg-white/10 rounded-full font-bold ml-2">{terms.length}개</span>
+                                {t.registered}
+                                <span className="text-xs max-w-min px-3 py-1 bg-white/10 rounded-full font-bold ml-2">{terms.length} {t.count}</span>
                             </h2>
-                            <button onClick={fetchTerms} className="p-2 text-slate-400 hover:text-white transition-colors" title="새로고침">
+                            <button onClick={fetchTerms} className="p-2 text-slate-400 hover:text-white transition-colors" title={t.refresh}>
                                 <svg className={`w-6 h-6 ${loading ? 'animate-spin text-blue-400' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                 </svg>
@@ -915,7 +927,7 @@ export default function GlossaryPage() {
                         <div className="overflow-y-auto pr-2 custom-scrollbar flex-1 flex flex-col gap-2">
                             {loading && terms.length === 0 ? (
                                 <div className="text-center py-10 text-slate-500 font-bold animate-pulse uppercase tracking-widest">
-                                    데이터를 불러오는 중입니다...
+                                    {t.loading}
                                 </div>
                             ) : (
                                 <AnimatePresence>
@@ -930,7 +942,7 @@ export default function GlossaryPage() {
                                         >
                                             <div className="flex items-center gap-4">
                                                 <span className="w-14 text-center px-2 py-1 bg-white/5 rounded-lg text-xs font-black text-slate-400 tracking-wider">
-                                                    {term.category}
+                                                    {categoryLabel(term.category, lang)}
                                                 </span>
                                                 <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4">
                                                     <span className={`text-xl font-black ${term.is_active ? 'text-amber-400' : 'text-slate-500 line-through'}`}>
@@ -951,18 +963,18 @@ export default function GlossaryPage() {
                                                     }}
                                                     className="px-3 py-1.5 rounded-lg border border-slate-600/50 text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-700 transition-colors hidden md:block"
                                                 >
-                                                    수정
+                                                    {t.edit}
                                                 </button>
                                                 <button
                                                     onClick={() => handleToggleActive(term.id, term.is_active)}
                                                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${term.is_active ? 'bg-white/10 text-slate-300 hover:bg-slate-700' : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'}`}
                                                 >
-                                                    {term.is_active ? '비활성화' : '활성화'}
+                                                    {term.is_active ? t.deactivate : t.activate}
                                                 </button>
                                                 <button
                                                     onClick={() => handleDelete(term.id)}
                                                     className="p-1.5 text-slate-500 hover:text-red-400 bg-white/5 hover:bg-red-500/10 rounded-lg transition-colors"
-                                                    title="완전 삭제"
+                                                    title={t.delete}
                                                 >
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -975,7 +987,7 @@ export default function GlossaryPage() {
                             )}
                             {terms.length === 0 && !loading && (
                                 <div className="text-center py-10 text-slate-500 font-bold uppercase tracking-widest">
-                                    등록된 용어가 없습니다.
+                                    {t.none}
                                 </div>
                             )}
                         </div>

@@ -48,6 +48,9 @@ export type QrEntryText = {
   blockedTitle: string;
   blockedBody: string;
   workerFallbackName: string;
+  activeTitle: string;
+  activeBody: string;
+  checkout: string;
 };
 
 export const QR_LANGUAGE_OPTIONS: QrLanguageOption[] = [
@@ -93,6 +96,9 @@ const EN_TEXT: QrEntryText = {
   blockedTitle: "Work ended for today",
   blockedBody: "SQ Link access is disabled until the next TBM check-in.",
   workerFallbackName: "Worker",
+  activeTitle: "SQ Link is active",
+  activeBody: "You have already checked in.",
+  checkout: "Check out",
 };
 
 export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
@@ -116,6 +122,9 @@ export const QR_ENTRY_TEXT: Record<QrLanguageCode, QrEntryText> = {
     blockedTitle: "오늘 근무가 종료되었습니다",
     blockedBody: "다음 TBM 출근 태깅 전까지 SQ Link 사용이 중지됩니다.",
     workerFallbackName: "근로자",
+    activeTitle: "SQ Link 이용 중",
+    activeBody: "이미 입장 처리되었습니다.",
+    checkout: "퇴근하기",
   },
   vi: {
     ...EN_TEXT,

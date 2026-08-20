@@ -7,6 +7,7 @@ import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import ExportMenu from "@/components/ExportMenu";
 import { exportData, type ExportFormat } from "@/utils/export-files";
+import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 // 언어 폴백용 — nationality 가 없을 때만 사용
 const isoMap: Record<string, string> = {
@@ -54,6 +55,11 @@ const ui: Record<string, any> = {
         prev: "이전",
         next: "다음",
         noHistoryDate: "해당 날짜에 TBM이 없습니다.",
+        language: "언어",
+        desc: "근로자 확인 및 서명 현황을 실시간으로 확인합니다.",
+        signatureTitle: "근로자 전자 서명",
+        verified: "검증 완료 · 법적 효력 있음",
+        downloadImage: "이미지 다운로드",
     },
     en: {
         title: "TBM Status",
@@ -76,6 +82,11 @@ const ui: Record<string, any> = {
         prev: "Prev",
         next: "Next",
         noHistoryDate: "No TBM on this date.",
+        language: "Language",
+        desc: "Monitor worker confirmation and signature status in real time.",
+        signatureTitle: "Worker Digital Signature",
+        verified: "Verified & legally binding",
+        downloadImage: "Download image",
     },
     zh: {
         title: "TBM签名状态",
@@ -98,6 +109,17 @@ const ui: Record<string, any> = {
         prev: "上一天",
         next: "下一天",
         noHistoryDate: "该日期没有TBM。",
+        language: "语言",
+        desc: "实时查看工人确认和签名状态。",
+        signatureTitle: "工人电子签名",
+        verified: "已验证，具有法律效力",
+        downloadImage: "下载图片",
+    },
+    vi: {
+        title: "Trạng thái chữ ký TBM", signed: "Đã ký", unsigned: "Chưa ký", total: "Tổng", back: "Quay lại", noTBM: "Chưa có TBM được gửi.", noWorker: "Không có công nhân đã đăng ký.", signedAt: "Thời gian ký", refreshBtn: "Làm mới", status: "Theo dõi trực tiếp", totalAttendance: "Tổng số người có mặt", signedRate: "Tỷ lệ đã ký", activeDispatch: "Nội dung gửi gần đây", registry: "Danh sách công nhân", members: "người", historyTitle: "Lịch sử TBM", today: "Hôm nay", prev: "Trước", next: "Tiếp", noHistoryDate: "Không có TBM trong ngày này.", language: "Ngôn ngữ", desc: "Theo dõi xác nhận và trạng thái chữ ký của công nhân theo thời gian thực.", signatureTitle: "Chữ ký điện tử của công nhân", verified: "Đã xác minh · có giá trị pháp lý", downloadImage: "Tải ảnh"
+    },
+    ru: {
+        title: "Статус подписей TBM", signed: "Подписано", unsigned: "Не подписано", total: "Всего", back: "Назад", noTBM: "TBM ещё не отправлялся.", noWorker: "Нет зарегистрированных работников.", signedAt: "Время подписи", refreshBtn: "Обновить", status: "Мониторинг в реальном времени", totalAttendance: "Всего присутствующих", signedRate: "Доля подписей", activeDispatch: "Последняя отправка", registry: "Список работников", members: "чел.", historyTitle: "История TBM", today: "Сегодня", prev: "Назад", next: "Далее", noHistoryDate: "На эту дату нет TBM.", language: "Язык", desc: "Отслеживайте подтверждения и статус подписей работников в реальном времени.", signatureTitle: "Электронная подпись работника", verified: "Проверено · юридически действительно", downloadImage: "Скачать изображение"
     },
 };
 
@@ -114,6 +136,7 @@ function toDateStr(d: Date): string {
 function TBMStatusPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const displayLang = useDisplayLanguage();
     const [workers, setWorkers] = useState<WorkerStatus[]>([]);
     const [latestTBM, setLatestTBM] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -209,23 +232,23 @@ function TBMStatusPageContent() {
         const signedWorkers = workers.filter(w => w.signed);
         const unsignedWorkers = workers.filter(w => !w.signed);
         await exportData(format, {
-            title: "TBM 서명 현황 리포트",
-            subtitle: `${latestTBM.site_name || "현장"} / ${new Date(latestTBM.created_at).toLocaleString("ko-KR")}`,
+            title: `${t.title} Report`,
+            subtitle: `${latestTBM.site_name || t.status} / ${new Date(latestTBM.created_at).toLocaleString(locale)}`,
             filename: `tbm_signature_report_${latestTBM.site_name || "site"}_${new Date().toISOString().slice(0, 10)}`,
             summary: [
-                { label: "전체", value: workers.length },
-                { label: "서명 완료", value: signedWorkers.length },
-                { label: "미서명", value: unsignedWorkers.length },
-                { label: "서명률", value: workers.length ? `${Math.round((signedWorkers.length / workers.length) * 100)}%` : "0%" },
+                { label: t.total, value: workers.length },
+                { label: t.signed, value: signedWorkers.length },
+                { label: t.unsigned, value: unsignedWorkers.length },
+                { label: t.signedRate, value: workers.length ? `${Math.round((signedWorkers.length / workers.length) * 100)}%` : "0%" },
             ],
             columns: [
-                { key: "display_name", label: "근로자" },
-                { key: "preferred_lang", label: "언어" },
-                { key: "signed", label: "서명 여부", value: row => row.signed ? "완료" : "미서명" },
-                { key: "signed_at", label: "서명 시각", value: row => row.signed_at || "" },
+                { key: "display_name", label: t.registry },
+                { key: "preferred_lang", label: t.language },
+                { key: "signed", label: t.status, value: row => row.signed ? t.signed : t.unsigned },
+                { key: "signed_at", label: t.signedAt, value: row => row.signed_at || "" },
                 {
-                    key: "signature", label: "서명",
-                    value: row => row.signed ? "서명함" : "-",  // excel/json: 텍스트
+                    key: "signature", label: t.signed,
+                    value: row => row.signed ? t.signed : "-",  // excel/json: text
                     html: row => row.signed && row.signature_data   // pdf/word: 서명 이미지
                         ? `<img src="${row.signature_data}" style="height:34px;max-width:130px;object-fit:contain" />`
                         : "-",
@@ -503,7 +526,8 @@ function TBMStatusPageContent() {
     const signedCount = workers.filter(w => w.signed).length;
     const totalCount = workers.length;
     const signRate = totalCount > 0 ? Math.round((signedCount / totalCount) * 100) : 0;
-    const t = getUI(adminLang);
+    const t = getUI(displayLang || adminLang);
+    const locale = ({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[displayLang || adminLang] || "en-US";
 
     return (
         <RoleGuard allowedRole="admin">
@@ -551,7 +575,7 @@ function TBMStatusPageContent() {
                         <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
                             <p className="flex items-center gap-2 text-[10px] font-black tracking-[.18em] text-green-200"><span className="h-2 w-2 rounded-full bg-green-400" />{t.status}</p>
                             <h2 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h2>
-                            <p className="mt-2 text-sm font-bold text-slate-100">근로자 확인 및 서명 현황을 실시간으로 확인합니다.</p>
+                            <p className="mt-2 text-sm font-bold text-slate-100">{t.desc}</p>
                         </div>
                     </div>
 
@@ -617,7 +641,7 @@ function TBMStatusPageContent() {
                                         className={`flex-shrink-0 px-4 py-3 rounded-2xl text-xs font-bold tap-effect transition-all ${latestTBM?.id === tbm.id ? "bg-blue-500/20 text-blue-400 border border-blue-500/30" : "glass border-white/5 text-slate-500 hover:text-white"}`}
                                     >
                                         <span className="font-black">#{idx + 1}</span>
-                                        <span className="ml-2">{new Date(tbm.created_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</span>
+                                        <span className="ml-2">{new Date(tbm.created_at).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}</span>
                                     </button>
                                 ))}
                             </div>
@@ -634,7 +658,7 @@ function TBMStatusPageContent() {
                         <div className="glass rounded-[32px] p-6 border-white/5 flex flex-col gap-3 group animate-float">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{t.activeDispatch}</h3>
-                                <span className="text-[10px] text-slate-700 font-bold">{new Date(latestTBM.created_at).toLocaleString()}</span>
+                                <span className="text-[10px] text-slate-700 font-bold">{new Date(latestTBM.created_at).toLocaleString(locale)}</span>
                             </div>
                             <p className="text-slate-400 font-bold leading-relaxed italic">&quot;{latestTBM.content_ko}&quot;</p>
                         </div>
@@ -681,12 +705,12 @@ function TBMStatusPageContent() {
                                                         setSelectedWorker(worker.display_name);
                                                     }}
                                                     className="h-14 px-3 rounded-xl bg-white border border-white/10 flex items-center justify-center hover:bg-white/95 hover:border-blue-400/40 transition-all shadow-lg group/sig"
-                                                    title="클릭하여 크게 보기"
+                                                    title={t.signatureTitle}
                                                 >
                                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                                     <img
                                                         src={worker.signature_data}
-                                                        alt={`${worker.display_name} 서명`}
+                                                        alt={`${worker.display_name} ${t.signed}`}
                                                         className="h-full w-auto max-w-[120px] object-contain"
                                                     />
                                                 </button>
@@ -709,7 +733,7 @@ function TBMStatusPageContent() {
                         <div className="relative glass p-1 rounded-[40px] border border-white/20 shadow-2xl animate-float max-w-lg w-full" onClick={e => e.stopPropagation()}>
                             <div className="bg-white rounded-[38px] overflow-hidden p-8 flex flex-col gap-6 items-center">
                                 <div className="flex justify-between w-full items-center">
-                                    <h3 className="text-slate-950 font-black italic tracking-tighter uppercase">Worker Digital Signature</h3>
+                                    <h3 className="text-slate-950 font-black italic tracking-tighter uppercase">{t.signatureTitle}</h3>
                                     <button onClick={() => setSelectedSignature(null)} className="text-slate-400 hover:text-slate-950 transition-colors">
                                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -720,20 +744,20 @@ function TBMStatusPageContent() {
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                     src={selectedSignature}
-                                    alt="Signature"
+                                    alt={t.signatureTitle}
                                     className="w-full h-auto object-contain border-y border-slate-100 py-4"
                                 />
                                 <div className="flex justify-between w-full items-center">
                                     <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                                         <Shield className="w-3 h-3" />
-                                        Verified & Legally Binding
+                                        {t.verified}
                                     </div>
                                     <button
                                         onClick={() => handleDownload(selectedSignature, selectedWorker || "worker")}
                                         className="bg-slate-950 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-colors flex items-center gap-2"
                                     >
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                        Download Image
+                                        {t.downloadImage}
                                     </button>
                                 </div>
                             </div>

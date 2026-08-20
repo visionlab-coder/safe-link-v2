@@ -61,6 +61,29 @@ type Mode = "lang" | "role" | "worker" | "admin";
 
 const V3_ROLE_PRIORITY: V3Role[] = ["ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER", "WORKER", "VIEWER"];
 
+const RESET_PASSWORD_LABELS: Record<string, string> = {
+  ko: "비밀번호를 잊으셨나요?",
+  vi: "Quên mật khẩu?",
+  zh: "忘记密码？",
+  th: "ลืมรหัสผ่าน?",
+  uz: "Parolni unutdingizmi?",
+  ph: "Nakalimutan ang password?",
+  km: "ភ្លេចពាក្យសម្ងាត់?",
+  id: "Lupa kata sandi?",
+  mn: "Нууц үгээ мартсан уу?",
+  my: "စကားဝှက်မေ့နေပါသလား?",
+  ne: "पासवर्ड बिर्सनुभयो?",
+  bn: "পাসওয়ার্ড ভুলে গেছেন?",
+  kk: "Құпия сөзді ұмыттыңыз ба?",
+  ru: "Забыли пароль?",
+  en: "Forgot password?",
+  jp: "パスワードをお忘れですか？",
+  fr: "Mot de passe oublié ?",
+  es: "¿Olvidó su contraseña?",
+  ar: "هل نسيت كلمة المرور؟",
+  hi: "पासवर्ड भूल गए?",
+};
+
 function pickDefaultV3Role(roles: V3Role[]): V3Role | null {
   return V3_ROLE_PRIORITY.find((role) => roles.includes(role)) ?? null;
 }
@@ -260,8 +283,18 @@ function AuthContent() {
     setLoading(true);
     try {
       const user = await loginV3(adminEmail, password);
+      const activeLang = lang || "ko";
+      // 로그인 화면에서 고른 언어를 다음 화면의 기본 언어로 유지하고,
+      // 로그인한 사용자의 설정에도 저장한다. 저장 실패가 로그인을 막지는 않는다.
+      localStorage.setItem("safe-link-lang", activeLang);
+      await fetch("/api/auth/setup-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ display_name: user.displayName, preferred_lang: activeLang }),
+      }).catch(() => null);
       sessionStorage.setItem("safe-link-session-active", "true");
-      redirectByRoleString(pickDefaultV3Role(user.roles), lang || "ko");
+      redirectByRoleString(pickDefaultV3Role(user.roles), activeLang);
     } catch (err) {
       alert(sanitizeAuthError(err instanceof Error ? err.message : "unknown"));
       setLoading(false);
@@ -315,7 +348,7 @@ function AuthContent() {
           <div className="p-7">
             {/* Header */}
             <div className="text-center mb-7">
-              <BrandLogo compact={false} className="mb-4 justify-center" imageClassName="max-w-[250px]" />
+              <BrandLogo compact={false} framed className="mb-4 justify-center" imageClassName="max-w-[250px]" />
               <div className="relative mb-4 h-28 overflow-hidden rounded-2xl border border-[#cdd6e2]">
                 <picture>
                   <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/access.webp" />
@@ -388,7 +421,7 @@ function AuthContent() {
 
         {/* Brand + lang chip */}
         <div className="text-center mb-5">
-          <BrandLogo compact className="mb-3 justify-center" imageClassName="max-w-[180px]" />
+          <BrandLogo compact framed className="mb-3 justify-center" imageClassName="max-w-[180px]" />
           <h1 className="text-4xl font-black text-white tracking-tighter leading-none">
             SAFE<span className="text-blue-400">-LINK</span>
           </h1>
@@ -612,6 +645,16 @@ function AuthContent() {
                     onKeyDown={e => !adminSignupMode && e.key === "Enter" && handleAdminLogin()}
                     className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
                 </div>
+
+                {!adminSignupMode && (
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/auth/reset-password?lang=${encodeURIComponent(lang || "en")}`)}
+                    className="min-h-11 -mt-2 self-end px-2 text-xs font-semibold text-blue-600 hover:text-blue-500 transition-colors"
+                  >
+                    {RESET_PASSWORD_LABELS[lang || "en"] ?? RESET_PASSWORD_LABELS.en}
+                  </button>
+                )}
 
                 {adminSignupMode && (
                   <>

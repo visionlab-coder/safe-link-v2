@@ -10,6 +10,15 @@ import {
     type AllowedRole,
     type ProfileRole,
 } from "@/lib/roles";
+import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+
+const ROLE_GUARD_MESSAGE: Record<string, string> = {
+    ko: "안전하게 로그인 확인 중입니다...",
+    en: "Verifying your secure sign-in...",
+    zh: "正在安全验证登录...",
+    vi: "Đang xác minh đăng nhập an toàn...",
+    ru: "Безопасная проверка входа...",
+};
 
 // RoleGuard — 클라이언트 인증/권한 가드.
 //
@@ -32,6 +41,7 @@ export default function RoleGuard({
     allowedRole: AllowedRole;
 }) {
     const router = useRouter();
+    const language = useDisplayLanguage();
     const [isAuthorized, setIsAuthorized] = useState(false);
 
     useEffect(() => {
@@ -132,7 +142,7 @@ export default function RoleGuard({
                 <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-[28px] border border-blue-100 bg-white shadow-[0_16px_40px_rgba(37,99,235,.12)]">
                     <div className="h-10 w-10 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin" />
                 </div>
-                <p className="font-black tracking-tight text-[#172033]">안전하게 로그인 확인 중입니다...</p>
+                <p className="font-black tracking-tight text-[#172033]">{ROLE_GUARD_MESSAGE[language] ?? ROLE_GUARD_MESSAGE.en}</p>
                 <p className="mt-2 text-xs font-bold tracking-widest text-slate-500">SAFE-LINK SECURE ACCESS</p>
             </div>
         );

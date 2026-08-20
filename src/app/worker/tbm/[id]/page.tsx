@@ -12,6 +12,7 @@ import { hangulize } from "@/utils/hangulize";
 import { playPremiumAudio } from "@/utils/tts";
 import { playNotificationSound } from "@/utils/notifications";
 import { saveTbmCache, loadTbmCache, isOffline } from "@/utils/native/tbm-cache";
+import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 // ── 언어 코드 매핑 ── (미사용 — 향후 TTS 연동 예정)
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -121,12 +122,13 @@ const translateChunked = async (
 
 // ── UI 텍스트 (다국어) ──
 const uiText: Record<string, any> = {
-    ko: { title: "안전 브리핑", original: "원문 (한국어)", translated: "번역본", voice: "음성으로 듣기", signHere: "이곳에 서명하세요", clear: "다시 쓰기", confirm: "✍️ 서명 완료하기", signed: "✓ 오늘 서명 완료!", translating: "번역 중...", noTBM: "오늘 전파된 브리핑이 없습니다.", mustSign: "서명 없이 나가시겠습니까?", alreadySigned: "이미 오늘 서명하셨습니다.", back: "뒤로", pron: "발음", rev: "역번역", listenFirst: "먼저 브리핑 음성을 끝까지 들어주세요.", listenStatus: "브리핑 청취" },
-    en: { title: "Safety Briefing", original: "Original (Korean)", translated: "Translation", voice: "Listen", signHere: "Please sign here", clear: "Clear", confirm: "✍️ Confirm & Sign", signed: "✓ Signed!", translating: "Translating...", noTBM: "No briefing today.", mustSign: "Leave without signing?", alreadySigned: "Already signed today.", back: "Back", pron: "Pronunciation", rev: "Reverse Trans", listenFirst: "Please listen to the full audio briefing first.", listenStatus: "Briefing Status" },
-    vi: { title: "Thông báo an toàn", original: "Gốc (Tiếng Hàn)", translated: "Bản dịch", voice: "Nghe", signHere: "Ký tên ở đây", clear: "Xóa", confirm: "✍️ Xác nhận & Ký", signed: "✓ Đã ký!", translating: "Đang dịch...", noTBM: "Chưa có thông báo hôm nay.", mustSign: "Rời đi mà không ký?", alreadySigned: "Đã ký hôm nay rồi.", back: "Quay lại", pron: "Phát âm", rev: "Dịch ngược", listenFirst: "Vui lòng nghe hết bản tin an toàn trước.", listenStatus: "Trạng thái nghe" },
+    ko: { title: "안전 브리핑", original: "원문 (한국어)", translated: "번역본", voice: "음성으로 듣기", signHere: "이곳에 서명하세요", clear: "다시 쓰기", confirm: "✍️ 서명 완료하기", signed: "✓ 오늘 서명 완료!", translating: "번역 중...", noTBM: "오늘 전파된 브리핑이 없습니다.", mustSign: "서명 없이 나가시겠습니까?", alreadySigned: "이미 오늘 서명하셨습니다.", back: "뒤로", pron: "발음", rev: "역번역", listenFirst: "먼저 브리핑 음성을 끝까지 들어주세요.", listenStatus: "브리핑 청취", male: "남성", female: "여성", offline: "📴 오프라인 — 저장된 TBM을 표시합니다. 네트워크 복구 후 최신 내용으로 갱신하세요.", playing: "재생 중...", voiceLang: "음성 언어", signatureFailed: "서명 저장에 실패했습니다", networkFailed: "서명 저장 중 네트워크 오류가 발생했습니다." },
+    en: { title: "Safety Briefing", original: "Original (Korean)", translated: "Translation", voice: "Listen", signHere: "Please sign here", clear: "Clear", confirm: "✍️ Confirm & Sign", signed: "✓ Signed!", translating: "Translating...", noTBM: "No briefing today.", mustSign: "Leave without signing?", alreadySigned: "Already signed today.", back: "Back", pron: "Pronunciation", rev: "Reverse Trans", listenFirst: "Please listen to the full audio briefing first.", listenStatus: "Briefing Status", male: "Male", female: "Female", offline: "📴 Offline — displaying saved TBM. Refresh after the network is restored.", playing: "Playing...", voiceLang: "Voice language", signatureFailed: "Failed to save signature", networkFailed: "A network error occurred while saving the signature." },
+    vi: { title: "Thông báo an toàn", original: "Gốc (Tiếng Hàn)", translated: "Bản dịch", voice: "Nghe", signHere: "Ký tên ở đây", clear: "Xóa", confirm: "✍️ Xác nhận & Ký", signed: "✓ Đã ký!", translating: "Đang dịch...", noTBM: "Chưa có thông báo hôm nay.", mustSign: "Rời đi mà không ký?", alreadySigned: "Đã ký hôm nay rồi.", back: "Quay lại", pron: "Phát âm", rev: "Dịch ngược", listenFirst: "Vui lòng nghe hết bản tin an toàn trước.", listenStatus: "Trạng thái nghe", male: "NAM", female: "NỮ", offline: "📴 Ngoại tuyến — đang hiển thị TBM đã lưu. Hãy làm mới sau khi có mạng.", playing: "Đang phát...", voiceLang: "Ngôn ngữ giọng nói", signatureFailed: "Không thể lưu chữ ký", networkFailed: "Đã xảy ra lỗi mạng khi lưu chữ ký." },
     th: { title: "สรุปความปลอดภัย", original: "ต้นฉบับ (เกาหลี)", translated: "คำแปล", voice: "ฟังเสียง", signHere: "ลงชื่อที่นี่", clear: "ล้าง", confirm: "✍️ ยืนยันและลงนาม", signed: "✓ ลงนามแล้ว!", translating: "กำลังแปล...", noTBM: "ยังไม่มีสรุปวันนี้", mustSign: "ออกโดยไม่ลงนาม?", alreadySigned: "ลงนามแล้ววันนี้", back: "กลับ", pron: "การออกเสียง", rev: "แปลย้อนกลับ" },
     uz: { title: "Xavfsizlik brifing", original: "Asl (Koreys)", translated: "Tarjima", voice: "Tinglash", signHere: "Bu yerga imzo chekish", clear: "Tozalash", confirm: "✍️ Tasdiqlash va imzo", signed: "✓ Imzolandi!", translating: "Tarjima qilinmoqda...", noTBM: "Bugungi brifing yo'q.", mustSign: "Imzosiz chiqilsinmi?", alreadySigned: "Bugun allaqachon imzolandi.", back: "Orqaga", pron: "Talaffuz", rev: "Teskari tarjima", listenFirst: "Iltimos, avval brifingni oxirigacha tinglang.", listenStatus: "Eshitish holati" },
-    zh: { title: "安全简报", original: "原文（韩语）", translated: "翻译", voice: "语音播放", signHere: "请在此签名", clear: "清除", confirm: "✍️ 确认并签名", signed: "✓ 签名完成！", translating: "翻译中...", noTBM: "今天没有简报", mustSign: "不签名就离开？", alreadySigned: "今天已经签名了。", back: "返回", pron: "发音", rev: "回译", listenFirst: "请先完整听取简报语音。", listenStatus: "听取状态" },
+    zh: { title: "安全简报", original: "原文（韩语）", translated: "翻译", voice: "语音播放", signHere: "请在此签名", clear: "清除", confirm: "✍️ 确认并签名", signed: "✓ 签名完成！", translating: "翻译中...", noTBM: "今天没有简报", mustSign: "不签名就离开？", alreadySigned: "今天已经签名了。", back: "返回", pron: "发音", rev: "回译", listenFirst: "请先完整听取简报语音。", listenStatus: "听取状态", male: "男", female: "女", offline: "📴 离线 — 正在显示已保存的 TBM。网络恢复后请刷新。", playing: "正在播放...", voiceLang: "语音语言", signatureFailed: "签名保存失败", networkFailed: "保存签名时发生网络错误。" },
+    ru: { title: "Инструктаж по безопасности", original: "Оригинал (корейский)", translated: "Перевод", voice: "Прослушать", signHere: "Поставьте подпись здесь", clear: "Очистить", confirm: "✍️ Подтвердить и подписать", signed: "✓ Подписано!", translating: "Перевод...", noTBM: "Сегодня инструктажа нет.", mustSign: "Выйти без подписи?", alreadySigned: "Вы уже подписали сегодня.", back: "Назад", pron: "Произношение", rev: "Обратный перевод", listenFirst: "Сначала полностью прослушайте инструктаж.", listenStatus: "Статус прослушивания", male: "МУЖ", female: "ЖЕН", offline: "📴 Офлайн — показан сохранённый TBM. После восстановления сети обновите содержимое.", playing: "Воспроизведение...", voiceLang: "Язык голоса", signatureFailed: "Не удалось сохранить подпись", networkFailed: "При сохранении подписи произошла ошибка сети." },
 };
 // ── 텍스트 클리닝 (중법 괄호 및 반복 제거) ──
 const cleanupText = (text: string): string => {
@@ -155,6 +157,7 @@ function WorkerTBMDetailContent() {
     const searchParams = useSearchParams();
     const tbmId = params?.id as string | undefined;
     const urlLang = searchParams.get("lang");
+    const displayLang = useDisplayLanguage();
     const signaturePadRef = useRef<SignatureCanvas | null>(null);
 
     const [tbm, setTbm] = useState<any>(null);
@@ -186,8 +189,7 @@ function WorkerTBMDetailContent() {
         };
         if (!me.user) { setLoading(false); return; }
 
-        let lang = me.profile?.preferred_lang || "ko";
-        if (urlLang) lang = urlLang;
+        const lang = displayLang || urlLang || me.profile?.preferred_lang || "ko";
 
         setPreferredLang(lang);
 
@@ -255,7 +257,7 @@ function WorkerTBMDetailContent() {
         }
 
         setLoading(false);
-    }, [tbmId, urlLang]);
+    }, [tbmId, urlLang, displayLang]);
 
     useEffect(() => { loadTBM(); }, [loadTBM]);
 
@@ -325,7 +327,7 @@ function WorkerTBMDetailContent() {
             if (!res.ok) {
                 const body = await res.json().catch(() => ({})) as { error?: string };
                 console.error("서명 저장 실패:", body.error);
-                alert("서명 저장에 실패했습니다: " + (body.error ?? `HTTP ${res.status}`));
+                alert(`${t.signatureFailed || "Failed to save signature"}: ${body.error ?? `HTTP ${res.status}`}`);
                 return;
             }
 
@@ -336,7 +338,7 @@ function WorkerTBMDetailContent() {
             setTimeout(() => router.replace("/worker"), 2000);
         } catch (e) {
             console.error("서명 저장 실패:", e);
-            alert("서명 저장 중 네트워크 오류가 발생했습니다.");
+            alert(t.networkFailed || "A network error occurred while saving the signature.");
         } finally {
             setIsSubmitting(false);
         }
@@ -382,18 +384,18 @@ function WorkerTBMDetailContent() {
                                 onClick={() => changeGender('male')}
                                 className={`px-2 py-1 md:px-3 rounded-full text-[9px] md:text-[10px] font-black transition-all ${voiceGender === 'male' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
                             >
-                                MALE
+                                {t.male || "MALE"}
                             </button>
                             <button
                                 onClick={() => changeGender('female')}
                                 className={`px-3 py-1 md:px-3 rounded-full text-[9px] md:text-[10px] font-black transition-all ${voiceGender === 'female' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
                             >
-                                FEMALE
+                                {t.female || "FEMALE"}
                             </button>
                         </div>
 
                         <div className="hidden sm:flex flex-col items-end">
-                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter">Voice Lang</span>
+                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter">{t.voiceLang || "Voice language"}</span>
                             <span className="text-[10px] font-bold text-slate-300">{preferredLang.toUpperCase()}</span>
                         </div>
                         <Image
@@ -411,7 +413,7 @@ function WorkerTBMDetailContent() {
 
                     {fromCache && (
                         <div className="rounded-2xl bg-amber-500/15 border border-amber-400/30 text-amber-200 text-sm px-4 py-3">
-                            📴 오프라인 — 저장된 TBM을 표시합니다. 네트워크 복구 후 최신 내용으로 갱신하세요.
+                            {t.offline || "📴 Offline — displaying saved TBM. Refresh after the network is restored."}
                         </div>
                     )}
 
@@ -440,7 +442,7 @@ function WorkerTBMDetailContent() {
                                 <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
                                     <p className="text-[10px] font-black tracking-[.18em] text-red-200">SQ-LINK TBM</p>
                                     <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
-                                    <p className="mt-2 text-sm font-bold text-slate-100">{new Date(tbm.created_at).toLocaleDateString(preferredLang === "ko" ? "ko-KR" : "en-US", { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                                    <p className="mt-2 text-sm font-bold text-slate-100">{new Date(tbm.created_at).toLocaleDateString(({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[preferredLang] || "en-US", { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                                 </div>
                             </div>
 
@@ -553,7 +555,7 @@ function WorkerTBMDetailContent() {
                                                     <div className="w-1.5 h-6 bg-blue-500 rounded-full animate-[bounce_1.2s_infinite]" />
                                                     <div className="w-1.5 h-4 bg-blue-500 rounded-full animate-[bounce_0.8s_infinite]" />
                                                 </div>
-                                                <span className="text-xl font-black text-blue-400 uppercase italic">Playing...</span>
+                                                <span className="text-xl font-black text-blue-400 uppercase italic">{t.playing || "Playing..."}</span>
                                             </>
                                         ) : (
                                             <>

@@ -5,6 +5,7 @@ type BrandLogoProps = {
   imageClassName?: string;
   compact?: boolean;
   showProduct?: boolean;
+  framed?: boolean;
 };
 
 export default function BrandLogo({
@@ -12,22 +13,23 @@ export default function BrandLogo({
   imageClassName = "",
   compact = true,
   showProduct = false,
+  framed = false,
 }: BrandLogoProps) {
   const width = compact ? 208 : 360;
   const height = compact ? 60 : 104;
 
   return (
     <div className={`inline-flex items-center gap-3 ${className}`}>
-      <div className="rounded-2xl bg-white/95 px-3 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.35)] ring-1 ring-white/70">
-      <Image
-        src={compact ? "/brand/seowon-logo-compact-transparent.png" : "/brand/seowon-logo-transparent.png"}
-        alt="SEOWON"
-        width={width}
-        height={height}
-        priority
-        unoptimized
-        className={`h-auto w-auto object-contain drop-shadow-sm ${imageClassName}`}
-      />
+      <div className={framed ? "bg-white/95 px-3 py-2" : ""}>
+        <Image
+          src={compact ? "/brand/seowon-logo-compact-transparent.png" : "/brand/seowon-logo-transparent.png"}
+          alt="SEOWON"
+          width={width}
+          height={height}
+          priority
+          unoptimized
+          className={`h-auto w-auto object-contain ${imageClassName}`}
+        />
       </div>
       {showProduct && (
         <div className="hidden sm:flex flex-col border-l border-white/10 pl-3 leading-none">

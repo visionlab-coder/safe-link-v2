@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
+import { persistDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 interface VisionItem {
     name_ko: string;
@@ -48,12 +49,21 @@ const i18n: Record<string, Record<string, string>> = {
 };
 const getT = (lang: string) => i18n[lang] || i18n["en"];
 
+const VISION_COMMON: Record<string, Record<string, string>> = {
+    ko: { choose:"앨범에서 선택", unsupportedCamera:"이 브라우저에서는 카메라 촬영을 지원하지 않습니다. 최신 Safari에서 다시 시도해 주세요.", permission:"카메라 권한이 거부되었습니다. iPhone 설정 → Safari → 카메라에서 허용한 뒤 다시 시도해 주세요.", startCamera:"카메라를 시작하지 못했습니다. 다른 앱에서 카메라를 사용 중인지 확인해 주세요.", tooLarge:"사진 용량이 5MB를 초과했습니다. 해상도를 낮추거나 다시 촬영해 주세요.", invalidImage:"지원하지 않거나 손상된 이미지입니다. JPG, PNG 또는 WEBP 사진으로 다시 시도해 주세요.", quota:"AI 분석 사용 한도에 도달했습니다. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요.", unavailable:"AI 분석 서비스를 사용할 수 없습니다. 관리자에게 문의해 주세요.", requestFailed:"AI 분석 요청에 실패했습니다. 연결 상태를 확인한 뒤 다시 촬영해 주세요.", cameraStarting:"카메라 준비 중입니다. 잠시 후 다시 촬영해 주세요.", unsupportedFile:"지원하지 않는 파일입니다. JPG, PNG 또는 WEBP 이미지를 선택해 주세요.", selectSmaller:"사진 용량이 5MB를 초과했습니다. 더 작은 이미지를 선택해 주세요.", readFailed:"이미지 파일을 읽지 못했습니다. 다른 파일을 선택해 주세요." },
+    en: { choose:"CHOOSE PHOTO", unsupportedCamera:"Camera capture is unavailable. Please try the latest Safari.", permission:"Camera permission was denied. Allow camera access in Safari settings and try again.", startCamera:"Could not start the camera. Check whether another app is using it.", tooLarge:"The photo exceeds 5MB. Reduce its size or take another photo.", invalidImage:"This image is unsupported or corrupted. Try a JPG, PNG, or WEBP photo.", quota:"The AI analysis quota has been reached. Try later or contact an administrator.", unavailable:"The AI analysis service is unavailable. Contact an administrator.", requestFailed:"The AI analysis request failed. Check your connection and try again.", cameraStarting:"The camera is still starting. Please try again.", unsupportedFile:"Unsupported file. Choose a JPG, PNG, or WEBP image.", selectSmaller:"The photo exceeds 5MB. Choose a smaller image.", readFailed:"Could not read the image. Choose another file." },
+    zh: { choose:"从相册选择", unsupportedCamera:"此浏览器不支持拍照。请使用最新版 Safari 重试。", permission:"相机权限被拒绝。请在 iPhone 设置中允许 Safari 使用相机后重试。", startCamera:"无法启动相机。请检查是否有其他应用正在使用相机。", tooLarge:"照片超过 5MB。请降低尺寸或重新拍摄。", invalidImage:"图片不受支持或已损坏。请使用 JPG、PNG 或 WEBP 图片。", quota:"已达到 AI 分析使用限额。请稍后重试或联系管理员。", unavailable:"AI 分析服务不可用。请联系管理员。", requestFailed:"AI 分析请求失败。请检查网络后重试。", cameraStarting:"相机正在启动，请稍后重试。", unsupportedFile:"不支持的文件。请选择 JPG、PNG 或 WEBP 图片。", selectSmaller:"照片超过 5MB。请选择较小的图片。", readFailed:"无法读取图片文件。请选择其他文件。" },
+    vi: { choose:"CHỌN TỪ THƯ VIỆN", unsupportedCamera:"Trình duyệt này không hỗ trợ chụp ảnh. Hãy thử Safari mới nhất.", permission:"Quyền camera bị từ chối. Hãy cho phép camera cho Safari trong cài đặt iPhone và thử lại.", startCamera:"Không thể khởi động camera. Hãy kiểm tra ứng dụng khác có đang dùng camera không.", tooLarge:"Ảnh vượt quá 5MB. Hãy giảm kích thước hoặc chụp lại.", invalidImage:"Ảnh không được hỗ trợ hoặc bị hỏng. Hãy dùng JPG, PNG hoặc WEBP.", quota:"Đã đạt giới hạn sử dụng phân tích AI. Hãy thử lại sau hoặc liên hệ quản trị viên.", unavailable:"Dịch vụ phân tích AI không khả dụng. Hãy liên hệ quản trị viên.", requestFailed:"Yêu cầu phân tích AI thất bại. Hãy kiểm tra kết nối và thử lại.", cameraStarting:"Camera đang khởi động. Hãy thử lại sau.", unsupportedFile:"Tệp không được hỗ trợ. Hãy chọn JPG, PNG hoặc WEBP.", selectSmaller:"Ảnh vượt quá 5MB. Hãy chọn ảnh nhỏ hơn.", readFailed:"Không thể đọc tệp ảnh. Hãy chọn tệp khác." },
+    ru: { choose:"ВЫБРАТЬ ИЗ ГАЛЕРЕИ", unsupportedCamera:"Этот браузер не поддерживает съёмку. Попробуйте последнюю версию Safari.", permission:"Доступ к камере запрещён. Разрешите камеру для Safari в настройках iPhone и попробуйте снова.", startCamera:"Не удалось запустить камеру. Проверьте, не использует ли её другое приложение.", tooLarge:"Фото превышает 5 МБ. Уменьшите размер или сделайте снимок заново.", invalidImage:"Изображение не поддерживается или повреждено. Используйте JPG, PNG или WEBP.", quota:"Достигнут лимит AI-анализа. Попробуйте позже или обратитесь к администратору.", unavailable:"Сервис AI-анализа недоступен. Обратитесь к администратору.", requestFailed:"Не удалось выполнить AI-анализ. Проверьте соединение и попробуйте снова.", cameraStarting:"Камера запускается. Повторите попытку позже.", unsupportedFile:"Неподдерживаемый файл. Выберите JPG, PNG или WEBP.", selectSmaller:"Фото превышает 5 МБ. Выберите файл меньшего размера.", readFailed:"Не удалось прочитать файл изображения. Выберите другой файл." },
+};
+
 export default function WorkerVisionPage() {
     const router = useRouter();
     const videoRef = useRef<HTMLVideoElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [lang, setLang] = useState("ko");
+    const lang = useDisplayLanguage();
+    const common = VISION_COMMON[lang] || VISION_COMMON.en;
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -67,7 +77,7 @@ export default function WorkerVisionPage() {
             const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
             if (!res.ok) return;
             const data = await res.json() as { profile?: { preferred_lang?: string | null } | null };
-            if (data.profile?.preferred_lang) setLang(data.profile.preferred_lang);
+            if (data.profile?.preferred_lang) persistDisplayLanguage(data.profile.preferred_lang);
         };
         loadLang();
     }, []);
@@ -96,9 +106,7 @@ export default function WorkerVisionPage() {
     const openCamera = async () => {
         setCameraError("");
         if (!navigator.mediaDevices?.getUserMedia) {
-            setCameraError(lang === "ko"
-                ? "이 브라우저에서는 카메라 촬영을 지원하지 않습니다. 최신 Safari에서 다시 시도해 주세요."
-                : "Camera capture is unavailable. Please try the latest Safari.");
+            setCameraError(common.unsupportedCamera);
             return;
         }
 
@@ -116,13 +124,7 @@ export default function WorkerVisionPage() {
             setIsCameraOpen(true);
         } catch (err) {
             const errorName = err instanceof DOMException ? err.name : "";
-            setCameraError(errorName === "NotAllowedError"
-                ? (lang === "ko"
-                    ? "카메라 권한이 거부되었습니다. iPhone 설정 → Safari → 카메라에서 허용한 뒤 다시 시도해 주세요."
-                    : "Camera permission was denied. Allow camera access in Safari settings and try again.")
-                : (lang === "ko"
-                    ? "카메라를 시작하지 못했습니다. 다른 앱에서 카메라를 사용 중인지 확인해 주세요."
-                    : "Could not start the camera. Check whether another app is using it."));
+            setCameraError(errorName === "NotAllowedError" ? common.permission : common.startCamera);
         }
     };
 
@@ -151,9 +153,7 @@ export default function WorkerVisionPage() {
             setItems([]);
             const message = (() => {
                 if (reason.includes("vision_image_too_large") || reason.includes("Image too large")) {
-                    return lang === "ko"
-                        ? "사진 용량이 5MB를 초과했습니다. 해상도를 낮추거나 다시 촬영해 주세요."
-                        : "The photo exceeds 5MB. Reduce its size or take another photo.";
+                    return common.tooLarge;
                 }
                 if (
                     reason.includes("vision_image_type_not_allowed") ||
@@ -161,14 +161,10 @@ export default function WorkerVisionPage() {
                     reason.includes("vision_image_empty") ||
                     reason.includes("vision_image_signature_mismatch")
                 ) {
-                    return lang === "ko"
-                        ? "지원하지 않거나 손상된 이미지입니다. JPG, PNG 또는 WEBP 사진으로 다시 시도해 주세요."
-                        : "This image is unsupported or corrupted. Try a JPG, PNG, or WEBP photo.";
+                    return common.invalidImage;
                 }
                 if (reason.includes("ai_quota_exceeded")) {
-                    return lang === "ko"
-                        ? "AI 분석 사용 한도에 도달했습니다. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요."
-                        : "The AI analysis quota has been reached. Try later or contact an administrator.";
+                    return common.quota;
                 }
                 if (
                     reason.includes("ai_vendor_not_configured") ||
@@ -176,13 +172,9 @@ export default function WorkerVisionPage() {
                     reason.includes("google_vision_failed") ||
                     reason.includes("vision_api_failed")
                 ) {
-                    return lang === "ko"
-                        ? "AI 분석 서비스를 사용할 수 없습니다. 관리자에게 문의해 주세요."
-                        : "The AI analysis service is unavailable. Contact an administrator.";
+                    return common.unavailable;
                 }
-                return lang === "ko"
-                    ? "AI 분석 요청에 실패했습니다. 연결 상태를 확인한 뒤 다시 촬영해 주세요."
-                    : "The AI analysis request failed. Check your connection and try again.";
+                return common.requestFailed;
             })();
             setAnalysisError(message);
         } finally {
@@ -194,9 +186,7 @@ export default function WorkerVisionPage() {
     const capturePhoto = () => {
         const video = videoRef.current;
         if (!video || !video.videoWidth || !video.videoHeight) {
-            setCameraError(lang === "ko"
-                ? "카메라 준비 중입니다. 잠시 후 다시 촬영해 주세요."
-                : "The camera is still starting. Please try again.");
+            setCameraError(common.cameraStarting);
             return;
         }
 
@@ -217,15 +207,11 @@ export default function WorkerVisionPage() {
         if (!file) return;
         setCameraError("");
         if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-            setCameraError(lang === "ko"
-                ? "지원하지 않는 파일입니다. JPG, PNG 또는 WEBP 이미지를 선택해 주세요."
-                : "Unsupported file. Choose a JPG, PNG, or WEBP image.");
+            setCameraError(common.unsupportedFile);
             return;
         }
         if (file.size > MAX_IMAGE_BYTES) {
-            setCameraError(lang === "ko"
-                ? "사진 용량이 5MB를 초과했습니다. 더 작은 이미지를 선택해 주세요."
-                : "The photo exceeds 5MB. Choose a smaller image.");
+            setCameraError(common.selectSmaller);
             return;
         }
 
@@ -233,9 +219,7 @@ export default function WorkerVisionPage() {
         reader.onload = () => {
             if (typeof reader.result === "string") void analyzeImage(reader.result, file.type);
         };
-        reader.onerror = () => setCameraError(lang === "ko"
-            ? "이미지 파일을 읽지 못했습니다. 다른 파일을 선택해 주세요."
-            : "Could not read the image. Choose another file.");
+        reader.onerror = () => setCameraError(common.readFailed);
         reader.readAsDataURL(file);
     };
 
@@ -297,7 +281,7 @@ export default function WorkerVisionPage() {
                             onClick={() => fileInputRef.current?.click()}
                             className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-sm font-black text-slate-200 tap-effect"
                         >
-                            {t.choose || i18n.en.choose}
+                            {t.choose || common.choose}
                         </button>
                     </>
                 )}

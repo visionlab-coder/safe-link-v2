@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 interface LibraryItem {
     id: string;
@@ -83,6 +84,12 @@ const UI_TEXT: Record<string, Record<string, string>> = {
         selectAll: "全选",
         deselectAll: "取消全选",
     },
+    vi: {
+        title: "Thư viện đào tạo cơ bản", subtitle: "Chọn mục đánh giá rủi ro để thêm vào TBM", allCategories: "Tất cả", allSubs: "Tất cả hạng mục", criticalOnly: "Chỉ mục trọng điểm", hazard: "Yếu tố nguy hiểm", measure: "Biện pháp phòng ngừa", risk: "Mức rủi ro", freq: "Tần suất", sev: "Mức độ", selected: "đã chọn", insert: "Chèn vào TBM", close: "Đóng", loading: "Đang tải...", noData: "Không có dữ liệu", critical: "Trọng điểm", selectAll: "Chọn tất cả", deselectAll: "Bỏ chọn tất cả",
+    },
+    ru: {
+        title: "Библиотека базового обучения", subtitle: "Выберите пункты оценки риска для добавления в TBM", allCategories: "Все", allSubs: "Все подкатегории", criticalOnly: "Только критичные", hazard: "Фактор риска", measure: "Мера профилактики", risk: "Уровень риска", freq: "Частота", sev: "Тяжесть", selected: "выбрано", insert: "Вставить в TBM", close: "Закрыть", loading: "Загрузка...", noData: "Нет данных", critical: "Критично", selectAll: "Выбрать всё", deselectAll: "Снять выбор",
+    },
 };
 
 const RISK_COLORS: Record<number, string> = {
@@ -93,8 +100,9 @@ const RISK_COLORS: Record<number, string> = {
     5: "text-red-500 bg-red-500/20 border-red-500/30",
 };
 
-export default function SafetyLibraryModal({ isOpen, onClose, onSelect, lang = "ko" }: SafetyLibraryModalProps) {
-    const t = UI_TEXT[lang] || UI_TEXT["ko"];
+export default function SafetyLibraryModal({ isOpen, onClose, onSelect, lang }: SafetyLibraryModalProps) {
+    const displayLanguage = useDisplayLanguage();
+    const t = UI_TEXT[lang ?? displayLanguage] || UI_TEXT.en;
 
     const [items, setItems] = useState<LibraryItem[]>([]);
     const [loading, setLoading] = useState(false);
@@ -184,8 +192,8 @@ export default function SafetyLibraryModal({ isOpen, onClose, onSelect, lang = "
         if (selected.length === 0) return;
 
         const lines = selected.map((item) => {
-            const critical = item.is_critical ? " [중점관리]" : "";
-            return `[${item.accident_type}] ${item.hazard_description}\n  -> 예방대책: ${item.preventive_measure}${critical}`;
+            const critical = item.is_critical ? ` [${t.critical}]` : "";
+            return `[${item.accident_type}] ${item.hazard_description}\n  -> ${t.measure}: ${item.preventive_measure}${critical}`;
         });
 
         onSelect(lines.join("\n\n"));

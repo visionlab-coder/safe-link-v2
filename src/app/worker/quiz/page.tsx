@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { CheckCircle, XCircle, Brain, ChevronRight } from "lucide-react";
+import { persistDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 const i18n: Record<string, Record<string, string>> = {
   ko: {
@@ -12,7 +13,7 @@ const i18n: Record<string, Record<string, string>> = {
     back: "돌아가기", alreadyAnswered: "이미 응답 완료", waiting: "퀴즈 불러오는 중...",
     submit: "제출하기", score: "점수", outOf: "개 중", correct2: "개 정답",
     selectAll: "모든 문항에 답하세요", question: "문항", of: "/",
-    result: "결과", excellent: "우수", good: "양호", tryAgain: "재교육 권장",
+    result: "결과", excellent: "우수", good: "양호", tryAgain: "재교육 권장", description: "오늘의 안전교육 내용을 퀴즈로 확인합니다.",
   },
   en: {
     title: "SAFETY QUIZ", noQuiz: "No active quiz right now",
@@ -20,7 +21,7 @@ const i18n: Record<string, Record<string, string>> = {
     back: "Back", alreadyAnswered: "Already submitted", waiting: "Loading quiz...",
     submit: "Submit", score: "Score", outOf: "out of", correct2: "correct",
     selectAll: "Answer all questions", question: "Question", of: "/",
-    result: "Result", excellent: "Excellent", good: "Good", tryAgain: "Re-training recommended",
+    result: "Result", excellent: "Excellent", good: "Good", tryAgain: "Re-training recommended", description: "Check today’s safety training with a quiz.",
   },
   zh: {
     title: "安全测验", noQuiz: "目前没有进行中的测验",
@@ -28,7 +29,7 @@ const i18n: Record<string, Record<string, string>> = {
     back: "返回", alreadyAnswered: "已提交", waiting: "加载测验中...",
     submit: "提交", score: "分数", outOf: "共", correct2: "题正确",
     selectAll: "请回答所有题目", question: "题", of: "/",
-    result: "结果", excellent: "优秀", good: "良好", tryAgain: "建议再培训",
+    result: "结果", excellent: "优秀", good: "良好", tryAgain: "建议再培训", description: "通过测验确认今天的安全教育内容。",
   },
   vi: {
     title: "BÀI KIỂM TRA", noQuiz: "Không có bài kiểm tra nào",
@@ -36,7 +37,7 @@ const i18n: Record<string, Record<string, string>> = {
     back: "Quay lại", alreadyAnswered: "Đã nộp bài", waiting: "Đang tải...",
     submit: "Nộp bài", score: "Điểm số", outOf: "trên", correct2: "câu đúng",
     selectAll: "Trả lời tất cả câu hỏi", question: "Câu", of: "/",
-    result: "Kết quả", excellent: "Xuất sắc", good: "Tốt", tryAgain: "Khuyến nghị đào tạo lại",
+    result: "Kết quả", excellent: "Xuất sắc", good: "Tốt", tryAgain: "Khuyến nghị đào tạo lại", description: "Kiểm tra nội dung đào tạo an toàn hôm nay bằng câu đố.",
   },
   th: {
     title: "แบบทดสอบ", noQuiz: "ไม่มีแบบทดสอบ",
@@ -44,7 +45,7 @@ const i18n: Record<string, Record<string, string>> = {
     back: "กลับ", alreadyAnswered: "ส่งแล้ว", waiting: "กำลังโหลด...",
     submit: "ส่งคำตอบ", score: "คะแนน", outOf: "จาก", correct2: "ข้อถูก",
     selectAll: "ตอบทุกข้อ", question: "ข้อ", of: "/",
-    result: "ผล", excellent: "ยอดเยี่ยม", good: "ดี", tryAgain: "แนะนำให้อบรมซ้ำ",
+    result: "ผล", excellent: "ยอดเยี่ยม", good: "ดี", tryAgain: "แนะนำให้อบรมซ้ำ", description: "ตรวจสอบเนื้อหาการอบรมความปลอดภัยวันนี้ด้วยแบบทดสอบ",
   },
   id: {
     title: "KUIS KESELAMATAN", noQuiz: "Tidak ada kuis aktif",
@@ -52,7 +53,15 @@ const i18n: Record<string, Record<string, string>> = {
     back: "Kembali", alreadyAnswered: "Sudah dikirim", waiting: "Memuat kuis...",
     submit: "Kirim", score: "Skor", outOf: "dari", correct2: "benar",
     selectAll: "Jawab semua pertanyaan", question: "Soal", of: "/",
-    result: "Hasil", excellent: "Sangat Baik", good: "Baik", tryAgain: "Disarankan pelatihan ulang",
+    result: "Hasil", excellent: "Sangat Baik", good: "Baik", tryAgain: "Disarankan pelatihan ulang", description: "Periksa materi pelatihan keselamatan hari ini melalui kuis.",
+  },
+  ru: {
+    title: "ТЕСТ ПО БЕЗОПАСНОСТИ", noQuiz: "Сейчас нет активного теста",
+    correct: "Верно!", wrong: "Неверно", correctAnswer: "Правильный ответ",
+    back: "Назад", alreadyAnswered: "Уже отправлено", waiting: "Загрузка теста...",
+    submit: "Отправить", score: "Баллы", outOf: "из", correct2: "правильных",
+    selectAll: "Ответьте на все вопросы", question: "вопросов", of: "/",
+    result: "Результат", excellent: "Отлично", good: "Хорошо", tryAgain: "Рекомендуется повторное обучение", description: "Проверьте содержание сегодняшнего инструктажа по безопасности с помощью теста.",
   },
 };
 const getT = (lang: string) => i18n[lang] ?? i18n["en"];
@@ -77,7 +86,7 @@ type QuizResponse = {
 
 export default function WorkerQuizPage() {
   const router = useRouter();
-  const [lang, setLang] = useState("ko");
+  const lang = useDisplayLanguage();
   const [quizResponse, setQuizResponse] = useState<QuizResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>([]);
@@ -91,7 +100,7 @@ export default function WorkerQuizPage() {
       if (!meRes.ok) { router.push("/auth/login"); return; }
       const me = await meRes.json() as { profile?: { preferred_lang?: string | null } | null };
       const workerLang = me.profile?.preferred_lang ?? "ko";
-      setLang(workerLang);
+      persistDisplayLanguage(workerLang);
 
       // auth_user_id → nfc_workers.id → tbm_quiz_responses 조회 (ID 불일치 방지)
       const res = await fetch("/api/quiz/worker-quiz");
@@ -186,7 +195,7 @@ export default function WorkerQuizPage() {
           <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
             <p className="text-[10px] font-black tracking-[.18em] text-amber-200">SQ-LINK EDUCATION</p>
             <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
-            <p className="mt-2 text-sm font-bold text-slate-100">오늘의 안전교육 내용을 퀴즈로 확인합니다.</p>
+            <p className="mt-2 text-sm font-bold text-slate-100">{t.description}</p>
           </div>
         </div>
 

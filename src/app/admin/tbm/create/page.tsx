@@ -9,6 +9,7 @@ import { Suspense } from "react";
 import { normalizeKo, normalizeKoAsync } from "@/utils/normalize";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
 import SafetyLibraryModal from "@/components/SafetyLibraryModal";
+import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 const adminUI: Record<string, any> = {
     ko: {
@@ -34,7 +35,7 @@ const adminUI: Record<string, any> = {
         libraryDesc: "위험성평가 항목 불러오기",
         briefingGuide: "AI 브리핑 가이드",
         guideGenerate: "가이드 생성",
-        deleteHistory: "이력 숨기기",
+        deleteHistory: "이력 숨기기", categoryPlaceholder: "카테고리 (예: 거푸집, 배근, 타설)", applyDraft: "클릭하여 초안에 적용", extraPoints: "추가 안전 포인트", chat: "1:1 대화 바로가기", male: "남성", female: "여성", guideFailed: "가이드 생성에 실패했습니다.", aiFailed: "AI 연결에 실패했습니다. 인터넷 연결을 확인해주세요.",
     },
     en: {
         title: "SAFETY BROADCAST",
@@ -59,7 +60,7 @@ const adminUI: Record<string, any> = {
         libraryDesc: "Load risk assessment items",
         briefingGuide: "AI BRIEFING GUIDE",
         guideGenerate: "Generate Guide",
-        deleteHistory: "Hide",
+        deleteHistory: "Hide", categoryPlaceholder: "Category (e.g. formwork, rebar, pouring)", applyDraft: "Click to apply this draft", extraPoints: "Additional safety points", chat: "Go to 1:1 Chat", male: "Male", female: "Female", guideFailed: "Failed to generate a guide.", aiFailed: "AI connection failed. Check your internet connection.",
     },
     zh: {
         title: "安全简报发布",
@@ -84,7 +85,13 @@ const adminUI: Record<string, any> = {
         libraryDesc: "加载危险评估项目",
         briefingGuide: "AI简报指南",
         guideGenerate: "生成指南",
-        deleteHistory: "隐藏记录",
+        deleteHistory: "隐藏记录", categoryPlaceholder: "类别（例如：模板、配筋、浇筑）", applyDraft: "点击应用到草案", extraPoints: "附加安全要点", chat: "进入一对一对话", male: "男声", female: "女声", guideFailed: "生成指南失败。", aiFailed: "AI 连接失败，请检查网络连接。",
+    },
+    vi: {
+        title: "Phát thông báo an toàn", subtitle: "Gửi ngay cho toàn bộ công nhân", smartAssist: "TRỢ LÝ AI", generateTips: "Tạo hướng dẫn AI", processing: "Đang xử lý...", koreanDraft: "Bản nháp TBM", voiceInput: "NHẬP GIỌNG NÓI", listening: "ĐANG NGHE...", placeholder: "Nhập quy tắc an toàn hôm nay...", normResult: "Kết quả chuẩn hóa", changes: "thay đổi", pushBtn: "📡 PHÁT TBM", historyTitle: "Lịch sử gửi gần đây", noHistory: "Không có lịch sử phát", pushSuccess: "Đã phát", back: "Quay lại", previewNorm: "Xem trước tự động sửa", recTime: "Đang ghi", library: "Thư viện đào tạo cơ bản", libraryDesc: "Tải hạng mục đánh giá rủi ro", briefingGuide: "HƯỚNG DẪN BRIEFING AI", guideGenerate: "Tạo hướng dẫn", deleteHistory: "Ẩn", categoryPlaceholder: "Danh mục (ví dụ: cốp pha, cốt thép, đổ bê tông)", applyDraft: "Nhấp để áp dụng bản nháp", extraPoints: "Điểm an toàn bổ sung", chat: "Đi đến trò chuyện 1:1", male: "NAM", female: "NỮ", guideFailed: "Không thể tạo hướng dẫn.", aiFailed: "Không thể kết nối AI. Hãy kiểm tra mạng."
+    },
+    ru: {
+        title: "Рассылка инструктажа", subtitle: "Мгновенная отправка всем работникам", smartAssist: "ИИ-АССИСТЕНТ", generateTips: "Создать рекомендации ИИ", processing: "Обработка...", koreanDraft: "Черновик TBM", voiceInput: "ГОЛОСОВОЙ ВВОД", listening: "СЛУШАЕМ...", placeholder: "Введите сегодняшние правила безопасности...", normResult: "Результат нормализации", changes: "изменений", pushBtn: "📡 РАЗОСЛАТЬ TBM", historyTitle: "Последние рассылки", noHistory: "Истории рассылок нет", pushSuccess: "Рассылка завершена", back: "Назад", previewNorm: "Предпросмотр автокоррекции", recTime: "Запись", library: "Библиотека базового обучения", libraryDesc: "Загрузить пункты оценки рисков", briefingGuide: "РУКОВОДСТВО ИИ ПО БРИФИНГУ", guideGenerate: "Создать руководство", deleteHistory: "Скрыть", categoryPlaceholder: "Категория (например: опалубка, арматура, бетонирование)", applyDraft: "Нажмите, чтобы применить черновик", extraPoints: "Дополнительные меры безопасности", chat: "Перейти в личный чат", male: "МУЖСКОЙ", female: "ЖЕНСКИЙ", guideFailed: "Не удалось создать руководство.", aiFailed: "Не удалось подключиться к ИИ. Проверьте интернет."
     }
 };
 
@@ -108,6 +115,19 @@ function getBroadcastErrorMessage(lang: string, error?: string, detail?: string)
         return `TBM 저장에 실패했습니다.${detail ? ` (${detail})` : ""}`;
     }
 
+    const messages = {
+        zh: { site: "此管理员账户未关联现场。请设置现场后重试。", access: "无法向其他现场发布 TBM。请确认管理员与工人属于同一现场。", invalid: "现场 ID 格式无效。", content: "请输入要发布的 TBM 内容。", failed: "TBM 保存失败。" },
+        vi: { site: "Tài khoản quản trị chưa được liên kết với công trường. Hãy thiết lập công trường rồi thử lại.", access: "Không thể phát TBM sang công trường khác. Hãy kiểm tra quản trị viên và công nhân thuộc cùng công trường.", invalid: "ID công trường không hợp lệ.", content: "Hãy nhập nội dung TBM để phát.", failed: "Không thể lưu TBM." },
+        ru: { site: "К этому аккаунту администратора не привязан объект. Укажите объект и повторите попытку.", access: "Нельзя отправить TBM на другой объект. Проверьте, что администратор и работники относятся к одному объекту.", invalid: "Неверный формат ID объекта.", content: "Введите содержание TBM для рассылки.", failed: "Не удалось сохранить TBM." },
+    }[lang];
+    if (messages) {
+        if (error === "site_id_required" || error === "admin_site_required") return messages.site;
+        if (error === "cross_site_access_denied") return messages.access;
+        if (error === "site_id_invalid") return messages.invalid;
+        if (error === "content_required") return messages.content;
+        return `${messages.failed}${detail ? ` (${detail})` : ""}`;
+    }
+
     if (error === "site_id_required" || error === "admin_site_required") {
         return "No site is linked to this admin account. Set the admin site and try again.";
     }
@@ -122,6 +142,7 @@ function getBroadcastErrorMessage(lang: string, error?: string, detail?: string)
 function AdminTBMCreateContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const displayLang = useDisplayLanguage();
     const [tbmText, setTbmText] = useState("");
     const [isSending, setIsSending] = useState(false);
     const [history, setHistory] = useState<any[]>([]);
@@ -216,9 +237,9 @@ function AdminTBMCreateContent() {
             const [tipsData, draftData] = await Promise.all([tipsRes.json(), draftRes.json()]);
             if (draftData.draft) setBriefingDraft(draftData.draft);
             if (tipsData.tips) setAiTips(tipsData.tips);
-            if (!draftData.draft && !tipsData.tips) alert("가이드 생성에 실패했습니다.");
+            if (!draftData.draft && !tipsData.tips) alert((getUI(displayLang || adminLang)).guideFailed);
         } catch {
-            alert("AI 연결에 실패했습니다. 인터넷 연결을 확인해주세요.");
+            alert((getUI(displayLang || adminLang)).aiFailed);
         } finally {
             setIsGuideLoading(false);
         }
@@ -309,7 +330,7 @@ function AdminTBMCreateContent() {
             if (!res.ok) {
                 setBroadcastResult({
                     type: "error",
-                    message: getBroadcastErrorMessage(adminLang, result.error, result.detail),
+                    message: getBroadcastErrorMessage(displayLang || adminLang, result.error, result.detail),
                 });
                 return;
             }
@@ -322,14 +343,15 @@ function AdminTBMCreateContent() {
             console.error(e);
             setBroadcastResult({
                 type: "error",
-                message: getBroadcastErrorMessage(adminLang),
+                message: getBroadcastErrorMessage(displayLang || adminLang),
             });
         } finally {
             setIsSending(false);
         }
     };
 
-    const t = getUI(adminLang);
+    const t = getUI(displayLang || adminLang);
+    const locale = ({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[displayLang || adminLang] || "en-US";
 
     return (
         <RoleGuard allowedRole="admin">
@@ -354,13 +376,13 @@ function AdminTBMCreateContent() {
                                 onClick={() => changeGender('male')}
                                 className={`px-3 py-1 rounded-full text-[10px] font-black transition-all ${voiceGender === 'male' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
                             >
-                                MALE
+                                {t.male}
                             </button>
                             <button
                                 onClick={() => changeGender('female')}
                                 className={`px-3 py-1 rounded-full text-[10px] font-black transition-all ${voiceGender === 'female' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
                             >
-                                FEMALE
+                                {t.female}
                             </button>
                         </div>
                     </div>
@@ -395,7 +417,7 @@ function AdminTBMCreateContent() {
                             <input
                                 value={briefingCategory}
                                 onChange={(e) => setBriefingCategory(e.target.value)}
-                                placeholder="카테고리 (예: 거푸집, 배근, 타설)"
+                                placeholder={t.categoryPlaceholder}
                                 className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white placeholder-slate-700 focus:outline-none focus:border-purple-500/40"
                             />
                         </div>
@@ -405,12 +427,12 @@ function AdminTBMCreateContent() {
                                 className="w-full text-left p-5 glass rounded-2xl text-slate-300 hover:text-white hover:bg-purple-500/5 border border-purple-500/20 transition-all text-sm tap-effect leading-relaxed whitespace-pre-wrap mb-3"
                             >
                                 {briefingDraft}
-                                <span className="block mt-3 text-[10px] font-black text-purple-400 uppercase tracking-widest">클릭하여 초안에 적용</span>
+                                <span className="block mt-3 text-[10px] font-black text-purple-400 uppercase tracking-widest">{t.applyDraft}</span>
                             </button>
                         )}
                         {aiTips.length > 0 && (
                             <div className="flex flex-col gap-2 mt-2">
-                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">추가 안전 포인트</span>
+                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">{t.extraPoints}</span>
                                 {aiTips.map((tip, idx) => (
                                     <button key={idx} onClick={() => { setTbmText(tip); setAiTips([]); setBriefingDraft(""); }} className="text-left p-4 glass rounded-2xl text-slate-300 hover:text-white hover:bg-white/5 border-white/5 transition-all text-sm tap-effect leading-relaxed">
                                         {tip}
@@ -466,7 +488,7 @@ function AdminTBMCreateContent() {
                             <textarea
                                 value={tbmText}
                                 onChange={(e) => setTbmText(e.target.value)}
-                                placeholder={isRecording ? `${t.listening} [${adminLang}]` : t.placeholder}
+                                placeholder={isRecording ? `${t.listening} [${displayLang || adminLang}]` : t.placeholder}
                                 className="flex-1 w-full bg-transparent text-2xl md:text-3xl font-bold text-white placeholder-slate-800 outline-none resize-none leading-snug tracking-tight"
                             />
 
@@ -532,7 +554,7 @@ function AdminTBMCreateContent() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                     </svg>
                                     <span className="font-black text-lg tracking-tight">
-                                        {adminLang === "ko" ? "1:1 대화 바로가기" : adminLang === "zh" ? "进入1对1对话" : "Go to 1:1 Chat"}
+                                        {t.chat}
                                     </span>
                                     <svg className="w-5 h-5 text-slate-600 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
@@ -562,7 +584,7 @@ function AdminTBMCreateContent() {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">
-                                            <span>{new Date(tbm.created_at).toLocaleString()}</span>
+                                            <span>{new Date(tbm.created_at).toLocaleString(locale)}</span>
                                             <span className="w-1 h-1 bg-slate-800 rounded-full" />
                                             <span className="text-blue-900">{t.pushSuccess}</span>
                                         </div>

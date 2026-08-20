@@ -9,6 +9,15 @@ import { playNotificationSound } from "@/utils/notifications";
 import { ensureLocalNotifyPermission } from "@/utils/native/local-notify";
 import { logoutV3 } from "@/lib/v3-auth";
 import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
+import { persistDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+
+const WORKER_COMMON: Record<string, Record<string, string>> = {
+    ko: { profile:"프로필", connecting:"연결 중...", safetyHome:"근로자 안전 홈", todayTitle:"오늘 할 일", todayDesc:"교육을 확인하고 서명하면 완료됩니다.", step1:"교육 확인", step2:"서명", step3:"완료", helperTitle:"필요한 기능", logoutFailed:"로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.", pledgeTitle:"TBM 안전 서약", pledgeDesc:"서명으로 안전 서약 확인" },
+    en: { profile:"Profile", connecting:"Connecting...", safetyHome:"Worker Safety Home", todayTitle:"Today", todayDesc:"Review the safety training and sign to finish.", step1:"Review", step2:"Sign", step3:"Done", helperTitle:"Tools", logoutFailed:"Sign-out failed. Please try again shortly.", pledgeTitle:"TBM Safety Pledge", pledgeDesc:"Confirm your safety pledge with a signature" },
+    zh: { profile:"个人资料", connecting:"正在连接...", safetyHome:"工人安全主页", todayTitle:"今日任务", todayDesc:"确认安全教育并签名即可完成。", step1:"确认教育", step2:"签名", step3:"完成", helperTitle:"所需功能", logoutFailed:"退出失败，请稍后重试。", pledgeTitle:"TBM 安全承诺", pledgeDesc:"通过签名确认安全承诺" },
+    vi: { profile:"Hồ sơ", connecting:"Đang kết nối...", safetyHome:"Trang an toàn công nhân", todayTitle:"Việc cần làm hôm nay", todayDesc:"Xem đào tạo an toàn và ký để hoàn tất.", step1:"Xem đào tạo", step2:"Ký tên", step3:"Hoàn tất", helperTitle:"Chức năng cần thiết", logoutFailed:"Đăng xuất thất bại. Vui lòng thử lại sau.", pledgeTitle:"Cam kết an toàn TBM", pledgeDesc:"Xác nhận cam kết an toàn bằng chữ ký" },
+    ru: { profile:"Профиль", connecting:"Подключение...", safetyHome:"Главная безопасности работника", todayTitle:"Задачи на сегодня", todayDesc:"Ознакомьтесь с инструктажем и подпишите, чтобы завершить.", step1:"Ознакомиться", step2:"Подписать", step3:"Готово", helperTitle:"Нужные функции", logoutFailed:"Не удалось выйти. Повторите попытку позже.", pledgeTitle:"Обязательство по безопасности TBM", pledgeDesc:"Подтвердите обязательство по безопасности подписью" },
+};
 
 const workerUI: Record<string, any> = {
     ko: {
@@ -527,6 +536,7 @@ const isoMap: Record<string, string> = {
 function WorkerHomeContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const displayLang = useDisplayLanguage();
     const [profile, setProfile] = useState<any>(null);
     const [hasNewTBM, setHasNewTBM] = useState(false);
     const [newTBMTime] = useState<string>("");
@@ -624,6 +634,7 @@ function WorkerHomeContent() {
                 ...data.profile,
                 preferred_lang: urlLang || data.profile.preferred_lang || "ko",
             });
+            persistDisplayLanguage(urlLang || data.profile.preferred_lang || "ko");
         };
         fetchProfile();
 
@@ -631,34 +642,26 @@ function WorkerHomeContent() {
         ensureLocalNotifyPermission();
     }, [urlLang]);
 
-    const lang = profile?.preferred_lang || urlLang || "ko";
+    const lang = displayLang || profile?.preferred_lang || urlLang || "ko";
     const newChatCount = useUnreadChatCount(profile?.id);
     const t = getUI(lang);
+    const common = WORKER_COMMON[lang] || WORKER_COMMON.en;
     const iso = isoMap[lang] || "un";
-    const simpleHome = lang === "ko"
-        ? {
-            todayTitle: "오늘 할 일",
-            todayDesc: "교육을 확인하고 서명하면 완료됩니다.",
-            step1: "교육 확인",
-            step2: "서명",
-            step3: "완료",
-            helperTitle: "필요한 기능",
-        }
-        : {
-            todayTitle: "Today",
-            todayDesc: "Review the safety training and sign to finish.",
-            step1: "Review",
-            step2: "Sign",
-            step3: "Done",
-            helperTitle: "Tools",
-        };
+    const simpleHome = {
+        todayTitle: common.todayTitle,
+        todayDesc: common.todayDesc,
+        step1: common.step1,
+        step2: common.step2,
+        step3: common.step3,
+        helperTitle: common.helperTitle,
+    };
 
     const handleSignOut = async () => {
         try {
             await logoutV3();
             window.location.replace("/auth");
         } catch {
-            window.alert("로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+            window.alert(common.logoutFailed);
         }
     };
 
@@ -686,7 +689,7 @@ function WorkerHomeContent() {
                             </div>
                         </div>
                         <p className="hidden min-w-0 truncate text-slate-500 font-bold text-sm leading-tight uppercase tracking-tight sm:block">
-                            {profile ? t.greeting(profile.display_name || "Worker") : "Connecting..."}
+                            {profile ? t.greeting(profile.display_name || "Worker") : common.connecting}
                         </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
@@ -702,14 +705,14 @@ function WorkerHomeContent() {
                             <span className="text-[10px] text-[#172033] font-black">{lang.toUpperCase()}</span>
                         </div>
                         <button onClick={() => router.push('/auth/setup')} className="whitespace-nowrap rounded-lg px-2 py-2 text-[9px] font-black text-blue-600 hover:bg-blue-50 uppercase tracking-widest transition-colors">
-                            프로필
+                            {common.profile}
                         </button>
                         <button onClick={handleSignOut} className="whitespace-nowrap rounded-lg px-2 py-2 text-[9px] font-black text-slate-500 hover:bg-red-50 hover:text-red-500 uppercase tracking-widest transition-colors">
                             {t.signOut}
                         </button>
                     </div>
                     <p className="order-3 basis-full truncate text-xs font-bold text-slate-500 sm:hidden">
-                        {profile ? t.greeting(profile.display_name || "Worker") : "Connecting..."}
+                        {profile ? t.greeting(profile.display_name || "Worker") : common.connecting}
                     </p>
                 </header>
 
@@ -723,10 +726,10 @@ function WorkerHomeContent() {
                     <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
                         <p className="text-[10px] font-black tracking-[.18em] text-green-200">SQ-LINK FIELD SAFETY</p>
                         <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">
-                            {lang === "ko" ? "근로자 안전 홈" : "Worker Safety Home"}
+                            {common.safetyHome}
                         </h1>
                         <p className="mt-2 text-sm font-bold text-slate-100">
-                            {profile ? t.greeting(profile.display_name || "Worker") : "Connecting..."}
+                            {profile ? t.greeting(profile.display_name || "Worker") : common.connecting}
                         </p>
                     </div>
                 </div>
@@ -953,10 +956,10 @@ function WorkerHomeContent() {
                         </div>
                         <div className="flex flex-col">
                             <h2 className="text-lg font-black text-white">
-                                {lang === "ko" ? "TBM 안전 서약" : lang === "zh" ? "TBM 安全承诺" : lang === "vi" ? "Cam kết an toàn" : lang === "th" ? "คำมั่นสัญญา" : lang === "id" ? "Janji Keselamatan" : "TBM Safety Pledge"}
+                                {common.pledgeTitle}
                             </h2>
                             <p className="text-slate-400 font-bold text-xs tracking-tight">
-                                {lang === "ko" ? "서명으로 안전 서약 확인" : lang === "zh" ? "签名确认安全承诺" : lang === "vi" ? "Ký tên xác nhận cam kết" : lang === "th" ? "เซ็นชื่อยืนยันคำมั่น" : lang === "id" ? "Tanda tangan untuk konfirmasi" : "Sign to confirm safety pledge"}
+                                {common.pledgeDesc}
                             </p>
                         </div>
                     </div>

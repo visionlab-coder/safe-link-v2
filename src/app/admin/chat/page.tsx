@@ -15,6 +15,7 @@ import { usePresence } from "@/hooks/usePresence";
 import ExportMenu from "@/components/ExportMenu";
 import ChatPlayButton from "@/components/ChatPlayButton";
 import { exportData, type ExportFormat } from "@/utils/export-files";
+import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 type ParsedMessage = { norm: string; text: string; pron: string; rev: string };
 const ui: Record<string, Record<string, string>> = {
@@ -30,6 +31,7 @@ const ui: Record<string, Record<string, string>> = {
         pron: "발음",
         rev: "역번역",
         trans: "번역",
+        male: "남성", female: "여성", nfcQr: "근로자 NFC QR", noNfc: "NFC 카드가 등록되지 않은 근로자입니다", scanNfc: "근로자 NFC 카드 URL을 스캔하세요.", close: "닫기", older: "이전 메시지 불러오기", original: "원문", refresh: "대화 새로고침",
     },
     en: {
         title: "Live Translation Chat",
@@ -43,6 +45,16 @@ const ui: Record<string, Record<string, string>> = {
         pron: "Pronunciation",
         rev: "Reverse Trans",
         trans: "Translation",
+        male: "Male", female: "Female", nfcQr: "Worker NFC QR", noNfc: "This worker has no registered NFC card.", scanNfc: "Scan the worker NFC card URL.", close: "Close", older: "Load older messages", original: "Original", refresh: "Refresh chat",
+    },
+    zh: {
+        title: "实时翻译对话", back: "返回", selectWorker: "请选择要交谈的工人。", search: "搜索姓名...", noWorkers: "现场没有已登记的工人。", chatPlaceholder: "输入消息（自动翻译/TTS）...", listening: "正在倾听...", admin: "我（管理员）", pron: "发音", rev: "回译", trans: "翻译", male: "男", female: "女", nfcQr: "工人 NFC 二维码", noNfc: "该工人没有已登记的 NFC 卡。", scanNfc: "请扫描工人 NFC 卡网址。", close: "关闭", older: "加载更多消息", original: "原文", refresh: "刷新对话",
+    },
+    vi: {
+        title: "Trò chuyện dịch trực tiếp", back: "Quay lại", selectWorker: "Chọn công nhân để trò chuyện.", search: "Tìm tên...", noWorkers: "Không có công nhân được đăng ký tại công trường.", chatPlaceholder: "Nhập tin nhắn (tự động dịch/TTS)...", listening: "Đang nghe...", admin: "Tôi (Quản trị viên)", pron: "Phát âm", rev: "Dịch ngược", trans: "Bản dịch", male: "Nam", female: "Nữ", nfcQr: "QR NFC công nhân", noNfc: "Công nhân này chưa có thẻ NFC đăng ký.", scanNfc: "Hãy quét URL thẻ NFC của công nhân.", close: "Đóng", older: "Tải tin nhắn cũ", original: "Bản gốc", refresh: "Làm mới trò chuyện",
+    },
+    ru: {
+        title: "Чат с переводом", back: "Назад", selectWorker: "Выберите работника для чата.", search: "Поиск по имени...", noWorkers: "На объекте нет зарегистрированных работников.", chatPlaceholder: "Введите сообщение (автоперевод/TTS)...", listening: "Слушаю...", admin: "Я (администратор)", pron: "Произношение", rev: "Обратный перевод", trans: "Перевод", male: "Муж", female: "Жен", nfcQr: "NFC QR работника", noNfc: "У этого работника нет зарегистрированной NFC-карты.", scanNfc: "Отсканируйте URL NFC-карты работника.", close: "Закрыть", older: "Загрузить предыдущие сообщения", original: "Оригинал", refresh: "Обновить чат",
     },
 };
 
@@ -107,6 +119,7 @@ function AdminChatContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const urlLang = searchParams.get("lang");
+    const displayLang = useDisplayLanguage();
 
     const [adminLang, setAdminLang] = useState("ko");
     const [workers, setWorkers] = useState<WorkerProfile[]>([]);
@@ -174,10 +187,7 @@ function AdminChatContent() {
         setMyId(userId);
 
         const profile = me.profile ?? null;
-        let finalLang = profile?.preferred_lang || "ko";
-        if (urlLang && urlLang !== profile?.preferred_lang) {
-            finalLang = urlLang;
-        }
+        const finalLang = displayLang || urlLang || profile?.preferred_lang || "ko";
         setAdminLang(finalLang);
 
         const workersRes = await fetch("/api/admin/chat/workers", { cache: "no-store" });
@@ -187,7 +197,7 @@ function AdminChatContent() {
         } else {
             setWorkers([]);
         }
-    }, [router, urlLang]);
+    }, [router, urlLang, displayLang]);
 
     const markMessagesRead = useCallback(async (peerId: string) => {
         const response = await fetch("/api/chat/messages", {
@@ -620,13 +630,13 @@ function AdminChatContent() {
                                 onClick={() => changeGender('male')}
                                 className={`px-2 py-1 md:px-3 rounded-full text-[9px] md:text-[10px] font-black transition-all ${voiceGender === 'male' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                             >
-                                MALE
+                                {t.male}
                             </button>
                             <button
                                 onClick={() => changeGender('female')}
                                 className={`px-2 py-1 md:px-3 rounded-full text-[9px] md:text-[10px] font-black transition-all ${voiceGender === 'female' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                             >
-                                FEMALE
+                                {t.female}
                             </button>
                         </div>
 
@@ -652,14 +662,14 @@ function AdminChatContent() {
                                         }
                                     }}
                                     className="p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-all border border-slate-100"
-                                    title="근로자 NFC QR"
+                                    title={t.nfcQr}
                                 >
                                     <QrCode className="w-5 h-5" />
                                 </button>
                                 <button
                                     onClick={() => fetchMessages()}
                                     className="p-2 rounded-full hover:bg-slate-100 text-blue-500 transition-all tap-effect border border-slate-100 shadow-sm"
-                                    title="Refresh Chat"
+                                    title={t.refresh}
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                                 </button>
@@ -756,7 +766,7 @@ function AdminChatContent() {
                                     onClick={e => e.stopPropagation()}
                                 >
                                     <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">
-                                        근로자 NFC QR
+                                        {t.nfcQr}
                                     </h3>
                                     <p className="text-xs text-slate-400 font-bold text-center -mt-4">
                                         {activeWorker?.display_name}
@@ -777,18 +787,18 @@ function AdminChatContent() {
                                             />
                                         ) : (
                                             <div className="w-48 h-48 flex items-center justify-center">
-                                                <p className="text-center text-xs text-slate-400 leading-relaxed">NFC 카드가<br />등록되지 않은<br />근로자입니다</p>
+                                                <p className="text-center text-xs text-slate-400 leading-relaxed">{t.noNfc}</p>
                                             </div>
                                         )}
                                     </div>
                                     <p className="text-center text-slate-500 font-bold leading-tight">
-                                        근로자 NFC 카드 URL을<br />스캔하세요.
+                                        {t.scanNfc}
                                     </p>
                                     <button
                                         onClick={() => setShowQR(false)}
                                         className="w-full py-4 bg-slate-900 text-white rounded-full font-black uppercase tracking-widest hover:bg-slate-800 transition-all"
                                     >
-                                        닫기
+                                        {t.close}
                                     </button>
                                 </motion.div>
                             </motion.div>
@@ -800,7 +810,7 @@ function AdminChatContent() {
                         <div ref={messagesContainerRef} className="min-h-0 flex-1 overscroll-contain overflow-y-auto p-4 pb-6 md:p-8 md:pb-8 flex flex-col gap-6" style={{ backgroundImage: 'radial-gradient(circle at center, #e2e8f0 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
                             {hasMore && (
                                 <button onClick={loadOlderMessages} disabled={loadingOlder} className="self-center px-4 py-2 text-xs font-black text-slate-400 hover:text-slate-600 bg-white/80 rounded-full border border-slate-200 tap-effect uppercase tracking-widest disabled:opacity-50">
-                                    {loadingOlder ? '...' : adminLang === 'ko' ? '이전 메시지 불러오기' : adminLang === 'zh' ? '加载更多消息' : 'Load older messages'}
+                                    {loadingOlder ? '...' : t.older}
                                 </button>
                             )}
                             <AnimatePresence initial={false}>
@@ -879,7 +889,7 @@ function AdminChatContent() {
                                                         </div>
                                                         {m.source_text !== parsed.text && m.source_lang !== 'ko' && (
                                                             <div className="pt-3 border-t border-slate-100 flex items-start gap-1.5">
-                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-500 shrink-0 mt-0.5 font-black">원문</span>
+                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-500 shrink-0 mt-0.5 font-black">{t.original}</span>
                                                                 <span className="min-w-0 break-words font-bold text-base md:text-lg text-slate-500">{m.source_text}</span>
                                                             </div>
                                                         )}

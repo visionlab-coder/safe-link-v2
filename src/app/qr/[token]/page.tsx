@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { AlertCircle, CheckCircle, Globe2, Loader2 } from "lucide-react";
 import { logoutV3 } from "@/lib/v3-auth";
+import { persistDisplayLanguage } from "@/hooks/useDisplayLanguage";
 import {
   findQrLanguageByCode,
   findQrLanguageByCountry,
@@ -116,6 +117,7 @@ export default function QrLandingPage() {
   useEffect(() => {
     localStorage.setItem("safe-link-lang", language.lang);
     localStorage.setItem("safe-link-country", language.country);
+    persistDisplayLanguage(language.lang);
   }, [language.country, language.lang]);
 
   useEffect(() => {
@@ -217,15 +219,15 @@ export default function QrLandingPage() {
       <main className="flex min-h-screen flex-col items-center justify-center gap-5 bg-gray-950 px-6">
         <CheckCircle className="h-16 w-16 text-emerald-400" />
         <div className="text-center">
-          <h1 className="text-xl font-bold text-white">SQ Link 활성 중 / Active</h1>
-          <p className="mt-2 text-sm leading-6 text-gray-400">이미 입장됨 · Already checked in</p>
+          <h1 className="text-xl font-bold text-white">{text.activeTitle}</h1>
+          <p className="mt-2 text-sm leading-6 text-gray-400">{text.activeBody}</p>
         </div>
         <button
           type="button"
           onClick={handleLogout}
           className="mt-2 flex h-14 w-full max-w-sm items-center justify-center rounded-lg bg-red-600 text-base font-black text-white"
         >
-          퇴근하기 / Check Out
+          {text.checkout}
         </button>
       </main>
     );

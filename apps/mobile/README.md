@@ -5,8 +5,8 @@
 ## 현재 기준
 
 ```text
-웹앱 테스트 도메인: https://app-test.safe-link.co.kr
-API 테스트 도메인: https://api-test.safe-link.co.kr
+웹앱 도메인: https://app.safe-link.co.kr
+API 도메인: 운영 웹앱의 서버 프록시를 통해 연결
 임시 앱 ID: kr.co.safelink.mobile.dev
 임시 앱 이름: SQ Link Dev
 ```
@@ -25,7 +25,7 @@ npm --prefix apps/mobile run build
 
 ## 아직 남은 것
 
-- `app-test.safe-link.co.kr`, `api-test.safe-link.co.kr` DNS/HTTPS 연결
+- 운영 도메인(`app.safe-link.co.kr`)의 App Links / Universal Links 연결
 - iOS 네이티브 프로젝트 생성
 - Android 네이티브 프로젝트 재생성 또는 보강
 - 앱 아이콘, 스플래시, 스토어 스크린샷 제작

@@ -13,6 +13,7 @@ import { formalizeKo } from "@/utils/politeness";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
 import { usePresence } from "@/hooks/usePresence";
 import ChatPlayButton from "@/components/ChatPlayButton";
+import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 type ParsedMessage = { text: string; pron: string; rev: string };
 
@@ -27,6 +28,7 @@ const ui: Record<string, Record<string, string>> = {
         rev: "역번역",
         selectAdmin: "대화할 관리자를 선택하세요.",
         friendAdded: "새로운 관리자가 대화 목록에 추가되었습니다.",
+        noAdmins: "등록된 관리자가 없습니다. QR 코드를 스캔하여 추가하세요.", older: "이전 메시지", translation: "번역", assistantHint: "현장의 담당 관리자나 안내받은 QR 코드를 통해 관리자를 추가하세요.", male: "남성", female: "여성", conversationList: "대화 상대 목록",
     },
     en: {
         title: "Select Admin",
@@ -38,6 +40,7 @@ const ui: Record<string, Record<string, string>> = {
         rev: "Reverse Trans",
         selectAdmin: "Select an admin to chat with.",
         friendAdded: "New admin has been added to your chat list.",
+        noAdmins: "No administrators are registered. Scan a QR code to add one.", older: "Older messages", translation: "Translation", assistantHint: "Add an administrator through your site contact or the QR code you were given.", male: "Male", female: "Female", conversationList: "Conversation list",
     },
     zh: {
         title: "选择管理员",
@@ -49,6 +52,7 @@ const ui: Record<string, Record<string, string>> = {
         rev: "反向翻译",
         selectAdmin: "请选择与之交谈的管理员。",
         friendAdded: "新管理员已添加到您的对话列表中。",
+        noAdmins: "没有已登记的管理员。请扫描二维码添加管理员。", older: "更多消息", translation: "翻译", assistantHint: "请通过现场负责人或收到的二维码添加管理员。", male: "男", female: "女", conversationList: "对话对象列表",
     },
     vi: {
         title: "Chọn Quản trị viên",
@@ -60,6 +64,7 @@ const ui: Record<string, Record<string, string>> = {
         rev: "Dịch ngược",
         selectAdmin: "Chọn quản trị viên để trò chuyện.",
         friendAdded: "Quản trị viên mới đã được thêm vào danh sách.",
+        noAdmins: "Chưa có quản trị viên được đăng ký. Hãy quét mã QR để thêm.", older: "Tin nhắn cũ", translation: "Bản dịch", assistantHint: "Hãy thêm quản trị viên qua người phụ trách công trường hoặc mã QR được cung cấp.", male: "Nam", female: "Nữ", conversationList: "Danh sách đối tượng trò chuyện",
     },
     th: {
         title: "เลือกผู้ดูแล",
@@ -170,6 +175,7 @@ const ui: Record<string, Record<string, string>> = {
         rev: "Обратный перевод",
         selectAdmin: "Выберите администратора для чата.",
         friendAdded: "Новый администратор добавлен в список чата.",
+        noAdmins: "Нет зарегистрированных администраторов. Отсканируйте QR-код, чтобы добавить администратора.", older: "Предыдущие сообщения", translation: "Перевод", assistantHint: "Добавьте администратора через ответственного на объекте или полученный QR-код.", male: "Муж", female: "Жен", conversationList: "Список собеседников",
     },
     ar: {
         title: "اختيار المدير",
@@ -233,6 +239,7 @@ function WorkerChatContent() {
     const searchParams = useSearchParams();
     const urlLang = searchParams.get("lang");
     const addFriendId = searchParams.get("add_friend");
+    const displayLang = useDisplayLanguage();
 
     const [lang, setLang] = useState("ko");
     const [messages, setMessages] = useState<Message[]>([]);
@@ -329,10 +336,7 @@ function WorkerChatContent() {
         const mySiteId = payload.worker?.site_id ?? null;
         if (mySiteId) setSiteId(mySiteId);
 
-        let finalLang = payload.worker?.preferred_lang || "ko";
-        if (urlLang && urlLang !== payload.worker?.preferred_lang) {
-            finalLang = urlLang;
-        }
+        const finalLang = displayLang || urlLang || payload.worker?.preferred_lang || "ko";
         setLang(finalLang);
 
         // Load friend IDs from local storage
@@ -354,7 +358,7 @@ function WorkerChatContent() {
             return isFriendA - isFriendB;
         });
         setAdmins(prioritized);
-    }, [router, urlLang, addFriendId]);
+    }, [router, urlLang, addFriendId, displayLang]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -619,10 +623,10 @@ function WorkerChatContent() {
                             </span>
                         </button>
                         <div className="flex items-center bg-slate-100 rounded-full p-1 border border-slate-200">
-                            <button onClick={() => changeGender('male')} className={`min-h-11 min-w-11 px-2 py-1 rounded-full text-[9px] font-black transition-all ${voiceGender === 'male' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>MALE</button>
-                            <button onClick={() => changeGender('female')} className={`min-h-11 min-w-11 px-2 py-1 rounded-full text-[9px] font-black transition-all ${voiceGender === 'female' ? 'bg-pink-500 text-white' : 'text-slate-400'}`}>FEMALE</button>
+                            <button onClick={() => changeGender('male')} className={`min-h-11 min-w-11 px-2 py-1 rounded-full text-[9px] font-black transition-all ${voiceGender === 'male' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>{t.male || "MALE"}</button>
+                            <button onClick={() => changeGender('female')} className={`min-h-11 min-w-11 px-2 py-1 rounded-full text-[9px] font-black transition-all ${voiceGender === 'female' ? 'bg-pink-500 text-white' : 'text-slate-400'}`}>{t.female || "FEMALE"}</button>
                         </div>
-                        <button aria-label="대화 상대 목록" onClick={() => setShowSidebar(!showSidebar)} className="min-h-11 min-w-11 p-2 rounded-full hover:bg-slate-100 text-slate-500 relative transition-all">
+                        <button aria-label={t.conversationList || "Conversation list"} onClick={() => setShowSidebar(!showSidebar)} className="min-h-11 min-w-11 p-2 rounded-full hover:bg-slate-100 text-slate-500 relative transition-all">
                             <Users className="w-6 h-6" />
                             {Object.values(unreadAdmins).reduce((a, b) => a + b, 0) > 0 && (
                                 <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 rounded-full border-[2px] border-white text-white text-[10px] font-black flex items-center justify-center">
@@ -649,7 +653,7 @@ function WorkerChatContent() {
                         <div className="flex flex-col gap-2">
                             {filteredAdmins.length === 0 ? (
                                 <div className="text-center py-10 text-slate-400 font-bold italic px-4">
-                                    등록된 관리자가 없습니다.<br />QR 코드를 스캔하여 추가하세요.
+                                    {t.noAdmins || "No administrators are registered."}
                                 </div>
                             ) : (
                                 filteredAdmins.map(a => (
@@ -707,7 +711,7 @@ function WorkerChatContent() {
                                                 setLoadingOlder(false);
                                             }
                                         }} className="self-center px-4 py-2 text-xs font-black text-slate-400 hover:text-slate-600 bg-white/80 rounded-full border border-slate-200 tap-effect uppercase tracking-widest disabled:opacity-50">
-                                            {loadingOlder ? '...' : lang === 'ko' ? '이전 메시지' : lang === 'zh' ? '更多消息' : lang === 'vi' ? 'Tin nhắn cũ' : 'Older messages'}
+                                            {loadingOlder ? '...' : t.older || 'Older messages'}
                                         </button>
                                     )}
                                     <AnimatePresence initial={false}>
@@ -743,7 +747,7 @@ function WorkerChatContent() {
                                                                 </div>
                                                                 {parsed.text && parsed.text !== m.source_text && (
                                                                     <div className="pt-3 border-t border-blue-400/50 flex items-start gap-1.5">
-                                                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">번역</span>
+                                                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">{t.translation || "Translation"}</span>
                                                                         <span className="font-bold text-lg">{parsed.text}</span>
                                                                     </div>
                                                                 )}
@@ -787,7 +791,7 @@ function WorkerChatContent() {
                                     <Users className="w-16 h-16" />
                                 </div>
                                 <h2 className="text-2xl font-black text-slate-400 uppercase tracking-widest leading-tight">{t.selectAdmin}</h2>
-                                <p className="text-slate-400 font-bold max-w-xs">{t.friendAdded ? "현장의 담당 관리자나 안내받은 QR 코드를 통해 관리자를 추가하세요." : ""}</p>
+                                <p className="text-slate-400 font-bold max-w-xs">{t.assistantHint || ""}</p>
                             </div>
                         )}
                     </div>

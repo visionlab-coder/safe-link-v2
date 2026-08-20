@@ -30,6 +30,36 @@ body {
   text-size-adjust: 100%;
 }
 
+/* 관리자·시스템·통합관제에서 공통으로 쓰는 언어 선택 UI */
+.language-dropdown {
+  appearance: none;
+  min-width: 7.5rem;
+  height: 2.25rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  padding: 0 2rem 0 0.75rem;
+  color: #334155;
+  background: #f8fafc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23475569'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.09 1.04l-4.25 4.5a.75.75 0 0 1-1.09 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z' clip-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 0.65rem center / 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+}
+
+.language-dropdown:hover { border-color: #93c5fd; background-color: #fff; }
+.language-dropdown:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, .14); }
+.language-dropdown option { background: #fff; color: #172033; }
+.language-dropdown-light { box-shadow: 0 2px 8px rgba(16, 42, 67, .08); }
+.admin-language-select {
+  height: 2.25rem !important;
+  background-image: none;
+}
+
+@media (max-width: 640px) {
+  .language-dropdown { min-width: 6.8rem; height: 2.125rem; padding-left: .625rem; font-size: .6875rem; }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

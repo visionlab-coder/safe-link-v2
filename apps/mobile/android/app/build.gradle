@@ -23,7 +23,7 @@ def safeLinkValue = { String name, String fallback = null ->
 
 def safeLinkAndroidAppId = safeLinkValue('SAFE_LINK_ANDROID_APP_ID', 'kr.co.safelink.mobile.dev')
 def safeLinkAndroidAppName = safeLinkValue('SAFE_LINK_ANDROID_APP_NAME', 'SQ Link Dev')
-def safeLinkAndroidAppLinkHost = safeLinkValue('SAFE_LINK_ANDROID_APP_LINK_HOST', 'app-test.safe-link.co.kr')
+def safeLinkAndroidAppLinkHost = safeLinkValue('SAFE_LINK_ANDROID_APP_LINK_HOST', 'app.safe-link.co.kr')
 def safeLinkVersionCode = safeLinkValue('SAFE_LINK_ANDROID_VERSION_CODE', '1') as Integer
 def safeLinkVersionName = safeLinkValue('SAFE_LINK_ANDROID_VERSION_NAME', '1.0')
 

@@ -2,6 +2,15 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import BrandLogo from "@/components/BrandLogo";
 import type { FeatureVisual } from "@/components/ResponsiveFeatureHero";
+import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+
+const LAYOUT_UI: Record<string, { operator: string; completed: string }> = {
+  ko: { operator: "판교 데이터센터 · 안전관리자", completed: "완료" },
+  en: { operator: "Pangyo Data Center · Safety Manager", completed: "Complete" },
+  zh: { operator: "板桥数据中心 · 安全管理员", completed: "完成" },
+  vi: { operator: "Trung tâm dữ liệu Pangyo · Quản lý an toàn", completed: "Hoàn thành" },
+  ru: { operator: "Дата-центр Пангьо · Специалист по безопасности", completed: "Готово" },
+};
 
 type Props = {
   visual: FeatureVisual;
@@ -16,7 +25,9 @@ type Props = {
  * 제품 화면으로 이식한 공통 구조다. 브라우저·휴대폰 외곽 프레임은 의도적으로
  * 포함하지 않으며, action과 children에는 기존 기능 컴포넌트를 연결한다.
  */
-export default function VisualizationScreenLayout({ visual, operator = "판교 데이터센터 · 안전관리자", action, children, className = "" }: Props) {
+export default function VisualizationScreenLayout({ visual, operator, action, children, className = "" }: Props) {
+  const language = useDisplayLanguage();
+  const t = LAYOUT_UI[language] ?? LAYOUT_UI.en;
   const webImage = visual.image === "tbm"
     ? "/images/mobile-v4/web/tbm/03.webp"
     : `/images/mobile-v3/website/${visual.image}.webp`;
@@ -29,7 +40,7 @@ export default function VisualizationScreenLayout({ visual, operator = "판교 �
       <header className="concept-page-header">
         <BrandLogo compact imageClassName="!w-[88px] max-w-none max-sm:!w-[78px]" />
         <span className="text-xs font-black text-[#063789]">SQ-LINK</span>
-        <span className="text-[10px] font-bold text-[#526076] max-sm:hidden">{operator}</span>
+        <span className="text-[10px] font-bold text-[#526076] max-sm:hidden">{operator ?? t.operator}</span>
       </header>
 
       <div className="admin-concept-hero relative h-[min(32vw,288px)] min-h-40 overflow-hidden bg-[#dbe3ec] max-sm:h-[178px] max-sm:min-h-[178px]">
@@ -60,7 +71,7 @@ export default function VisualizationScreenLayout({ visual, operator = "판교 �
             <div key={step.title} className="grid min-h-[52px] grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-2.5 border-b border-[#edf1f5] px-1 py-2 last:border-b-0 max-sm:min-h-12">
               <span className="grid h-[26px] w-[26px] place-items-center rounded-[5px] bg-[#0b5ed7] text-[10px] font-black text-white">{index + 1}</span>
               <span><strong className="block text-xs">{step.title}</strong><small className="mt-0.5 block text-[9px] text-[#7a8595]">{step.description}</small></span>
-              <span className="text-[9px] font-black text-[#07835a]">완료</span>
+              <span className="text-[9px] font-black text-[#07835a]">{t.completed}</span>
             </div>
           ))}
         </div>

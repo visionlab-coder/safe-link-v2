@@ -5,12 +5,13 @@ import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { MapPin } from "lucide-react";
+import { ChevronDown, LogOut, MapPin, Settings, UserRound } from "lucide-react";
 import SiteAgentBriefing from "@/components/agents/SiteAgentBriefing";
 import SystemHealthCheck from "@/components/SystemHealthCheck";
 import ResponsiveFeatureHero from "@/components/ResponsiveFeatureHero";
 import { logoutV3 } from "@/lib/v3-auth";
 import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
+import { persistDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 // 관리자 모드: 한국어 / 영어 / 중국어 3개 (그 외 언어는 영어 fallback)
 const adminUI: Record<string, any> = {
@@ -28,6 +29,12 @@ const adminUI: Record<string, any> = {
         glossaryTitle: "용어 사전 관리",
         glossaryDesc: "현장 은어를 등록하고 표준어 변환을 관리합니다.",
         signOut: "로그아웃",
+        profile: "내 정보",
+        systemManagement: "시스템 관리",
+        integratedControl: "통합 관제",
+        accountMenu: "계정 메뉴",
+        fieldUnit: "현장 운영",
+        hero: { eyebrow: "CONTROL CENTER", title: "관리자 통합 현황", description: "위험과 미처리 업무를 한 화면에서 확인합니다.", metrics: ["출입 인원", "TBM 완료", "조치 필요"], steps: [["인원 현황", "출입·교육 상태를 집계합니다."], ["위험 확인", "미조치 항목을 우선 표시합니다."], ["보고 준비", "오늘 문서를 자동으로 정리합니다."]] },
         roleLabel: { HQ_ADMIN: "현장 소장", SAFETY_OFFICER: "안전관리자", WORKER: "근로자" },
         greeting: (name: string) => `반갑습니다, ${name}님`,
     },
@@ -45,6 +52,12 @@ const adminUI: Record<string, any> = {
         glossaryTitle: "Glossary Management",
         glossaryDesc: "Manage site slang and standard term translations.",
         signOut: "Sign out",
+        profile: "My profile",
+        systemManagement: "System management",
+        integratedControl: "Integrated control",
+        accountMenu: "Account menu",
+        fieldUnit: "Field operations",
+        hero: { eyebrow: "CONTROL CENTER", title: "Integrated Admin Overview", description: "Review risks and pending work from one screen.", metrics: ["People on site", "TBM complete", "Action needed"], steps: [["Workforce status", "Summarize entry and training status."], ["Risk review", "Show unaddressed items first."], ["Prepare reports", "Organize today’s documents automatically."]] },
         roleLabel: { HQ_ADMIN: "Site Manager", SAFETY_OFFICER: "Safety Officer", WORKER: "Worker" },
         greeting: (name: string) => `Welcome, ${name}`,
     },
@@ -62,6 +75,12 @@ const adminUI: Record<string, any> = {
         glossaryTitle: "术语词典管理",
         glossaryDesc: "管理现场行话及标准用语转换。",
         signOut: "退出",
+        profile: "我的资料",
+        systemManagement: "系统管理",
+        integratedControl: "综合管控",
+        accountMenu: "账户菜单",
+        fieldUnit: "现场运营",
+        hero: { eyebrow: "控制中心", title: "管理员综合概览", description: "在一个页面查看风险和待处理工作。", metrics: ["现场人数", "TBM 完成", "需要处理"], steps: [["人员现状", "汇总出入与培训状态。"], ["风险确认", "优先显示未处理事项。"], ["报告准备", "自动整理今日文档。"]] },
         roleLabel: { HQ_ADMIN: "现场主管", SAFETY_OFFICER: "安全管理员", WORKER: "工人" },
         greeting: (name: string) => `您好, ${name}`,
     },
@@ -79,6 +98,12 @@ const adminUI: Record<string, any> = {
         glossaryTitle: "Quản lý từ điển",
         glossaryDesc: "Quản lý tiếng lóng tại hiện trường và chuyển đổi thuật ngữ.",
         signOut: "Đăng xuất",
+        profile: "Thông tin của tôi",
+        systemManagement: "Quản lý hệ thống",
+        integratedControl: "Điều hành tích hợp",
+        accountMenu: "Menu tài khoản",
+        fieldUnit: "Vận hành công trường",
+        hero: { eyebrow: "TRUNG TÂM ĐIỀU HÀNH", title: "Tổng quan quản trị", description: "Theo dõi rủi ro và công việc chưa xử lý trên một màn hình.", metrics: ["Người tại công trường", "TBM hoàn thành", "Cần xử lý"], steps: [["Tình hình nhân sự", "Tổng hợp trạng thái vào cổng và đào tạo."], ["Kiểm tra rủi ro", "Ưu tiên hiển thị các mục chưa xử lý."], ["Chuẩn bị báo cáo", "Tự động sắp xếp tài liệu hôm nay."]] },
         roleLabel: { HQ_ADMIN: "Giám đốc hiện trường", SAFETY_OFFICER: "Cán bộ an toàn", WORKER: "Công nhân" },
         greeting: (name: string) => `Chào mừng, ${name}`,
     },
@@ -116,8 +141,51 @@ const adminUI: Record<string, any> = {
         roleLabel: { HQ_ADMIN: "Sayt menejeri", SAFETY_OFFICER: "Xavfsizlik xodimi", WORKER: "Ishchi" },
         greeting: (name: string) => `Xush kelibsiz, ${name}`,
     },
+    ru: {
+        board: "Панель управления в реальном времени",
+        boardDesc: "Контролируйте TBM и связь с работниками в реальном времени.",
+        tbmTitle: "Рассылка TBM",
+        tbmDesc: "Создавайте инструкции по безопасности и отправляйте их работникам на родном языке.",
+        tbmBtn: "Новая рассылка",
+        chatTitle: "AI-чат 1:1",
+        chatDesc: "Автоматический перевод в реальном времени для общения с работниками.",
+        chatBtn: "Открыть чат",
+        statusTitle: "Статус подписей",
+        statusDesc: "Проверяйте подтверждения TBM и юридические подписи в реальном времени.",
+        glossaryTitle: "Управление словарём",
+        glossaryDesc: "Управляйте терминами площадки и стандартными переводами.",
+        signOut: "Выйти",
+        profile: "Мой профиль",
+        systemManagement: "Управление системой",
+        integratedControl: "Интегрированный контроль",
+        accountMenu: "Меню аккаунта",
+        fieldUnit: "Работа объекта",
+        hero: { eyebrow: "ЦЕНТР УПРАВЛЕНИЯ", title: "Общий обзор администратора", description: "Просматривайте риски и незавершённые задачи на одном экране.", metrics: ["На объекте", "TBM выполнено", "Требует действий"], steps: [["Статус персонала", "Сводка прохода и обучения."], ["Проверка рисков", "Сначала показываются нерешённые пункты."], ["Подготовка отчёта", "Автоматически формируются документы за сегодня."]] },
+        roleLabel: { HQ_ADMIN: "Руководитель площадки", SAFETY_OFFICER: "Специалист по безопасности", WORKER: "Работник" },
+        greeting: (name: string) => `Добро пожаловать, ${name}`,
+    },
 };
 const getUI = (lang: string) => adminUI[lang] || adminUI["en"];
+
+const adminFeatureUI: Record<string, Record<string, string>> = {
+    ko: { termsAction: "용어 관리", aiTitle: "AI 엔진 · 키 설정", aiDesc: "통번역 엔진(Google·Papago)과 API 키를 재배포 없이 즉시 교체·테스트합니다.", aiAction: "엔진 전환", liveTitle: "실시간 통역", liveDesc: "실시간 동시통역. 말하면 근로자 폰에서 자동 번역 재생.", liveAction: "방송 시작", quizTitle: "안전 퀴즈", quizDesc: "실시간 안전 퀴즈. 근로자 이해도를 즉시 확인.", quizAction: "퀴즈 만들기", accessTitle: "출입 관리", accessDesc: "SQ Link 출입카드와 대체 확인 코드를 발급합니다.", accessAction: "출입 관리 열기", incentiveTitle: "안전 인센티브", incentiveDesc: "퀴즈 우수자에게 안전장비를 지급하고 성과를 기록합니다.", incentiveAction: "지급 관리", nfcTitle: "NFC 근로자 관리", nfcDesc: "NFC 스티커 등록·발급 및 TBM 참석 현황을 관리합니다.", nfcAction: "NFC 관리", guideTitle: "기능 사용 가이드", guideDesc: "NFC 근로자 관리·인센티브·ESG 리포트 단계별 안내. 처음 담당하는 직원도 바로 시작 가능.", guideAction: "가이드 열기", esgTitle: "ESG 안전 리포트", esgDesc: "TBM 인증율·서약·감사체인 기반 ESG 종합 점수를 산출합니다.", esgAction: "리포트 보기", statusAction: "현황 보기" },
+    en: { termsAction: "Manage terms", aiTitle: "AI Engine & Key Settings", aiDesc: "Switch and test translation engines and API keys without redeploying.", aiAction: "Switch engine", liveTitle: "Live Interpreter", liveDesc: "Real-time interpretation. Speak and workers hear it translated.", liveAction: "Start broadcast", quizTitle: "Safety Quiz", quizDesc: "Live safety quiz. Check worker comprehension instantly.", quizAction: "Create quiz", accessTitle: "Access Center", accessDesc: "Issue SQ Link access cards and fallback codes.", accessAction: "Open access center", incentiveTitle: "Safety Incentive", incentiveDesc: "Grant safety equipment to top quiz performers and track results.", incentiveAction: "Manage grants", nfcTitle: "NFC Worker Management", nfcDesc: "Register NFC stickers and manage TBM attendance records.", nfcAction: "Manage NFC", guideTitle: "Feature Guide", guideDesc: "Step-by-step guidance for NFC, incentives, and ESG reporting.", guideAction: "Open guide", esgTitle: "ESG Safety Report", esgDesc: "Calculate an ESG score from TBM certification, pledges, and audit records.", esgAction: "View report", statusAction: "View status" },
+    zh: { termsAction: "管理术语", aiTitle: "AI 引擎与密钥设置", aiDesc: "无需重新部署即可更换和测试翻译引擎及 API 密钥。", aiAction: "切换引擎", liveTitle: "实时口译", liveDesc: "实时同声传译。发言后自动翻译播放。", liveAction: "开始广播", quizTitle: "安全测验", quizDesc: "实时安全测验。即时确认工人理解度。", quizAction: "创建测验", accessTitle: "出入管理中心", accessDesc: "发放 SQ Link 出入卡和备用确认代码。", accessAction: "打开出入管理", incentiveTitle: "安全激励", incentiveDesc: "向测验优秀者发放安全装备并记录成果。", incentiveAction: "管理发放", nfcTitle: "NFC 工人管理", nfcDesc: "管理 NFC 贴纸登记、发放及 TBM 出勤情况。", nfcAction: "管理 NFC", guideTitle: "功能使用指南", guideDesc: "NFC、激励和 ESG 报告的分步指南。", guideAction: "打开指南", esgTitle: "ESG 安全报告", esgDesc: "基于 TBM 认证、承诺书和审计记录计算 ESG 综合评分。", esgAction: "查看报告", statusAction: "查看状态" },
+    vi: { termsAction: "Quản lý thuật ngữ", aiTitle: "Cài đặt AI & khóa", aiDesc: "Thay đổi và kiểm tra công cụ dịch cùng khóa API mà không cần triển khai lại.", aiAction: "Đổi công cụ", liveTitle: "Phiên dịch trực tiếp", liveDesc: "Phiên dịch thời gian thực. Công nhân nghe bản dịch tự động.", liveAction: "Bắt đầu phát", quizTitle: "Câu đố an toàn", quizDesc: "Câu đố an toàn trực tiếp để kiểm tra mức độ hiểu của công nhân.", quizAction: "Tạo câu đố", accessTitle: "Trung tâm ra vào", accessDesc: "Cấp thẻ ra vào SQ Link và mã xác nhận dự phòng.", accessAction: "Mở quản lý ra vào", incentiveTitle: "Khuyến khích an toàn", incentiveDesc: "Cấp thiết bị an toàn cho người đạt kết quả tốt và lưu thành tích.", incentiveAction: "Quản lý cấp phát", nfcTitle: "Quản lý công nhân NFC", nfcDesc: "Đăng ký NFC, cấp thẻ và quản lý tình hình tham gia TBM.", nfcAction: "Quản lý NFC", guideTitle: "Hướng dẫn sử dụng", guideDesc: "Hướng dẫn từng bước về NFC, khuyến khích và báo cáo ESG.", guideAction: "Mở hướng dẫn", esgTitle: "Báo cáo an toàn ESG", esgDesc: "Tính điểm ESG từ xác nhận TBM, cam kết và hồ sơ kiểm toán.", esgAction: "Xem báo cáo", statusAction: "Xem trạng thái" },
+    ru: { termsAction: "Управление терминами", aiTitle: "Настройки AI и ключей", aiDesc: "Меняйте и тестируйте движки перевода и API-ключи без повторного развёртывания.", aiAction: "Сменить движок", liveTitle: "Онлайн-перевод", liveDesc: "Синхронный перевод в реальном времени для работников.", liveAction: "Начать трансляцию", quizTitle: "Тест по безопасности", quizDesc: "Проверяйте понимание требований безопасности работниками в реальном времени.", quizAction: "Создать тест", accessTitle: "Центр доступа", accessDesc: "Выдавайте карты доступа SQ Link и резервные коды.", accessAction: "Открыть доступ", incentiveTitle: "Поощрения за безопасность", incentiveDesc: "Выдавайте средства защиты лучшим участникам тестов и фиксируйте результаты.", incentiveAction: "Управление выдачей", nfcTitle: "Управление NFC-работниками", nfcDesc: "Регистрируйте NFC-метки и управляйте посещением TBM.", nfcAction: "Управление NFC", guideTitle: "Руководство", guideDesc: "Пошаговое руководство по NFC, поощрениям и ESG-отчётам.", guideAction: "Открыть руководство", esgTitle: "Отчёт ESG по безопасности", esgDesc: "Рассчитывайте оценку ESG по TBM, обязательствам и журналам аудита.", esgAction: "Открыть отчёт", statusAction: "Открыть статус" },
+};
+const getFeatureUI = (lang: string) => adminFeatureUI[lang] || adminFeatureUI.en;
+const ADMIN_ESG_CLAIM: Record<string, string> = {
+    ko: "청구항 24", en: "Claim 24", zh: "权利要求 24", vi: "Yêu cầu 24", ru: "Пункт 24",
+};
+
+const ADMIN_LANGUAGE_OPTIONS = [
+    { code: "ko", label: "한국어" },
+    { code: "en", label: "English" },
+    { code: "zh", label: "中文" },
+    { code: "vi", label: "Tiếng Việt" },
+    { code: "ru", label: "Русский" },
+] as const;
 
 function AdminDashboardContent() {
     const router = useRouter();
@@ -131,9 +199,15 @@ function AdminDashboardContent() {
         title?: string;
         site_code?: string;
     } | null>(null);
+    const [selectedLang, setSelectedLang] = useState<string | null>(null);
+    const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 
     // URL 파라미터로 명시적으로 전달된 언어가 있는지 확인 (override)
     const urlLang = searchParams.get("lang");
+
+    useEffect(() => {
+        setSelectedLang(localStorage.getItem("safe-link-lang"));
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -188,8 +262,18 @@ function AdminDashboardContent() {
         }
     };
 
-    const lang = currentUser?.prefLang || urlLang || "ko";
+    const handleLanguageChange = (nextLang: string) => {
+        persistDisplayLanguage(nextLang);
+        setSelectedLang(nextLang);
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("lang", nextLang);
+        router.replace(`/admin?${params.toString()}`);
+    };
+
+    const requestedLang = urlLang || selectedLang || currentUser?.prefLang || "ko";
+    const lang = ADMIN_LANGUAGE_OPTIONS.some((option) => option.code === requestedLang) ? requestedLang : "en";
     const t = getUI(lang);
+    const feature = getFeatureUI(lang);
     const roleDisplay = currentUser ? ((t.roleLabel as any)[currentUser.role] || currentUser.role) : "Admin";
     const siteId = searchParams.get("site_id");
     const siteName = siteId === "1" ? "SITE ALPHA" : siteId === "2" ? "SITE BETA" : siteId === "3" ? "SITE GAMMA" : null;
@@ -198,21 +282,23 @@ function AdminDashboardContent() {
         <RoleGuard allowedRole="admin">
             <div className="min-h-screen bg-[#eef3f8] text-white flex flex-col pb-12 font-sans selection:bg-blue-500/30">
 
-                <header className="w-full border-y border-slate-200 bg-white shadow-sm">
-                    <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:flex-nowrap sm:px-8">
-                        <Image
-                            src="/brand/seowon-logo-compact-transparent.png"
-                            alt="SEOWON Since 1991"
-                            width={208}
-                            height={60}
-                            priority
-                            unoptimized
-                            className="h-auto w-[112px] shrink-0 object-contain sm:w-[132px]"
-                        />
+                <header className="relative z-[70] w-full border-b border-slate-200 bg-white shadow-sm">
+                    <div className="mx-auto grid max-w-[1600px] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-3 px-4 py-3 sm:px-6 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:px-8">
+                        <div className="flex shrink-0 items-center gap-3">
+                            <Image
+                                src="/brand/seowon-logo-compact-transparent.png"
+                                alt="SEOWON Since 1991"
+                                width={208}
+                                height={60}
+                                priority
+                                unoptimized
+                                className="h-auto w-[112px] object-contain sm:w-[132px]"
+                            />
+                            <div className="hidden h-8 w-px bg-slate-200 lg:block" />
+                            <span className="hidden whitespace-nowrap text-sm font-black tracking-tight text-[#063789] lg:block">SQ-LINK</span>
+                        </div>
 
-                        <div className="hidden h-8 w-px shrink-0 bg-slate-200 sm:block" />
-
-                        <div className="order-3 flex min-w-0 basis-full flex-wrap items-center gap-2 sm:order-none sm:flex-1 sm:basis-auto">
+                        <div className="order-3 col-span-2 flex min-w-0 flex-wrap items-center gap-2 border-t border-slate-100 pt-3 lg:order-none lg:col-span-1 lg:border-0 lg:pt-0">
                             <p className="min-w-0 truncate text-xs font-bold text-slate-600 sm:text-sm">
                                 {currentUser ? t.greeting(currentUser.name) : "Authenticating..."}
                                 {currentUser?.title && <span className="ml-1 text-slate-400">[{currentUser.title}]</span>}
@@ -229,27 +315,59 @@ function AdminDashboardContent() {
                             )}
                         </div>
 
-                        <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+                        <div className="order-2 flex shrink-0 items-center gap-1 sm:gap-2">
+                            <label className="sr-only" htmlFor="admin-language">표시 언어</label>
+                            <div className="relative">
+                                <select
+                                    id="admin-language"
+                                    aria-label="표시 언어"
+                                    value={lang}
+                                    onChange={(event) => handleLanguageChange(event.target.value)}
+                                    className="language-dropdown admin-language-select pr-8"
+                                >
+                                    {ADMIN_LANGUAGE_OPTIONS.map((option) => (
+                                        <option key={option.code} value={option.code}>{option.label}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+                            </div>
                             <div className={`hidden whitespace-nowrap rounded-full px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest sm:block ${currentUser?.role === 'HQ_ADMIN' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
                                 {roleDisplay}
                             </div>
-                            {(currentUser?.role === 'ROOT' || currentUser?.role === 'HQ_OFFICER') && (
-                                <button onClick={() => router.push('/system')} className="whitespace-nowrap rounded-lg bg-indigo-50 px-2.5 py-2 text-[9px] font-black text-indigo-600 transition-colors hover:bg-indigo-100">
-                                    시스템
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    aria-label={t.accountMenu}
+                                    aria-expanded={isAccountMenuOpen}
+                                    onClick={() => setIsAccountMenuOpen((open) => !open)}
+                                    className="flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[10px] font-black text-slate-700 shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                                >
+                                    <UserRound className="h-3.5 w-3.5" />
+                                    <span className="hidden sm:inline">{currentUser?.name || t.profile}</span>
+                                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isAccountMenuOpen ? "rotate-180" : ""}`} />
                                 </button>
-                            )}
-                            {currentUser?.role === 'HQ_ADMIN' && (
-                                <button onClick={() => router.push('/control')} className="whitespace-nowrap rounded-lg bg-blue-50 px-2.5 py-2 text-[9px] font-black text-blue-600 transition-colors hover:bg-blue-100">
-                                    통합 관제
-                                </button>
-                            )}
-                            <button onClick={() => router.push('/auth/setup')} className="whitespace-nowrap rounded-lg px-2 py-2 text-[9px] font-black text-blue-600 transition-colors hover:bg-blue-50">
-                                프로필
-                            </button>
-                            <button onClick={handleSignOut} className="whitespace-nowrap rounded-lg px-2 py-2 text-[9px] font-black text-slate-500 transition-colors hover:bg-red-50 hover:text-red-500">
-                                {t.signOut}
-                            </button>
-                            <span className="ml-1 shrink-0 text-base font-black tracking-tight text-[#063789] sm:ml-2 sm:text-xl">SQ-LINK</span>
+                                {isAccountMenuOpen && (
+                                    <div className="absolute right-0 top-[calc(100%+0.5rem)] z-[80] w-48 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_16px_40px_rgba(16,42,67,.16)]">
+                                        <button onClick={() => router.push('/auth/setup')} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-700">
+                                            <UserRound className="h-4 w-4" />{t.profile}
+                                        </button>
+                                        {(currentUser?.role === 'ROOT' || currentUser?.role === 'HQ_OFFICER') && (
+                                            <button onClick={() => router.push('/system')} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-700">
+                                                <Settings className="h-4 w-4" />{t.systemManagement}
+                                            </button>
+                                        )}
+                                        {currentUser?.role === 'HQ_ADMIN' && (
+                                            <button onClick={() => router.push('/control')} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-700">
+                                                <Settings className="h-4 w-4" />{t.integratedControl}
+                                            </button>
+                                        )}
+                                        <div className="my-1 border-t border-slate-100" />
+                                        <button onClick={handleSignOut} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold text-red-600 transition-colors hover:bg-red-50">
+                                            <LogOut className="h-4 w-4" />{t.signOut}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </header>
@@ -257,27 +375,27 @@ function AdminDashboardContent() {
                 <div className="w-full">
                     <ResponsiveFeatureHero visual={{
                         image: "dashboard",
-                        eyebrow: "CONTROL CENTER",
-                        title: "관리자 통합 현황",
-                        description: "위험과 미처리 업무를 한 화면에서 확인합니다.",
-                        metrics: [{ label: "출입 인원", value: "286명" }, { label: "TBM 완료", value: "94%" }, { label: "조치 필요", value: "7건" }],
-                        steps: [{ title: "인원 현황", description: "출입·교육 상태를 집계합니다." }, { title: "위험 확인", description: "미조치 항목을 우선 표시합니다." }, { title: "보고 준비", description: "오늘 문서를 자동으로 정리합니다." }],
+                        eyebrow: t.hero.eyebrow,
+                        title: t.hero.title,
+                        description: t.hero.description,
+                        metrics: [{ label: t.hero.metrics[0], value: "286" }, { label: t.hero.metrics[1], value: "94%" }, { label: t.hero.metrics[2], value: "7" }],
+                        steps: t.hero.steps.map(([title, description]: [string, string]) => ({ title, description })),
                     }} />
                 </div>
 
                 {/* 🚨 Pre-flight Health Check (Critical for Monday Demo) */}
                 <div className="mx-4 mt-8 sm:mx-8">
-                    <SystemHealthCheck />
+                    <SystemHealthCheck lang={lang} />
                 </div>
 
                 {/* 🤖 Tier 2: Site Agent Briefing (Role-specific) */}
                 {currentUser && (
                     <div className="mx-4 mt-8 sm:mx-8">
-                        <SiteAgentBriefing
-                            role={currentUser.role}
-                            siteId={siteId}
-                            lang={currentUser.prefLang}
-                        />
+                            <SiteAgentBriefing
+                                role={currentUser.role}
+                                siteId={siteId}
+                                lang={lang}
+                            />
                     </div>
                 )}
 
@@ -364,7 +482,7 @@ function AdminDashboardContent() {
                                 {t.statusDesc}
                             </p>
                             <div className="mt-4 flex items-center gap-2 text-green-400 font-black tracking-widest text-sm uppercase">
-                                <span>View Status</span>
+                                <span>{feature.statusAction}</span>
                                 <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                 </svg>
@@ -393,7 +511,7 @@ function AdminDashboardContent() {
                                 {t.glossaryDesc}
                             </p>
                             <div className="mt-4 flex items-center gap-2 text-amber-400 font-black tracking-widest text-sm uppercase">
-                                <span>Manage Terms</span>
+                                <span>{feature.termsAction}</span>
                                 <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                 </svg>
@@ -417,12 +535,12 @@ function AdminDashboardContent() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
                             </div>
-                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">AI 엔진 · 키 설정</h3>
+                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">{feature.aiTitle}</h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
-                                통번역 엔진(Google·Papago)과 API 키를 재배포 없이 즉시 교체·테스트합니다.
+                                {feature.aiDesc}
                             </p>
                             <div className="mt-4 flex items-center gap-2 text-emerald-400 font-black tracking-widest text-sm uppercase">
-                                <span>Engine Switch</span>
+                                <span>{feature.aiAction}</span>
                                 <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                 </svg>
@@ -445,12 +563,12 @@ function AdminDashboardContent() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
                                 </svg>
                             </div>
-                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">Live Interpreter</h3>
+                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">{feature.liveTitle}</h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
-                                {lang === "ko" ? "실시간 동시통역. 말하면 근로자 폰에서 자동 번역 재생." : lang === "zh" ? "实时同声传译。发言后自动翻译播放。" : "Real-time interpretation. Speak and workers hear it translated."}
+                                {feature.liveDesc}
                             </p>
                             <div className="mt-4 flex items-center gap-2 text-indigo-400 font-black tracking-widest text-sm uppercase">
-                                <span>Start Broadcast</span>
+                                <span>{feature.liveAction}</span>
                                 <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                 </svg>
@@ -473,12 +591,12 @@ function AdminDashboardContent() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
                                 </svg>
                             </div>
-                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">Safety Quiz</h3>
+                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">{feature.quizTitle}</h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
-                                {lang === "ko" ? "실시간 안전 퀴즈. 근로자 이해도를 즉시 확인." : lang === "zh" ? "实时安全测验。即时确认工人理解度。" : "Live safety quiz. Check worker comprehension instantly."}
+                                {feature.quizDesc}
                             </p>
                             <div className="mt-4 flex items-center gap-2 text-pink-400 font-black tracking-widest text-sm uppercase">
-                                <span>Create Quiz</span>
+                                <span>{feature.quizAction}</span>
                                 <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                 </svg>
@@ -502,12 +620,12 @@ function AdminDashboardContent() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                                 </svg>
                             </div>
-                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">Access Center</h3>
+                            <h3 className="text-3xl font-black text-[#172033] uppercase italic">{feature.accessTitle}</h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
-                                Issue SQ Link access cards and fallback codes.
+                                {feature.accessDesc}
                             </p>
                             <div className="mt-4 flex items-center gap-2 text-purple-400 font-black tracking-widest text-sm uppercase">
-                                <span>Open Access Center</span>
+                                <span>{feature.accessAction}</span>
                                 <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                 </svg>
@@ -531,13 +649,13 @@ function AdminDashboardContent() {
                                 </svg>
                             </div>
                             <h3 className="text-3xl font-black text-[#172033] uppercase italic">
-                                {lang === "ko" ? "안전 인센티브" : lang === "zh" ? "安全激励" : "Safety Incentive"}
+                                {feature.incentiveTitle}
                             </h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
-                                {lang === "ko" ? "퀴즈 우수자에게 안전장비를 지급하고 성과를 기록합니다." : lang === "zh" ? "向测验优秀者发放安全装备并记录成果。" : "Grant safety equipment to top quiz performers and track results."}
+                                {feature.incentiveDesc}
                             </p>
                             <div className="mt-4 flex items-center gap-2 text-orange-400 font-black tracking-widest text-sm uppercase">
-                                <span>Manage Grants</span>
+                                <span>{feature.incentiveAction}</span>
                                 <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                 </svg>
@@ -561,13 +679,13 @@ function AdminDashboardContent() {
                                 </svg>
                             </div>
                             <h3 className="text-3xl font-black text-[#172033] uppercase italic">
-                                {lang === "ko" ? "NFC 근로자 관리" : lang === "zh" ? "NFC工人管理" : "NFC Worker Mgmt"}
+                                {feature.nfcTitle}
                             </h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
-                                {lang === "ko" ? "NFC 스티커 등록·발급 및 TBM 참석 현황을 관리합니다." : lang === "zh" ? "管理NFC贴纸注册·发放及TBM出勤情况。" : "Register NFC stickers and manage TBM attendance records."}
+                                {feature.nfcDesc}
                             </p>
                             <div className="mt-4 flex items-center gap-2 text-cyan-400 font-black tracking-widest text-sm uppercase">
-                                <span>Manage NFC</span>
+                                <span>{feature.nfcAction}</span>
                                 <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                 </svg>
@@ -591,13 +709,13 @@ function AdminDashboardContent() {
                                 </svg>
                             </div>
                             <h3 className="text-3xl font-black text-[#172033] uppercase italic">
-                                {lang === "ko" ? "기능 사용 가이드" : lang === "zh" ? "功能使用指南" : "Feature Guide"}
+                                {feature.guideTitle}
                             </h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
-                                {lang === "ko" ? "NFC 근로자 관리·인센티브·ESG 리포트 단계별 안내. 처음 담당하는 직원도 바로 시작 가능." : lang === "zh" ? "NFC工人管理·激励·ESG报告分步指南。新担当人员也可立即开始。" : "Step-by-step guide for NFC, incentives, and ESG report."}
+                                {feature.guideDesc}
                             </p>
                             <div className="mt-4 flex items-center gap-2 text-blue-300 font-black tracking-widest text-sm uppercase">
-                                <span>Open Guide</span>
+                                <span>{feature.guideAction}</span>
                                 <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                 </svg>
@@ -621,16 +739,16 @@ function AdminDashboardContent() {
                                 </svg>
                             </div>
                             <h3 className="text-3xl font-black text-[#172033] uppercase italic">
-                                {lang === "ko" ? "ESG 안전 리포트" : lang === "zh" ? "ESG安全报告" : "ESG Safety Report"}
+                                {feature.esgTitle}
                             </h3>
                             <p className="text-slate-400 font-bold text-lg leading-relaxed flex-grow">
-                                {lang === "ko" ? "TBM 인증율·서약·감사체인 기반 ESG 종합 점수를 산출합니다." : lang === "zh" ? "基于TBM认证率、承诺书和审计链计算ESG综合评分。" : "Compute ESG score from TBM certification, pledges, and audit chain."}
+                                {feature.esgDesc}
                             </p>
                             <div className="flex items-center gap-2 mt-4">
-                                <span className="text-[10px] bg-emerald-900/50 text-emerald-400 px-2 py-0.5 rounded font-black">청구항 24</span>
+                                <span className="text-[10px] bg-emerald-900/50 text-emerald-400 px-2 py-0.5 rounded font-black">{ADMIN_ESG_CLAIM[lang] || ADMIN_ESG_CLAIM.en}</span>
                             </div>
                             <div className="mt-2 flex items-center gap-2 text-emerald-400 font-black tracking-widest text-sm uppercase">
-                                <span>View Report</span>
+                                <span>{feature.esgAction}</span>
                                 <svg className="w-4 h-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                 </svg>
