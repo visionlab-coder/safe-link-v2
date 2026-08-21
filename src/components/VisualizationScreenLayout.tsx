@@ -3,6 +3,7 @@ import Image from "next/image";
 import BrandLogo from "@/components/BrandLogo";
 import type { FeatureVisual } from "@/components/ResponsiveFeatureHero";
 import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { getT as getAuthT } from "@/app/auth/translations";
 
 const LAYOUT_UI: Record<string, { operator: string; completed: string }> = {
   ko: { operator: "판교 데이터센터 · 안전관리자", completed: "완료" },
@@ -27,7 +28,7 @@ type Props = {
  */
 export default function VisualizationScreenLayout({ visual, operator, action, children, className = "" }: Props) {
   const language = useDisplayLanguage();
-  const t = LAYOUT_UI[language] ?? LAYOUT_UI.en;
+  const t = LAYOUT_UI[language] ?? { operator: getAuthT(language).adminRole, completed: getAuthT(language).doEnter };
   const webImage = visual.image === "tbm"
     ? "/images/mobile-v4/web/tbm/03.webp"
     : `/images/mobile-v3/website/${visual.image}.webp`;

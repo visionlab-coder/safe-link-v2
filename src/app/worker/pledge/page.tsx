@@ -5,7 +5,7 @@ import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import SignatureCanvas from "react-signature-canvas";
 import { PenLine, CheckCircle, RotateCcw, ArrowLeft, Loader } from "lucide-react";
-import { persistDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { persistDisplayLanguage, resolveDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 const PLEDGE_KO = "본인은 오늘 TBM 안전 교육 내용을 충분히 이해하였으며, 작업 중 안전 수칙을 반드시 준수할 것을 서약합니다.";
 
@@ -43,7 +43,7 @@ export default function WorkerPledgePage() {
         profile?: { preferred_lang?: string | null; site_id?: string | null };
       };
       if (cancelled) return;
-      persistDisplayLanguage(me.profile?.preferred_lang ?? "ko");
+      persistDisplayLanguage(resolveDisplayLanguage(me.profile?.preferred_lang));
       setSiteId(me.profile?.site_id ?? "");
 
       const tbmRes = await fetch("/api/tbm/today?limit=1", { cache: "no-store" });

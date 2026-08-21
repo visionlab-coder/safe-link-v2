@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { getT as getAuthT } from "@/app/auth/translations";
 import RoleGuard from "@/components/RoleGuard";
 import ExportMenu from "@/components/ExportMenu";
 import { exportData, type ExportFormat } from "@/utils/export-files";
@@ -125,8 +126,18 @@ function VennDiagram({ report, t }: { report: EsgReport; t: Record<string, strin
 export default function AdminEsgPage() {
   const router = useRouter();
   const lang = useDisplayLanguage();
-  const t = ESG_UI[lang] || ESG_UI.en;
-  const locale = ({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[lang] || "en-US";
+  const auth = getAuthT(lang);
+  const esgFallback = {
+    claim: "24", title: "ESG", desc: auth.adminDesc, loading: auth.chooseRoleDesc,
+    from: auth.chooseRole, to: auth.doEnter, generate: auth.doEnter, tbm: "TBM", attendance: auth.workerRole,
+    certification: auth.adminRole, pledge: auth.doSignup, signed: auth.doEnter, stopWork: auth.workerRole,
+    resolved: auth.doEnter, total: "-", audit: "ESG", interpretation: auth.changeLang, multilingual: auth.changeLang,
+    equipment: auth.adminRole, score: "ESG", noReport: auth.chooseRoleDesc, venn: "ESG", average: auth.doEnter,
+    category: auth.chooseRole, metric: auth.chooseRoleDesc, value: "-", detail: auth.adminDesc, people: "-", cases: "-",
+    auditHash: "SHA-256", formula: "ESG",
+  };
+  const t = { ...esgFallback, ...(ESG_UI[lang] ?? {}) };
+  const locale = ({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[lang] || lang;
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState("");
   const [from, setFrom] = useState(() => {

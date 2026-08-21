@@ -6,15 +6,7 @@ import { ChevronRight, HardHat, Languages, ShieldCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { languages } from "@/constants";
 import BrandLogo from "@/components/BrandLogo";
-
-const startText: Record<string, string> = { ko: "본인 확인 시작", en: "Start verification", vi: "Bắt đầu", zh: "开始验证", ru: "Начать проверку", th: "เริ่มต้น", uz: "Boshlash" };
-const roleText: Record<string, { admin: string; worker: string; prompt: string }> = {
-  ko: { admin: "관리자", worker: "현장 근로자", prompt: "이용할 서비스를 선택하세요" },
-  en: { admin: "Administrator", worker: "Field worker", prompt: "Choose your service" },
-  vi: { admin: "Quản trị viên", worker: "Công nhân", prompt: "Chọn dịch vụ" },
-  zh: { admin: "管理员", worker: "现场工人", prompt: "选择服务" },
-  ru: { admin: "Администратор", worker: "Работник объекта", prompt: "Выберите сервис" },
-};
+import { getT } from "./auth/translations";
 
 const LANDING_UI: Record<string, Record<string, string | string[]>> = {
   ko: { os:"FIELD SAFETY OS", access:"SECURE ACCESS", title:"이름 중심의 간단하고\n안전한 현장 입장", desc:"근로자의 선호 언어와 현장 배정을 확인한 뒤, 필요한 안전 업무를 바로 시작합니다.", language:"언어 선택", languageDesc:"근로자의 선호 언어로 서비스를 시작합니다.", adminDesc:"현장 운영 및 안전관리", workerDesc:"교육 확인 및 안전 업무", login:"로그인 · 본인 확인", loginDesc:"웹과 모바일에서 같은 흐름으로 시작합니다.", steps:["정보 확인|이름과 최소 정보를 확인합니다.", "현장 연결|배정 현장을 자동으로 확인합니다.", "입장 완료|근로자 세션을 발급합니다."] },
@@ -23,6 +15,27 @@ const LANDING_UI: Record<string, Record<string, string | string[]>> = {
   vi: { os:"HỆ ĐIỀU HÀNH AN TOÀN CÔNG TRƯỜNG", access:"TRUY CẬP AN TOÀN", title:"Vào công trường đơn giản\nvà an toàn theo tên", desc:"Xác nhận ngôn ngữ ưa dùng và công trường được phân công của công nhân, sau đó bắt đầu công việc an toàn cần thiết.", language:"Chọn ngôn ngữ", languageDesc:"Bắt đầu dịch vụ bằng ngôn ngữ ưa dùng của công nhân.", adminDesc:"Vận hành công trường và quản lý an toàn", workerDesc:"Xác nhận đào tạo và công việc an toàn", login:"Đăng nhập · xác minh danh tính", loginDesc:"Bắt đầu theo cùng một quy trình trên web và di động.", steps:["Xác nhận thông tin|Xác nhận tên và thông tin tối thiểu.", "Kết nối công trường|Tự động xác nhận công trường được phân công.", "Hoàn tất vào|Cấp phiên làm việc cho công nhân."] },
   ru: { os:"СИСТЕМА БЕЗОПАСНОСТИ ОБЪЕКТА", access:"БЕЗОПАСНЫЙ ДОСТУП", title:"Простой и безопасный\nвход на объект по имени", desc:"Подтвердите предпочитаемый язык и назначенный объект работника, затем сразу начните необходимые задачи по безопасности.", language:"Выберите язык", languageDesc:"Начните сервис на предпочитаемом языке работника.", adminDesc:"Управление объектом и безопасностью", workerDesc:"Подтверждение обучения и задачи безопасности", login:"Вход · подтверждение личности", loginDesc:"Одинаковый процесс в веб-версии и на мобильном устройстве.", steps:["Проверка данных|Подтвердите имя и минимальные сведения.", "Подключение объекта|Автоматически подтвердите назначенный объект.", "Вход завершён|Создайте сессию работника."] },
 };
+
+function fallbackLandingUi(language: string): Record<string, string | string[]> {
+  const auth = getT(language);
+  return {
+    os: "SQ-LINK",
+    access: "SQ-LINK",
+    title: auth.chooseRole,
+    desc: auth.chooseRoleDesc,
+    language: auth.changeLang,
+    languageDesc: auth.chooseRoleDesc,
+    adminDesc: auth.adminRoleDesc,
+    workerDesc: auth.workerRoleDesc,
+    login: auth.doLogin,
+    loginDesc: auth.chooseRoleDesc,
+    steps: [
+      `${auth.chooseRole}|${auth.chooseRoleDesc}`,
+      `${auth.workerRole}|${auth.workerRoleDesc}`,
+      `${auth.adminRole}|${auth.adminRoleDesc}`,
+    ],
+  };
+}
 
 function LandingPageInner() {
   const router = useRouter();
@@ -34,8 +47,8 @@ function LandingPageInner() {
 
   useEffect(() => { if (qrRole === "admin") setShowRoles(true); }, [qrRole]);
 
-  const text = roleText[selectedLang] || roleText.en;
-  const ui = LANDING_UI[selectedLang] || LANDING_UI.en;
+  const auth = getT(selectedLang);
+  const ui = LANDING_UI[selectedLang] || fallbackLandingUi(selectedLang);
   const steps = ui.steps as string[];
   const buildAuthUrl = (role: "admin" | "worker") => {
     if (role === "worker" && qrRole === "worker") {
@@ -67,10 +80,10 @@ function LandingPageInner() {
           </div>
         </div>
 
-        {!showRoles ? <button onClick={() => qrRole === "worker" ? router.push(buildAuthUrl("worker")) : setShowRoles(true)} className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0b5ed7] px-5 text-sm font-black text-white shadow-[0_10px_22px_rgba(11,94,215,.2)] transition hover:bg-[#063789] sm:w-auto">{startText[selectedLang] || "Start verification"}<ChevronRight className="h-4 w-4" /></button> : <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <button onClick={() => router.push(buildAuthUrl("admin"))} className="flex items-center gap-3 rounded-lg border border-[#d9e1ea] bg-white p-4 text-left transition hover:border-[#0b5ed7] hover:shadow-md"><span className="grid h-10 w-10 place-items-center rounded-lg bg-[#e9f2ff] text-[#0b5ed7]"><ShieldCheck className="h-5 w-5" /></span><span><b className="block text-sm">{text.admin}</b><small className="mt-1 block text-[11px] text-[#758195]">{ui.adminDesc as string}</small></span></button>
-          <button onClick={() => router.push(buildAuthUrl("worker"))} className="flex items-center gap-3 rounded-lg border border-[#d9e1ea] bg-white p-4 text-left transition hover:border-[#07835a] hover:shadow-md"><span className="grid h-10 w-10 place-items-center rounded-lg bg-[#edf9f4] text-[#07835a]"><HardHat className="h-5 w-5" /></span><span><b className="block text-sm">{text.worker}</b><small className="mt-1 block text-[11px] text-[#758195]">{ui.workerDesc as string}</small></span></button>
-          <p className="sm:col-span-2 text-center text-xs font-medium text-[#758195]">{text.prompt}</p>
+        {!showRoles ? <button onClick={() => qrRole === "worker" ? router.push(buildAuthUrl("worker")) : setShowRoles(true)} className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0b5ed7] px-5 text-sm font-black text-white shadow-[0_10px_22px_rgba(11,94,215,.2)] transition hover:bg-[#063789] sm:w-auto">{auth.doEnter}<ChevronRight className="h-4 w-4" /></button> : <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <button onClick={() => router.push(buildAuthUrl("admin"))} className="flex items-center gap-3 rounded-lg border border-[#d9e1ea] bg-white p-4 text-left transition hover:border-[#0b5ed7] hover:shadow-md"><span className="grid h-10 w-10 place-items-center rounded-lg bg-[#e9f2ff] text-[#0b5ed7]"><ShieldCheck className="h-5 w-5" /></span><span><b className="block text-sm">{auth.adminRole}</b><small className="mt-1 block text-[11px] text-[#758195]">{ui.adminDesc as string}</small></span></button>
+          <button onClick={() => router.push(buildAuthUrl("worker"))} className="flex items-center gap-3 rounded-lg border border-[#d9e1ea] bg-white p-4 text-left transition hover:border-[#07835a] hover:shadow-md"><span className="grid h-10 w-10 place-items-center rounded-lg bg-[#edf9f4] text-[#07835a]"><HardHat className="h-5 w-5" /></span><span><b className="block text-sm">{auth.workerRole}</b><small className="mt-1 block text-[11px] text-[#758195]">{ui.workerDesc as string}</small></span></button>
+          <p className="sm:col-span-2 text-center text-xs font-medium text-[#758195]">{auth.chooseRoleDesc}</p>
         </div>}
       </div>
 

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { CheckCircle, XCircle, Brain, ChevronRight } from "lucide-react";
-import { persistDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { persistDisplayLanguage, resolveDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 const i18n: Record<string, Record<string, string>> = {
   ko: {
@@ -99,7 +99,7 @@ export default function WorkerQuizPage() {
       const meRes = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
       if (!meRes.ok) { router.push("/auth/login"); return; }
       const me = await meRes.json() as { profile?: { preferred_lang?: string | null } | null };
-      const workerLang = me.profile?.preferred_lang ?? "ko";
+      const workerLang = resolveDisplayLanguage(me.profile?.preferred_lang);
       persistDisplayLanguage(workerLang);
 
       // auth_user_id → nfc_workers.id → tbm_quiz_responses 조회 (ID 불일치 방지)

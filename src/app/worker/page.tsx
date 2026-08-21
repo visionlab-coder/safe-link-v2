@@ -9,7 +9,8 @@ import { playNotificationSound } from "@/utils/notifications";
 import { ensureLocalNotifyPermission } from "@/utils/native/local-notify";
 import { logoutV3 } from "@/lib/v3-auth";
 import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
-import { persistDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { persistDisplayLanguage, resolveDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { getT as getAuthT } from "@/app/auth/translations";
 
 const WORKER_COMMON: Record<string, Record<string, string>> = {
     ko: { profile:"프로필", connecting:"연결 중...", safetyHome:"근로자 안전 홈", todayTitle:"오늘 할 일", todayDesc:"교육을 확인하고 서명하면 완료됩니다.", step1:"교육 확인", step2:"서명", step3:"완료", helperTitle:"필요한 기능", logoutFailed:"로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.", pledgeTitle:"TBM 안전 서약", pledgeDesc:"서명으로 안전 서약 확인" },
@@ -525,7 +526,34 @@ const workerUI: Record<string, any> = {
         liveDesc: "Terjemahan langsung ucapan admin",
     },
 };
-const getUI = (lang: string) => workerUI[lang] || workerUI["en"];
+function getWorkerFallback(lang: string) {
+    const auth = getAuthT(lang);
+    return {
+        greeting: (name: string) => name,
+        tbmBadge: "TBM", tbmDesc: auth.workerDesc, tbmBtn: auth.doEnter,
+        newTBM: "TBM", chatTitle: "AI", chatDesc: auth.chooseRoleDesc, chatBtn: auth.doEnter,
+        signOut: auth.back, safeWork: auth.workerRoleDesc, status: auth.chooseRole,
+        newChat: "AI", openChat: auth.doEnter, stopWork: auth.workerRole,
+        stopWorkDesc: auth.workerRoleDesc, stopWorkFamily: auth.workerDesc,
+        stopWorkConfirm: auth.doEnter, stopWorkCancel: auth.back, stopWorkSend: auth.doEnter,
+        stopWorkReason: auth.workerDesc, visionTitle: "AI", visionDesc: auth.workerDesc,
+        quizTitle: auth.chooseRole, quizDesc: auth.chooseRoleDesc,
+        liveTitle: auth.changeLang, liveDesc: auth.workerRoleDesc,
+    };
+}
+
+const getUI = (lang: string) => ({ ...getWorkerFallback(lang), ...(workerUI[lang] ?? {}) });
+
+function getWorkerCommon(lang: string) {
+    const auth = getAuthT(lang);
+    const fallback = {
+        profile: auth.name, connecting: "SQ-LINK", safetyHome: auth.workerTitle,
+        todayTitle: auth.chooseRole, todayDesc: auth.workerDesc, step1: auth.doEnter,
+        step2: auth.doEnter, step3: auth.doEnter, helperTitle: auth.chooseRole,
+        logoutFailed: auth.adminDesc, pledgeTitle: "TBM", pledgeDesc: auth.workerRoleDesc,
+    };
+    return { ...fallback, ...(WORKER_COMMON[lang] ?? {}) };
+}
 
 const isoMap: Record<string, string> = {
     ko: "kr", en: "us", vi: "vn", zh: "cn", th: "th", uz: "uz", ph: "ph",
@@ -539,7 +567,7 @@ function WorkerHomeContent() {
     const displayLang = useDisplayLanguage();
     const [profile, setProfile] = useState<any>(null);
     const [hasNewTBM, setHasNewTBM] = useState(false);
-    const [newTBMTime] = useState<string>("");
+    const [newTBMTime, setNewTBMTime] = useState<string>("");
 
     // 신규 채팅 알림 관련 상태
     const [newChatTime] = useState<string>("");
@@ -629,12 +657,13 @@ function WorkerHomeContent() {
                 } | null;
             };
             if (!data.user || !data.profile) return;
+            const activeLanguage = resolveDisplayLanguage(data.profile.preferred_lang, urlLang);
             setProfile({
                 id: data.user.id,
                 ...data.profile,
-                preferred_lang: urlLang || data.profile.preferred_lang || "ko",
+                preferred_lang: activeLanguage,
             });
-            persistDisplayLanguage(urlLang || data.profile.preferred_lang || "ko");
+            persistDisplayLanguage(activeLanguage);
         };
         fetchProfile();
 
@@ -642,11 +671,54 @@ function WorkerHomeContent() {
         ensureLocalNotifyPermission();
     }, [urlLang]);
 
+    // 관리자 PC에서 발송한 TBM은 근로자 앱/웹이 같은 API에서 주기적으로 확인한다.
+    // 기존 구현은 hasNewTBM 상태를 한 번도 갱신하지 않아 알림 카드가 영구히 숨겨졌다.
+    useEffect(() => {
+        let cancelled = false;
+
+        const refreshTbm = async () => {
+            try {
+                const response = await fetch("/api/tbm/today?limit=1", {
+                    cache: "no-store",
+                    credentials: "include",
+                });
+                if (!response.ok || cancelled) return;
+                const payload = await response.json() as {
+                    tbms?: Array<{ created_at?: string | null; published_at?: string | null }>;
+                };
+                const latest = payload.tbms?.[0];
+                if (!latest) {
+                    if (!cancelled) setHasNewTBM(false);
+                    return;
+                }
+                if (!cancelled) {
+                    setHasNewTBM(true);
+                    const timestamp = latest.published_at ?? latest.created_at;
+                    setNewTBMTime(timestamp ? new Date(timestamp).toLocaleTimeString() : "");
+                }
+            } catch {
+                // 네트워크 일시 실패는 다음 주기에 다시 조회한다.
+            }
+        };
+
+        void refreshTbm();
+        const interval = window.setInterval(refreshTbm, 15_000);
+        const onVisibilityChange = () => {
+            if (document.visibilityState === "visible") void refreshTbm();
+        };
+        document.addEventListener("visibilitychange", onVisibilityChange);
+        return () => {
+            cancelled = true;
+            window.clearInterval(interval);
+            document.removeEventListener("visibilitychange", onVisibilityChange);
+        };
+    }, []);
+
     const lang = displayLang || profile?.preferred_lang || urlLang || "ko";
     const newChatCount = useUnreadChatCount(profile?.id);
     const t = getUI(lang);
-    const common = WORKER_COMMON[lang] || WORKER_COMMON.en;
-    const iso = isoMap[lang] || "un";
+    const common = getWorkerCommon(lang);
+    const iso = isoMap[lang] || isoMap.ko;
     const simpleHome = {
         todayTitle: common.todayTitle,
         todayDesc: common.todayDesc,
@@ -836,7 +908,7 @@ function WorkerHomeContent() {
                             </div>
                             <div className="flex-1">
                                 <h2 className="text-2xl font-bold text-white italic lowercase tracking-tight">{t.newTBM}</h2>
-                                <p className="text-red-200/60 font-medium text-sm">Arrived at {newTBMTime}</p>
+                                {newTBMTime && <p className="text-red-200/60 font-medium text-sm">{newTBMTime}</p>}
                             </div>
                             <div className="w-12 h-12 glass rounded-full flex items-center justify-center text-white group-hover:translate-x-1 transition-transform">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

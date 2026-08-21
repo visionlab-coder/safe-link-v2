@@ -11,6 +11,7 @@ import {
     type ProfileRole,
 } from "@/lib/roles";
 import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { getT as getAuthT } from "@/app/auth/translations";
 
 const ROLE_GUARD_MESSAGE: Record<string, string> = {
     ko: "안전하게 로그인 확인 중입니다...",
@@ -142,8 +143,8 @@ export default function RoleGuard({
                 <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-[28px] border border-blue-100 bg-white shadow-[0_16px_40px_rgba(37,99,235,.12)]">
                     <div className="h-10 w-10 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin" />
                 </div>
-                <p className="font-black tracking-tight text-[#172033]">{ROLE_GUARD_MESSAGE[language] ?? ROLE_GUARD_MESSAGE.en}</p>
-                <p className="mt-2 text-xs font-bold tracking-widest text-slate-500">SAFE-LINK SECURE ACCESS</p>
+                <p className="font-black tracking-tight text-[#172033]">{ROLE_GUARD_MESSAGE[language] ?? getAuthT(language).adminDesc}</p>
+                <p className="mt-2 text-xs font-bold tracking-widest text-slate-500">SQ-LINK</p>
             </div>
         );
     }

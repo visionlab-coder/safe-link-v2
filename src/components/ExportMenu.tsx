@@ -4,6 +4,7 @@ import { Download, FileJson, FileSpreadsheet, FileText, Printer } from "lucide-r
 import type { ElementType } from "react";
 import type { ExportFormat } from "@/utils/export-files";
 import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { getT as getAuthT } from "@/app/auth/translations";
 
 const EXPORT_LABELS: Record<string, string> = {
   ko: "내보내기",
@@ -28,7 +29,7 @@ const OPTIONS: Array<{ format: ExportFormat; label: string; icon: ElementType }>
 
 export default function ExportMenu({ disabled, onExport, includeJson = false }: ExportMenuProps) {
   const language = useDisplayLanguage();
-  const exportLabel = EXPORT_LABELS[language] ?? EXPORT_LABELS.en;
+  const exportLabel = EXPORT_LABELS[language] ?? getAuthT(language).doEnter;
   const options = includeJson ? [...OPTIONS, { format: "json" as const, label: "JSON", icon: FileJson }] : OPTIONS;
 
   return (

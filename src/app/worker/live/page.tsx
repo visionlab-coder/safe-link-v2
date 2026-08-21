@@ -5,7 +5,7 @@ import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { playPremiumAudio, VoiceGender } from "@/utils/tts";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
-import { persistDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { persistDisplayLanguage, resolveDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 interface Subtitle {
     id: string;
@@ -199,7 +199,7 @@ export default function WorkerLivePage() {
                 profile?: { preferred_lang?: string | null; site_id?: string | null; display_name?: string | null } | null;
             };
             if (data.user?.id) {
-                const preferredLang = data.profile?.preferred_lang || "ko";
+                const preferredLang = resolveDisplayLanguage(data.profile?.preferred_lang);
                 persistDisplayLanguage(preferredLang);
                 langRef.current = preferredLang;
                 setAuthReady({

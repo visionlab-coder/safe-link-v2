@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Bot, Sparkles, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { getT as getAuthT } from "@/app/auth/translations";
 
 const BRIEFING_UI: Record<string, { title: string; active: string; details: string; personas: Record<string, string> }> = {
     ko: { title: "AI 현장 브리핑", active: "활성", details: "상세 분석", personas: { HQ_ADMIN: "현장 지휘 보조", SAFETY_OFFICER: "안전 점검 보조", default: "운영 보조" } },
@@ -17,7 +18,11 @@ const BRIEFING_UI: Record<string, { title: string; active: string; details: stri
  * 관리자 역할에 맞춰 AI 참모가 실시간 브리핑을 제공합니다.
  */
 export default function SiteAgentBriefing({ role, siteId, lang = "ko" }: { role: string, siteId?: string | null, lang?: string }) {
-    const t = BRIEFING_UI[lang] || BRIEFING_UI.en;
+    const auth = getAuthT(lang);
+    const t = BRIEFING_UI[lang] || {
+        title: "AI", active: auth.doEnter, details: auth.chooseRoleDesc,
+        personas: { HQ_ADMIN: auth.adminRole, SAFETY_OFFICER: auth.adminRole, default: auth.adminRole },
+    };
     const [briefing, setBriefing] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
 

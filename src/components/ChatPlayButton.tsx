@@ -1,6 +1,7 @@
 "use client";
 
 import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { getT as getAuthT } from "@/app/auth/translations";
 
 const PLAY_LABELS: Record<string, { idle: string; playing: string }> = {
     ko: { idle: "메시지를 음성으로 듣기", playing: "음성 재생 중" },
@@ -24,7 +25,7 @@ export default function ChatPlayButton({
     label,
 }: ChatPlayButtonProps) {
     const language = useDisplayLanguage();
-    const text = PLAY_LABELS[language] ?? PLAY_LABELS.en;
+    const text = PLAY_LABELS[language] ?? { idle: getAuthT(language).doEnter, playing: getAuthT(language).doEnter };
     return (
         <button
             type="button"

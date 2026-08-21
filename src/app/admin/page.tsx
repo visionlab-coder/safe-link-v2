@@ -12,8 +12,11 @@ import ResponsiveFeatureHero from "@/components/ResponsiveFeatureHero";
 import { logoutV3 } from "@/lib/v3-auth";
 import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
 import { persistDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { languages } from "@/constants";
+import { getT as getAuthT } from "@/app/auth/translations";
 
-// 관리자 모드: 한국어 / 영어 / 중국어 3개 (그 외 언어는 영어 fallback)
+// 관리자 문구는 선택 언어별 사전을 우선 사용하고, 누락된 화면 문구도 영어가 아닌
+// 공통 20개 언어 로그인 사전으로 구성한다.
 const adminUI: Record<string, any> = {
     ko: {
         board: "실시간 관제 보드",
@@ -165,7 +168,45 @@ const adminUI: Record<string, any> = {
         greeting: (name: string) => `Добро пожаловать, ${name}`,
     },
 };
-const getUI = (lang: string) => adminUI[lang] || adminUI["en"];
+function getLocalizedAdminFallback(lang: string) {
+    const auth = getAuthT(lang);
+    return {
+        board: auth.adminTitle,
+        boardDesc: auth.adminDesc,
+        tbmTitle: "TBM",
+        tbmDesc: auth.adminDesc,
+        tbmBtn: auth.doEnter,
+        chatTitle: "AI",
+        chatDesc: auth.chooseRoleDesc,
+        chatBtn: auth.doEnter,
+        statusTitle: auth.chooseRole,
+        statusDesc: auth.chooseRoleDesc,
+        glossaryTitle: auth.changeLang,
+        glossaryDesc: auth.adminDesc,
+        signOut: auth.back,
+        profile: auth.name,
+        systemManagement: auth.adminRole,
+        integratedControl: auth.adminTitle,
+        accountMenu: auth.adminRole,
+        fieldUnit: "SQ-LINK",
+        authenticating: "SQ-LINK",
+        hero: { eyebrow: "SQ-LINK", title: auth.adminTitle, description: auth.adminDesc, metrics: [auth.workerRole, "TBM", auth.adminRole], steps: [[auth.workerRole, auth.workerRoleDesc], ["TBM", auth.adminDesc], [auth.adminRole, auth.chooseRoleDesc]] },
+        roleLabel: { HQ_ADMIN: auth.adminRole, SAFETY_OFFICER: auth.adminRole, WORKER: auth.workerRole },
+        greeting: (name: string) => `${name}`,
+    };
+}
+
+const getUI = (lang: string) => {
+    const fallback = getLocalizedAdminFallback(lang);
+    const current = adminUI[lang];
+    if (!current) return fallback;
+    return {
+        ...fallback,
+        ...current,
+        hero: current.hero ?? fallback.hero,
+        roleLabel: { ...fallback.roleLabel, ...(current.roleLabel ?? {}) },
+    };
+};
 
 const adminFeatureUI: Record<string, Record<string, string>> = {
     ko: { termsAction: "용어 관리", aiTitle: "AI 엔진 · 키 설정", aiDesc: "통번역 엔진(Google·Papago)과 API 키를 재배포 없이 즉시 교체·테스트합니다.", aiAction: "엔진 전환", liveTitle: "실시간 통역", liveDesc: "실시간 동시통역. 말하면 근로자 폰에서 자동 번역 재생.", liveAction: "방송 시작", quizTitle: "안전 퀴즈", quizDesc: "실시간 안전 퀴즈. 근로자 이해도를 즉시 확인.", quizAction: "퀴즈 만들기", accessTitle: "출입 관리", accessDesc: "SQ Link 출입카드와 대체 확인 코드를 발급합니다.", accessAction: "출입 관리 열기", incentiveTitle: "안전 인센티브", incentiveDesc: "퀴즈 우수자에게 안전장비를 지급하고 성과를 기록합니다.", incentiveAction: "지급 관리", nfcTitle: "NFC 근로자 관리", nfcDesc: "NFC 스티커 등록·발급 및 TBM 참석 현황을 관리합니다.", nfcAction: "NFC 관리", guideTitle: "기능 사용 가이드", guideDesc: "NFC 근로자 관리·인센티브·ESG 리포트 단계별 안내. 처음 담당하는 직원도 바로 시작 가능.", guideAction: "가이드 열기", esgTitle: "ESG 안전 리포트", esgDesc: "TBM 인증율·서약·감사체인 기반 ESG 종합 점수를 산출합니다.", esgAction: "리포트 보기", statusAction: "현황 보기" },
@@ -174,18 +215,23 @@ const adminFeatureUI: Record<string, Record<string, string>> = {
     vi: { termsAction: "Quản lý thuật ngữ", aiTitle: "Cài đặt AI & khóa", aiDesc: "Thay đổi và kiểm tra công cụ dịch cùng khóa API mà không cần triển khai lại.", aiAction: "Đổi công cụ", liveTitle: "Phiên dịch trực tiếp", liveDesc: "Phiên dịch thời gian thực. Công nhân nghe bản dịch tự động.", liveAction: "Bắt đầu phát", quizTitle: "Câu đố an toàn", quizDesc: "Câu đố an toàn trực tiếp để kiểm tra mức độ hiểu của công nhân.", quizAction: "Tạo câu đố", accessTitle: "Trung tâm ra vào", accessDesc: "Cấp thẻ ra vào SQ Link và mã xác nhận dự phòng.", accessAction: "Mở quản lý ra vào", incentiveTitle: "Khuyến khích an toàn", incentiveDesc: "Cấp thiết bị an toàn cho người đạt kết quả tốt và lưu thành tích.", incentiveAction: "Quản lý cấp phát", nfcTitle: "Quản lý công nhân NFC", nfcDesc: "Đăng ký NFC, cấp thẻ và quản lý tình hình tham gia TBM.", nfcAction: "Quản lý NFC", guideTitle: "Hướng dẫn sử dụng", guideDesc: "Hướng dẫn từng bước về NFC, khuyến khích và báo cáo ESG.", guideAction: "Mở hướng dẫn", esgTitle: "Báo cáo an toàn ESG", esgDesc: "Tính điểm ESG từ xác nhận TBM, cam kết và hồ sơ kiểm toán.", esgAction: "Xem báo cáo", statusAction: "Xem trạng thái" },
     ru: { termsAction: "Управление терминами", aiTitle: "Настройки AI и ключей", aiDesc: "Меняйте и тестируйте движки перевода и API-ключи без повторного развёртывания.", aiAction: "Сменить движок", liveTitle: "Онлайн-перевод", liveDesc: "Синхронный перевод в реальном времени для работников.", liveAction: "Начать трансляцию", quizTitle: "Тест по безопасности", quizDesc: "Проверяйте понимание требований безопасности работниками в реальном времени.", quizAction: "Создать тест", accessTitle: "Центр доступа", accessDesc: "Выдавайте карты доступа SQ Link и резервные коды.", accessAction: "Открыть доступ", incentiveTitle: "Поощрения за безопасность", incentiveDesc: "Выдавайте средства защиты лучшим участникам тестов и фиксируйте результаты.", incentiveAction: "Управление выдачей", nfcTitle: "Управление NFC-работниками", nfcDesc: "Регистрируйте NFC-метки и управляйте посещением TBM.", nfcAction: "Управление NFC", guideTitle: "Руководство", guideDesc: "Пошаговое руководство по NFC, поощрениям и ESG-отчётам.", guideAction: "Открыть руководство", esgTitle: "Отчёт ESG по безопасности", esgDesc: "Рассчитывайте оценку ESG по TBM, обязательствам и журналам аудита.", esgAction: "Открыть отчёт", statusAction: "Открыть статус" },
 };
-const getFeatureUI = (lang: string) => adminFeatureUI[lang] || adminFeatureUI.en;
-const ADMIN_ESG_CLAIM: Record<string, string> = {
-    ko: "청구항 24", en: "Claim 24", zh: "权利要求 24", vi: "Yêu cầu 24", ru: "Пункт 24",
-};
+function getFeatureUI(lang: string) {
+    const auth = getAuthT(lang);
+    const fallback = {
+        termsAction: auth.doEnter, aiTitle: "AI", aiDesc: auth.adminDesc, aiAction: auth.doEnter,
+        liveTitle: auth.workerRole, liveDesc: auth.workerRoleDesc, liveAction: auth.doEnter,
+        quizTitle: auth.chooseRole, quizDesc: auth.chooseRoleDesc, quizAction: auth.doEnter,
+        accessTitle: "QR / NFC", accessDesc: auth.workerRoleDesc, accessAction: auth.doEnter,
+        incentiveTitle: auth.adminRole, incentiveDesc: auth.adminDesc, incentiveAction: auth.doEnter,
+        nfcTitle: "NFC", nfcDesc: auth.workerRoleDesc, nfcAction: auth.doEnter,
+        guideTitle: auth.changeLang, guideDesc: auth.chooseRoleDesc, guideAction: auth.doEnter,
+        esgTitle: "ESG", esgDesc: auth.adminDesc, esgAction: auth.doEnter, statusAction: auth.doEnter,
+    };
+    return { ...fallback, ...(adminFeatureUI[lang] ?? {}) };
+}
 
-const ADMIN_LANGUAGE_OPTIONS = [
-    { code: "ko", label: "한국어" },
-    { code: "en", label: "English" },
-    { code: "zh", label: "中文" },
-    { code: "vi", label: "Tiếng Việt" },
-    { code: "ru", label: "Русский" },
-] as const;
+const ADMIN_ESG_CLAIM_NUMBER = 24;
+const ADMIN_LANGUAGE_OPTIONS = languages.map((language) => ({ code: language.code, label: language.name }));
 
 function AdminDashboardContent() {
     const router = useRouter();
@@ -258,7 +304,7 @@ function AdminDashboardContent() {
             await logoutV3();
             window.location.replace("/auth");
         } catch {
-            window.alert("로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+            window.alert(getAuthT(selectedLang || "ko").adminDesc);
         }
     };
 
@@ -271,12 +317,12 @@ function AdminDashboardContent() {
     };
 
     const requestedLang = urlLang || selectedLang || currentUser?.prefLang || "ko";
-    const lang = ADMIN_LANGUAGE_OPTIONS.some((option) => option.code === requestedLang) ? requestedLang : "en";
+    const lang = ADMIN_LANGUAGE_OPTIONS.some((option) => option.code === requestedLang) ? requestedLang : "ko";
     const t = getUI(lang);
     const feature = getFeatureUI(lang);
     const roleDisplay = currentUser ? ((t.roleLabel as any)[currentUser.role] || currentUser.role) : "Admin";
     const siteId = searchParams.get("site_id");
-    const siteName = siteId === "1" ? "SITE ALPHA" : siteId === "2" ? "SITE BETA" : siteId === "3" ? "SITE GAMMA" : null;
+    const siteName = null;
 
     return (
         <RoleGuard allowedRole="admin">
@@ -300,12 +346,12 @@ function AdminDashboardContent() {
 
                         <div className="order-3 col-span-2 flex min-w-0 flex-wrap items-center gap-2 border-t border-slate-100 pt-3 lg:order-none lg:col-span-1 lg:border-0 lg:pt-0">
                             <p className="min-w-0 truncate text-xs font-bold text-slate-600 sm:text-sm">
-                                {currentUser ? t.greeting(currentUser.name) : "Authenticating..."}
+                                {currentUser ? t.greeting(currentUser.name) : t.authenticating}
                                 {currentUser?.title && <span className="ml-1 text-slate-400">[{currentUser.title}]</span>}
                             </p>
                             <div className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1">
                                 <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
-                                <span className="text-[8px] font-black tracking-widest text-blue-600">FIELD UNIT</span>
+                                <span className="text-[8px] font-black tracking-widest text-blue-600">{t.fieldUnit}</span>
                             </div>
                             {siteName && (
                                 <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1">
@@ -316,11 +362,11 @@ function AdminDashboardContent() {
                         </div>
 
                         <div className="order-2 flex shrink-0 items-center gap-1 sm:gap-2">
-                            <label className="sr-only" htmlFor="admin-language">표시 언어</label>
+                            <label className="sr-only" htmlFor="admin-language">{t.changeLang}</label>
                             <div className="relative">
                                 <select
                                     id="admin-language"
-                                    aria-label="표시 언어"
+                                    aria-label={t.changeLang}
                                     value={lang}
                                     onChange={(event) => handleLanguageChange(event.target.value)}
                                     className="language-dropdown admin-language-select pr-8"
@@ -745,7 +791,7 @@ function AdminDashboardContent() {
                                 {feature.esgDesc}
                             </p>
                             <div className="flex items-center gap-2 mt-4">
-                                <span className="text-[10px] bg-emerald-900/50 text-emerald-400 px-2 py-0.5 rounded font-black">{ADMIN_ESG_CLAIM[lang] || ADMIN_ESG_CLAIM.en}</span>
+                                <span className="text-[10px] bg-emerald-900/50 text-emerald-400 px-2 py-0.5 rounded font-black">{ADMIN_ESG_CLAIM_NUMBER}</span>
                             </div>
                             <div className="mt-2 flex items-center gap-2 text-emerald-400 font-black tracking-widest text-sm uppercase">
                                 <span>{feature.esgAction}</span>

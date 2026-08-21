@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
-import { persistDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { persistDisplayLanguage, resolveDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 interface VisionItem {
     name_ko: string;
@@ -77,7 +77,7 @@ export default function WorkerVisionPage() {
             const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
             if (!res.ok) return;
             const data = await res.json() as { profile?: { preferred_lang?: string | null } | null };
-            if (data.profile?.preferred_lang) persistDisplayLanguage(data.profile.preferred_lang);
+            persistDisplayLanguage(resolveDisplayLanguage(data.profile?.preferred_lang));
         };
         loadLang();
     }, []);

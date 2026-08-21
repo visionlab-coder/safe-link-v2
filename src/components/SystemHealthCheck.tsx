@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Activity, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { getT as getAuthT } from "@/app/auth/translations";
 
 interface HealthStatus {
     postgresql: { status: string; message: string };
@@ -22,7 +23,20 @@ const HEALTH_UI: Record<string, { title: string; subtitle: string; refresh: stri
 };
 
 export default function SystemHealthCheck({ lang = "ko" }: { lang?: string }) {
-    const t = HEALTH_UI[lang] || HEALTH_UI.en;
+    const auth = getAuthT(lang);
+    const fallback = {
+        title: auth.adminTitle,
+        subtitle: auth.adminDesc,
+        refresh: auth.doEnter,
+        ready: auth.doEnter,
+        error: auth.noMatch,
+        delayed: auth.adminDesc,
+        services: {
+            postgresql: "PostgreSQL", google_translate: "AI", google_tts: "TTS",
+            google_stt: "STT", openai: "OpenAI", naver_papago: "Papago", realtime: "SQ-LINK",
+        },
+    };
+    const t = { ...fallback, ...(HEALTH_UI[lang] ?? {}) };
     const [status, setStatus] = useState<HealthStatus | null>(null);
     const [loading, setLoading] = useState(false);
     const [consecFailures, setConsecFailures] = useState(0);

@@ -11,50 +11,76 @@ import { getDefaultRouteForProfileRole, type ProfileRole } from "@/lib/roles";
 import { adminSignupV3, getV3CurrentUser, loginV3, logoutV3, quickLoginWorkerV3 } from "@/lib/v3-auth";
 import type { V3Role } from "@/lib/v3-role-contract";
 
-/** 원시 API 에러를 사용자 친화적 한국어로 변환. 절대 내부 에러 메시지를 그대로 노출하지 않음. */
-function sanitizeAuthError(msg: string): string {
+type AuthNotice = "retry" | "network" | "workerNotFound" | "signupPending" | "multipleSites" | "nfcHint";
+
+/** 로그인 과정에서만 쓰는 안내 문구도 선택 언어 사전으로 관리한다. */
+const AUTH_NOTICES: Record<string, Record<AuthNotice, string>> = {
+  ko: { retry: "오류가 발생했습니다. 잠시 후 다시 시도해주세요.", network: "네트워크 연결을 확인해주세요.", workerNotFound: "입력한 정보와 일치하는 근로자가 없습니다. 관리자에게 NFC 등록을 요청해주세요.", signupPending: "관리자 가입 신청이 접수되었습니다. 승인 후 로그인할 수 있습니다.", multipleSites: "여러 현장에서 일치하는 근로자가 확인되었습니다. 현장을 선택해주세요.", nfcHint: "입장 전 관리자에게 NFC 등록을 요청해주세요." },
+  vi: { retry: "Đã xảy ra lỗi. Vui lòng thử lại sau.", network: "Vui lòng kiểm tra kết nối mạng.", workerNotFound: "Không tìm thấy công nhân khớp với thông tin đã nhập. Vui lòng yêu cầu quản lý đăng ký NFC.", signupPending: "Yêu cầu đăng ký quản lý đã được gửi. Bạn có thể đăng nhập sau khi được phê duyệt.", multipleSites: "Tìm thấy công nhân phù hợp tại nhiều công trường. Vui lòng chọn công trường.", nfcHint: "Vui lòng yêu cầu quản lý đăng ký NFC trước khi vào." },
+  zh: { retry: "发生错误，请稍后重试。", network: "请检查网络连接。", workerNotFound: "未找到与输入信息匹配的工人。请向管理员申请 NFC 登记。", signupPending: "管理员注册申请已提交。审批后即可登录。", multipleSites: "在多个现场找到了匹配的工人。请选择现场。", nfcHint: "进入前请向管理员申请 NFC 登记。" },
+  th: { retry: "เกิดข้อผิดพลาด โปรดลองอีกครั้งภายหลัง", network: "โปรดตรวจสอบการเชื่อมต่อเครือข่าย", workerNotFound: "ไม่พบคนงานที่ตรงกับข้อมูลที่กรอก โปรดขอให้ผู้ดูแลลงทะเบียน NFC", signupPending: "ส่งคำขอสมัครผู้ดูแลแล้ว คุณจะเข้าสู่ระบบได้หลังได้รับอนุมัติ", multipleSites: "พบคนงานที่ตรงกันในหลายไซต์ โปรดเลือกไซต์", nfcHint: "โปรดขอให้ผู้ดูแลลงทะเบียน NFC ก่อนเข้า" },
+  uz: { retry: "Xatolik yuz berdi. Keyinroq qayta urinib ko'ring.", network: "Tarmoq ulanishini tekshiring.", workerNotFound: "Kiritilgan ma'lumotlarga mos ishchi topilmadi. Administratordan NFC ro'yxatdan o'tkazishni so'rang.", signupPending: "Administrator ro'yxatdan o'tish so'rovi yuborildi. Tasdiqlangandan so'ng kirishingiz mumkin.", multipleSites: "Mos ishchi bir nechta saytda topildi. Saytni tanlang.", nfcHint: "Kirishdan oldin administratordan NFC ro'yxatdan o'tkazishni so'rang." },
+  ph: { retry: "May naganap na error. Pakisubukan muli mamaya.", network: "Pakisuri ang koneksyon sa network.", workerNotFound: "Walang manggagawang tumutugma sa inilagay na impormasyon. Hilinging iparehistro ang NFC sa administrator.", signupPending: "Naipadala ang kahilingan sa pagpaparehistro ng admin. Maaari kang mag-login pagkatapos maaprubahan.", multipleSites: "May tumutugmang manggagawa sa maraming site. Pumili ng site.", nfcHint: "Hilinging irehistro ng administrator ang NFC bago pumasok." },
+  km: { retry: "មានបញ្ហាកើតឡើង។ សូមព្យាយាមម្តងទៀតនៅពេលក្រោយ។", network: "សូមពិនិត្យការតភ្ជាប់បណ្តាញ។", workerNotFound: "រកមិនឃើញកម្មករដែលត្រូវនឹងព័ត៌មានដែលបានបញ្ចូលទេ។ សូមស្នើអ្នកគ្រប់គ្រងចុះឈ្មោះ NFC។", signupPending: "សំណើចុះឈ្មោះអ្នកគ្រប់គ្រងត្រូវបានផ្ញើ។ អ្នកអាចចូលបានបន្ទាប់ពីអនុម័ត។", multipleSites: "រកឃើញកម្មករត្រូវគ្នានៅកន្លែងច្រើន។ សូមជ្រើសរើសទីតាំង។", nfcHint: "សូមស្នើអ្នកគ្រប់គ្រងចុះឈ្មោះ NFC មុនចូល។" },
+  id: { retry: "Terjadi kesalahan. Silakan coba lagi nanti.", network: "Periksa koneksi jaringan Anda.", workerNotFound: "Pekerja yang sesuai dengan informasi tidak ditemukan. Minta administrator mendaftarkan NFC.", signupPending: "Permohonan pendaftaran admin telah dikirim. Anda dapat masuk setelah disetujui.", multipleSites: "Pekerja yang sesuai ditemukan di beberapa lokasi. Pilih lokasi.", nfcHint: "Minta administrator mendaftarkan NFC sebelum masuk." },
+  mn: { retry: "Алдаа гарлаа. Дараа дахин оролдоно уу.", network: "Сүлжээний холболтоо шалгана уу.", workerNotFound: "Оруулсан мэдээлэлтэй тохирох ажилтан олдсонгүй. Админаас NFC бүртгэл хүснэ үү.", signupPending: "Админы бүртгэлийн хүсэлт илгээгдлээ. Зөвшөөрсний дараа нэвтэрнэ үү.", multipleSites: "Тохирох ажилтан хэд хэдэн талбайд олдлоо. Талбайг сонгоно уу.", nfcHint: "Орохын өмнө админаас NFC бүртгэл хүснэ үү." },
+  my: { retry: "အမှားဖြစ်ပွားခဲ့သည်။ နောက်မှ ထပ်မံကြိုးစားပါ။", network: "ကွန်ရက်ချိတ်ဆက်မှုကို စစ်ဆေးပါ။", workerNotFound: "ထည့်သွင်းထားသော အချက်အလက်နှင့် ကိုက်ညီသည့် အလုပ်သမားမတွေ့ပါ။ စီမံခန့်ခွဲသူထံ NFC မှတ်ပုံတင်ရန် တောင်းဆိုပါ။", signupPending: "စီမံခန့်ခွဲသူ အကောင့်လျှောက်လွှာကို ပို့ပြီးပါပြီ။ အတည်ပြုပြီးနောက် ဝင်ရောက်နိုင်ပါသည်။", multipleSites: "ကိုက်ညီသည့် အလုပ်သမားကို နေရာအများအပြားတွင် တွေ့ရှိခဲ့သည်။ နေရာကို ရွေးပါ။", nfcHint: "မဝင်မီ စီမံခန့်ခွဲသူထံ NFC မှတ်ပုံတင်ရန် တောင်းဆိုပါ။" },
+  ne: { retry: "त्रुटि भयो। कृपया पछि पुन: प्रयास गर्नुहोस्।", network: "नेटवर्क जडान जाँच गर्नुहोस्।", workerNotFound: "दिइएको जानकारीसँग मिल्ने कामदार भेटिएन। प्रशासकलाई NFC दर्ता गर्न अनुरोध गर्नुहोस्।", signupPending: "प्रशासक दर्ता अनुरोध पठाइएको छ। स्वीकृति पछि लगइन गर्न सक्नुहुन्छ।", multipleSites: "मिल्ने कामदार धेरै साइटमा भेटियो। साइट छान्नुहोस्।", nfcHint: "प्रवेश गर्नु अघि प्रशासकलाई NFC दर्ता गर्न अनुरोध गर्नुहोस्।" },
+  bn: { retry: "একটি ত্রুটি ঘটেছে। পরে আবার চেষ্টা করুন।", network: "নেটওয়ার্ক সংযোগ পরীক্ষা করুন।", workerNotFound: "প্রদত্ত তথ্যের সঙ্গে মেলে এমন কর্মী পাওয়া যায়নি। প্রশাসককে NFC নিবন্ধনের অনুরোধ করুন।", signupPending: "অ্যাডমিন নিবন্ধনের অনুরোধ পাঠানো হয়েছে। অনুমোদনের পর লগইন করা যাবে।", multipleSites: "একাধিক সাইটে মিল থাকা কর্মী পাওয়া গেছে। সাইট নির্বাচন করুন।", nfcHint: "প্রবেশের আগে প্রশাসককে NFC নিবন্ধনের অনুরোধ করুন।" },
+  kk: { retry: "Қате орын алды. Кейінірек қайталап көріңіз.", network: "Желі қосылымын тексеріңіз.", workerNotFound: "Енгізілген ақпаратқа сәйкес жұмысшы табылмады. Әкімшіден NFC тіркеуді сұраңыз.", signupPending: "Әкімшіге тіркелу өтінімі жіберілді. Мақұлданғаннан кейін кіре аласыз.", multipleSites: "Сәйкес жұмысшы бірнеше нысанда табылды. Нысанды таңдаңыз.", nfcHint: "Кірмес бұрын әкімшіден NFC тіркеуді сұраңыз." },
+  ru: { retry: "Произошла ошибка. Повторите попытку позже.", network: "Проверьте подключение к сети.", workerNotFound: "Работник с указанными данными не найден. Попросите администратора зарегистрировать NFC.", signupPending: "Заявка на регистрацию администратора отправлена. Войти можно после одобрения.", multipleSites: "Подходящий работник найден на нескольких объектах. Выберите объект.", nfcHint: "Перед входом попросите администратора зарегистрировать NFC." },
+  en: { retry: "An error occurred. Please try again later.", network: "Check your network connection.", workerNotFound: "No worker matches the entered information. Ask an administrator to register NFC.", signupPending: "Your administrator registration request was submitted. You can sign in after approval.", multipleSites: "A matching worker was found at multiple sites. Select a site.", nfcHint: "Ask an administrator to register NFC before entering." },
+  jp: { retry: "エラーが発生しました。しばらくしてからもう一度お試しください。", network: "ネットワーク接続を確認してください。", workerNotFound: "入力した情報に一致する作業員が見つかりません。管理者に NFC 登録を依頼してください。", signupPending: "管理者登録の申請を受け付けました。承認後にログインできます。", multipleSites: "複数の現場で一致する作業員が見つかりました。現場を選択してください。", nfcHint: "入場前に管理者へ NFC 登録を依頼してください。" },
+  fr: { retry: "Une erreur est survenue. Veuillez réessayer plus tard.", network: "Vérifiez votre connexion réseau.", workerNotFound: "Aucun travailleur ne correspond aux informations saisies. Demandez à un administrateur d'enregistrer le NFC.", signupPending: "Votre demande d'inscription administrateur a été envoyée. Vous pourrez vous connecter après approbation.", multipleSites: "Un travailleur correspondant a été trouvé sur plusieurs sites. Sélectionnez un site.", nfcHint: "Demandez à un administrateur d'enregistrer le NFC avant d'entrer." },
+  es: { retry: "Se produjo un error. Inténtelo de nuevo más tarde.", network: "Compruebe la conexión de red.", workerNotFound: "No hay ningún trabajador que coincida con la información introducida. Pida a un administrador que registre el NFC.", signupPending: "La solicitud de registro de administrador se ha enviado. Podrá iniciar sesión tras la aprobación.", multipleSites: "Se encontró un trabajador coincidente en varios sitios. Seleccione un sitio.", nfcHint: "Pida a un administrador que registre el NFC antes de entrar." },
+  ar: { retry: "حدث خطأ. يرجى المحاولة مرة أخرى لاحقاً.", network: "تحقق من اتصال الشبكة.", workerNotFound: "لم يتم العثور على عامل يطابق المعلومات المدخلة. اطلب من المسؤول تسجيل NFC.", signupPending: "تم إرسال طلب تسجيل المسؤول. يمكنك تسجيل الدخول بعد الموافقة.", multipleSites: "تم العثور على عامل مطابق في مواقع متعددة. اختر الموقع.", nfcHint: "اطلب من المسؤول تسجيل NFC قبل الدخول." },
+  hi: { retry: "एक त्रुटि हुई। कृपया बाद में पुनः प्रयास करें।", network: "अपना नेटवर्क कनेक्शन जाँचें।", workerNotFound: "दर्ज जानकारी से मेल खाने वाला कर्मचारी नहीं मिला। व्यवस्थापक से NFC पंजीकरण का अनुरोध करें।", signupPending: "व्यवस्थापक पंजीकरण अनुरोध भेज दिया गया है। स्वीकृति के बाद लॉगिन कर सकते हैं।", multipleSites: "मिलान करने वाला कर्मचारी कई साइटों पर मिला। साइट चुनें।", nfcHint: "प्रवेश से पहले व्यवस्थापक से NFC पंजीकरण का अनुरोध करें।" },
+};
+
+/** 원시 API 에러를 사용자 친화적 문구로 변환. 내부 에러 메시지를 그대로 노출하지 않는다. */
+function sanitizeAuthError(msg: string, language: string): string {
   // production에서 원시 에러 로그 비활성화 — 민감 정보 노출 방지
   if (process.env.NODE_ENV !== 'production') {
     console.error("[Auth] Raw error:", msg);
   }
   const m = msg.toLowerCase();
   if (m.includes("api key") || m.includes("apikey") || m.includes("unauthorized") || m.includes("authentication")) {
-    return "서버 연결 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+    return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
   }
   if (m.includes("invalid login") || m.includes("invalid credentials") || m.includes("invalid_credentials") || m.includes("wrong password") || m.includes("v3_login_failed_401")) {
-    return "이메일 또는 비밀번호가 올바르지 않습니다.";
+    return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
   }
   if (m.includes("already registered") || m.includes("already exists") || m.includes("duplicate") || m.includes("email_already_registered")) {
-    return "이미 등록된 계정입니다. 로그인을 시도해주세요.";
+    return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
   }
   if (m.includes("password_min_length") || m.includes("password_too_short")) {
-    return "비밀번호는 12자 이상으로 입력해주세요.";
+    return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
   }
   if (m.includes("domain_not_allowed")) {
-    return "회사 이메일(@seowonenc.co.kr)만 회원가입이 가능합니다.";
+    return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
   }
   if (m.includes("admin_signup_role_fields_not_allowed")) {
-    return "권한 정보는 가입 화면에서 직접 지정할 수 없습니다.";
+    return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
   }
   if (m.includes("admin_signup_forbidden_by_security_filter") || m.includes("v3_admin_signup_failed_403")) {
-    return "관리자 회원가입이 서버 보안 검증에서 차단되었습니다. 서버를 최신 상태로 재시작한 뒤 다시 시도해주세요.";
+    return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
   }
   if (m.includes("v3_backend_unreachable") || m.includes("v3_admin_signup_failed_503")) {
-    return "백엔드 서버 연결 오류입니다. Spring Boot 서버가 실행 중인지 확인해주세요.";
+    return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
   }
   if (m.includes("account_pending") || m.includes("account_not_active")) {
-    return "승인 대기 중인 계정입니다. 관리자 승인 후 로그인할 수 있습니다.";
+    return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
   }
   if (m.includes("not confirmed") || m.includes("email") && m.includes("confirm")) {
-    return "이메일 인증이 필요합니다. 메일함을 확인해주세요.";
+    return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
   }
   if (m.includes("rate limit") || m.includes("rate_limited") || m.includes("too many")) {
-    return "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.";
+    return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
   }
   if (m.includes("network") || m.includes("fetch") || m.includes("connection")) {
-    return "네트워크 연결을 확인해주세요.";
+    return AUTH_NOTICES[language]?.network ?? AUTH_NOTICES.en.network;
   }
-  return "오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+  return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
 }
 
 type Mode = "lang" | "role" | "worker" | "admin";
@@ -82,6 +108,10 @@ const RESET_PASSWORD_LABELS: Record<string, string> = {
   es: "¿Olvidó su contraseña?",
   ar: "هل نسيت كلمة المرور؟",
   hi: "पासवर्ड भूल गए?",
+};
+
+const EMAIL_LABELS: Record<string, string> = {
+  ko: "이메일", vi: "Email", zh: "电子邮件", th: "อีเมล", uz: "Email", ph: "Email", km: "អ៊ីមែល", id: "Email", mn: "Имэйл", my: "အီးမေးလ်", ne: "इमेल", bn: "ইমেইল", kk: "Электрондық пошта", ru: "Электронная почта", en: "Email", jp: "メールアドレス", fr: "E-mail", es: "Correo electrónico", ar: "البريد الإلكتروني", hi: "ईमेल",
 };
 
 function pickDefaultV3Role(roles: V3Role[]): V3Role | null {
@@ -151,6 +181,7 @@ function AuthContent() {
   const urlLang = searchParams.get("lang");
   const [lang, setLang] = useState<string>(urlLang || "");
   const t = getT(lang || "en");
+  const emailLabel = EMAIL_LABELS[lang || "en"] || EMAIL_LABELS.en;
 
   const [mode, setMode] = useState<Mode>(urlLang ? "role" : "lang");
   const [loading, setLoading] = useState(false);
@@ -236,7 +267,7 @@ function AuthContent() {
       });
 
       if (!result.ok && result.status === 429) {
-        alert(sanitizeAuthError("rate limit"));
+        alert(sanitizeAuthError("rate limit", activeLang));
         setLoading(false);
         return;
       }
@@ -248,13 +279,13 @@ function AuthContent() {
       }
 
       if (!result.ok && result.status === 404) {
-        alert("입력한 이니셜과 뒷 4자리에 일치하는 근로자가 없습니다. 관리자에게 NFC 등록을 요청해주세요.");
+        alert((AUTH_NOTICES[activeLang] ?? AUTH_NOTICES.en).workerNotFound);
         setLoading(false);
         return;
       }
 
       if (!result.ok) {
-        alert(sanitizeAuthError("error" in result ? result.error : "unknown"));
+        alert(sanitizeAuthError("error" in result ? result.error : "unknown", activeLang));
         setLoading(false);
         return;
       }
@@ -268,10 +299,10 @@ function AuthContent() {
         }
         router.push(`/worker?lang=${activeLang}`);
       } else {
-        alert(sanitizeAuthError("session not established"));
+        alert(sanitizeAuthError("session not established", activeLang));
       }
     } catch {
-      alert(sanitizeAuthError("network"));
+      alert(sanitizeAuthError("network", activeLang));
     }
     setLoading(false);
   };
@@ -281,9 +312,9 @@ function AuthContent() {
   const handleAdminLogin = async () => {
     if (!adminEmail || !password) return;
     setLoading(true);
+    const activeLang = lang || "ko";
     try {
       const user = await loginV3(adminEmail, password);
-      const activeLang = lang || "ko";
       // 로그인 화면에서 고른 언어를 다음 화면의 기본 언어로 유지하고,
       // 로그인한 사용자의 설정에도 저장한다. 저장 실패가 로그인을 막지는 않는다.
       localStorage.setItem("safe-link-lang", activeLang);
@@ -296,7 +327,7 @@ function AuthContent() {
       sessionStorage.setItem("safe-link-session-active", "true");
       redirectByRoleString(pickDefaultV3Role(user.roles), activeLang);
     } catch (err) {
-      alert(sanitizeAuthError(err instanceof Error ? err.message : "unknown"));
+      alert(sanitizeAuthError(err instanceof Error ? err.message : "unknown", activeLang));
       setLoading(false);
     }
   };
@@ -317,7 +348,7 @@ function AuthContent() {
         preferredLang: activeLang,
       });
       if (signup.approvalRequired || signup.accountStatus === "PENDING") {
-        alert("관리자 가입 신청이 접수되었습니다. 승인 후 로그인할 수 있습니다.");
+        alert((AUTH_NOTICES[activeLang] ?? AUTH_NOTICES.en).signupPending);
         setAdminSignupMode(false);
         setPassConfirm("");
         setLoading(false);
@@ -325,7 +356,7 @@ function AuthContent() {
       }
       setLoading(false);
     } catch (err) {
-      alert(sanitizeAuthError(err instanceof Error ? err.message : "unknown"));
+      alert(sanitizeAuthError(err instanceof Error ? err.message : "unknown", activeLang));
       setLoading(false);
     }
   };
@@ -366,7 +397,7 @@ function AuthContent() {
               </h1>
               <p className="text-[10px] text-slate-600 tracking-[0.4em] uppercase mt-2">Field Communication OS</p>
               <div className="mt-5 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                <p className="text-sm font-semibold text-slate-300">언어를 선택하세요</p>
+                <p className="text-sm font-semibold text-slate-300">{t.changeLang}</p>
                 <p className="text-xs text-slate-600 mt-1">Select Language · 语言选择</p>
               </div>
             </div>
@@ -551,8 +582,8 @@ function AuthContent() {
                 <div style={fieldBox}>
                   <input
                     type="text"
-                    aria-label="이름 이니셜"
-                    placeholder="이름 이니셜 (예: BK, NGUYEN)"
+                    aria-label={t.name}
+                    placeholder={`${t.name} (BK, NGUYEN)`}
                     value={initials}
                     onChange={e => setInitials(e.target.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toUpperCase())}
                     maxLength={6}
@@ -564,9 +595,9 @@ function AuthContent() {
                 <div style={fieldBox}>
                   <input
                     type="tel"
-                    aria-label="휴대전화 뒷 4자리"
+                    aria-label={t.phone}
                     inputMode="numeric"
-                    placeholder="휴대전화 뒷 4자리 (예: 1234)"
+                    placeholder={`${t.phone} (1234)`}
                     value={phoneLast4}
                     onChange={e => setPhoneLast4(e.target.value.replace(/\D/g, "").slice(0, 4))}
                     onKeyDown={e => e.key === "Enter" && handleWorkerEnter()}
@@ -578,7 +609,7 @@ function AuthContent() {
                 {/* 복수 사이트 매칭 시 사이트 선택 */}
                 {multipleSites.length > 0 && (
                   <div className="flex flex-col gap-2 p-3 rounded-xl" style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.25)" }}>
-                    <p className="text-amber-300 text-xs font-bold">같은 정보의 근로자가 복수 현장에 있습니다. 본인 현장을 선택하세요.</p>
+                    <p className="text-amber-300 text-xs font-bold">{(AUTH_NOTICES[lang || "en"] ?? AUTH_NOTICES.en).multipleSites}</p>
                     {multipleSites.map(s => (
                       <button
                         key={s.site_id}
@@ -595,7 +626,7 @@ function AuthContent() {
                 {/* Hint */}
                 <div className="flex items-start gap-2">
                   <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-slate-600" />
-                  <p className="text-[11px] text-slate-600 leading-snug">관리자에게 NFC 카드 등록을 미리 요청해주세요.</p>
+                  <p className="text-[11px] text-slate-600 leading-snug">{(AUTH_NOTICES[lang || "en"] ?? AUTH_NOTICES.en).nfcHint}</p>
                 </div>
 
                 {/* CTA */}
@@ -633,7 +664,7 @@ function AuthContent() {
 
                 {/* Email */}
                 <div style={fieldBox}>
-                  <input type="email" aria-label="Email" placeholder="Email" value={adminEmail}
+                  <input type="email" aria-label={emailLabel} placeholder={emailLabel} value={adminEmail}
                     onChange={e => setAdminEmail(e.target.value)}
                     className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
                 </div>

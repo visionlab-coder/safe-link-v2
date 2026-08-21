@@ -35,3 +35,17 @@ export function persistDisplayLanguage(language: string): void {
   window.localStorage.setItem("safe-link-lang", language);
   window.dispatchEvent(new Event(DISPLAY_LANGUAGE_CHANGED));
 }
+
+/**
+ * 화면에서 사용자가 명시적으로 고른 언어(localStorage)를 DB 프로필의 기본 언어보다
+ * 우선한다. 개별 페이지가 프로필을 다시 불러오더라도 현재 화면 언어를 한국어로
+ * 덮어쓰지 않도록 공통으로 사용한다.
+ */
+export function resolveDisplayLanguage(
+  profileLanguage?: string | null,
+  urlLanguage?: string | null,
+  fallback = "ko",
+): string {
+  if (typeof window === "undefined") return urlLanguage || profileLanguage || fallback;
+  return urlLanguage || window.localStorage.getItem("safe-link-lang") || profileLanguage || fallback;
+}

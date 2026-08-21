@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { WifiOff } from "lucide-react";
 import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { getT as getAuthT } from "@/app/auth/translations";
 
 const OFFLINE_MESSAGE: Record<string, string> = {
   ko: "인터넷 연결이 없습니다. 입력 내용은 유지되며, 연결 후 다시 시도해 주세요.",
@@ -36,7 +37,7 @@ export default function OfflineBanner() {
       className="safe-area-banner fixed inset-x-0 top-0 z-[9999] flex items-center justify-center gap-2 bg-amber-500 py-3 text-center text-sm font-black text-slate-950 shadow-lg"
     >
       <WifiOff className="h-5 w-5 shrink-0" />
-      {OFFLINE_MESSAGE[language] ?? OFFLINE_MESSAGE.en}
+      {OFFLINE_MESSAGE[language] ?? getAuthT(language).adminDesc}
     </div>
   );
 }
