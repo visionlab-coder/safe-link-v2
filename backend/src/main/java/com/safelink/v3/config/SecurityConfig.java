@@ -54,6 +54,9 @@ public class SecurityConfig {
                 new AntPathRequestMatcher("/api/v1/qr/site-entry", "POST"),
                 new AntPathRequestMatcher("/api/v1/qr/worker-token", "POST"),
                 new AntPathRequestMatcher("/api/v1/nfc/worker-preference", "POST"),
+                // 채팅 화면의 온라인 표시 heartbeat는 본인 세션의 휘발성 상태만 갱신한다.
+                // Next.js BFF 경유 요청에는 XSRF 쿠키를 전달하지 않으므로 별도 예외가 필요하다.
+                new AntPathRequestMatcher("/api/v1/chat/compat/presence", "POST"),
                 new AntPathRequestMatcher("/api/v1/ai/internal/translate", "POST"),
                 new AntPathRequestMatcher("/api/v1/travel/internal/signal", "POST"),
                 new AntPathRequestMatcher("/api/v1/reports/internal/verification-code", "POST"),
