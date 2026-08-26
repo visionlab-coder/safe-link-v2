@@ -130,7 +130,7 @@ function AdminChatContent() {
     const [sttError, setSttError] = useState("");
     const [isSending, setIsSending] = useState(false);
     const [myId, setMyId] = useState("");
-    const onlineUsers = usePresence(myId || null);
+    const onlineUsers = usePresence(myId || null, workers.map((worker) => worker.id));
     const triedJitTranslate = useRef<Set<string>>(new Set());
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const voiceGenderRef = useRef<'male' | 'female'>('female');

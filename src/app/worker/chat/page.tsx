@@ -253,8 +253,8 @@ function WorkerChatContent() {
     const [loadingOlder, setLoadingOlder] = useState(false);
 
     const [myId, setMyId] = useState("");
-    const onlineUsers = usePresence(myId || null);
     const [admins, setAdmins] = useState<AdminProfile[]>([]);
+    const onlineUsers = usePresence(myId || null, admins.map((admin) => admin.id));
     const [activeAdmin, setActiveAdmin] = useState<AdminProfile | null>(null);
     const [siteId, setSiteId] = useState<string | null>(null);
     const [adminActivity, setAdminActivity] = useState<Record<string, number>>({});
