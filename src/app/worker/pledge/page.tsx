@@ -138,7 +138,7 @@ export default function WorkerPledgePage() {
           <button onClick={() => router.back()} className="p-2 text-slate-400 hover:text-white">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <span className="text-base font-black tracking-tight text-[#063789]">SQ-LINK</span>
+          <span className="text-base font-black tracking-tight text-[#063789]">SQ LINK</span>
           <div className="flex items-center gap-2">
             <PenLine className="w-5 h-5 text-blue-400" />
           </div>
@@ -152,7 +152,7 @@ export default function WorkerPledgePage() {
             </picture>
             <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
             <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
-              <p className="text-[10px] font-black tracking-[.18em] text-blue-200">SQ-LINK PLEDGE</p>
+              <p className="text-[10px] font-black tracking-[.18em] text-blue-200">SQ LINK PLEDGE</p>
               <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
               <p className="mt-2 text-sm font-bold text-slate-100">{t.description}</p>
             </div>

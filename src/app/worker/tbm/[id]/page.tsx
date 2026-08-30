@@ -440,7 +440,7 @@ function WorkerTBMDetailContent() {
                                 </picture>
                                 <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
                                 <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
-                                    <p className="text-[10px] font-black tracking-[.18em] text-red-200">SQ-LINK TBM</p>
+                                    <p className="text-[10px] font-black tracking-[.18em] text-red-200">SQ LINK TBM</p>
                                     <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
                                     <p className="mt-2 text-sm font-bold text-slate-100">{new Date(tbm.created_at).toLocaleDateString(({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[preferredLang] || "en-US", { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                                 </div>

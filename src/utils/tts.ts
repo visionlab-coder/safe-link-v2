@@ -7,6 +7,12 @@
 
 export type VoiceGender = 'male' | 'female';
 
+const notifyTtsFailure = () => {
+    if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("sq-link:tts-failure"));
+    }
+};
+
 export const getVoiceLang = (c: string) => {
     const map: Record<string, string> = {
         ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN",
@@ -21,19 +27,15 @@ export const getVoiceLang = (c: string) => {
 /**
  * 음성 재생 시 괄호 안의 내용은 무조건 제거 (근로자 피로감 방지)
  */
-const stripForSpeech = (text: string): string => {
-    let result = '';
-    let depth = 0;
-    for (const char of text) {
-        if (char === '(' || char === '（') depth++;
-        else if (char === ')' || char === '）') {
-            if (depth > 0) depth--;
-        } else if (depth === 0) {
-            result += char;
-        }
-    }
-    // Remove emojis so TTS doesn't read them out loud
-    result = result.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '');
+export const stripForSpeech = (text: string): string => {
+    // 닫힌 괄호는 화면 보충 설명이므로 통째로 읽지 않는다.
+    // 닫히지 않은 괄호는 사용자가 입력을 이어가는 중일 수 있어 기호만 제거하고 본문은 보존한다.
+    // 예: "안전모(필수 착용)를 쓰세요" → "안전모를 쓰세요"
+    const result = text
+        .replace(/\([^)]*\)|（[^）]*）/g, ' ')
+        .replace(/[()（）\[\]［］{}｛｝<>〈〉《》]/g, ' ')
+        .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, ' ')
+        .replace(/[^\p{L}\p{M}\p{N}\s.,!?。！？]/gu, ' ');
     return result.replace(/\s{2,}/g, ' ').trim();
 };
 
@@ -66,15 +68,18 @@ export const playPremiumAudio = (
     text: string,
     langCode: string,
     gender: VoiceGender = 'female',
-    onEnd?: () => void
+    onEnd?: () => void,
+    onStart?: () => void,
 ) => {
     if (!text || typeof window === 'undefined') {
+        if (typeof window !== 'undefined') notifyTtsFailure();
         if (onEnd) onEnd();
         return;
     }
 
     const cleanText = stripForSpeech(text);
     if (!cleanText) {
+        notifyTtsFailure();
         if (onEnd) onEnd();
         return;
     }
@@ -86,7 +91,7 @@ export const playPremiumAudio = (
         || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     const isAndroid = /Android/i.test(navigator.userAgent);
     if ((isAppleMobile || isAndroid) && window.speechSynthesis) {
-        playBrowserNativeAudio(cleanText, langCode, gender, onEnd);
+        playBrowserNativeAudio(cleanText, langCode, gender, onEnd, onStart);
         return;
     }
 
@@ -97,16 +102,17 @@ export const playPremiumAudio = (
             if (onEnd) onEnd();
         } else {
             // Cloud 실패 시 브라우저 내장 음성으로 폴백
-            playBrowserNativeAudio(cleanText, langCode, gender, onEnd);
+            playBrowserNativeAudio(cleanText, langCode, gender, onEnd, onStart);
         }
-    });
+    }, onStart);
 };
 
 /** 브라우저 내장 음성 (최후의 보루) */
-const playBrowserNativeAudio = (text: string, langCode: string, gender: VoiceGender, onEnd?: () => void) => {
+const playBrowserNativeAudio = (text: string, langCode: string, gender: VoiceGender, onEnd?: () => void, onStart?: () => void) => {
     const targetLang = getVoiceLang(langCode);
     if (typeof window === 'undefined' || !window.speechSynthesis) {
         console.warn("[PremiumTTS] speechSynthesis is not supported in this browser.");
+        notifyTtsFailure();
         if (onEnd) onEnd();
         return;
     }
@@ -144,9 +150,20 @@ const playBrowserNativeAudio = (text: string, langCode: string, gender: VoiceGen
     window.speechSynthesis.cancel();
     const chunks = chunkText(text);
     let current = 0;
+    let anySuccess = false;
+    let started = false;
+    const announceStart = () => {
+        if (started) return;
+        started = true;
+        onStart?.();
+    };
 
     const speakNext = () => {
-        if (current >= chunks.length) { if (onEnd) onEnd(); return; }
+        if (current >= chunks.length) {
+            if (!anySuccess) notifyTtsFailure();
+            if (onEnd) onEnd();
+            return;
+        }
         const currentChunk = chunks[current++];
         const utter = new SpeechSynthesisUtterance(currentChunk);
         if (bestVoice) utter.voice = bestVoice;
@@ -159,19 +176,30 @@ const playBrowserNativeAudio = (text: string, langCode: string, gender: VoiceGen
         // 영구 잠김을 막되 실제 재생 시간을 충분히 보장하는 안전 타임아웃이다.
         const maxChunkMs = Math.min(45_000, Math.max(10_000, currentChunk.length * 250 + 8_000));
         let settled = false;
-        const finishChunk = () => {
+        const startWatchdog = window.setTimeout(() => {
+            if (!settled && !started) {
+                console.warn("[PremiumTTS] Browser speech did not start.");
+                window.speechSynthesis.cancel();
+                finishChunk(false);
+            }
+        }, 5_000);
+        const finishChunk = (succeeded: boolean) => {
             if (settled) return;
             settled = true;
+            anySuccess = anySuccess || succeeded;
             window.clearTimeout(watchdog);
+            window.clearTimeout(startWatchdog);
             speakNext();
         };
         const watchdog = window.setTimeout(() => {
             console.warn("[PremiumTTS] Browser speech completion event timed out.");
             window.speechSynthesis.cancel();
-            finishChunk();
+            // 일부 모바일 WebView는 실제 재생 후에도 완료 이벤트를 누락한다.
+            finishChunk(true);
         }, maxChunkMs);
 
-        utter.onend = finishChunk;
+        utter.onstart = announceStart;
+        utter.onend = () => finishChunk(true);
         utter.onerror = (err) => {
             console.warn(`[PremiumTTS] Browser Native Runtime Fallback: ${bestVoice?.name ?? "default"}`, err);
             // ❌ 에러 발생 시 해당 음성 블랙리스트 추가
@@ -179,15 +207,14 @@ const playBrowserNativeAudio = (text: string, langCode: string, gender: VoiceGen
             window.speechSynthesis.cancel();
             window.clearTimeout(watchdog);
             if (settled) return;
-            settled = true;
             // Apple 모바일은 비동기 Proxy 재시도가 다시 자동재생 차단될 수 있으므로
             // 다음 청크로 안전하게 진행한다. 그 외 브라우저만 Proxy를 재시도한다.
             const isAppleMobile = /iPad|iPhone|iPod/.test(navigator.userAgent)
                 || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
             if (isAppleMobile) {
-                speakNext();
+                finishChunk(false);
             } else {
-                playProxyAudio(currentChunk, langCode, gender, () => speakNext());
+                playProxyAudio(currentChunk, langCode, gender, (success) => finishChunk(success), announceStart);
             }
         };
         window.speechSynthesis.speak(utter);
@@ -200,7 +227,13 @@ const playBrowserNativeAudio = (text: string, langCode: string, gender: VoiceGen
  * 모든 청크를 동시에 prefetch → 순차 재생 (다음 청크가 이미 버퍼링된 상태로 대기)
  * 오디오 재생 차단 시 브라우저 TTS로 폴백, 실패해도 큐 멈추지 않음
  */
-export const playProxyAudio = (text: string, lang: string, gender: VoiceGender, onDone?: (success: boolean) => void) => {
+export const playProxyAudio = (
+    text: string,
+    lang: string,
+    gender: VoiceGender,
+    onDone?: (success: boolean) => void,
+    onStart?: () => void,
+) => {
     const tl = lang === 'zh' ? 'zh-CN' : lang;
     const rawSegments = text.match(/[^.!?。！？\n]+[.!?。！？\n]?/g) || [text];
     const segments = rawSegments.map(s => s.trim()).filter(Boolean);
@@ -217,21 +250,47 @@ export const playProxyAudio = (text: string, lang: string, gender: VoiceGender, 
 
     let idx = 0;
     let anySuccess = false;
+    let started = false;
+    const announceStart = () => {
+        if (started) return;
+        started = true;
+        onStart?.();
+    };
 
     const playNext = () => {
         if (idx >= audios.length) { onDone?.(anySuccess); return; }
         const { audio, chunk } = audios[idx++];
-        audio.onended = () => { anySuccess = true; playNext(); };
-        audio.onerror = () => tryBrowserFallback(chunk, lang, gender, playNext);
-        audio.play().catch(() => tryBrowserFallback(chunk, lang, gender, playNext));
+        let fallbackStarted = false;
+        const fallback = () => {
+            if (fallbackStarted) return;
+            fallbackStarted = true;
+            window.clearTimeout(startWatchdog);
+            // audio.play() 실패 직후에도 네트워크 오디오가 늦게 시작되는 WebView가 있다.
+            // 폴백 TTS와 겹쳐 같은 문장이 두 번 들리지 않도록 원본 오디오를 명시적으로 중지한다.
+            audio.pause();
+            audio.removeAttribute("src");
+            audio.load();
+            tryBrowserFallback(chunk, lang, gender, (success) => {
+                anySuccess = anySuccess || success;
+                playNext();
+            }, announceStart);
+        };
+        const startWatchdog = window.setTimeout(fallback, 5_000);
+        audio.onplaying = () => {
+            window.clearTimeout(startWatchdog);
+            announceStart();
+        };
+        audio.onended = () => { window.clearTimeout(startWatchdog); anySuccess = true; playNext(); };
+        audio.onerror = fallback;
+        audio.play().catch(fallback);
     };
     playNext();
 };
 
 /** 단일 청크에 대한 브라우저 TTS 폴백 (실패해도 콜백 호출하여 큐 진행) */
-const tryBrowserFallback = (text: string, lang: string, gender: VoiceGender, onEnd: () => void) => {
+const tryBrowserFallback = (text: string, lang: string, gender: VoiceGender, onEnd: (success: boolean) => void, onStart?: () => void) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
-        onEnd();
+        onEnd(false);
         return;
     }
     const targetLang = getVoiceLang(lang);
@@ -246,9 +305,14 @@ const tryBrowserFallback = (text: string, lang: string, gender: VoiceGender, onE
     if (voice) utter.voice = voice;
     utter.lang = targetLang;
     utter.rate = 0.95;
-    utter.onend = onEnd;
-    utter.onerror = () => onEnd();
-    window.speechSynthesis.speak(utter);
+    utter.onstart = onStart ?? null;
+    utter.onend = () => onEnd(true);
+    utter.onerror = () => onEnd(false);
+    try {
+        window.speechSynthesis.speak(utter);
+    } catch {
+        onEnd(false);
+    }
 };
 
 if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis) {

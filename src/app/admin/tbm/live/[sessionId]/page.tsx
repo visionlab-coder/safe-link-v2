@@ -215,7 +215,7 @@ export default function TbmLiveSessionPage() {
         {/* 헤더 */}
         <div className="concept-page-header">
           <div className="flex w-full items-center justify-between">
-            <p className="font-black tracking-tight text-[#063789]">SQ-LINK</p>
+            <p className="font-black tracking-tight text-[#063789]">SQ LINK</p>
             {isActive && (
               <button onClick={handleCloseSession} className="bg-red-800 hover:bg-red-700 text-red-100 text-xs px-3 py-1.5 rounded-lg transition-colors">
                 {t.close}
@@ -233,7 +233,7 @@ export default function TbmLiveSessionPage() {
             </picture>
             <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
             <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
-              <p className="text-[10px] font-black tracking-[.18em] text-green-200">SQ-LINK TBM NFC</p>
+              <p className="text-[10px] font-black tracking-[.18em] text-green-200">SQ LINK TBM NFC</p>
               <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{session?.title || t.fallback}</h1>
               <p className="mt-2 text-sm font-bold text-slate-100">{session?.site_id} · {attendance.length} {t.people}</p>
             </div>

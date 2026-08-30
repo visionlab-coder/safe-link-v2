@@ -13,14 +13,15 @@ const LANDING_UI: Record<string, Record<string, string | string[]>> = {
   en: { os:"FIELD SAFETY OS", access:"SECURE ACCESS", title:"Simple, secure site entry\ncentered on your name", desc:"Confirm the worker’s preferred language and site assignment, then start the required safety work right away.", language:"Select language", languageDesc:"Start the service in the worker’s preferred language.", adminDesc:"Site operations and safety management", workerDesc:"Training confirmation and safety tasks", login:"Sign in · identity verification", loginDesc:"Start with the same flow on web and mobile.", steps:["Verify information|Confirm name and minimum information.", "Connect site|Automatically verify the assigned site.", "Entry complete|Issue a worker session."] },
   zh: { os:"现场安全操作系统", access:"安全访问", title:"以姓名为中心的简单\n安全现场进入", desc:"确认工人的首选语言和现场分配后，立即开始必要的安全工作。", language:"选择语言", languageDesc:"以工人的首选语言开始服务。", adminDesc:"现场运营与安全管理", workerDesc:"培训确认与安全工作", login:"登录 · 身份确认", loginDesc:"在网页和移动端以相同流程开始。", steps:["确认信息|确认姓名和最少信息。", "连接现场|自动确认分配的现场。", "进入完成|发放工人会话。"] },
   vi: { os:"HỆ ĐIỀU HÀNH AN TOÀN CÔNG TRƯỜNG", access:"TRUY CẬP AN TOÀN", title:"Vào công trường đơn giản\nvà an toàn theo tên", desc:"Xác nhận ngôn ngữ ưa dùng và công trường được phân công của công nhân, sau đó bắt đầu công việc an toàn cần thiết.", language:"Chọn ngôn ngữ", languageDesc:"Bắt đầu dịch vụ bằng ngôn ngữ ưa dùng của công nhân.", adminDesc:"Vận hành công trường và quản lý an toàn", workerDesc:"Xác nhận đào tạo và công việc an toàn", login:"Đăng nhập · xác minh danh tính", loginDesc:"Bắt đầu theo cùng một quy trình trên web và di động.", steps:["Xác nhận thông tin|Xác nhận tên và thông tin tối thiểu.", "Kết nối công trường|Tự động xác nhận công trường được phân công.", "Hoàn tất vào|Cấp phiên làm việc cho công nhân."] },
+  id: { os:"SISTEM KESELAMATAN LOKASI", access:"AKSES AMAN", title:"Masuk lokasi dengan mudah\ndan aman berdasarkan nama", desc:"Konfirmasikan bahasa pilihan dan lokasi kerja pekerja, lalu mulai pekerjaan keselamatan yang diperlukan.", language:"Pilih bahasa", languageDesc:"Mulai layanan dalam bahasa pilihan pekerja.", adminDesc:"Operasional lokasi dan manajemen keselamatan", workerDesc:"Konfirmasi pelatihan dan tugas keselamatan", login:"Masuk · verifikasi identitas", loginDesc:"Mulai dengan alur yang sama di web dan perangkat seluler.", steps:["Verifikasi informasi|Konfirmasikan nama dan informasi minimum.", "Hubungkan lokasi|Verifikasi lokasi yang ditugaskan secara otomatis.", "Masuk selesai|Buat sesi pekerja."] },
   ru: { os:"СИСТЕМА БЕЗОПАСНОСТИ ОБЪЕКТА", access:"БЕЗОПАСНЫЙ ДОСТУП", title:"Простой и безопасный\nвход на объект по имени", desc:"Подтвердите предпочитаемый язык и назначенный объект работника, затем сразу начните необходимые задачи по безопасности.", language:"Выберите язык", languageDesc:"Начните сервис на предпочитаемом языке работника.", adminDesc:"Управление объектом и безопасностью", workerDesc:"Подтверждение обучения и задачи безопасности", login:"Вход · подтверждение личности", loginDesc:"Одинаковый процесс в веб-версии и на мобильном устройстве.", steps:["Проверка данных|Подтвердите имя и минимальные сведения.", "Подключение объекта|Автоматически подтвердите назначенный объект.", "Вход завершён|Создайте сессию работника."] },
 };
 
 function fallbackLandingUi(language: string): Record<string, string | string[]> {
   const auth = getT(language);
   return {
-    os: "SQ-LINK",
-    access: "SQ-LINK",
+    os: "SQ LINK",
+    access: "SQ LINK",
     title: auth.chooseRole,
     desc: auth.chooseRoleDesc,
     language: auth.changeLang,
@@ -63,7 +64,7 @@ function LandingPageInner() {
 
   return <main className="min-h-screen bg-[#eef3f8] text-[#172033]">
     <header className="flex h-[72px] items-center justify-between border-b border-[#d9e1ea] bg-white px-5 sm:px-8 lg:px-12">
-      <div className="flex items-center gap-4"><BrandLogo compact imageClassName="!w-[124px] max-w-none" /><span className="hidden border-l border-[#d9e1ea] pl-4 text-xs font-black tracking-[.18em] text-[#063789] sm:block">SQ-LINK</span></div>
+      <div className="flex items-center gap-4"><BrandLogo compact imageClassName="!w-[124px] max-w-none" /><span className="hidden border-l border-[#d9e1ea] pl-4 text-xs font-black tracking-[.18em] text-[#063789] sm:block">SQ LINK</span></div>
       <span className="flex items-center gap-2 text-[11px] font-bold text-[#526076]"><i className="h-2 w-2 rounded-full bg-[#07835a]" />{ui.os as string}</span>
     </header>
 

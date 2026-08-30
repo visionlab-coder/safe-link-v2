@@ -78,10 +78,10 @@ export default function GuideNfcPage() {
             <button onClick={() => router.back()} className="p-2 text-gray-500 hover:text-white transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <span className="font-black tracking-tight text-[#063789]">SQ-LINK</span>
+            <span className="font-black tracking-tight text-[#063789]">SQ LINK</span>
           </div>
 
-          <ResponsiveFeatureHero visual={{ ...visualizationSpecs.nfcQr, eyebrow: "SQ-LINK GUIDE · CLAIMS 1–5", title: t.title, description: t.description }} />
+          <ResponsiveFeatureHero visual={{ ...visualizationSpecs.nfcQr, eyebrow: "SQ LINK GUIDE · CLAIMS 1–5", title: t.title, description: t.description }} />
 
           {/* 개요 */}
           <div className="bg-cyan-900/20 border border-cyan-800/40 rounded-xl p-4 mb-6 mt-4">

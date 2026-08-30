@@ -80,7 +80,7 @@ function ControlDashboardContent() {
                 <header className="concept-page-header animate-float">
                     <div className="min-w-0 flex-1 flex flex-col gap-1">
                         <div className="flex min-w-0 items-center gap-2 mb-1">
-                            <h1 className="shrink-0 whitespace-nowrap text-lg font-black tracking-tight text-[#063789] uppercase sm:text-xl">SQ-LINK</h1>
+                            <h1 className="shrink-0 whitespace-nowrap text-lg font-black tracking-tight text-[#063789] uppercase sm:text-xl">SQ LINK</h1>
                             <div className="flex items-center gap-1 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full">
                                 <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                                 <span className="text-[10px] text-indigo-400 font-black tracking-widest leading-none">{t.hq}</span>

@@ -33,9 +33,7 @@ const adminUI: Record<string, any> = {
         recTime: "녹음 중",
         library: "기초교육 라이브러리",
         libraryDesc: "위험성평가 항목 불러오기",
-        briefingGuide: "AI 브리핑 가이드",
-        guideGenerate: "가이드 생성",
-        deleteHistory: "이력 숨기기", categoryPlaceholder: "카테고리 (예: 거푸집, 배근, 타설)", applyDraft: "클릭하여 초안에 적용", extraPoints: "추가 안전 포인트", chat: "1:1 대화 바로가기", male: "남성", female: "여성", guideFailed: "가이드 생성에 실패했습니다.", aiFailed: "AI 연결에 실패했습니다. 인터넷 연결을 확인해주세요.",
+        deleteHistory: "이력 숨기기", chat: "1:1 대화 바로가기", male: "남성", female: "여성",
     },
     en: {
         title: "SAFETY BROADCAST",
@@ -58,9 +56,7 @@ const adminUI: Record<string, any> = {
         recTime: "Recording",
         library: "Safety Library",
         libraryDesc: "Load risk assessment items",
-        briefingGuide: "AI BRIEFING GUIDE",
-        guideGenerate: "Generate Guide",
-        deleteHistory: "Hide", categoryPlaceholder: "Category (e.g. formwork, rebar, pouring)", applyDraft: "Click to apply this draft", extraPoints: "Additional safety points", chat: "Go to 1:1 Chat", male: "Male", female: "Female", guideFailed: "Failed to generate a guide.", aiFailed: "AI connection failed. Check your internet connection.",
+        deleteHistory: "Hide", chat: "Go to 1:1 Chat", male: "Male", female: "Female",
     },
     zh: {
         title: "安全简报发布",
@@ -83,15 +79,13 @@ const adminUI: Record<string, any> = {
         recTime: "录音中",
         library: "基础教育资料库",
         libraryDesc: "加载危险评估项目",
-        briefingGuide: "AI简报指南",
-        guideGenerate: "生成指南",
-        deleteHistory: "隐藏记录", categoryPlaceholder: "类别（例如：模板、配筋、浇筑）", applyDraft: "点击应用到草案", extraPoints: "附加安全要点", chat: "进入一对一对话", male: "男声", female: "女声", guideFailed: "生成指南失败。", aiFailed: "AI 连接失败，请检查网络连接。",
+        deleteHistory: "隐藏记录", chat: "进入一对一对话", male: "男声", female: "女声",
     },
     vi: {
-        title: "Phát thông báo an toàn", subtitle: "Gửi ngay cho toàn bộ công nhân", smartAssist: "TRỢ LÝ AI", generateTips: "Tạo hướng dẫn AI", processing: "Đang xử lý...", koreanDraft: "Bản nháp TBM", voiceInput: "NHẬP GIỌNG NÓI", listening: "ĐANG NGHE...", placeholder: "Nhập quy tắc an toàn hôm nay...", normResult: "Kết quả chuẩn hóa", changes: "thay đổi", pushBtn: "📡 PHÁT TBM", historyTitle: "Lịch sử gửi gần đây", noHistory: "Không có lịch sử phát", pushSuccess: "Đã phát", back: "Quay lại", previewNorm: "Xem trước tự động sửa", recTime: "Đang ghi", library: "Thư viện đào tạo cơ bản", libraryDesc: "Tải hạng mục đánh giá rủi ro", briefingGuide: "HƯỚNG DẪN BRIEFING AI", guideGenerate: "Tạo hướng dẫn", deleteHistory: "Ẩn", categoryPlaceholder: "Danh mục (ví dụ: cốp pha, cốt thép, đổ bê tông)", applyDraft: "Nhấp để áp dụng bản nháp", extraPoints: "Điểm an toàn bổ sung", chat: "Đi đến trò chuyện 1:1", male: "NAM", female: "NỮ", guideFailed: "Không thể tạo hướng dẫn.", aiFailed: "Không thể kết nối AI. Hãy kiểm tra mạng."
+        title: "Phát thông báo an toàn", subtitle: "Gửi ngay cho toàn bộ công nhân", smartAssist: "TRỢ LÝ AI", generateTips: "Tạo hướng dẫn AI", processing: "Đang xử lý...", koreanDraft: "Bản nháp TBM", voiceInput: "NHẬP GIỌNG NÓI", listening: "ĐANG NGHE...", placeholder: "Nhập quy tắc an toàn hôm nay...", normResult: "Kết quả chuẩn hóa", changes: "thay đổi", pushBtn: "📡 PHÁT TBM", historyTitle: "Lịch sử gửi gần đây", noHistory: "Không có lịch sử phát", pushSuccess: "Đã phát", back: "Quay lại", previewNorm: "Xem trước tự động sửa", recTime: "Đang ghi", library: "Thư viện đào tạo cơ bản", libraryDesc: "Tải hạng mục đánh giá rủi ro", deleteHistory: "Ẩn", chat: "Đi đến trò chuyện 1:1", male: "NAM", female: "NỮ"
     },
     ru: {
-        title: "Рассылка инструктажа", subtitle: "Мгновенная отправка всем работникам", smartAssist: "ИИ-АССИСТЕНТ", generateTips: "Создать рекомендации ИИ", processing: "Обработка...", koreanDraft: "Черновик TBM", voiceInput: "ГОЛОСОВОЙ ВВОД", listening: "СЛУШАЕМ...", placeholder: "Введите сегодняшние правила безопасности...", normResult: "Результат нормализации", changes: "изменений", pushBtn: "📡 РАЗОСЛАТЬ TBM", historyTitle: "Последние рассылки", noHistory: "Истории рассылок нет", pushSuccess: "Рассылка завершена", back: "Назад", previewNorm: "Предпросмотр автокоррекции", recTime: "Запись", library: "Библиотека базового обучения", libraryDesc: "Загрузить пункты оценки рисков", briefingGuide: "РУКОВОДСТВО ИИ ПО БРИФИНГУ", guideGenerate: "Создать руководство", deleteHistory: "Скрыть", categoryPlaceholder: "Категория (например: опалубка, арматура, бетонирование)", applyDraft: "Нажмите, чтобы применить черновик", extraPoints: "Дополнительные меры безопасности", chat: "Перейти в личный чат", male: "МУЖСКОЙ", female: "ЖЕНСКИЙ", guideFailed: "Не удалось создать руководство.", aiFailed: "Не удалось подключиться к ИИ. Проверьте интернет."
+        title: "Рассылка инструктажа", subtitle: "Мгновенная отправка всем работникам", smartAssist: "ИИ-АССИСТЕНТ", generateTips: "Создать рекомендации ИИ", processing: "Обработка...", koreanDraft: "Черновик TBM", voiceInput: "ГОЛОСОВОЙ ВВОД", listening: "СЛУШАЕМ...", placeholder: "Введите сегодняшние правила безопасности...", normResult: "Результат нормализации", changes: "изменений", pushBtn: "📡 РАЗОСЛАТЬ TBM", historyTitle: "Последние рассылки", noHistory: "Истории рассылок нет", pushSuccess: "Рассылка завершена", back: "Назад", previewNorm: "Предпросмотр автокоррекции", recTime: "Запись", library: "Библиотека базового обучения", libraryDesc: "Загрузить пункты оценки рисков", deleteHistory: "Скрыть", chat: "Перейти в личный чат", male: "МУЖСКОЙ", female: "ЖЕНСКИЙ"
     }
 };
 
@@ -146,8 +140,6 @@ function AdminTBMCreateContent() {
     const [tbmText, setTbmText] = useState("");
     const [isSending, setIsSending] = useState(false);
     const [history, setHistory] = useState<any[]>([]);
-    const [isGuideLoading, setIsGuideLoading] = useState(false);
-    const [aiTips, setAiTips] = useState<string[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
     const [hiddenNoticeIds, setHiddenNoticeIds] = useState<string[]>([]);
     const [normalizeResult, setNormalizeResult] = useState<{ normalized: string; changes: { from: string; to: string }[] } | null>(null);
@@ -165,8 +157,6 @@ function AdminTBMCreateContent() {
 
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
     const [adminSiteId, setAdminSiteId] = useState<string | null>(null);
-    const [briefingCategory, setBriefingCategory] = useState("");
-    const [briefingDraft, setBriefingDraft] = useState("");
 
     const loadProfile = useCallback(async () => {
         const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
@@ -216,34 +206,6 @@ function AdminTBMCreateContent() {
         const stored = localStorage.getItem(`safelink_hidden_notices_${userId}`);
         if (stored) setHiddenNoticeIds(JSON.parse(stored) as string[]);
     }, [userId]);
-
-    const handleGenerateGuide = async () => {
-        setIsGuideLoading(true);
-        setAiTips([]);
-        setBriefingDraft("");
-        try {
-            const [tipsRes, draftRes] = await Promise.all([
-                fetch("/api/tbm/ai-tips", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ context: tbmText.trim() }),
-                }),
-                fetch("/api/tbm/briefing-draft", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ category: briefingCategory.trim() }),
-                }),
-            ]);
-            const [tipsData, draftData] = await Promise.all([tipsRes.json(), draftRes.json()]);
-            if (draftData.draft) setBriefingDraft(draftData.draft);
-            if (tipsData.tips) setAiTips(tipsData.tips);
-            if (!draftData.draft && !tipsData.tips) alert((getUI(displayLang || adminLang)).guideFailed);
-        } catch {
-            alert((getUI(displayLang || adminLang)).aiFailed);
-        } finally {
-            setIsGuideLoading(false);
-        }
-    };
 
 
     // ── 정규화 미리보기 (디바운스) ──
@@ -395,53 +357,13 @@ function AdminTBMCreateContent() {
                   </picture>
                   <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
                   <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
-                    <p className="text-[10px] font-black tracking-[.18em] text-blue-200">SQ-LINK TBM</p>
+                    <p className="text-[10px] font-black tracking-[.18em] text-blue-200">SQ LINK TBM</p>
                     <h2 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h2>
                     <p className="mt-2 text-sm font-bold text-slate-100">{t.subtitle}</p>
                   </div>
                 </div>
 
                 <main className="flex-1 flex flex-col p-4 md:p-8 gap-8 max-w-3xl mx-auto w-full pb-20">
-                    <section className="glass rounded-[40px] p-8 border-white/10 shadow-2xl relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 blur-[60px] rounded-full -mr-16 -mt-16 group-hover:bg-purple-500/20 transition-all duration-1000" />
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-black text-white flex items-center gap-3 italic font-mono">
-                                <span className="w-2 h-6 bg-purple-500 rounded-full" />
-                                {t.briefingGuide}
-                            </h3>
-                            <button onClick={handleGenerateGuide} disabled={isGuideLoading} className="flex items-center gap-2 px-6 py-3 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl text-xs font-black shadow-lg tap-effect disabled:opacity-50 tracking-widest uppercase">
-                                {isGuideLoading ? t.processing : t.guideGenerate}
-                            </button>
-                        </div>
-                        <div className="flex gap-2 mb-4">
-                            <input
-                                value={briefingCategory}
-                                onChange={(e) => setBriefingCategory(e.target.value)}
-                                placeholder={t.categoryPlaceholder}
-                                className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white placeholder-slate-700 focus:outline-none focus:border-purple-500/40"
-                            />
-                        </div>
-                        {briefingDraft && (
-                            <button
-                                onClick={() => { setTbmText(briefingDraft); setBriefingDraft(""); setAiTips([]); }}
-                                className="w-full text-left p-5 glass rounded-2xl text-slate-300 hover:text-white hover:bg-purple-500/5 border border-purple-500/20 transition-all text-sm tap-effect leading-relaxed whitespace-pre-wrap mb-3"
-                            >
-                                {briefingDraft}
-                                <span className="block mt-3 text-[10px] font-black text-purple-400 uppercase tracking-widest">{t.applyDraft}</span>
-                            </button>
-                        )}
-                        {aiTips.length > 0 && (
-                            <div className="flex flex-col gap-2 mt-2">
-                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">{t.extraPoints}</span>
-                                {aiTips.map((tip, idx) => (
-                                    <button key={idx} onClick={() => { setTbmText(tip); setAiTips([]); setBriefingDraft(""); }} className="text-left p-4 glass rounded-2xl text-slate-300 hover:text-white hover:bg-white/5 border-white/5 transition-all text-sm tap-effect leading-relaxed">
-                                        {tip}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </section>
-
                     {/* 기초교육 라이브러리 섹션 */}
                     <section className="glass rounded-[40px] p-8 border-white/10 shadow-2xl relative overflow-hidden group">
                         <div className="absolute top-0 left-0 w-32 h-32 bg-green-500/10 blur-[60px] rounded-full -ml-16 -mt-16 group-hover:bg-green-500/20 transition-all duration-1000" />

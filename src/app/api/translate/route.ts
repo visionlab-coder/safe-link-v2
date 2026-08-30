@@ -192,6 +192,14 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
             }
         }
 
+        // Papago가 중국어 요청형 문장에서 "~해주세요, 식사하세요"처럼
+        // 미완성 조사/접두어를 그대로 반환하는 경우가 있다. 한국어 결과에
+        // 이 형태가 섞이면 Google 번역으로 다시 시도해 정상 문장만 반환한다.
+        if (tl === "ko" && /(?:^|\s)~\s*해s*주(?:세|세)요/.test(translatedText)) {
+            translatedText = "";
+            engine = "google";
+        }
+
         // === 1.5. 비Papago 언어의 건설현장 문맥 번역 ===
         if (!translatedText && forced !== "google" && v3AiVendorContext) {
             const contextualTranslation = await contextualConstructionTranslate(processedText, sl, tl, v3AiVendorContext);
@@ -234,6 +242,18 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
 
         if (!translatedText) {
             return await aiFullFallback(processedText, sl, tl, v3AiVendorContext);
+        }
+
+        // 채팅 전송은 상대방에게 번역문을 먼저 전달하는 것이 우선이다.
+        // 역번역·발음은 표시 보조 정보이므로 fast 요청에서는 추가 AI 왕복을
+        // 만들지 않는다. 이전에는 fast=true여도 역번역을 기다려 전송이 늦었다.
+        if (fast) {
+            return NextResponse.json({
+                translated: stripEmoji(tl === "ko" ? formalizeKo(translatedText) : translatedText),
+                pronunciation: "",
+                reverse_translated: "",
+                engine,
+            });
         }
 
         // === 3. 역번역 및 발음 처리 (Google로 통일하여 속도 확보) ===
@@ -300,14 +320,12 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
         if (!shouldGeneratePronunciation) {
             pronunciation = "";
         } else if (isChinese) {
-            if (chinesePron) {
-                pronunciation = chinesePron;
-            } else {
-                const py = pinyin.isSupported()
-                    ? pinyin.convertToPinyin(pronTarget, ' ', true)
-                    : pronTarget;
-                pronunciation = hangulize(py, 'zh');
-            }
+            // 중국어 발음은 병음 기반의 결정적 변환을 우선 사용한다.
+            // 생성형 결과가 你好를 "닝하오"처럼 잘못 표기하는 경우를 막는다.
+            const py = pinyin.isSupported()
+                ? pinyin.convertToPinyin(pronTarget, ' ', true)
+                : pronTarget;
+            pronunciation = hangulize(py, 'zh') || chinesePron;
         } else if (isJapanese) {
             const raw = japPron || hangulize(pronTarget, 'ja');
             // 한글·공백·구두점만 허용 — 한자·가나 제거

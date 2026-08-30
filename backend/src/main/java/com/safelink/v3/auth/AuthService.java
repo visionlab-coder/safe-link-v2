@@ -189,7 +189,23 @@ public class AuthService {
 
         var account = candidates.getFirst();
         if (preferredLanguage != null && !preferredLanguage.isBlank()) {
-            users.updatePreferredLanguage(account.id(), preferredLanguage);
+            String resolvedLanguage = resolvePreferredLanguage(preferredLanguage);
+            users.updatePreferredLanguage(account.id(), resolvedLanguage);
+            // 빠른 로그인에서 선택한 언어는 DB만이 아니라 이번 로그인 세션에도 즉시 반영돼야 한다.
+            // 이전 account 객체를 그대로 쓰면 중국어를 선택해도 세션은 기존 ko/en 상태라
+            // 1:1 채팅이 입력 원문을 번역하지 않고 전송하게 된다.
+            // 방금 조회한 계정의 소속/권한은 그대로 유지되므로 재조회 없이 언어만 갱신한다.
+            // 이 방식은 빠른 로그인 흐름의 불필요한 DB 왕복도 제거한다.
+            account = new UserAccount(
+                account.id(),
+                account.email(),
+                account.displayName(),
+                resolvedLanguage,
+                account.accountStatus(),
+                account.passwordHash(),
+                account.roles(),
+                account.siteIds()
+            );
         }
         audit.record(account.id(), requestedSiteId, "auth.worker_quick_login", "user", String.valueOf(account.id()), "ALLOWED", "quick_login", Map.of("ip", ipAddress));
         return new WorkerQuickLoginSuccess(account.toPrincipal());

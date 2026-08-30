@@ -236,7 +236,7 @@ export default function WorkerVisionPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
                         </svg>
                     </button>
-                    <span className="text-base font-black tracking-tight text-[#063789]">SQ-LINK</span>
+                    <span className="text-base font-black tracking-tight text-[#063789]">SQ LINK</span>
                 </header>
 
                 <div className="admin-concept-hero relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
@@ -246,7 +246,7 @@ export default function WorkerVisionPage() {
                     </picture>
                     <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
                     <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
-                        <p className="text-[10px] font-black tracking-[.18em] text-purple-200">SQ-LINK VISION</p>
+                        <p className="text-[10px] font-black tracking-[.18em] text-purple-200">SQ LINK VISION</p>
                         <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
                         <p className="mt-2 text-sm font-bold text-slate-100">{t.subtitle}</p>
                     </div>

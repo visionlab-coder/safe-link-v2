@@ -40,7 +40,7 @@ export default function VisualizationScreenLayout({ visual, operator, action, ch
     <section className={`bg-[#f5f8fb] text-[#111827] ${className}`}>
       <header className="concept-page-header">
         <BrandLogo compact imageClassName="!w-[88px] max-w-none max-sm:!w-[78px]" />
-        <span className="text-xs font-black text-[#063789]">SQ-LINK</span>
+        <span className="text-xs font-black text-[#063789]">SQ LINK</span>
         <span className="text-[10px] font-bold text-[#526076] max-sm:hidden">{operator ?? t.operator}</span>
       </header>
 

@@ -40,8 +40,8 @@ const T: Record<string, Record<string, string>> = {
     next: "다음 →", prev: "← 이전",
     rememberMe: "이 기기에서 자동 로그인",
     rememberDesc: "다음부터 앱 실행 시 자동으로 로그인됩니다",
-    completeTitle: "등록 완료!", completeDesc: "이제 SAFE-LINK를 사용할 준비가 되었습니다.",
-    startBtn: "SAFE-LINK 시작하기", adminAccountWorker: "관리자 권한 계정은 근로자 역할을 선택할 수 없습니다.", romanizing: "영문 이름을 자동 변환 중입니다...", saveFailed: "프로필 저장에 실패했습니다. 잠시 후 다시 시도해주세요.",
+    completeTitle: "등록 완료!", completeDesc: "이제 SQ LINK를 사용할 준비가 되었습니다.",
+    startBtn: "SQ LINK 시작하기", adminAccountWorker: "관리자 권한 계정은 근로자 역할을 선택할 수 없습니다.", romanizing: "영문 이름을 자동 변환 중입니다...", saveFailed: "프로필 저장에 실패했습니다. 잠시 후 다시 시도해주세요.",
   },
   en: {
     pgTitle: "Profile Setup", editTitle: "Profile Settings",
@@ -63,8 +63,8 @@ const T: Record<string, Record<string, string>> = {
     next: "Next →", prev: "← Back",
     rememberMe: "Auto-login on this device",
     rememberDesc: "Will log in automatically next time you open the app",
-    completeTitle: "Setup Complete!", completeDesc: "You are ready to use SAFE-LINK.",
-    startBtn: "Start SAFE-LINK", adminAccountWorker: "An administrator account cannot select the worker role.", romanizing: "Converting the name to Roman letters...", saveFailed: "We could not save the profile. Please try again shortly.",
+    completeTitle: "Setup Complete!", completeDesc: "You are ready to use SQ LINK.",
+    startBtn: "Start SQ LINK", adminAccountWorker: "An administrator account cannot select the worker role.", romanizing: "Converting the name to Roman letters...", saveFailed: "We could not save the profile. Please try again shortly.",
   },
   vi: {
     pgTitle: "Đăng ký thông tin", editTitle: "Cài đặt hồ sơ",
@@ -86,8 +86,8 @@ const T: Record<string, Record<string, string>> = {
     next: "Tiếp theo →", prev: "← Quay lại",
     rememberMe: "Tự động đăng nhập trên thiết bị này",
     rememberDesc: "Lần sau sẽ tự động đăng nhập khi mở ứng dụng",
-    completeTitle: "Hoàn thành!", completeDesc: "Bạn đã sẵn sàng sử dụng SAFE-LINK.",
-    startBtn: "Bắt đầu SAFE-LINK", adminAccountWorker: "Tài khoản quản trị không thể chọn vai trò công nhân.", romanizing: "Đang chuyển tên sang chữ La-tinh...", saveFailed: "Không thể lưu hồ sơ. Vui lòng thử lại sau.",
+    completeTitle: "Hoàn thành!", completeDesc: "Bạn đã sẵn sàng sử dụng SQ LINK.",
+    startBtn: "Bắt đầu SQ LINK", adminAccountWorker: "Tài khoản quản trị không thể chọn vai trò công nhân.", romanizing: "Đang chuyển tên sang chữ La-tinh...", saveFailed: "Không thể lưu hồ sơ. Vui lòng thử lại sau.",
   },
   zh: {
     pgTitle: "注册基本信息", editTitle: "个人资料设置",
@@ -109,8 +109,8 @@ const T: Record<string, Record<string, string>> = {
     next: "下一步 →", prev: "← 返回",
     rememberMe: "在此设备上自动登录",
     rememberDesc: "下次打开应用时将自动登录",
-    completeTitle: "注册完成！", completeDesc: "您已准备好使用SAFE-LINK。",
-    startBtn: "开始使用SAFE-LINK", adminAccountWorker: "管理员账户不能选择工人角色。", romanizing: "正在转换英文姓名...", saveFailed: "无法保存个人资料，请稍后重试。",
+    completeTitle: "注册完成！", completeDesc: "您已准备好使用SQ LINK。",
+    startBtn: "开始使用SQ LINK", adminAccountWorker: "管理员账户不能选择工人角色。", romanizing: "正在转换英文姓名...", saveFailed: "无法保存个人资料，请稍后重试。",
   },
   th: {
     pgTitle: "ลงทะเบียนข้อมูล", editTitle: "ตั้งค่าโปรไฟล์",
@@ -132,8 +132,8 @@ const T: Record<string, Record<string, string>> = {
     next: "ถัดไป →", prev: "← ย้อนกลับ",
     rememberMe: "เข้าสู่ระบบอัตโนมัติ",
     rememberDesc: "ครั้งถัดไปจะเข้าสู่ระบบโดยอัตโนมัติ",
-    completeTitle: "ลงทะเบียนเสร็จสิ้น!", completeDesc: "คุณพร้อมใช้งาน SAFE-LINK แล้ว",
-    startBtn: "เริ่มใช้งาน SAFE-LINK", adminAccountWorker: "บัญชีผู้ดูแลไม่สามารถเลือกบทบาทคนงานได้", romanizing: "กำลังแปลงชื่อเป็นอักษรโรมัน...", saveFailed: "ไม่สามารถบันทึกโปรไฟล์ได้ โปรดลองอีกครั้งภายหลัง",
+    completeTitle: "ลงทะเบียนเสร็จสิ้น!", completeDesc: "คุณพร้อมใช้งาน SQ LINK แล้ว",
+    startBtn: "เริ่มใช้งาน SQ LINK", adminAccountWorker: "บัญชีผู้ดูแลไม่สามารถเลือกบทบาทคนงานได้", romanizing: "กำลังแปลงชื่อเป็นอักษรโรมัน...", saveFailed: "ไม่สามารถบันทึกโปรไฟล์ได้ โปรดลองอีกครั้งภายหลัง",
   },
   ru: {
     pgTitle: "Регистрация данных", editTitle: "Настройка профиля",
@@ -155,8 +155,8 @@ const T: Record<string, Record<string, string>> = {
     next: "Далее →", prev: "← Назад",
     rememberMe: "Автовход на этом устройстве",
     rememberDesc: "При следующем запуске вход будет выполнен автоматически",
-    completeTitle: "Регистрация завершена!", completeDesc: "Всё готово к использованию SAFE-LINK.",
-    startBtn: "Открыть SAFE-LINK", adminAccountWorker: "Учётная запись администратора не может выбрать роль работника.", romanizing: "Имя преобразуется в латиницу...", saveFailed: "Не удалось сохранить профиль. Повторите попытку позже.",
+    completeTitle: "Регистрация завершена!", completeDesc: "Всё готово к использованию SQ LINK.",
+    startBtn: "Открыть SQ LINK", adminAccountWorker: "Учётная запись администратора не может выбрать роль работника.", romanizing: "Имя преобразуется в латиницу...", saveFailed: "Не удалось сохранить профиль. Повторите попытку позже.",
   },
 };
 const getT = (lang: string) => T[lang] || T.en;
@@ -500,7 +500,7 @@ function SetupContent() {
       <div className="relative z-10 w-full max-w-[380px]">
         <div className="mb-5 text-center">
           <h1 className="text-[28px] font-black leading-none tracking-tighter text-[#172033]">
-            SAFE<span style={{ color:"#2563EB" }}>-LINK</span>
+            SQ<span style={{ color:"#2563EB" }}> LINK</span>
           </h1>
           <p className="mt-1 text-[9px] uppercase tracking-[0.4em] text-slate-500">
             {isEditMode ? t.editTitle : t.pgTitle}

@@ -33,7 +33,7 @@ export default function SystemHealthCheck({ lang = "ko" }: { lang?: string }) {
         delayed: auth.adminDesc,
         services: {
             postgresql: "PostgreSQL", google_translate: "AI", google_tts: "TTS",
-            google_stt: "STT", openai: "OpenAI", naver_papago: "Papago", realtime: "SQ-LINK",
+            google_stt: "STT", openai: "OpenAI", naver_papago: "Papago", realtime: "SQ LINK",
         },
     };
     const t = { ...fallback, ...(HEALTH_UI[lang] ?? {}) };

@@ -194,7 +194,7 @@ export default function AdminIncentivePage() {
             </picture>
             <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
             <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
-              <p className="text-[10px] font-black tracking-[.18em] text-yellow-200">SQ-LINK INCENTIVE</p>
+              <p className="text-[10px] font-black tracking-[.18em] text-yellow-200">SQ LINK INCENTIVE</p>
               <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
               <p className="mt-2 text-sm font-bold text-slate-100">{t.desc}</p>
             </div>

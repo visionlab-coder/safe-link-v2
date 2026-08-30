@@ -60,7 +60,18 @@ public class AiMediaService {
             AudioResult openAi = tryCall(() -> synthesizeOpenAi(text, gender));
             if (openAi != null && !openAi.audioBase64().isBlank()) return openAi;
         }
-        return synthesizeGoogle(text, voiceLanguageCode, voiceName, gender, encoding);
+        try {
+            return synthesizeGoogle(text, voiceLanguageCode, voiceName, gender, encoding);
+        } catch (ServiceUnavailableException googleFailure) {
+            // Google Cloud TTS가 API 비활성화·키 제한·일시 장애로 실패해도
+            // 설정된 OpenAI 음성으로 한 번 더 시도한다. 중국어 등 Google 우선 언어도
+            // 이 경로를 타므로 앱/웹에서 무음으로 끝나지 않는다.
+            if ("MP3".equals(encoding) && configured(properties.getOpenAiApiKey())) {
+                AudioResult openAi = tryCall(() -> synthesizeOpenAi(text, gender));
+                if (openAi != null && !openAi.audioBase64().isBlank()) return openAi;
+            }
+            throw googleFailure;
+        }
     }
 
     private SttResult transcribeOpenAi(String audio, String mimeType, String languageCode, String prompt) {

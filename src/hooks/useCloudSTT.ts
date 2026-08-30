@@ -49,6 +49,8 @@ interface UseCloudSTTOptions {
     silenceDuration?: number;
     /** 실시간 통역 모드: latest_long 모델 + 서버 용어집 정규화 */
     live?: boolean;
+    /** 1:1 채팅은 TBM 예시 문구를 STT 프롬프트로 전달하지 않는다. */
+    context?: "chat" | "safety";
 }
 
 /** 노이즈 환경(건설 현장)에 최적화된 오디오 제약조건 */
@@ -60,7 +62,6 @@ const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
     sampleRate: { ideal: 48000 },
 };
 
-const FETCH_TIMEOUT = 8_000;
 // 짧은 인사말도 버리지 않는다. 일부 Android 기기는 1~2초 Opus 청크가 2KB 미만이다.
 const MIN_CHUNK_SIZE = 400;
 const MAX_EMPTY_STREAK = 2;
@@ -76,6 +77,7 @@ export function useCloudSTT({
     chunkInterval = 10_000,
     silenceDuration = 2000,
     live = false,
+    context = "safety",
 }: UseCloudSTTOptions) {
     const [isRecording, setIsRecording] = useState(false);
     const [audioLevel, setAudioLevel] = useState(0);
@@ -93,6 +95,7 @@ export function useCloudSTT({
     const silenceDurationRef = useRef(silenceDuration);
     const chunkIntervalRef   = useRef(chunkInterval);
     const liveRef            = useRef(live);
+    const contextRef         = useRef(context);
 
     // VAD (Voice Activity Detection) refs
     const audioCtxRef = useRef<AudioContext | null>(null);
@@ -109,6 +112,7 @@ export function useCloudSTT({
     useEffect(() => { silenceDurationRef.current = silenceDuration; }, [silenceDuration]);
     useEffect(() => { chunkIntervalRef.current = chunkInterval; }, [chunkInterval]);
     useEffect(() => { liveRef.current = live; }, [live]);
+    useEffect(() => { contextRef.current = context; }, [context]);
 
     const stopVAD = useCallback(() => {
         if (vadFrameRef.current) { cancelAnimationFrame(vadFrameRef.current); vadFrameRef.current = null; }
@@ -191,9 +195,6 @@ export function useCloudSTT({
             return;
         }
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-
         try {
             const base64 = await blobToBase64(blob);
             if (!base64) return;
@@ -209,8 +210,8 @@ export function useCloudSTT({
                         ? { sampleRateHertz: Math.round(sampleRateHertz) }
                         : {}),
                     ...(liveRef.current && { live: true }),
+                    context: contextRef.current,
                 }),
-                signal: controller.signal,
             });
 
             const data = await res.json();
@@ -237,13 +238,11 @@ export function useCloudSTT({
                 }
             }
         } catch (e: unknown) {
-            if (e instanceof DOMException && e.name === "AbortError") {
-                onErrorRef.current?.("network", "네트워크가 불안정합니다. 재시도 중...");
-            } else {
-                console.error("[Cloud STT] Error:", e);
-            }
-        } finally {
-            clearTimeout(timeoutId);
+            console.error("[Cloud STT] Error:", e);
+            onErrorRef.current?.(
+                "network",
+                "음성 인식 서버에 연결하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.",
+            );
         }
     }, []);
 

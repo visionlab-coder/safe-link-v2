@@ -8,8 +8,6 @@ import RoleGuard from "@/components/RoleGuard";
 import { Users, QrCode } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { playPremiumAudio } from "@/utils/tts";
-import { playNotificationSound } from "@/utils/notifications";
-import { formalizeKo } from "@/utils/politeness";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
 import { usePresence } from "@/hooks/usePresence";
 import ChatPlayButton from "@/components/ChatPlayButton";
@@ -299,9 +297,10 @@ function WorkerChatContent() {
 
     const playAudio = (messageId: string, text: string, langCode: string) => {
         const currentGender = voiceGenderRef.current;
-        setPlayingMessageId(messageId);
         playPremiumAudio(text, langCode, currentGender, () => {
             setPlayingMessageId(current => current === messageId ? null : current);
+        }, () => {
+            setPlayingMessageId(messageId);
         });
     };
 
@@ -384,11 +383,6 @@ function WorkerChatContent() {
             const hasNewLatestMessage = Boolean(latest?.id && latest.id !== latestMessageIdRef.current);
             latestMessageIdRef.current = latest?.id ?? null;
             if (latest) recordAdminActivity(activeAdmin.id, latest.created_at);
-            const newIncoming = sorted.filter((m) =>
-                m.from_user === activeAdmin.id &&
-                m.to_user === myId &&
-                !processedAudioIds.current.has(m.id)
-            );
             setMessages(sorted);
             setHasMore(sorted.length >= MSG_PAGE_SIZE);
             sorted.forEach(m => processedAudioIds.current.add(m.id));
@@ -410,12 +404,6 @@ function WorkerChatContent() {
             }
             if (scroll || hasNewLatestMessage) {
                 revealLatestMessage();
-            }
-            if (!scroll && newIncoming.length > 0) {
-                playNotificationSound();
-                if (typeof navigator !== "undefined" && navigator.vibrate) {
-                    navigator.vibrate([300, 100, 300]);
-                }
             }
         };
         void fetchMessages();
@@ -464,10 +452,6 @@ function WorkerChatContent() {
                 if (incoming.length === 0) continue;
                 incoming.forEach((msg) => unreadAdminSeenRef.current.add(msg.id));
                 setUnreadAdmins(prev => ({ ...prev, [admin.id]: (prev[admin.id] || 0) + incoming.length }));
-                playNotificationSound();
-                if (typeof navigator !== "undefined" && navigator.vibrate) {
-                    navigator.vibrate([300, 100, 300]);
-                }
             }
         };
         void pollUnread();
@@ -512,11 +496,13 @@ function WorkerChatContent() {
                     const transRes = await fetch('/api/translate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: originalText, sl: lang, tl: 'ko' })
+                        body: JSON.stringify({ text: originalText, sl: lang, tl: 'ko', fast: true, pronunciation: false })
                     });
                     if (transRes.ok) {
                         const transData = await transRes.json() as { translated?: string; pronunciation?: string; reverse_translated?: string };
-                        translated = formalizeKo(transData.translated || originalText);
+                        // 1:1 대화 번역은 발신자가 입력한 의미를 그대로 보존한다.
+                        // TBM용 문장 보정은 일반 대화에 적용하지 않는다.
+                        translated = transData.translated || originalText;
                         pron = transData.pronunciation || "";
                         rev = transData.reverse_translated || "";
                     }
@@ -566,6 +552,7 @@ function WorkerChatContent() {
         onError: (_type, message) => setSttError(message),
         chunkInterval: 4000,   // 4s max — 채팅은 짧은 발화, 10s 대기 불필요
         silenceDuration: 1200, // 1.2s 침묵 = 대화형 자연 휴지
+        context: "chat",
     });
 
     const t = getUI(lang);
@@ -660,9 +647,9 @@ function WorkerChatContent() {
                                     <button
                                         key={a.id}
                                         onClick={() => { setActiveAdmin(a); setShowSidebar(false); }}
-                                        className={`flex items-center gap-4 p-4 rounded-3xl transition-all border ${activeAdmin?.id === a.id ? 'bg-blue-600 border-blue-700 text-white shadow-lg' : 'bg-slate-50 border-slate-100 hover:bg-slate-100 text-slate-700'}`}
+                                        className={`flex items-center gap-4 p-4 rounded-3xl transition-all border ${activeAdmin?.id === a.id ? 'bg-blue-100 border-blue-200 text-slate-900 shadow-lg' : 'bg-slate-50 border-slate-100 hover:bg-slate-100 text-slate-700'}`}
                                     >
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-xs shrink-0 relative ${onlineUsers.has(a.id) ? 'bg-white/20 ring-2 ring-green-400/60' : 'bg-white/20'}`}>
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-xs shrink-0 relative ${activeAdmin?.id === a.id ? 'bg-blue-200' : 'bg-white/20'} ${onlineUsers.has(a.id) ? 'ring-2 ring-green-400/60' : ''}`}>
                                             {a.display_name[0]}
                                             {onlineUsers.has(a.id) && (
                                                 <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
@@ -734,7 +721,7 @@ function WorkerChatContent() {
                                                                 }
                                                             }} disabled={!voiceEnabled} playing={playingMessageId === m.id} />
                                                     </div>
-                                                    <div className={`p-5 rounded-[32px] shadow-lg border-2 flex flex-col gap-3 ${isMe ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
+                                                    <div className={`p-5 rounded-[32px] shadow-lg border-2 flex flex-col gap-3 ${isMe ? 'bg-blue-100 border-blue-200 rounded-tr-sm text-slate-900' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
 
                                                         {isMe ? (
                                                             // ── 내가 보낸 메시지: 원문(내 언어) + 하단에 한국어 번역 ──
@@ -742,12 +729,12 @@ function WorkerChatContent() {
                                                                 <div className="flex flex-col gap-1">
                                                                     <p className="font-black text-2xl md:text-3xl leading-snug whitespace-pre-wrap">{m.source_text}</p>
                                                                     {m.is_read === false && (
-                                                                        <span className="text-[10px] font-black text-amber-300 self-end mr-2 leading-none">1</span>
+                                                                        <span className="text-[11px] font-black text-blue-700 self-end mr-2 leading-none">1</span>
                                                                     )}
                                                                 </div>
                                                                 {parsed.text && parsed.text !== m.source_text && (
-                                                                    <div className="pt-3 border-t border-blue-400/50 flex items-start gap-1.5">
-                                                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">{t.translation || "Translation"}</span>
+                                                                    <div className="pt-3 border-t border-blue-200 flex items-start gap-1.5">
+                                                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-blue-200 text-blue-800 shrink-0 mt-0.5 font-black">{t.translation || "Translation"}</span>
                                                                         <span className="font-bold text-lg">{parsed.text}</span>
                                                                     </div>
                                                                 )}

@@ -50,10 +50,10 @@ export default function GuideIncentivePage() {
             <button onClick={() => router.back()} className="p-2 text-gray-500 hover:text-white transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <span className="font-black tracking-tight text-[#063789]">SQ-LINK</span>
+            <span className="font-black tracking-tight text-[#063789]">SQ LINK</span>
           </div>
 
-          <ResponsiveFeatureHero visual={{ ...visualizationSpecs.education, eyebrow: "SQ-LINK GUIDE · CLAIM 12", title: t.heroTitle, description: t.heroDesc }} />
+          <ResponsiveFeatureHero visual={{ ...visualizationSpecs.education, eyebrow: "SQ LINK GUIDE · CLAIM 12", title: t.heroTitle, description: t.heroDesc }} />
 
           <div className="bg-yellow-900/20 border border-yellow-800/40 rounded-xl p-4 mb-6 mt-4">
             <p className="text-sm text-yellow-300 leading-relaxed">

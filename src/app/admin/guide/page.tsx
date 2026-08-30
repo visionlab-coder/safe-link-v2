@@ -45,7 +45,7 @@ const GUIDE_META = [
 
 const GUIDE_UI: Record<string, GuideCopy> = {
   ko: {
-    heroEyebrow: "SQ-LINK GUIDE", heroTitle: "기능 사용 가이드", heroDescription: "처음 담당하는 직원을 위한 단계별 안내", contact: "문의", contactPerson: "미래전략TF 김무빈 차장",
+    heroEyebrow: "SQ LINK GUIDE", heroTitle: "기능 사용 가이드", heroDescription: "처음 담당하는 직원을 위한 단계별 안내", contact: "문의", contactPerson: "미래전략TF 김무빈 차장",
     guides: [
       { ...GUIDE_META[0], title: "NFC 근로자 관리", desc: "근로자 등록 → NFC 스티커 발급 → TBM 참석 인증", steps: ["근로자 정보 등록", "NFC 스티커 기록·부착", "TBM 세션 개설 및 태그"], badge: "청구항 1-5" },
       { ...GUIDE_META[1], title: "안전장비 인센티브", desc: "퀴즈 80점↑ 근로자에게 안전장비 지급 및 이력 기록", steps: ["퀴즈 세션 선택", "점수별 대상자 확인", "장비 유형 선택 후 지급 확정"], badge: "청구항 12" },
@@ -53,7 +53,7 @@ const GUIDE_UI: Record<string, GuideCopy> = {
     ],
   },
   en: {
-    heroEyebrow: "SQ-LINK GUIDE", heroTitle: "Feature Guide", heroDescription: "Step-by-step guidance for new operators", contact: "Contact", contactPerson: "Future Strategy TF · Deputy General Manager Kim Mu-bin",
+    heroEyebrow: "SQ LINK GUIDE", heroTitle: "Feature Guide", heroDescription: "Step-by-step guidance for new operators", contact: "Contact", contactPerson: "Future Strategy TF · Deputy General Manager Kim Mu-bin",
     guides: [
       { ...GUIDE_META[0], title: "NFC Worker Management", desc: "Register worker → issue NFC tag → verify TBM attendance", steps: ["Register worker details", "Write and attach NFC tag", "Create a TBM session and tag in"], badge: "Claims 1–5" },
       { ...GUIDE_META[1], title: "Safety Equipment Incentives", desc: "Issue safety equipment to workers scoring 80+ on quizzes and keep records", steps: ["Select a quiz session", "Review eligible workers by score", "Choose equipment and confirm issue"], badge: "Claim 12" },
@@ -61,7 +61,7 @@ const GUIDE_UI: Record<string, GuideCopy> = {
     ],
   },
   zh: {
-    heroEyebrow: "SQ-LINK 指南", heroTitle: "功能使用指南", heroDescription: "为新负责人提供分步说明", contact: "咨询", contactPerson: "未来战略 TF · 金武彬副总经理",
+    heroEyebrow: "SQ LINK 指南", heroTitle: "功能使用指南", heroDescription: "为新负责人提供分步说明", contact: "咨询", contactPerson: "未来战略 TF · 金武彬副总经理",
     guides: [
       { ...GUIDE_META[0], title: "NFC 工人管理", desc: "登记工人 → 发放 NFC 标签 → 认证 TBM 出席", steps: ["登记工人信息", "写入并粘贴 NFC 标签", "创建 TBM 会话并刷卡"], badge: "权利要求 1–5" },
       { ...GUIDE_META[1], title: "安全设备激励", desc: "向测验得分 80 分以上的工人发放安全设备并记录历史", steps: ["选择测验会话", "按分数确认对象", "选择设备类型并确认发放"], badge: "权利要求 12" },
@@ -69,7 +69,7 @@ const GUIDE_UI: Record<string, GuideCopy> = {
     ],
   },
   vi: {
-    heroEyebrow: "HƯỚNG DẪN SQ-LINK", heroTitle: "Hướng dẫn sử dụng", heroDescription: "Hướng dẫn từng bước cho người phụ trách mới", contact: "Liên hệ", contactPerson: "Nhóm chiến lược tương lai · Phó giám đốc Kim Mu-bin",
+    heroEyebrow: "HƯỚNG DẪN SQ LINK", heroTitle: "Hướng dẫn sử dụng", heroDescription: "Hướng dẫn từng bước cho người phụ trách mới", contact: "Liên hệ", contactPerson: "Nhóm chiến lược tương lai · Phó giám đốc Kim Mu-bin",
     guides: [
       { ...GUIDE_META[0], title: "Quản lý công nhân NFC", desc: "Đăng ký công nhân → cấp thẻ NFC → xác nhận tham gia TBM", steps: ["Đăng ký thông tin công nhân", "Ghi và dán thẻ NFC", "Tạo phiên TBM và quét thẻ"], badge: "Yêu cầu 1–5" },
       { ...GUIDE_META[1], title: "Khuyến khích thiết bị an toàn", desc: "Cấp thiết bị an toàn và lưu lịch sử cho người đạt từ 80 điểm", steps: ["Chọn phiên câu đố", "Kiểm tra đối tượng theo điểm", "Chọn thiết bị và xác nhận cấp"], badge: "Yêu cầu 12" },
@@ -77,7 +77,7 @@ const GUIDE_UI: Record<string, GuideCopy> = {
     ],
   },
   ru: {
-    heroEyebrow: "РУКОВОДСТВО SQ-LINK", heroTitle: "Руководство по функциям", heroDescription: "Пошаговая инструкция для новых ответственных сотрудников", contact: "Контакты", contactPerson: "Группа стратегии будущего · заместитель генерального директора Ким Му-бин",
+    heroEyebrow: "РУКОВОДСТВО SQ LINK", heroTitle: "Руководство по функциям", heroDescription: "Пошаговая инструкция для новых ответственных сотрудников", contact: "Контакты", contactPerson: "Группа стратегии будущего · заместитель генерального директора Ким Му-бин",
     guides: [
       { ...GUIDE_META[0], title: "Управление работниками NFC", desc: "Регистрация работника → выдача NFC-метки → подтверждение участия в TBM", steps: ["Зарегистрировать данные работника", "Записать и прикрепить NFC-метку", "Создать сессию TBM и отметить метку"], badge: "Пункты 1–5" },
       { ...GUIDE_META[1], title: "Поощрение средствами защиты", desc: "Выдавайте средства защиты работникам с результатом теста от 80 баллов", steps: ["Выбрать сессию теста", "Проверить получателей по баллам", "Выбрать оборудование и подтвердить выдачу"], badge: "Пункт 12" },
@@ -105,7 +105,7 @@ export default function AdminGuidePage() {
             <button onClick={() => router.back()} className="p-2 text-gray-500 hover:text-white transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <span className="font-black tracking-tight text-[#063789]">SQ-LINK</span>
+            <span className="font-black tracking-tight text-[#063789]">SQ LINK</span>
           </div>
 
           <div className="mb-6">

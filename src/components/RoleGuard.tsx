@@ -144,7 +144,7 @@ export default function RoleGuard({
                     <div className="h-10 w-10 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin" />
                 </div>
                 <p className="font-black tracking-tight text-[#172033]">{ROLE_GUARD_MESSAGE[language] ?? getAuthT(language).adminDesc}</p>
-                <p className="mt-2 text-xs font-bold tracking-widest text-slate-500">SQ-LINK</p>
+                <p className="mt-2 text-xs font-bold tracking-widest text-slate-500">SQ LINK</p>
             </div>
         );
     }

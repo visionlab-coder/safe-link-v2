@@ -269,7 +269,7 @@ export default function QRDistributionPage() {
                         >
                             <ArrowLeft className="w-6 h-6" />
                         </button>
-                        <span className="text-base font-black tracking-tight text-[#063789]">SQ-LINK</span>
+                        <span className="text-base font-black tracking-tight text-[#063789]">SQ LINK</span>
                     </header>
 
                     <div className="admin-concept-hero relative h-44 w-full overflow-hidden rounded-[36px] border border-white/10 shadow-2xl">
@@ -279,7 +279,7 @@ export default function QRDistributionPage() {
                         </picture>
                         <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
                         <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
-                            <p className="text-[10px] font-black tracking-[.18em] text-blue-200">SQ-LINK ACCESS</p>
+                            <p className="text-[10px] font-black tracking-[.18em] text-blue-200">SQ LINK ACCESS</p>
                             <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
                             <p className="mt-2 text-sm font-bold text-slate-100">{t.desc}</p>
                         </div>

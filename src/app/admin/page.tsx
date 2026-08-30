@@ -188,9 +188,9 @@ function getLocalizedAdminFallback(lang: string) {
         systemManagement: auth.adminRole,
         integratedControl: auth.adminTitle,
         accountMenu: auth.adminRole,
-        fieldUnit: "SQ-LINK",
-        authenticating: "SQ-LINK",
-        hero: { eyebrow: "SQ-LINK", title: auth.adminTitle, description: auth.adminDesc, metrics: [auth.workerRole, "TBM", auth.adminRole], steps: [[auth.workerRole, auth.workerRoleDesc], ["TBM", auth.adminDesc], [auth.adminRole, auth.chooseRoleDesc]] },
+        fieldUnit: "SQ LINK",
+        authenticating: "SQ LINK",
+        hero: { eyebrow: "SQ LINK", title: auth.adminTitle, description: auth.adminDesc, metrics: [auth.workerRole, "TBM", auth.adminRole], steps: [[auth.workerRole, auth.workerRoleDesc], ["TBM", auth.adminDesc], [auth.adminRole, auth.chooseRoleDesc]] },
         roleLabel: { HQ_ADMIN: auth.adminRole, SAFETY_OFFICER: auth.adminRole, WORKER: auth.workerRole },
         greeting: (name: string) => `${name}`,
     };
@@ -341,7 +341,7 @@ function AdminDashboardContent() {
                                 className="h-auto w-[112px] object-contain sm:w-[132px]"
                             />
                             <div className="hidden h-8 w-px bg-slate-200 lg:block" />
-                            <span className="hidden whitespace-nowrap text-sm font-black tracking-tight text-[#063789] lg:block">SQ-LINK</span>
+                            <span className="hidden whitespace-nowrap text-sm font-black tracking-tight text-[#063789] lg:block">SQ LINK</span>
                         </div>
 
                         <div className="order-3 col-span-2 flex min-w-0 flex-wrap items-center gap-2 border-t border-slate-100 pt-3 lg:order-none lg:col-span-1 lg:border-0 lg:pt-0">
@@ -816,7 +816,7 @@ export default function AdminDashboard() {
                     <div className="h-10 w-10 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin" />
                 </div>
                 <p className="font-black tracking-tight text-[#172033]">관리자 화면을 준비하고 있습니다...</p>
-                <p className="mt-2 text-xs font-bold tracking-widest text-slate-500">SAFE-LINK FIELD CONSOLE</p>
+                <p className="mt-2 text-xs font-bold tracking-widest text-slate-500">SQ LINK FIELD CONSOLE</p>
             </div>
         }>
             <AdminDashboardContent />

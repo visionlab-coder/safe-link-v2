@@ -202,7 +202,7 @@ export default function AdminNfcHubPage() {
       <main className="visualization-light min-h-screen p-6">
         <section className="max-w-2xl mx-auto">
           <div className="concept-page-header">
-            <span className="font-black tracking-tight text-[#063789]">SQ-LINK</span>
+            <span className="font-black tracking-tight text-[#063789]">SQ LINK</span>
           </div>
           <div className="mb-8">
             <div className="admin-concept-hero relative rounded-2xl overflow-hidden h-40 w-full mt-4">
@@ -212,7 +212,7 @@ export default function AdminNfcHubPage() {
               </picture>
               <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
               <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
-                <p className="text-[10px] font-black tracking-[.18em] text-green-200">SQ-LINK NFC</p>
+                <p className="text-[10px] font-black tracking-[.18em] text-green-200">SQ LINK NFC</p>
                 <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title as string}</h1>
                 <p className="mt-2 text-sm font-bold text-slate-100">{t.desc as string}</p>
               </div>

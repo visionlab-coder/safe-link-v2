@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { getCookieUser } from "@/utils/auth/cookie-user";
 import { checkTtsLimit } from "@/utils/rate-limit";
 import { callV3AiTts } from "@/utils/ai/v3-ai-gateway";
+import { stripForSpeech } from "@/utils/tts";
 
 // Google Standard 전용 언어 — OpenAI tts-1-hd로 업그레이드 (Neural2 동급 품질)
 const OPENAI_TTS_LANGS = new Set(['uz', 'ne', 'km', 'my', 'mn', 'kk']);
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
         return new Response("RATE_LIMITED", { status: 429 });
     }
 
-    const text = request.nextUrl.searchParams.get('text') ?? '';
+    const text = stripForSpeech(request.nextUrl.searchParams.get('text') ?? '');
     const lang = request.nextUrl.searchParams.get('lang') ?? 'ko';
     const gender = request.nextUrl.searchParams.get('gender') ?? 'female';
     if (!text) return new Response('Missing text', { status: 400 });

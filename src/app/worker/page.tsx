@@ -547,7 +547,7 @@ const getUI = (lang: string) => ({ ...getWorkerFallback(lang), ...(workerUI[lang
 function getWorkerCommon(lang: string) {
     const auth = getAuthT(lang);
     const fallback = {
-        profile: auth.name, connecting: "SQ-LINK", safetyHome: auth.workerTitle,
+        profile: auth.name, connecting: "SQ LINK", safetyHome: auth.workerTitle,
         todayTitle: auth.chooseRole, todayDesc: auth.workerDesc, step1: auth.doEnter,
         step2: auth.doEnter, step3: auth.doEnter, helperTitle: auth.chooseRole,
         logoutFailed: auth.adminDesc, pledgeTitle: "TBM", pledgeDesc: auth.workerRoleDesc,
@@ -568,9 +568,6 @@ function WorkerHomeContent() {
     const [profile, setProfile] = useState<any>(null);
     const [hasNewTBM, setHasNewTBM] = useState(false);
     const [newTBMTime, setNewTBMTime] = useState<string>("");
-
-    // 신규 채팅 알림 관련 상태
-    const [newChatTime] = useState<string>("");
 
     const [showStopWorkModal, setShowStopWorkModal] = useState(false);
     const [stopWorkReason, setStopWorkReason] = useState("");
@@ -754,7 +751,7 @@ function WorkerHomeContent() {
                                 unoptimized
                                 className="h-auto w-[104px] shrink-0 object-contain sm:w-[124px]"
                             />
-                            <span className="hidden text-sm font-black tracking-tight text-[#063789] md:block">SQ-LINK</span>
+                            <span className="hidden text-sm font-black tracking-tight text-[#063789] md:block">SQ LINK</span>
                             <div className="flex items-center gap-1 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-full">
                                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                                 <span className="text-[10px] text-green-400 font-black tracking-widest leading-none">LIVE</span>
@@ -796,7 +793,7 @@ function WorkerHomeContent() {
                     </picture>
                     <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
                     <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
-                        <p className="text-[10px] font-black tracking-[.18em] text-green-200">SQ-LINK FIELD SAFETY</p>
+                        <p className="text-[10px] font-black tracking-[.18em] text-green-200">SQ LINK FIELD SAFETY</p>
                         <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">
                             {common.safetyHome}
                         </h1>
@@ -918,32 +915,6 @@ function WorkerHomeContent() {
                         </div>
                     </div>
                 )}
-                {/* 💬 신규 채팅 알림 (강제 팝업 형태) */}
-                {newChatCount > 0 && (
-                    <div
-                        className="relative overflow-hidden p-8 bg-blue-600/90 backdrop-blur-md rounded-[40px] border-blue-400 border-2 shadow-[0_0_60px_-15px_rgba(59,130,246,0.8)] cursor-pointer tap-effect animate-float z-50 transform transition-all hover:scale-[1.02]"
-                        onClick={() => router.push("/worker/chat")}
-                    >
-                        <div className="flex items-center gap-6 relative z-10">
-                            <div className="w-16 h-16 bg-white/20 rounded-3xl flex items-center justify-center text-white relative shadow-inner">
-                                <div className="absolute inset-0 bg-white rounded-3xl animate-ping opacity-30" />
-                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                                </svg>
-                            </div>
-                            <div className="flex-1">
-                                <h2 className="text-2xl font-bold text-white tracking-tight leading-none mb-1">{t.newChat}</h2>
-                                <p className="text-blue-100/80 font-bold text-sm">Requested at {newChatTime}</p>
-                            </div>
-                            <div className="w-12 h-12 bg-white text-blue-600 rounded-full flex items-center justify-center shadow-lg hover:bg-blue-50 transition-colors">
-                                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M5 3l14 9-14 9V3z" />
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
                 {/* 🎯 Daily TBM (The Main Mission) */}
                 <section className="glass rounded-[36px] p-6 md:p-8 border-white/10 shadow-3xl relative overflow-hidden flex flex-col gap-6">
                     <div className="absolute top-0 right-0 w-40 h-40 bg-green-500/10 blur-[70px] rounded-full -mr-20 -mt-20 pointer-events-none" />

@@ -30,6 +30,7 @@ function normalizeServerSide(text: string): { normalized: string; changes: { fro
 const WAKE_WORD_RE = /^(ok\s*google|okay\s*google|hey\s*google|ok\s*구글|오케이\s*구글|hey\s*siri|하이\s*빅스비|hi\s*bixby|ok\s*bixby|알렉사|alexa)\.?$/i;
 const JA_PHONETIC_IN_KO_RE = /고자이마스|고자이마시다|아리가또|아리가토|코니치와|고니치와|스미마셍|스미마센|와카리마스|와카리마셍|와카리마시타|나니?데스까|도코데스|도코카라|오하이오\s*고자|이키마스|이키마셍|오야스미/i;
 const OPUS_SAMPLE_RATES = new Set([8000, 12000, 16000, 24000, 48000]);
+const TBM_PROMPT_ECHO_RE = /오늘\s*TBM\s*안전교육을\s*시작합니다[.!。]?/i;
 
 function isCrossTalkContamination(transcript: string, shortLang: string): boolean {
   const hasHangul = /[가-힣ㄱ-ㆎ]/.test(transcript);
@@ -45,6 +46,12 @@ function normalizeOpusSampleRate(value: unknown): number {
   return Number.isInteger(parsed) && OPUS_SAMPLE_RATES.has(parsed) ? parsed : 48000;
 }
 
+function isTbmPromptEcho(transcript: string): boolean {
+  // Whisper가 무음·잡음 청크에서 안내용 prompt를 그대로 돌려주는 경우를 차단한다.
+  // 실제 짧은 대화가 우연히 포함되는 것은 막지 않도록, 문구와 충분한 길이를 함께 본다.
+  return transcript.length > 80 && TBM_PROMPT_ECHO_RE.test(transcript);
+}
+
 export async function POST(request: Request) {
   const user = await getCookieUser({ allowV3: true });
   if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
@@ -57,12 +64,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { audio, lang, mimeType, live = false, sampleRateHertz } = await request.json() as {
+    const { audio, lang, mimeType, live = false, sampleRateHertz, context = "safety" } = await request.json() as {
       audio?: string;
       lang?: string;
       mimeType?: string;
       live?: boolean;
       sampleRateHertz?: number;
+      context?: "chat" | "safety";
     };
     if (!audio) return NextResponse.json({ error: "No audio data" }, { status: 400 });
     if (typeof audio !== "string" || audio.length > 10 * 1024 * 1024 * (4 / 3)) {
@@ -71,6 +79,7 @@ export async function POST(request: Request) {
 
     const languageCode = lang || "ko-KR";
     const shortLang = languageCode.split("-")[0];
+    const isChatContext = context === "chat";
     const upstream = await callV3AiStt(request, {
       siteId,
       audio,
@@ -78,8 +87,8 @@ export async function POST(request: Request) {
       languageCode,
       sampleRateHertz: normalizeOpusSampleRate(sampleRateHertz),
       live: Boolean(live),
-      speechHints: shortLang === "ko" ? CONSTRUCTION_SPEECH_HINTS.slice(0, 500) : [],
-      prompt: shortLang === "ko" ? WHISPER_CONTEXT_PROMPT : undefined,
+      speechHints: !isChatContext && shortLang === "ko" ? CONSTRUCTION_SPEECH_HINTS.slice(0, 500) : [],
+      prompt: !isChatContext && shortLang === "ko" ? WHISPER_CONTEXT_PROMPT : undefined,
     });
     if (!upstream) return NextResponse.json({ error: "STT gateway unavailable" }, { status: 503 });
     if (!upstream.ok) {
@@ -91,7 +100,7 @@ export async function POST(request: Request) {
 
     const data = await upstream.json() as { transcript?: string; vendor?: string };
     const transcript = String(data.transcript || "").trim();
-    if (!transcript || WAKE_WORD_RE.test(transcript) || isCrossTalkContamination(transcript, shortLang)) {
+    if (!transcript || WAKE_WORD_RE.test(transcript) || isCrossTalkContamination(transcript, shortLang) || (isChatContext && isTbmPromptEcho(transcript))) {
       return NextResponse.json({ transcript: "" });
     }
     const engine = data.vendor === "openai" ? "whisper" : "google";

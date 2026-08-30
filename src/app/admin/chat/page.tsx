@@ -3,7 +3,6 @@ import { useEffect, useState, Suspense, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
-import { normalizeKoAsync } from "@/utils/normalize";
 import { motion, AnimatePresence } from "framer-motion";
 import { analyzeMessageWithAI } from "@/utils/ai/watchdog";
 import { playPremiumAudio } from "@/utils/tts";
@@ -429,9 +428,10 @@ function AdminChatContent() {
 
     const playAudio = (messageId: string, text: string, langCode: string) => {
         const currentGender = voiceGenderRef.current;
-        setPlayingMessageId(messageId);
         playPremiumAudio(text, langCode, currentGender, () => {
             setPlayingMessageId(current => current === messageId ? null : current);
+        }, () => {
+            setPlayingMessageId(messageId);
         });
     };
 
@@ -446,6 +446,7 @@ function AdminChatContent() {
         onError: (_type, message) => setSttError(message),
         chunkInterval: 4000,   // 4s max — 채팅은 짧은 발화, 10s 대기 불필요
         silenceDuration: 1200, // 1.2s 침묵 = 대화형 자연 휴지
+        context: "chat",
     });
 
     const clearComposer = useCallback(() => {
@@ -468,16 +469,20 @@ function AdminChatContent() {
             : textareaRef.current?.value ?? text;
         if (!messageText.trim() || !activeWorker || !myId || isSending) return;
 
+        // 대화 대상을 선택할 때 이미 최신 근로자 정보를 읽었다. 매 전송마다 다시
+        // 조회하면 번역 전송이 한 번 더 지연되므로, 현재 선택된 대상 정보를 사용한다.
+        const workerForSend = activeWorker;
+
         const originalText = messageText.trim();
         const tempId = `temp-${crypto.randomUUID()}`;
 
         // 🚀 즉시 표시 (번역 전)
         clearComposer();
         setIsSending(true);
-        recordWorkerActivity(activeWorker.id);
+        recordWorkerActivity(workerForSend.id);
         setMessages(prev => [...prev, {
-            id: tempId, from_user: myId, to_user: activeWorker.id,
-            source_lang: "ko", target_lang: activeWorker.preferred_lang,
+            id: tempId, from_user: myId, to_user: workerForSend.id,
+            source_lang: "ko", target_lang: workerForSend.preferred_lang,
             source_text: originalText,
             translated_text: JSON.stringify({ norm: originalText, text: originalText, pron: "", rev: "" }),
             created_at: new Date().toISOString(),
@@ -485,17 +490,19 @@ function AdminChatContent() {
         revealLatestMessage();
 
         try {
-            const { normalized } = await normalizeKoAsync(originalText);
+            // 1:1 대화는 TBM 방송과 달리 입력 원문을 절대 보정·확장하지 않는다.
+            // TBM 전용 은어 사전/존댓말 보정이 대화에 섞이면 사용자가 쓰지 않은 문구가 붙을 수 있다.
+            const normalized = originalText;
             let translated = normalized;
             let pron = "";
             let rev = "";
 
-            if (activeWorker.preferred_lang !== "ko") {
+            if (workerForSend.preferred_lang !== "ko") {
                 try {
                     const transRes = await fetch('/api/translate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: normalized, sl: 'ko', tl: activeWorker.preferred_lang })
+                        body: JSON.stringify({ text: normalized, sl: 'ko', tl: workerForSend.preferred_lang, fast: true, pronunciation: false })
                     });
                     if (transRes.ok) {
                         const transData = await transRes.json();
@@ -509,9 +516,9 @@ function AdminChatContent() {
             }
 
             const payload: Record<string, unknown> = {
-                to_user: activeWorker.id,
+                to_user: workerForSend.id,
                 source_lang: "ko",
-                target_lang: activeWorker.preferred_lang,
+                target_lang: workerForSend.preferred_lang,
                 source_text: originalText,
                 translated_text: JSON.stringify({ norm: normalized, text: translated, pron, rev }),
                 client_message_id: tempId,
@@ -839,41 +846,41 @@ function AdminChatContent() {
                                                 />
                                             </div>
 
-                                            <div className={`max-w-full min-w-0 overflow-hidden p-4 md:p-5 rounded-3xl shadow-md border flex flex-col gap-3 ${isAdmin ? 'bg-blue-600 border-blue-700 rounded-tr-sm text-white' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
+                                            <div className={`max-w-full min-w-0 overflow-hidden p-4 md:p-5 rounded-3xl shadow-md border flex flex-col gap-3 ${isAdmin ? 'bg-blue-100 border-blue-200 rounded-tr-sm text-slate-900' : 'bg-white border-slate-200 rounded-tl-sm text-slate-800'}`}>
 
                                                 {isAdmin ? (
                                                     // ── 관리자 메시지: 원문(한국어) → 한글발음 → 번역(외국어) → 역번역 ──
                                                     <>
                                                         {/* 1. 한국어 원문 (맨 위, 가장 크게) */}
                                                         <div className="flex flex-col gap-1">
-                                                            <p className="font-black text-lg md:text-2xl whitespace-pre-wrap break-words leading-snug drop-shadow-sm">
+                                                            <p className="font-black text-lg md:text-2xl whitespace-pre-wrap break-words leading-snug">
                                                                 {m.source_text}
                                                             </p>
                                                             {m.is_read === false && (
-                                                                <span className="text-[10px] font-black text-amber-300 self-end mr-1 leading-none">1</span>
+                                                                <span className="text-[11px] font-black text-blue-700 self-end mr-1 leading-none">1</span>
                                                             )}
                                                         </div>
 
-                                                        <div className="pt-3 border-t border-blue-400/50 flex flex-col gap-2">
+                                                        <div className="pt-3 border-t border-blue-200 flex flex-col gap-2">
                                                             {/* 2. 한글 발음 (영어 제외 — 관리자는 기초 영어 가능) */}
                                                             {activeWorker?.preferred_lang !== "en" && (() => {
                                                                 const pron = parsed.pron || hangulize(parsed.text, activeWorker?.preferred_lang || "en");
                                                                 return pron ? (
                                                                     <div className="flex items-start gap-1.5">
-                                                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">{t.pron}</span>
+                                                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-blue-200 text-blue-800 shrink-0 mt-0.5 font-black">{t.pron}</span>
                                                                         <span className="min-w-0 break-words font-bold text-base opacity-90">{pron}</span>
                                                                     </div>
                                                                 ) : null;
                                                             })()}
                                                             {/* 3. 번역 (외국어) */}
                                                             <div className="flex items-start gap-1.5">
-                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">{t.trans}</span>
+                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-blue-200 text-blue-800 shrink-0 mt-0.5 font-black">{t.trans}</span>
                                                                 <span className="min-w-0 break-words font-bold text-base md:text-lg">{parsed.text}</span>
                                                             </div>
                                                             {/* 4. 역번역 */}
                                                             {parsed.rev && (
                                                                 <div className="flex items-start gap-1.5">
-                                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/20 text-white shrink-0 mt-0.5 font-black">{t.rev}</span>
+                                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-blue-200 text-blue-800 shrink-0 mt-0.5 font-black">{t.rev}</span>
                                                                     <span className="min-w-0 break-words font-bold text-base opacity-80">{parsed.rev}</span>
                                                                 </div>
                                                             )}

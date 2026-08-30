@@ -15,7 +15,7 @@ type AuthNotice = "retry" | "network" | "workerNotFound" | "signupPending" | "mu
 
 /** 로그인 과정에서만 쓰는 안내 문구도 선택 언어 사전으로 관리한다. */
 const AUTH_NOTICES: Record<string, Record<AuthNotice, string>> = {
-  ko: { retry: "오류가 발생했습니다. 잠시 후 다시 시도해주세요.", network: "네트워크 연결을 확인해주세요.", workerNotFound: "입력한 정보와 일치하는 근로자가 없습니다. 관리자에게 NFC 등록을 요청해주세요.", signupPending: "관리자 가입 신청이 접수되었습니다. 승인 후 로그인할 수 있습니다.", multipleSites: "여러 현장에서 일치하는 근로자가 확인되었습니다. 현장을 선택해주세요.", nfcHint: "입장 전 관리자에게 NFC 등록을 요청해주세요." },
+  ko: { retry: "로그인을 완료하지 못했습니다. 잠시 후 다시 시도해주세요.", network: "네트워크 연결을 확인해주세요.", workerNotFound: "이니셜 또는 휴대전화 뒷 4자리가 일치하지 않거나, 등록·승인되지 않은 근로자입니다. 관리자에게 NFC 등록 상태를 확인해주세요.", signupPending: "관리자 가입 신청이 접수되었습니다. 승인 후 로그인할 수 있습니다.", multipleSites: "여러 현장에서 일치하는 근로자가 확인되었습니다. 현장을 선택해주세요.", nfcHint: "입장 전 관리자에게 NFC 등록을 요청해주세요." },
   vi: { retry: "Đã xảy ra lỗi. Vui lòng thử lại sau.", network: "Vui lòng kiểm tra kết nối mạng.", workerNotFound: "Không tìm thấy công nhân khớp với thông tin đã nhập. Vui lòng yêu cầu quản lý đăng ký NFC.", signupPending: "Yêu cầu đăng ký quản lý đã được gửi. Bạn có thể đăng nhập sau khi được phê duyệt.", multipleSites: "Tìm thấy công nhân phù hợp tại nhiều công trường. Vui lòng chọn công trường.", nfcHint: "Vui lòng yêu cầu quản lý đăng ký NFC trước khi vào." },
   zh: { retry: "发生错误，请稍后重试。", network: "请检查网络连接。", workerNotFound: "未找到与输入信息匹配的工人。请向管理员申请 NFC 登记。", signupPending: "管理员注册申请已提交。审批后即可登录。", multipleSites: "在多个现场找到了匹配的工人。请选择现场。", nfcHint: "进入前请向管理员申请 NFC 登记。" },
   th: { retry: "เกิดข้อผิดพลาด โปรดลองอีกครั้งภายหลัง", network: "โปรดตรวจสอบการเชื่อมต่อเครือข่าย", workerNotFound: "ไม่พบคนงานที่ตรงกับข้อมูลที่กรอก โปรดขอให้ผู้ดูแลลงทะเบียน NFC", signupPending: "ส่งคำขอสมัครผู้ดูแลแล้ว คุณจะเข้าสู่ระบบได้หลังได้รับอนุมัติ", multipleSites: "พบคนงานที่ตรงกันในหลายไซต์ โปรดเลือกไซต์", nfcHint: "โปรดขอให้ผู้ดูแลลงทะเบียน NFC ก่อนเข้า" },
@@ -199,6 +199,7 @@ function AuthContent() {
   const [initials, setInitials] = useState("");
   const [phoneLast4, setPhoneLast4] = useState("");
   const [multipleSites, setMultipleSites] = useState<Array<{ site_id: string; name: string; site_code: string | null }>>([]);
+  const [workerLoginError, setWorkerLoginError] = useState("");
 
   useEffect(() => {
     const savedLang = localStorage.getItem("safe-link-lang");
@@ -254,9 +255,22 @@ function AuthContent() {
   // 🔐 2026-06-08: 이니셜 + 휴대전화 뒷 4자리 빠른 로그인.
   // phone+name 흐름 폐기 — 단일 로그인 흐름으로 통합 (NFC 사전 등록 전제).
   const submitQuickLogin = async (siteId?: string) => {
-    if (!initials.trim() || phoneLast4.length !== 4) return;
     setLoading(true);
     const activeLang = lang || "ko";
+    const notices = AUTH_NOTICES[activeLang] ?? AUTH_NOTICES.en;
+
+    if (!initials.trim()) {
+      setWorkerLoginError(activeLang === "ko" ? "이니셜 또는 이름을 입력해주세요." : "Enter your initials or name.");
+      setLoading(false);
+      return;
+    }
+    if (phoneLast4.length !== 4) {
+      setWorkerLoginError(activeLang === "ko" ? "휴대전화 뒷 4자리를 입력해주세요." : "Enter the last 4 digits of your phone number.");
+      setLoading(false);
+      return;
+    }
+
+    setWorkerLoginError("");
 
     try {
       const result = await quickLoginWorkerV3({
@@ -267,25 +281,31 @@ function AuthContent() {
       });
 
       if (!result.ok && result.status === 429) {
-        alert(sanitizeAuthError("rate limit", activeLang));
+        setWorkerLoginError(sanitizeAuthError("rate limit", activeLang));
         setLoading(false);
         return;
       }
 
       if (!result.ok && result.status === 409) {
-        setMultipleSites("sites" in result ? result.sites : []);
+        const sites = "sites" in result ? result.sites : [];
+        setMultipleSites(sites);
+        if (sites.length === 0) {
+          setWorkerLoginError(activeLang === "ko"
+            ? "동일한 이니셜과 휴대전화 뒷 4자리를 가진 근로자가 여러 명입니다. 관리자에게 등록 정보를 확인해주세요."
+            : "More than one worker matches these details. Ask an administrator to verify the registration.");
+        }
         setLoading(false);
         return;
       }
 
       if (!result.ok && result.status === 404) {
-        alert((AUTH_NOTICES[activeLang] ?? AUTH_NOTICES.en).workerNotFound);
+        setWorkerLoginError(notices.workerNotFound);
         setLoading(false);
         return;
       }
 
       if (!result.ok) {
-        alert(sanitizeAuthError("error" in result ? result.error : "unknown", activeLang));
+        setWorkerLoginError(sanitizeAuthError("error" in result ? result.error : "unknown", activeLang));
         setLoading(false);
         return;
       }
@@ -299,10 +319,12 @@ function AuthContent() {
         }
         router.push(`/worker?lang=${activeLang}`);
       } else {
-        alert(sanitizeAuthError("session not established", activeLang));
+        setWorkerLoginError(activeLang === "ko"
+          ? "로그인 정보는 확인됐지만 세션을 시작하지 못했습니다. 브라우저를 새로고침한 뒤 다시 시도해주세요."
+          : "Your details were verified, but the sign-in session could not start. Refresh the browser and try again.");
       }
     } catch {
-      alert(sanitizeAuthError("network", activeLang));
+      setWorkerLoginError(sanitizeAuthError("network", activeLang));
     }
     setLoading(false);
   };
@@ -383,17 +405,17 @@ function AuthContent() {
               <div className="relative mb-4 h-28 overflow-hidden rounded-2xl border border-[#cdd6e2]">
                 <picture>
                   <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/access.webp" />
-                  <Image src="/images/mobile-v3/website/access.webp" alt="SAFE-LINK access" fill className="object-cover" priority />
+                  <Image src="/images/mobile-v3/website/access.webp" alt="SQ LINK access" fill className="object-cover" priority />
                 </picture>
                 <div className="absolute inset-0 bg-gradient-to-t from-[#071b36]/50 to-transparent" />
               </div>
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-4"
                 style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.18)" }}>
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                <span className="text-[10px] font-black tracking-widest text-blue-400 uppercase">SAFE-LINK · v2.0</span>
+                <span className="text-[10px] font-black tracking-widest text-blue-400 uppercase">SQ LINK · v2.0</span>
               </div>
               <h1 className="text-5xl font-black text-white tracking-tighter leading-none">
-                SAFE<span className="text-blue-400">-LINK</span>
+                SQ<span className="text-blue-400"> LINK</span>
               </h1>
               <p className="text-[10px] text-slate-600 tracking-[0.4em] uppercase mt-2">Field Communication OS</p>
               <div className="mt-5 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
@@ -454,7 +476,7 @@ function AuthContent() {
         <div className="text-center mb-5">
           <BrandLogo compact framed className="mb-3 justify-center" imageClassName="max-w-[180px]" />
           <h1 className="text-4xl font-black text-white tracking-tighter leading-none">
-            SAFE<span className="text-blue-400">-LINK</span>
+            SQ<span className="text-blue-400"> LINK</span>
           </h1>
           <p className="text-[10px] text-slate-700 tracking-[0.4em] uppercase mt-1.5">Field Communication OS</p>
           {selectedLangObj && (
@@ -472,7 +494,7 @@ function AuthContent() {
         <div className="relative mb-5 h-32 w-full overflow-hidden rounded-3xl border border-[#cdd6e2] shadow-lg">
           <picture>
             <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/access.webp" />
-            <Image src="/images/mobile-v3/website/access.webp" alt="SAFE-LINK access" fill className="object-cover" priority />
+            <Image src="/images/mobile-v3/website/access.webp" alt="SQ LINK access" fill className="object-cover" priority />
           </picture>
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/5 to-transparent" />
         </div>
@@ -585,7 +607,10 @@ function AuthContent() {
                     aria-label={t.name}
                     placeholder={`${t.name} (BK, NGUYEN)`}
                     value={initials}
-                    onChange={e => setInitials(e.target.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toUpperCase())}
+                    onChange={e => {
+                      setInitials(e.target.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toUpperCase());
+                      setWorkerLoginError("");
+                    }}
                     maxLength={6}
                     className="w-full bg-transparent text-white text-base font-mono font-black tracking-wider placeholder-slate-700 outline-none px-4 py-3.5"
                   />
@@ -599,12 +624,22 @@ function AuthContent() {
                     inputMode="numeric"
                     placeholder={`${t.phone} (1234)`}
                     value={phoneLast4}
-                    onChange={e => setPhoneLast4(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    onChange={e => {
+                      setPhoneLast4(e.target.value.replace(/\D/g, "").slice(0, 4));
+                      setWorkerLoginError("");
+                    }}
                     onKeyDown={e => e.key === "Enter" && handleWorkerEnter()}
                     maxLength={4}
                     className="w-full bg-transparent text-white text-base font-mono font-black tracking-[0.3em] placeholder-slate-700 outline-none px-4 py-3.5"
                   />
                 </div>
+
+                {workerLoginError && (
+                  <div role="alert" className="flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs font-bold text-red-700" style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
+                    <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>{workerLoginError}</span>
+                  </div>
+                )}
 
                 {/* 복수 사이트 매칭 시 사이트 선택 */}
                 {multipleSites.length > 0 && (
@@ -630,7 +665,7 @@ function AuthContent() {
                 </div>
 
                 {/* CTA */}
-                <button onClick={handleWorkerEnter} disabled={loading || !initials.trim() || phoneLast4.length !== 4}
+                <button onClick={handleWorkerEnter} disabled={loading}
                   className="w-full py-3.5 font-black text-sm text-white rounded-xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: "linear-gradient(135deg,#059669 0%,#10B981 100%)", boxShadow: "0 4px 24px rgba(16,185,129,0.28)" }}>
                   {loading ? <Spinner /> : t.doEnter}
