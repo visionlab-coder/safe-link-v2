@@ -496,7 +496,7 @@ function WorkerChatContent() {
                     const transRes = await fetch('/api/translate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: originalText, sl: lang, tl: 'ko', fast: true, pronunciation: false })
+                        body: JSON.stringify({ text: originalText, sl: lang, tl: 'ko', fast: true, quality: 'high', pronunciation: false })
                     });
                     if (transRes.ok) {
                         const transData = await transRes.json() as { translated?: string; pronunciation?: string; reverse_translated?: string };

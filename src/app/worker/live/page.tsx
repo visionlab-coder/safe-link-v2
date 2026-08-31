@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
-import { playPremiumAudio, VoiceGender } from "@/utils/tts";
+import { playLiveBroadcastAudio, VoiceGender } from "@/utils/tts";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
 import { persistDisplayLanguage, resolveDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
@@ -56,6 +56,7 @@ export default function WorkerLivePage() {
     const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
     const [isConnected, setIsConnected] = useState(false);
     const [audioEnabled, setAudioEnabled] = useState(true);
+    const [isTranslating, setIsTranslating] = useState(false);
     const [sttError, setSttError] = useState("");
     // profileId와 siteId를 동시에 세팅하여 subscription이 한 번만 생성되도록
     const [authReady, setAuthReady] = useState<{
@@ -71,7 +72,9 @@ export default function WorkerLivePage() {
     const langRef = useRef("ko");
     const genderRef = useRef<VoiceGender>("female");
     const seenRowsRef = useRef<Set<string>>(new Set());
-    const lastTranslationIdRef = useRef(0);
+    const activeSessionIdRef = useRef<string | null>(null);
+    const sessionLifecycleSupportedRef = useRef(true);
+    const translatingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastRenderedRef = useRef<{ text: string; at: number }>({ text: "", at: 0 });
 
     // Keep refs in sync
@@ -183,7 +186,9 @@ export default function WorkerLivePage() {
         isPlayingRef.current = true;
         const text = ttsQueueRef.current.shift()!;
         muteRecording();
-        playPremiumAudio(text, langRef.current, genderRef.current, () => {
+        // 근로자 방송 수신은 기본적으로 음성 켜짐이며, 도착 순서대로 자동 재생한다.
+        // 앱 WebView는 MainActivity에서 자동 재생을 허용한다.
+        playLiveBroadcastAudio(text, langRef.current, genderRef.current, () => {
             isPlayingRef.current = false;
             unmuteRecording();
             processQueue();
@@ -212,13 +217,31 @@ export default function WorkerLivePage() {
         load();
     }, []);
 
-    // Load the backlog once, then receive new translations over Spring SSE.
+    // 관리자가 아직 말을 시작하지 않았어도 같은 현장의 관리자에게 먼저 응답할 수 있다.
+    // 방송 시작 이벤트가 오면 해당 관리자 ID로 즉시 교체된다.
+    useEffect(() => {
+        if (!authReady?.siteId || activeAdminId) return;
+        let cancelled = false;
+        const loadSiteAdmin = async () => {
+            const res = await fetch("/api/worker/chat/admins", { cache: "no-store" });
+            if (!res.ok || cancelled) return;
+            const data = await res.json() as { admins?: Array<{ id?: string; site_id?: string | null }> };
+            const siteAdmin = data.admins?.find(admin => String(admin.site_id ?? "") === String(authReady.siteId));
+            if (siteAdmin?.id && !cancelled) setActiveAdminId(siteAdmin.id);
+        };
+        void loadSiteAdmin();
+        return () => { cancelled = true; };
+    }, [activeAdminId, authReady]);
+
+    // 과거 방송 이력은 화면에 진입한 순간 새 방송처럼 자동 재생하면 안 된다.
+    // 현재 접속 이후 관리자가 실제로 전파한 이벤트만 SSE로 수신·자동 재생한다.
     useEffect(() => {
         if (!authReady) return;
         const { siteId } = authReady;
         let cancelled = false;
         type TranslationRow = {
             id: string;
+            session_id?: string;
             text_ko: string;
             translations?: Record<string, string>;
             created_by?: string;
@@ -226,8 +249,16 @@ export default function WorkerLivePage() {
 
         const handleTranslation = async (row: TranslationRow) => {
             if (cancelled || seenRowsRef.current.has(row.id)) return;
+            // 방송 시작 신호를 받은 세션만 수신한다. 종료된/이전 세션은 절대 재생하지 않는다.
+            if (activeSessionIdRef.current && row.session_id !== activeSessionIdRef.current) return;
+            if (!activeSessionIdRef.current && sessionLifecycleSupportedRef.current) return;
+            // 이전 운영 백엔드 호환: 세션 API가 아직 없는 경우에도 화면 진입 뒤
+            // 새로 도착한 첫 발화만 방송으로 잡는다. 과거 이력은 불러오지 않는다.
+            if (!activeSessionIdRef.current && !sessionLifecycleSupportedRef.current) {
+                activeSessionIdRef.current = row.session_id ?? "legacy-live";
+                setIsConnected(true);
+            }
             seenRowsRef.current.add(row.id);
-            lastTranslationIdRef.current = Math.max(lastTranslationIdRef.current, Number(row.id));
             if (row.created_by) setActiveAdminId(row.created_by);
             const cleanTextKo = String(row.text_ko || "").trim().replace(/\s+/g, " ");
             if (!cleanTextKo) return;
@@ -235,6 +266,7 @@ export default function WorkerLivePage() {
             if (lastRenderedRef.current.text === cleanTextKo && now - lastRenderedRef.current.at < 10_000) return;
             lastRenderedRef.current = { text: cleanTextKo, at: now };
             setIsConnected(true);
+            setIsTranslating(false);
             const time = new Date().toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             const myLang = langRef.current;
 
@@ -289,20 +321,43 @@ export default function WorkerLivePage() {
             }
         };
 
-        const loadMissedTranslations = async () => {
-            const params = new URLSearchParams({ afterId: String(lastTranslationIdRef.current) });
-            if (siteId) params.set("siteId", siteId);
-            const res = await fetch(`/api/live/translations?${params.toString()}`, { cache: "no-store" });
-            if (!res.ok || cancelled) return;
-            const data = await res.json() as { translations?: TranslationRow[] };
-            for (const row of data.translations ?? []) {
-                await handleTranslation(row);
-            }
-        };
-
         const params = new URLSearchParams({ type: "translations" });
         if (siteId) params.set("siteId", siteId);
         const events = new EventSource(`/api/live/events?${params.toString()}`);
+        events.addEventListener("broadcast-start", event => {
+            try {
+                const broadcast = JSON.parse((event as MessageEvent<string>).data) as { session_id?: string; started_by?: string };
+                activeSessionIdRef.current = broadcast.session_id ?? null;
+                if (broadcast.started_by) setActiveAdminId(broadcast.started_by);
+                setIsConnected(Boolean(activeSessionIdRef.current));
+            } catch {
+                // 다음 방송 시작 신호에서 다시 동기화한다.
+            }
+        });
+        events.addEventListener("broadcast-stop", event => {
+            try {
+                const broadcast = JSON.parse((event as MessageEvent<string>).data) as { session_id?: string };
+                if (broadcast.session_id === activeSessionIdRef.current) {
+                    activeSessionIdRef.current = null;
+                    setIsConnected(false);
+                    setIsTranslating(false);
+                }
+            } catch {
+                // 연결이 유지되는 동안 다음 상태 신호를 기다린다.
+            }
+        });
+        events.addEventListener("broadcast-speaking", event => {
+            try {
+                const broadcast = JSON.parse((event as MessageEvent<string>).data) as { session_id?: string };
+                if (broadcast.session_id !== activeSessionIdRef.current) return;
+                setIsTranslating(true);
+                if (translatingTimerRef.current) clearTimeout(translatingTimerRef.current);
+                // 인식 실패 시에도 표시가 영구히 남지 않도록 안전하게 해제한다.
+                translatingTimerRef.current = setTimeout(() => setIsTranslating(false), 12_000);
+            } catch {
+                // 다음 정상 신호를 기다린다.
+            }
+        });
         events.addEventListener("translation", event => {
             try {
                 void handleTranslation(JSON.parse((event as MessageEvent<string>).data));
@@ -310,10 +365,27 @@ export default function WorkerLivePage() {
                 // EventSource reconnects automatically; missed rows are loaded on the next mount.
             }
         });
-        void loadMissedTranslations();
 
+        // 근로자가 방송 도중 화면에 들어온 경우 현재 활성 세션만 조회한다.
+        const loadCurrentBroadcast = async () => {
+            const query = new URLSearchParams();
+            if (siteId) query.set("siteId", siteId);
+            const res = await fetch(`/api/live/sessions?${query.toString()}`, { cache: "no-store" });
+            if (res.status === 404) {
+                sessionLifecycleSupportedRef.current = false;
+                return;
+            }
+            if (!res.ok || cancelled) return;
+            const data = await res.json() as { active?: boolean; session?: { session_id?: string; started_by?: string } };
+            if (!data.active || !data.session?.session_id) return;
+            activeSessionIdRef.current = data.session.session_id;
+            if (data.session.started_by) setActiveAdminId(data.session.started_by);
+            setIsConnected(true);
+        };
+        void loadCurrentBroadcast();
         return () => {
             cancelled = true;
+            if (translatingTimerRef.current) clearTimeout(translatingTimerRef.current);
             events.close();
         };
     }, [authReady, processQueue, locale]);
@@ -381,6 +453,12 @@ export default function WorkerLivePage() {
                                     <p className="text-sm text-slate-600 font-bold mt-2">{t.waitingDesc}</p>
                                 </div>
                             </div>
+                        </div>
+                    )}
+
+                    {isTranslating && (
+                        <div className="rounded-2xl border border-blue-400/30 bg-blue-500/10 px-4 py-3 text-center text-sm font-black text-blue-200 animate-pulse">
+                            번역 중…
                         </div>
                     )}
 

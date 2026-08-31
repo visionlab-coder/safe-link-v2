@@ -107,6 +107,43 @@ export const playPremiumAudio = (
     }, onStart);
 };
 
+/**
+ * 현장 실시간 통역 방송용 재생.
+ *
+ * Android 앱 WebView는 네이티브 설정으로 사용자 제스처 없이 HTML 오디오 재생을
+ * 허용한다. 따라서 방송 수신은 기기 내장 TTS보다 서버 TTS 오디오를 먼저 사용해
+ * 근로자가 별도 스피커 버튼을 누르지 않아도 수신 즉시 재생되도록 한다.
+ */
+export const playLiveBroadcastAudio = (
+    text: string,
+    langCode: string,
+    gender: VoiceGender = 'female',
+    onEnd?: () => void,
+    onStart?: () => void,
+) => {
+    if (!text || typeof window === 'undefined') {
+        if (typeof window !== 'undefined') notifyTtsFailure();
+        onEnd?.();
+        return;
+    }
+
+    const cleanText = stripForSpeech(text);
+    if (!cleanText) {
+        notifyTtsFailure();
+        onEnd?.();
+        return;
+    }
+
+    // 방송은 네트워크 TTS 오디오를 우선한다. 재생에 실패한 경우에만 기기 TTS로 폴백한다.
+    playProxyAudio(cleanText, langCode, gender, (success) => {
+        if (success) {
+            onEnd?.();
+            return;
+        }
+        playBrowserNativeAudio(cleanText, langCode, gender, onEnd, onStart);
+    }, onStart);
+};
+
 /** 브라우저 내장 음성 (최후의 보루) */
 const playBrowserNativeAudio = (text: string, langCode: string, gender: VoiceGender, onEnd?: () => void, onStart?: () => void) => {
     const targetLang = getVoiceLang(langCode);

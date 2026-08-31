@@ -33,8 +33,8 @@ function AdminLiveContent() {
         sourceText?: string;
     }>>([]);
     const [siteId, setSiteId] = useState<string | null>(null);
-    const [listenerCount] = useState(0);
     const [sttError, setSttError] = useState("");
+    const [isTranslating, setIsTranslating] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const [adminId, setAdminId] = useState("");
     const lastSentRef = useRef<{ text: string; at: number }>({ text: "", at: 0 });
@@ -81,58 +81,53 @@ function AdminLiveContent() {
             return;
         }
         lastSentRef.current = { text: cleanText, at: now };
+        setIsTranslating(true);
 
         const time = new Date().toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setTranscripts(prev => [...prev, { text: cleanText, time }]);
 
         // 현장 근로자 언어로 병렬 사전 번역 — 언어당 1번만 호출 (중복 근로자 기기 절약)
-        const langs = siteWorkerLangsRef.current;
-        const translations: Record<string, string> = {};
+        try {
+            const langs = siteWorkerLangsRef.current;
+            const translations: Record<string, string> = {};
 
-        if (langs.length > 0) {
-            await Promise.all(
-                langs.map(async (lang) => {
-                    try {
-                        const res = await fetch("/api/translate", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                text: cleanText,
-                                sl: "ko",
-                                tl: lang,
-                                fast: true,
-                                pronunciation: false,
-                                useGlossary: true,
-                            }),
-                        });
-                        const data = await res.json();
-                        if (data.translated) translations[lang] = data.translated;
-                    } catch {
-                        // 번역 실패 시 근로자 기기가 개별 폴백 호출로 처리
-                    }
-                })
-            );
+            if (langs.length > 0) {
+                await Promise.all(
+                    langs.map(async (lang) => {
+                        const controller = new AbortController();
+                        const timeout = window.setTimeout(() => controller.abort(), 2_000);
+                        try {
+                            const res = await fetch("/api/translate", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                signal: controller.signal,
+                                body: JSON.stringify({ text: cleanText, sl: "ko", tl: lang, fast: true, pronunciation: false, useGlossary: true }),
+                            });
+                            const data = await res.json();
+                            if (data.translated) translations[lang] = data.translated;
+                        } catch {
+                            // 번역 실패 시 근로자 기기가 개별 폴백 호출로 처리
+                        } finally {
+                            window.clearTimeout(timeout);
+                        }
+                    })
+                );
+            }
+
+            const saveRes = await fetch("/api/live/translations", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sessionId, siteId, text_ko: cleanText, translations }),
+            });
+            if (!saveRes.ok) {
+                const err = await saveRes.json().catch(() => ({})) as { error?: string };
+                setTranscripts(prev => [...prev, { text: `[${t.saveFailed}] ${err.error ?? saveRes.status}`, time }]);
+                return;
+            }
+            setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 100);
+        } finally {
+            setIsTranslating(false);
         }
-
-        const saveRes = await fetch("/api/live/translations", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                sessionId,
-                siteId,
-                text_ko: cleanText,
-                translations,
-            }),
-        });
-        if (!saveRes.ok) {
-            const err = await saveRes.json().catch(() => ({})) as { error?: string };
-            setTranscripts(prev => [...prev, { text: `[${t.saveFailed}] ${err.error ?? saveRes.status}`, time }]);
-            return;
-        }
-
-        setTimeout(() => {
-            scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-        }, 100);
     }, [sessionId, siteId, locale, t.saveFailed]);
 
     const {
@@ -144,9 +139,18 @@ function AdminLiveContent() {
     } = useCloudSTT({
         lang: "ko",
         onTranscript: handleTranscript,
-        onError: (_type, message) => setSttError(message),
-        chunkInterval: 6000,   // 6s — 교육 발화는 문장이 길므로 완전한 문장 단위 전송
-        silenceDuration: 2500, // 2.5s — 자연 휴지 허용, 문장 경계에서 자동 분할
+        onError: (_type, message) => { setIsTranslating(false); setSttError(message); },
+        onSpeechStart: () => {
+            setIsTranslating(true);
+            if (!sessionId) return;
+            void fetch("/api/live/sessions/speaking", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sessionId, siteId }),
+            });
+        },
+        chunkInterval: 1500,   // 실시간 방송은 긴 문장보다 빠른 전달을 우선한다.
+        silenceDuration: 600,
         live: true,
     });
 
@@ -204,16 +208,39 @@ function AdminLiveContent() {
 
     const handleStartBroadcast = async () => {
         const newSessionId = `live_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const sessionRes = await fetch("/api/live/sessions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId: newSessionId, siteId }),
+        });
+        // 운영 백엔드가 아직 세션 API 배포 전인 동안에도 기존 실시간 발화 전파는
+        // 멈추지 않도록 404만 호환 모드로 허용한다. 그 외 오류는 방송을 시작하지 않는다.
+        if (!sessionRes.ok && sessionRes.status !== 404) {
+            setSttError(t.saveFailed);
+            return;
+        }
         setSessionId(newSessionId);
         lastSentRef.current = { text: "", at: 0 };
         setTranscripts([]);
         setSttError("");
         const started = await toggleRecording();
-        setIsLive(started === true);
+        if (started === true) {
+            setIsLive(true);
+            return;
+        }
+        // 마이크 권한 등이 거부되면 근로자 수신 화면도 즉시 대기 상태로 되돌린다.
+        const params = new URLSearchParams({ sessionId: newSessionId });
+        if (siteId) params.set("siteId", siteId);
+        await fetch(`/api/live/sessions?${params.toString()}`, { method: "DELETE" });
     };
 
     const handleStopBroadcast = () => {
         if (isRecording) toggleRecording();
+        if (sessionId) {
+            const params = new URLSearchParams({ sessionId });
+            if (siteId) params.set("siteId", siteId);
+            void fetch(`/api/live/sessions?${params.toString()}`, { method: "DELETE" });
+        }
         setIsLive(false);
     };
 
@@ -224,7 +251,6 @@ function AdminLiveContent() {
             filename: `live_interpreter_${sessionId || "draft"}_${new Date().toISOString().slice(0, 10)}`,
             summary: [
                 { label: t.utterances, value: transcripts.length },
-                { label: t.listeners, value: listenerCount },
                 { label: t.status, value: isLive ? t.onAir : t.ended },
             ],
             columns: [
@@ -258,15 +284,6 @@ function AdminLiveContent() {
                     </div>
                     <div className="flex items-center gap-2">
                         <ExportMenu disabled={transcripts.length === 0} onExport={handleExport} />
-                        {isLive && (
-                            <div className="flex items-center gap-2 glass px-4 py-2 rounded-full border-white/5">
-                                <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                                </svg>
-                                <span className="text-sm font-black text-green-400">{listenerCount}</span>
-                                <span className="text-[10px] text-slate-500 font-black uppercase">{t.listeners}</span>
-                            </div>
-                        )}
                     </div>
                 </header>
 
@@ -348,6 +365,7 @@ function AdminLiveContent() {
                                 <span className="text-sm font-black text-red-400 uppercase tracking-widest">
                                     {isRecording ? t.recording : t.microphoneStopped}
                                 </span>
+                                {isTranslating && <span className="text-sm font-black text-blue-300 animate-pulse">번역 중…</span>}
                             </div>
                             {sttError && (
                                 <div role="alert" className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200">

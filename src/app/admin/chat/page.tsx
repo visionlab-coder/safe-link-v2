@@ -502,7 +502,7 @@ function AdminChatContent() {
                     const transRes = await fetch('/api/translate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: normalized, sl: 'ko', tl: workerForSend.preferred_lang, fast: true, pronunciation: false })
+                        body: JSON.stringify({ text: normalized, sl: 'ko', tl: workerForSend.preferred_lang, fast: true, quality: 'high', pronunciation: false })
                     });
                     if (transRes.ok) {
                         const transData = await transRes.json();

@@ -16,6 +16,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,6 +40,128 @@ public class LiveInterpreterController {
         this.siteGuard = siteGuard;
         this.audit = audit;
         this.eventBus = eventBus;
+    }
+
+    @PostMapping("/sessions")
+    @Transactional
+    public BroadcastSessionEvent startSession(@AuthenticationPrincipal SessionPrincipal actor, @RequestBody BroadcastSessionRequest request) {
+        requireAdmin(actor);
+        Long siteId = request.siteId() == null || request.siteId().isBlank() ? firstSiteId(actor) : parseLong(request.siteId(), "siteId_invalid");
+        if (siteId == null) throw new IllegalArgumentException("site_id_required");
+        siteGuard.requireSiteAccess(actor, siteId, "live.broadcast.start", "live_broadcast_session", null);
+        String sessionId = clean(request.sessionId());
+        if (sessionId.isBlank()) throw new IllegalArgumentException("session_id_required");
+
+        // 이전 방송은 종료 처리한 뒤 새 방송을 단 하나만 활성화한다.
+        jdbc.sql("""
+                update live_broadcast_sessions
+                set active = false, ended_at = now()
+                where site_id = :siteId and active = true
+            """)
+            .param("siteId", siteId)
+            .update();
+        jdbc.sql("""
+                insert into live_broadcast_sessions(session_id, site_id, started_by, active)
+                values (:sessionId, :siteId, :startedBy, true)
+            """)
+            .param("sessionId", sessionId)
+            .param("siteId", siteId)
+            .param("startedBy", actor.userId())
+            .update();
+
+        var event = new BroadcastSessionEvent(sessionId, String.valueOf(siteId), String.valueOf(actor.userId()), true);
+        audit.record(actor.userId(), siteId, "live.broadcast.start", "live_broadcast_session", sessionId, "ALLOWED", "server_api", Map.of());
+        eventBus.publish(LiveInterpreterEventBus.translationsChannel(siteId), "broadcast-start", event);
+        return event;
+    }
+
+    @DeleteMapping("/sessions")
+    @Transactional
+    public Map<String, Boolean> stopSession(
+        @AuthenticationPrincipal SessionPrincipal actor,
+        @RequestParam String sessionId,
+        @RequestParam(required = false) String siteId
+    ) {
+        requireAdmin(actor);
+        Long requestedSiteId = siteId == null || siteId.isBlank() ? firstSiteId(actor) : parseLong(siteId, "siteId_invalid");
+        if (requestedSiteId == null) throw new IllegalArgumentException("site_id_required");
+        siteGuard.requireSiteAccess(actor, requestedSiteId, "live.broadcast.stop", "live_broadcast_session", null);
+        int changed = jdbc.sql("""
+                update live_broadcast_sessions
+                set active = false, ended_at = now()
+                where session_id = :sessionId and site_id = :siteId and active = true
+            """)
+            .param("sessionId", clean(sessionId))
+            .param("siteId", requestedSiteId)
+            .update();
+        if (changed > 0) {
+            audit.record(actor.userId(), requestedSiteId, "live.broadcast.stop", "live_broadcast_session", clean(sessionId), "ALLOWED", "server_api", Map.of());
+            eventBus.publish(
+                LiveInterpreterEventBus.translationsChannel(requestedSiteId),
+                "broadcast-stop",
+                new BroadcastSessionEvent(clean(sessionId), String.valueOf(requestedSiteId), String.valueOf(actor.userId()), false)
+            );
+        }
+        return Map.of("stopped", changed > 0);
+    }
+
+    @PostMapping("/sessions/speaking")
+    public Map<String, Boolean> announceSpeech(
+        @AuthenticationPrincipal SessionPrincipal actor,
+        @RequestBody BroadcastSessionRequest request
+    ) {
+        requireAdmin(actor);
+        Long siteId = request.siteId() == null || request.siteId().isBlank() ? firstSiteId(actor) : parseLong(request.siteId(), "siteId_invalid");
+        if (siteId == null) throw new IllegalArgumentException("site_id_required");
+        siteGuard.requireSiteAccess(actor, siteId, "live.broadcast.speaking", "live_broadcast_session", null);
+        String sessionId = clean(request.sessionId());
+        boolean active = jdbc.sql("""
+                select exists(
+                    select 1 from live_broadcast_sessions
+                    where session_id = :sessionId and site_id = :siteId and started_by = :startedBy and active = true
+                )
+            """)
+            .param("sessionId", sessionId)
+            .param("siteId", siteId)
+            .param("startedBy", actor.userId())
+            .query(Boolean.class)
+            .single();
+        if (!active) return Map.of("announced", false);
+        eventBus.publish(
+            LiveInterpreterEventBus.translationsChannel(siteId),
+            "broadcast-speaking",
+            new BroadcastSessionEvent(sessionId, String.valueOf(siteId), String.valueOf(actor.userId()), true)
+        );
+        return Map.of("announced", true);
+    }
+
+    @GetMapping("/sessions")
+    public Map<String, Object> currentSession(
+        @AuthenticationPrincipal SessionPrincipal actor,
+        @RequestParam(required = false) String siteId
+    ) {
+        if (actor == null) throw new AccessDeniedException("authentication_required");
+        Long requestedSiteId = siteId == null || siteId.isBlank() ? firstSiteId(actor) : parseLong(siteId, "siteId_invalid");
+        if (requestedSiteId == null) throw new IllegalArgumentException("site_id_required");
+        siteGuard.requireSiteAccess(actor, requestedSiteId, "live.broadcast.current", "live_broadcast_session", null);
+        var active = jdbc.sql("""
+                select session_id, started_by
+                from live_broadcast_sessions
+                where site_id = :siteId and active = true
+                order by started_at desc
+                limit 1
+            """)
+            .param("siteId", requestedSiteId)
+            .query((rs, rowNum) -> new BroadcastSessionEvent(
+                rs.getString("session_id"),
+                String.valueOf(requestedSiteId),
+                String.valueOf(rs.getLong("started_by")),
+                true
+            ))
+            .optional();
+        if (active.isEmpty()) return Map.of("active", false);
+        var session = active.get();
+        return Map.of("active", true, "session", session);
     }
 
     @PostMapping("/translations")
@@ -294,6 +418,8 @@ public class LiveInterpreterController {
 
     public record TranslationRequest(String sessionId, String siteId, @JsonProperty("text_ko") String textKo, Map<String, String> translations) {}
     public record TranslationEvent(String id, @JsonProperty("session_id") String sessionId, @JsonProperty("site_id") String siteId, @JsonProperty("text_ko") String textKo, Map<String, String> translations, @JsonProperty("created_by") String createdBy, @JsonProperty("created_at") String createdAt) {}
+    public record BroadcastSessionRequest(String sessionId, String siteId) {}
+    public record BroadcastSessionEvent(@JsonProperty("session_id") String sessionId, @JsonProperty("site_id") String siteId, @JsonProperty("started_by") String startedBy, boolean active) {}
     public record WorkerResponseRequest(String siteId, String adminId, String sourceLang, String sourceText, String translatedText, String speakerName) {}
     public record WorkerResponseEvent(String id, String siteId, String workerId, String adminId, String sourceLang, String sourceText, String translatedText, String speakerName, String createdAt) {}
 }

@@ -84,7 +84,7 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
     const internalGatewayConfigured = Boolean(process.env.TRAVEL_API_SECRET?.trim());
 
     try {
-        const { text, sl, tl, fast, pronunciation: includePronunciation = true } = await request.json();
+        const { text, sl, tl, fast, quality, pronunciation: includePronunciation = true } = await request.json();
 
         if (!text || !sl || !tl) {
             return NextResponse.json({ error: "Missing required texts" }, { status: 400 });
@@ -164,7 +164,22 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
         let translatedText = "";
         let engine = "google";
 
-        if (usePapago) {
+        // 일반 1:1 대화는 문맥과 현장 용어의 의미 보존을 우선한다.
+        // fast는 발음·역번역만 생략할 뿐, quality=high 본문 번역의 정확도를 낮추지 않는다.
+        const useHighQualityContext = quality === "high" && forced !== "papago" && forced !== "google";
+        if (useHighQualityContext && v3AiVendorContext) {
+            try {
+                const contextualTranslation = await contextualConstructionTranslate(processedText, sl, tl, v3AiVendorContext);
+                if (contextualTranslation) {
+                    translatedText = contextualTranslation;
+                    engine = "openai-context";
+                }
+            } catch (err) {
+                console.warn("[Translation API] High-quality context translation failed, falling back:", err);
+            }
+        }
+
+        if (!translatedText && usePapago) {
             try {
                 if (v3AiVendorContext) {
                     const papagoData = await callV3AiVendor(v3AiVendorContext.request, {

@@ -4,6 +4,7 @@ import android.Manifest;
 import android.os.Build;
 import android.os.Bundle;
 import android.webkit.CookieManager;
+import android.webkit.WebSettings;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -32,6 +33,12 @@ public class MainActivity extends BridgeActivity {
             cookies.setAcceptThirdPartyCookies(getBridge().getWebView(), true);
         }
         cookies.flush();
+
+        // 현장 실시간 통역은 관리자의 발화가 도착하면 근로자 언어 음성을 즉시
+        // 재생하는 방송 기능이다. 근로자가 매 발화마다 스피커를 누르지 않도록
+        // 이 앱 WebView에서 HTML 오디오의 사용자 제스처 요구를 해제한다.
+        WebSettings webSettings = getBridge().getWebView().getSettings();
+        webSettings.setMediaPlaybackRequiresUserGesture(false);
 
         requestMediaPermissions();
     }

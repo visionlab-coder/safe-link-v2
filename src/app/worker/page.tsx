@@ -681,7 +681,7 @@ function WorkerHomeContent() {
                 });
                 if (!response.ok || cancelled) return;
                 const payload = await response.json() as {
-                    tbms?: Array<{ created_at?: string | null; published_at?: string | null }>;
+                    tbms?: Array<{ id?: string | number; title?: string | null; content_ko?: string | null; created_at?: string | null; published_at?: string | null }>;
                 };
                 const latest = payload.tbms?.[0];
                 if (!latest) {
@@ -692,6 +692,7 @@ function WorkerHomeContent() {
                     setHasNewTBM(true);
                     const timestamp = latest.published_at ?? latest.created_at;
                     setNewTBMTime(timestamp ? new Date(timestamp).toLocaleTimeString() : "");
+
                 }
             } catch {
                 // 네트워크 일시 실패는 다음 주기에 다시 조회한다.
