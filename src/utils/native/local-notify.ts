@@ -13,6 +13,9 @@ type CapWindow = Window & {
     Capacitor?: {
         isNativePlatform?: () => boolean;
         Plugins?: { LocalNotifications?: any };
+        // 원격 URL을 로드하는 WebView에서는 Plugins 객체에 사전 노출되지 않을 수 있다.
+        // 이 경우 Capacitor bridge의 native plugin proxy를 직접 등록해 사용한다.
+        registerPlugin?: (name: string) => any;
     };
 };
 
@@ -20,7 +23,13 @@ function getLocalNotifications(): any | null {
     if (typeof window === "undefined") return null;
     const cap = (window as CapWindow).Capacitor;
     if (!cap?.isNativePlatform?.()) return null;
-    return cap.Plugins?.LocalNotifications ?? null;
+    const existing = cap.Plugins?.LocalNotifications;
+    if (existing) return existing;
+    try {
+        return cap.registerPlugin?.("LocalNotifications") ?? null;
+    } catch {
+        return null;
+    }
 }
 
 /** Capacitor 네이티브 앱 안에서 실행 중인지 */
