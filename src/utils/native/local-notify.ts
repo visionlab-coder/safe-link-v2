@@ -57,6 +57,24 @@ function nextId(): number {
     return idCounter || 1;
 }
 
+const TBM_NOTIFICATION_CHANNEL = "tbm-safety-alerts-v1";
+
+/** Android 8+는 알림별이 아니라 채널별 소리 설정을 사용한다. */
+async function ensureTbmNotificationChannel(ln: any): Promise<void> {
+    try {
+        await ln.createChannel?.({
+            id: TBM_NOTIFICATION_CHANNEL,
+            name: "TBM 안전 알림",
+            description: "관리자가 전파한 새 TBM 안전 브리핑 알림",
+            importance: 5,
+            visibility: 1,
+            vibration: true,
+        });
+    } catch {
+        // 채널을 지원하지 않는 구형 Android에서는 기본 알림으로 계속 보낸다.
+    }
+}
+
 /**
  * 즉시 로컬 알림 표시(네이티브에서만, 그 외 no-op).
  * 실패는 조용히 무시 — 알림은 보조 기능이라 본 흐름을 막지 않는다.
@@ -65,6 +83,7 @@ export async function notifyNative(title: string, body: string): Promise<void> {
     const ln = getLocalNotifications();
     if (!ln) return;
     try {
+        await ensureTbmNotificationChannel(ln);
         await ln.schedule({
             notifications: [
                 {
@@ -72,6 +91,8 @@ export async function notifyNative(title: string, body: string): Promise<void> {
                     title,
                     body,
                     smallIcon: "ic_launcher",
+                    channelId: TBM_NOTIFICATION_CHANNEL,
+                    sound: "default",
                 },
             ],
         });
