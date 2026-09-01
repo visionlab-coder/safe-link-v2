@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Noto_Sans, Noto_Sans_KR, Noto_Sans_SC, Noto_Sans_TC, Noto_Sans_JP, Noto_Sans_Thai, Noto_Sans_Arabic, Noto_Sans_Devanagari } from "next/font/google";
 import "./globals.css";
 import AuthListener from "@/components/AuthListener";
+import ChatPresenceHeartbeat from "@/components/ChatPresenceHeartbeat";
 import OfflineBanner from "@/components/OfflineBanner";
 import TtsFailureToast from "@/components/TtsFailureToast";
 
@@ -133,6 +134,7 @@ export default function RootLayout({
         />
         <OfflineBanner />
         <AuthListener />
+        <ChatPresenceHeartbeat />
         <TtsFailureToast />
         <div className="safe-area-page">{children}</div>
       </body>

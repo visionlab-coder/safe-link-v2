@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 type PresencePayload = { online_user_ids?: string[] };
 
-/** Chat 화면이 열려 있는 사용자만 45초 유효시간으로 온라인 처리한다. */
+/** 로그인된 앱이 heartbeat를 보낸 사용자를 45초 유효시간으로 온라인 처리한다. */
 export function usePresence(userId: string | null, peerIds: string[] = []) {
     const [onlineUsers, setOnlineUsers] = useState<Set<string>>(() => new Set());
     const peerKey = useMemo(() => Array.from(new Set(peerIds)).sort().join(","), [peerIds]);

@@ -16,8 +16,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Chat-only presence. A user is online while the chat screen sends a heartbeat
- * within the last 45 seconds. The lookup is always restricted to a shared site.
+ * A user is online while an authenticated app sends a heartbeat within the last
+ * 45 seconds. The lookup is always restricted to a shared site.
  */
 @RestController
 @RequestMapping("/api/v1/chat/compat/presence")
