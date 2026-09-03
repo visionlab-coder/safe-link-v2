@@ -380,11 +380,11 @@ const SYSTEM_EXTRA = {
 } as const;
 
 const SYSTEM_ACCOUNT_MENU = {
-    ko: { account: "계정 메뉴", profile: "내 정보", system: "시스템 관리", control: "통합 관제" },
-    en: { account: "Account menu", profile: "My profile", system: "System management", control: "Integrated control" },
-    zh: { account: "账户菜单", profile: "我的资料", system: "系统管理", control: "综合管控" },
-    vi: { account: "Menu tài khoản", profile: "Hồ sơ của tôi", system: "Quản lý hệ thống", control: "Điều hành tích hợp" },
-    ru: { account: "Меню аккаунта", profile: "Мой профиль", system: "Управление системой", control: "Интегрированный контроль" },
+    ko: { account: "계정 메뉴", profile: "내 정보", admin: "관리자 통합 현황", control: "통합 관제" },
+    en: { account: "Account menu", profile: "My profile", admin: "Admin overview", control: "Integrated control" },
+    zh: { account: "账户菜单", profile: "我的资料", admin: "管理员综合概览", control: "综合管控" },
+    vi: { account: "Menu tài khoản", profile: "Hồ sơ của tôi", admin: "Tổng quan quản trị", control: "Điều hành tích hợp" },
+    ru: { account: "Меню аккаунта", profile: "Мой профиль", admin: "Обзор администратора", control: "Интегрированный контроль" },
 } as const;
 
 function LoadingScreen({ label }: { label: string }) {
@@ -921,7 +921,7 @@ export default function SystemAdminPage() {
                                 {isAccountMenuOpen && (
                                     <div className="absolute right-0 top-[calc(100%+0.5rem)] z-[90] w-48 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 text-slate-700 shadow-[0_16px_40px_rgba(16,42,67,.16)]">
                                         <button onClick={() => window.location.href = "/auth/setup"} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors hover:bg-blue-50 hover:text-blue-700"><UserRound className="h-4 w-4" />{accountMenu.profile}</button>
-                                        {isRootAdmin && <button onClick={() => window.location.href = "/system"} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors hover:bg-indigo-50 hover:text-indigo-700"><Settings className="h-4 w-4" />{accountMenu.system}</button>}
+                                        {isRootAdmin && <button onClick={() => window.location.href = "/admin"} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors hover:bg-blue-50 hover:text-blue-700"><Settings className="h-4 w-4" />{accountMenu.admin}</button>}
                                         {isRootAdmin && <button onClick={() => window.location.href = "/control"} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors hover:bg-blue-50 hover:text-blue-700"><Settings className="h-4 w-4" />{accountMenu.control}</button>}
                                         <div className="my-1 border-t border-slate-100" />
                                         <button onClick={handleSignOut} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold text-red-600 transition-colors hover:bg-red-50"><LogOut className="h-4 w-4" />{t.common.signOut}</button>
