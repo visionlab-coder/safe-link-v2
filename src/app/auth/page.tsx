@@ -186,10 +186,14 @@ const accentLine: React.CSSProperties = {
   background: "linear-gradient(90deg, transparent, #0b5ed7, transparent)",
 };
 const fieldBox: React.CSSProperties = {
-  background: "#f8fafc",
-  border: "1px solid #cdd6e2",
-  borderRadius: 12,
-  transition: "border-color 0.2s",
+  width: "100%",
+  boxSizing: "border-box",
+  overflow: "hidden",
+  background: "#f8fbff",
+  border: "1px solid #b9cbe4",
+  borderRadius: 14,
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,.8)",
+  transition: "border-color .2s ease, box-shadow .2s ease, background-color .2s ease",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -650,7 +654,7 @@ function AuthContent() {
                       setWorkerLoginError("");
                     }}
                     maxLength={6}
-                    className="w-full bg-transparent text-white text-base font-mono font-black tracking-wider placeholder-slate-700 outline-none px-4 py-3.5"
+                    className="block w-full box-border border-0 bg-transparent text-white text-base font-mono font-black tracking-wider placeholder-slate-700 outline-none px-4 py-3.5"
                   />
                 </div>
 
@@ -668,7 +672,7 @@ function AuthContent() {
                     }}
                     onKeyDown={e => e.key === "Enter" && handleWorkerEnter()}
                     maxLength={4}
-                    className="w-full bg-transparent text-white text-base font-mono font-black tracking-[0.3em] placeholder-slate-700 outline-none px-4 py-3.5"
+                    className="block w-full box-border border-0 bg-transparent text-white text-base font-mono font-black tracking-[0.3em] placeholder-slate-700 outline-none px-4 py-3.5"
                   />
                 </div>
 
@@ -739,7 +743,7 @@ function AuthContent() {
                 <div style={fieldBox}>
                   <input type="email" aria-label={emailLabel} placeholder={emailLabel} value={adminEmail}
                     onChange={e => setAdminEmail(e.target.value)}
-                    className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
+                    className="block w-full box-border border-0 bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
                 </div>
 
                 {/* Password */}
@@ -747,7 +751,7 @@ function AuthContent() {
                   <input type="password" aria-label={t.pass} placeholder={t.pass} value={password}
                     onChange={e => setPassword(e.target.value)}
                     onKeyDown={e => !adminSignupMode && e.key === "Enter" && handleAdminLogin()}
-                    className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
+                    className="block w-full box-border border-0 bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
                 </div>
 
                 {!adminSignupMode && (
@@ -772,7 +776,7 @@ function AuthContent() {
                     }}>
                       <input type="password" aria-label={t.passConfirm} placeholder={t.passConfirm} value={passConfirm}
                         onChange={e => setPassConfirm(e.target.value)}
-                        className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5 pr-11" />
+                        className="block w-full box-border border-0 bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5 pr-11" />
                       {passConfirm && (
                         <span className="absolute right-3.5 top-1/2 -translate-y-1/2">
                           {passConfirm === password
@@ -785,7 +789,7 @@ function AuthContent() {
                     <div style={fieldBox}>
                       <input type="email" aria-label={t.backupEmail} placeholder={t.backupEmail} value={backupEmail}
                         onChange={e => setBackupEmail(e.target.value)}
-                        className="w-full bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
+                        className="block w-full box-border border-0 bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
                     </div>
                   </>
                 )}
