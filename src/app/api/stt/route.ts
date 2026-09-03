@@ -7,13 +7,38 @@ import { CONSTRUCTION_GLOSSARY } from "@/constants/glossary";
 
 export const runtime = "nodejs";
 
-function normalizeServerSide(text: string): { normalized: string; changes: { from: string; to: string }[] } {
+/**
+ * 한국어 STT가 현장 소음에서 자주 만드는 명백한 오인식만 보정한다.
+ *
+ * `안전`을 말했는데 "안 센티미터" 또는 "안 미터"로 나오는 사례가 있어
+ * 번역 전에 바로잡는다. 숫자와 함께 쓰인 실제 길이(예: "10센티미터")는
+ * 대상이 아니므로 보존된다.
+ */
+function normalizeKoreanSttMisrecognitions(text: string): { normalized: string; changes: { from: string; to: string }[] } {
   const changes: { from: string; to: string }[] = [];
+  const corrections: Array<{ pattern: RegExp; replacement: string }> = [
+    { pattern: /안\s*센티(?:미터)?/g, replacement: "안전" },
+    { pattern: /안\s*미터/g, replacement: "안전" },
+  ];
+
+  let normalized = text;
+  for (const { pattern, replacement } of corrections) {
+    normalized = normalized.replace(pattern, (matched) => {
+      changes.push({ from: matched, to: replacement });
+      return replacement;
+    });
+  }
+  return { normalized, changes };
+}
+
+function normalizeServerSide(text: string): { normalized: string; changes: { from: string; to: string }[] } {
+  const sttCorrection = normalizeKoreanSttMisrecognitions(text);
+  const changes: { from: string; to: string }[] = [...sttCorrection.changes];
   const sorted = Object.entries(CONSTRUCTION_GLOSSARY)
     .filter(([, standard]) => !standard.includes("("))
     .sort((a, b) => b[0].length - a[0].length);
   const placeholders: string[] = [];
-  let result = text;
+  let result = sttCorrection.normalized;
   for (const [slang, standard] of sorted) {
     if (!result.includes(slang)) continue;
     changes.push({ from: slang, to: standard });
