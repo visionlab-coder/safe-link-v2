@@ -37,6 +37,9 @@ import {
     Clock,
     CheckCircle2,
     Menu,
+    ChevronDown,
+    LogOut,
+    UserRound,
 } from "lucide-react";
 import { persistDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
@@ -376,6 +379,14 @@ const SYSTEM_EXTRA = {
     ru: { loading: "Проверка доступа…", menuOpen: "Открыть системное меню", menuClose: "Закрыть системное меню", menuCollapse: "Свернуть системное меню", displayLanguage: "Язык интерфейса", audit: "Журнал аудита безопасности", recentOnly: "Последние 7 дней · только для главного администратора", refresh: "Обновить", allEvents: "Все события", warning: "Предупреждение", critical: "Критический", time: "Время", event: "Событие", actor: "Исполнитель", level: "Уровень", noLogs: "Нет журналов", info: "Информация", settings: "Глобальные настройки системы", sessionOnly: "Сохранено в сессии браузера · только для главного администратора", systemMode: "Режим системы", pilot: "Пилотный режим (POC)", production: "Рабочий режим (PROD)", escalation: "Время эскалации тревоги", minutes: "мин", escalationDesc: (minutes: number) => `Автоматически сообщить в штаб, если не устранено за ${minutes} мин.`, reminder: "Напоминание TBM", enabled: "Включено", disabled: "Выключено", reminderDesc: "Автоматически уведомлять объекты без TBM в 7:30", defaultLanguage: "Язык по умолчанию", emergencyContact: "Экстренный контакт", phonePlaceholder: "Введите номер телефона", emergencyDesc: "Приоритетный контакт при серьёзном происшествии (Министерство труда: 1544-1350)", maintenance: "Режим обслуживания", maintenanceDesc: "После включения доступ остаётся только у главного администратора", save: "Сохранить настройки", saved: "Сохранено" },
 } as const;
 
+const SYSTEM_ACCOUNT_MENU = {
+    ko: { account: "계정 메뉴", profile: "내 정보", system: "시스템 관리", control: "통합 관제" },
+    en: { account: "Account menu", profile: "My profile", system: "System management", control: "Integrated control" },
+    zh: { account: "账户菜单", profile: "我的资料", system: "系统管理", control: "综合管控" },
+    vi: { account: "Menu tài khoản", profile: "Hồ sơ của tôi", system: "Quản lý hệ thống", control: "Điều hành tích hợp" },
+    ru: { account: "Меню аккаунта", profile: "Мой профиль", system: "Управление системой", control: "Интегрированный контроль" },
+} as const;
+
 function LoadingScreen({ label }: { label: string }) {
     return (
         <div className="console-light min-h-screen flex flex-col items-center justify-center bg-slate-950 text-blue-600">
@@ -423,8 +434,10 @@ export default function SystemAdminPage() {
     const [approvingAdminId, setApprovingAdminId] = useState<number | null>(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
     const t = systemUI[lang] || systemUI.en;
     const extra = SYSTEM_EXTRA[lang as keyof typeof SYSTEM_EXTRA] || SYSTEM_EXTRA.en;
+    const accountMenu = SYSTEM_ACCOUNT_MENU[lang as keyof typeof SYSTEM_ACCOUNT_MENU] || SYSTEM_ACCOUNT_MENU.en;
 
     useEffect(() => {
         if (SYSTEM_LANGUAGE_OPTIONS.some((option) => option.code === displayLanguage)) {
@@ -582,6 +595,7 @@ export default function SystemAdminPage() {
                 const data = (await res.json()) as {
                     user?: { id: string; email: string | null };
                     profile?: { role?: string; display_name?: string | null; preferred_lang?: string | null } | null;
+                    v3?: { roles?: string[] };
                 };
                 if (data.user && data.profile) {
                     setCurrentUser({
@@ -589,6 +603,7 @@ export default function SystemAdminPage() {
                         email: data.user.email,
                         display_name: data.profile.display_name,
                         role: data.profile.role,
+                        roles: Array.isArray(data.v3?.roles) ? data.v3.roles.map((role) => role.toUpperCase()) : [String(data.profile.role || "")],
                         preferred_lang: data.profile.preferred_lang || "ko",
                     });
                     const savedLang = localStorage.getItem("safe-link-lang");
@@ -655,6 +670,8 @@ export default function SystemAdminPage() {
         await logoutV3().catch(() => undefined);
         window.location.href = "/auth";
     };
+
+    const isRootAdmin = currentUser?.roles?.includes("ROOT") === true;
 
     const handleOpenAddModal = () => {
         setEditingSite(null);
@@ -894,6 +911,23 @@ export default function SystemAdminPage() {
                                     <option key={option.code} value={option.code}>{option.label}</option>
                                 ))}
                             </select>
+
+                            <div className="relative">
+                                <button type="button" aria-label={accountMenu.account} aria-expanded={isAccountMenuOpen} onClick={() => setIsAccountMenuOpen((open) => !open)} className="flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[10px] font-black text-slate-700 shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+                                    <UserRound className="h-3.5 w-3.5" />
+                                    <span className="hidden sm:inline">{currentUser?.display_name || accountMenu.profile}</span>
+                                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isAccountMenuOpen ? "rotate-180" : ""}`} />
+                                </button>
+                                {isAccountMenuOpen && (
+                                    <div className="absolute right-0 top-[calc(100%+0.5rem)] z-[90] w-48 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 text-slate-700 shadow-[0_16px_40px_rgba(16,42,67,.16)]">
+                                        <button onClick={() => window.location.href = "/auth/setup"} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors hover:bg-blue-50 hover:text-blue-700"><UserRound className="h-4 w-4" />{accountMenu.profile}</button>
+                                        {isRootAdmin && <button onClick={() => window.location.href = "/system"} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors hover:bg-indigo-50 hover:text-indigo-700"><Settings className="h-4 w-4" />{accountMenu.system}</button>}
+                                        {isRootAdmin && <button onClick={() => window.location.href = "/control"} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors hover:bg-blue-50 hover:text-blue-700"><Settings className="h-4 w-4" />{accountMenu.control}</button>}
+                                        <div className="my-1 border-t border-slate-100" />
+                                        <button onClick={handleSignOut} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold text-red-600 transition-colors hover:bg-red-50"><LogOut className="h-4 w-4" />{t.common.signOut}</button>
+                                    </div>
+                                )}
+                            </div>
 
                             {activeTab === 'sites' && (
                                 <motion.button
