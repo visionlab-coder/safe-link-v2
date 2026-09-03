@@ -49,19 +49,9 @@ export default function RoleGuard({
         let cancelled = false;
 
         const checkAuth = async () => {
-            // rememberMe 처리: 브라우저 닫고 다시 열면 자동 로그인 안 함.
-            const rememberMe = typeof localStorage !== "undefined"
-                ? localStorage.getItem("safe-link-remember")
-                : null;
-            const sessionActive = typeof sessionStorage !== "undefined"
-                ? sessionStorage.getItem("safe-link-session-active")
-                : null;
-            if (rememberMe === "false" && !sessionActive) {
-                // signOut 호출은 cookie 클리어용 — /api/auth/signout 호출하면 좋지만
-                // 지금은 단순히 /auth 로 보내고 거기서 클리어.
-                router.replace("/auth");
-                return;
-            }
+            // V3에서는 서버의 HttpOnly 세션 쿠키가 인증의 기준이다.
+            // sessionStorage는 UI 보조값이므로, 새 탭·새로고침·직접 URL 진입에서
+            // 값이 없다는 이유만으로 유효한 서버 세션을 로그인 화면으로 보내지 않는다.
 
             try {
                 const v3User = await getV3CurrentUser().catch(() => null);
