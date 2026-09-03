@@ -104,6 +104,7 @@ function sanitizeAuthError(msg: string, language: string): string {
 }
 
 type Mode = "lang" | "role" | "worker" | "admin";
+type AuthFlash = { tone: "error" | "success"; message: string } | null;
 
 const V3_ROLE_PRIORITY: V3Role[] = ["ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER", "WORKER", "VIEWER"];
 
@@ -220,6 +221,7 @@ function AuthContent() {
   const [phoneLast4, setPhoneLast4] = useState("");
   const [multipleSites, setMultipleSites] = useState<Array<{ site_id: string; name: string; site_code: string | null }>>([]);
   const [workerLoginError, setWorkerLoginError] = useState("");
+  const [authFlash, setAuthFlash] = useState<AuthFlash>(null);
 
   useEffect(() => {
     const savedLang = localStorage.getItem("safe-link-lang");
@@ -353,6 +355,7 @@ function AuthContent() {
 
   const handleAdminLogin = async () => {
     if (!adminEmail || !password) return;
+    setAuthFlash(null);
     setLoading(true);
     const activeLang = lang || "ko";
     try {
@@ -369,7 +372,7 @@ function AuthContent() {
       sessionStorage.setItem("safe-link-session-active", "true");
       redirectByRoleString(pickDefaultV3Role(user.roles), activeLang);
     } catch (err) {
-      alert(sanitizeAuthError(err instanceof Error ? err.message : "unknown", activeLang));
+      setAuthFlash({ tone: "error", message: sanitizeAuthError(err instanceof Error ? err.message : "unknown", activeLang) });
       setLoading(false);
     }
   };
@@ -377,10 +380,11 @@ function AuthContent() {
   const handleAdminSignup = async () => {
     if (!adminEmail || !password || !passConfirm) return;
     if (password !== passConfirm) {
-      alert(t.noMatch);
+      setAuthFlash({ tone: "error", message: t.noMatch });
       return;
     }
 
+    setAuthFlash(null);
     setLoading(true);
     const activeLang = lang || "ko";
     try {
@@ -390,7 +394,7 @@ function AuthContent() {
         preferredLang: activeLang,
       });
       if (signup.approvalRequired || signup.accountStatus === "PENDING") {
-        alert((AUTH_NOTICES[activeLang] ?? AUTH_NOTICES.en).signupPending);
+        setAuthFlash({ tone: "success", message: (AUTH_NOTICES[activeLang] ?? AUTH_NOTICES.en).signupPending });
         setAdminSignupMode(false);
         setPassConfirm("");
         setLoading(false);
@@ -398,7 +402,7 @@ function AuthContent() {
       }
       setLoading(false);
     } catch (err) {
-      alert(sanitizeAuthError(err instanceof Error ? err.message : "unknown", activeLang));
+      setAuthFlash({ tone: "error", message: sanitizeAuthError(err instanceof Error ? err.message : "unknown", activeLang) });
       setLoading(false);
     }
   };
@@ -523,6 +527,20 @@ function AuthContent() {
         <div style={glassCard} className="overflow-hidden">
           <div style={accentLine} />
           <div className="p-6">
+            {authFlash && (
+              <div
+                role={authFlash.tone === "error" ? "alert" : "status"}
+                aria-live="polite"
+                className={`mb-4 flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs font-bold ${authFlash.tone === "error"
+                  ? "border border-red-200 bg-red-50 text-red-700"
+                  : "border border-emerald-200 bg-emerald-50 text-emerald-800"}`}
+              >
+                {authFlash.tone === "error"
+                  ? <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}
+                <span>{authFlash.message}</span>
+              </div>
+            )}
 
             {/* ── ROLE SCREEN ── */}
             {mode === "role" && (
