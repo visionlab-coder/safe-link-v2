@@ -25,6 +25,17 @@ export const getVoiceLang = (c: string) => {
 };
 
 /**
+ * 모바일 기기에는 한국어만 설치된 경우가 많다. 그 상태에서 speechSynthesis에
+ * 중국어 텍스트를 넘기면 기본 한국어 음성이 글자를 잘못 읽으므로, 해당 언어의
+ * 음성이 실제로 설치된 경우에만 기기 TTS를 사용한다.
+ */
+const hasNativeVoiceForLanguage = (langCode: string): boolean => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return false;
+    const base = getVoiceLang(langCode).split("-")[0].toLowerCase();
+    return window.speechSynthesis.getVoices().some(voice => voice.lang.toLowerCase().startsWith(base));
+};
+
+/**
  * 음성 재생 시 괄호 안의 내용은 무조건 제거 (근로자 피로감 방지)
  */
 export const stripForSpeech = (text: string): string => {
@@ -90,7 +101,7 @@ export const playPremiumAudio = (
     const isAppleMobile = /iPad|iPhone|iPod/.test(navigator.userAgent)
         || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     const isAndroid = /Android/i.test(navigator.userAgent);
-    if ((isAppleMobile || isAndroid) && window.speechSynthesis) {
+    if ((isAppleMobile || isAndroid) && hasNativeVoiceForLanguage(langCode)) {
         playBrowserNativeAudio(cleanText, langCode, gender, onEnd, onStart);
         return;
     }
