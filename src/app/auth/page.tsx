@@ -425,7 +425,7 @@ function AuthContent() {
           <div className="p-7">
             {/* Header */}
             <div className="text-center mb-7">
-              <BrandLogo compact={false} framed className="mb-4 justify-center" imageClassName="max-w-[250px]" />
+              <BrandLogo compact={false} className="mb-4 justify-center" imageClassName="max-w-[250px]" />
               <div className="relative mb-4 h-28 overflow-hidden rounded-2xl border border-[#cdd6e2]">
                 <picture>
                   <source media="(max-width: 639px)" srcSet="/images/mobile-v3/android/access.webp" />
@@ -498,7 +498,7 @@ function AuthContent() {
 
         {/* Brand + lang chip */}
         <div className="text-center mb-5">
-          <BrandLogo compact framed className="mb-3 justify-center" imageClassName="max-w-[180px]" />
+          <BrandLogo compact className="mb-3 justify-center" imageClassName="max-w-[180px]" />
           <h1 className="text-4xl font-black text-white tracking-tighter leading-none">
             SQ<span className="text-blue-400"> LINK</span>
           </h1>

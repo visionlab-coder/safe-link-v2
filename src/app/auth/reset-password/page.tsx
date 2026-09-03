@@ -72,7 +72,7 @@ function ResetPasswordContent() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-[#eef3f8] text-slate-900 px-5 py-10">
       <section className="w-full max-w-md rounded-3xl border border-[#d9e1ea] bg-white p-6 shadow-[0_18px_42px_rgba(16,42,67,0.14)] sm:p-8">
-        <BrandLogo compact showProduct framed className="justify-center" imageClassName="max-w-[180px]" />
+        <BrandLogo compact showProduct className="justify-center" imageClassName="max-w-[180px]" />
         <div className="flex items-center gap-3 my-6">
           <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-blue-50 border border-blue-200"><Lock className="w-5 h-5 text-blue-600" /></div>
           <div><h1 className="text-lg font-black text-slate-900">{t.title}</h1><p className="text-xs text-slate-500 mt-1 leading-5">{t.desc}</p></div>
