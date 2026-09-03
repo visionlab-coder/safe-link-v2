@@ -224,6 +224,7 @@ export async function callV3AiStt(
     live: boolean;
     speechHints?: string[];
     prompt?: string;
+    targetLanguages?: string[];
   },
 ): Promise<Response | null> {
   return callV3AiMedia(request, "/api/v1/ai/stt", payload);
