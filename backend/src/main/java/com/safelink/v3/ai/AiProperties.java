@@ -8,10 +8,16 @@ public class AiProperties {
     private long defaultLimitCount = 60;
     private boolean failOpenLocal;
     private boolean vendorEnabled;
+    private String translationProvider = "auto";
+    private String sttProvider = "auto";
     private String googleCloudApiKey = "";
     private String naverClientId = "";
     private String naverClientSecret = "";
     private String openAiApiKey = "";
+    private String flittoApiKey = "";
+    private String flittoApiBaseUrl = "";
+    private String deeplApiKey = "";
+    private String deeplApiBaseUrl = "https://api.deepl.com";
     private String openAiTextModel = "gpt-4o-mini";
     private String openAiVisionModel = "gpt-4o-mini";
     private String internalGatewaySecret = "";
@@ -29,6 +35,10 @@ public class AiProperties {
     public void setFailOpenLocal(boolean failOpenLocal) { this.failOpenLocal = failOpenLocal; }
     public boolean isVendorEnabled() { return vendorEnabled; }
     public void setVendorEnabled(boolean vendorEnabled) { this.vendorEnabled = vendorEnabled; }
+    public String getTranslationProvider() { return translationProvider; }
+    public void setTranslationProvider(String translationProvider) { this.translationProvider = translationProvider; }
+    public String getSttProvider() { return sttProvider; }
+    public void setSttProvider(String sttProvider) { this.sttProvider = sttProvider; }
     public String getGoogleCloudApiKey() { return googleCloudApiKey; }
     public void setGoogleCloudApiKey(String googleCloudApiKey) { this.googleCloudApiKey = googleCloudApiKey; }
     public String getNaverClientId() { return naverClientId; }
@@ -37,6 +47,14 @@ public class AiProperties {
     public void setNaverClientSecret(String naverClientSecret) { this.naverClientSecret = naverClientSecret; }
     public String getOpenAiApiKey() { return openAiApiKey; }
     public void setOpenAiApiKey(String openAiApiKey) { this.openAiApiKey = openAiApiKey; }
+    public String getFlittoApiKey() { return flittoApiKey; }
+    public void setFlittoApiKey(String flittoApiKey) { this.flittoApiKey = flittoApiKey; }
+    public String getFlittoApiBaseUrl() { return flittoApiBaseUrl; }
+    public void setFlittoApiBaseUrl(String flittoApiBaseUrl) { this.flittoApiBaseUrl = flittoApiBaseUrl; }
+    public String getDeeplApiKey() { return deeplApiKey; }
+    public void setDeeplApiKey(String deeplApiKey) { this.deeplApiKey = deeplApiKey; }
+    public String getDeeplApiBaseUrl() { return deeplApiBaseUrl; }
+    public void setDeeplApiBaseUrl(String deeplApiBaseUrl) { this.deeplApiBaseUrl = deeplApiBaseUrl; }
     public String getOpenAiTextModel() { return openAiTextModel; }
     public void setOpenAiTextModel(String openAiTextModel) { this.openAiTextModel = openAiTextModel; }
     public String getOpenAiVisionModel() { return openAiVisionModel; }

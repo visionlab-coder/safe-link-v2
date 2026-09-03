@@ -40,11 +40,36 @@ public class AiMediaService {
         List<String> speechHints,
         String prompt
     ) {
+        return switch (selectedSttProvider()) {
+            case "auto" -> transcribeDefault(audio, mimeType, languageCode, sampleRateHertz, live, speechHints, prompt);
+            case "google" -> transcribeGoogle(audio, mimeType, languageCode, sampleRateHertz, live, speechHints);
+            case "openai" -> transcribeOpenAi(audio, mimeType, languageCode, prompt);
+            // 실제 API 규격·권한이 도착하기 전에는 기존 Google STT로 조용히 폴백하지 않습니다.
+            // 테스트 로그가 선택한 공급자와 정확히 일치하도록 하기 위함입니다.
+            case "flitto", "deepl" -> throw new ServiceUnavailableException(selectedSttProvider() + "_stt_adapter_not_configured");
+            default -> throw new IllegalArgumentException("unsupported_stt_provider");
+        };
+    }
+
+    private SttResult transcribeDefault(
+        String audio,
+        String mimeType,
+        String languageCode,
+        int sampleRateHertz,
+        boolean live,
+        List<String> speechHints,
+        String prompt
+    ) {
         if (!live && configured(properties.getOpenAiApiKey())) {
             SttResult openAi = tryCall(() -> transcribeOpenAi(audio, mimeType, languageCode, prompt));
             if (openAi != null && !openAi.transcript().isBlank()) return openAi;
         }
         return transcribeGoogle(audio, mimeType, languageCode, sampleRateHertz, live, speechHints);
+    }
+
+    private String selectedSttProvider() {
+        String value = properties.getSttProvider();
+        return value == null || value.isBlank() ? "auto" : value.trim().toLowerCase();
     }
 
     public AudioResult synthesize(

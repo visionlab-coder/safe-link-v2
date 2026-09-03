@@ -97,10 +97,18 @@ safe-link:
     default-limit-count: ${SAFE_LINK_AI_LIMIT_COUNT:60}
     fail-open-local: ${SAFE_LINK_AI_FAIL_OPEN_LOCAL:false}
     vendor-enabled: ${SAFE_LINK_AI_VENDOR_ENABLED:false}
+    # 공급자 비교 테스트는 아래 두 값만 바꿉니다. 키는 서버 환경변수에만 둡니다.
+    # auto = 기존 기본 경로(번역: Papago→Google, STT: 기존 Google/OpenAI 규칙)
+    translation-provider: ${SAFE_LINK_TRANSLATION_PROVIDER:auto}
+    stt-provider: ${SAFE_LINK_STT_PROVIDER:auto}
     google-cloud-api-key: ${GOOGLE_CLOUD_API_KEY:}
     naver-client-id: ${NAVER_CLIENT_ID:}
     naver-client-secret: ${NAVER_CLIENT_SECRET:}
     open-ai-api-key: ${OPENAI_API_KEY:}
+    flitto-api-key: ${FLITTO_API_KEY:}
+    flitto-api-base-url: ${FLITTO_API_BASE_URL:}
+    deepl-api-key: ${DEEPL_API_KEY:}
+    deepl-api-base-url: ${DEEPL_API_BASE_URL:https://api.deepl.com}
     open-ai-text-model: ${OPENAI_TEXT_MODEL:gpt-4o-mini}
     open-ai-vision-model: ${OPENAI_VISION_MODEL:gpt-4o-mini}
     internal-gateway-secret: ${TRAVEL_API_SECRET:}

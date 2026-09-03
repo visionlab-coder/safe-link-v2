@@ -33,12 +33,30 @@ public class AiVendorService {
     }
 
     public VendorResult translateAuto(String text, String sourceLanguage, String targetLanguage) {
+        return switch (selectedTranslationProvider()) {
+            case "auto" -> translateDefault(text, sourceLanguage, targetLanguage);
+            case "papago" -> translatePapago(text, sourceLanguage, targetLanguage);
+            case "google" -> translateGoogle(text, sourceLanguage, targetLanguage);
+            case "openai" -> generateOpenAi(translationPrompt(text, sourceLanguage, targetLanguage), 1024, 0.2);
+            // 실제 API 규격·권한이 도착하기 전에는 기존 엔진으로 조용히 폴백하지 않습니다.
+            // 그래야 플리토/DeepL 비교 기간에 다른 공급자를 쓴 결과가 섞이지 않습니다.
+            case "flitto", "deepl" -> throw new ServiceUnavailableException(selectedTranslationProvider() + "_translation_adapter_not_configured");
+            default -> throw new IllegalArgumentException("unsupported_translation_provider");
+        };
+    }
+
+    private VendorResult translateDefault(String text, String sourceLanguage, String targetLanguage) {
         if (canUsePapago(sourceLanguage, targetLanguage)) {
             VendorResult papago = tryVendor(() -> translatePapago(text, sourceLanguage, targetLanguage));
             if (hasText(papago)) return papago;
         }
 
         return translateGoogle(text, sourceLanguage, targetLanguage);
+    }
+
+    private String selectedTranslationProvider() {
+        String value = properties.getTranslationProvider();
+        return value == null || value.isBlank() ? "auto" : value.trim().toLowerCase();
     }
 
     public VendorResult call(String provider, String text, String sourceLanguage, String targetLanguage, String prompt, Integer maxOutputTokens, Double temperature) {
