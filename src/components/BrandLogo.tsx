@@ -5,7 +5,6 @@ type BrandLogoProps = {
   imageClassName?: string;
   compact?: boolean;
   showProduct?: boolean;
-  framed?: boolean;
 };
 
 export default function BrandLogo({
@@ -13,14 +12,13 @@ export default function BrandLogo({
   imageClassName = "",
   compact = true,
   showProduct = false,
-  framed = false,
 }: BrandLogoProps) {
   const width = compact ? 208 : 360;
   const height = compact ? 60 : 104;
 
   return (
     <div className={`inline-flex items-center gap-3 ${className}`}>
-      <div className={framed ? "bg-white/95 px-3 py-2" : ""}>
+      <div>
         <Image
           src={compact ? "/brand/seowon-logo-compact-transparent.png" : "/brand/seowon-logo-transparent.png"}
           alt="SEOWON"
