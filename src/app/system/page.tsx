@@ -849,7 +849,7 @@ export default function SystemAdminPage() {
                 </aside>
 
                 {/* Main Content */}
-                <main className={`min-h-screen transition-[margin] duration-300 ${isSidebarCollapsed ? "md:ml-0" : "md:ml-64"}`}>
+                <main className={`system-main-frame min-h-screen min-w-0 transition-[margin] duration-300 ${isSidebarCollapsed ? "md:ml-0" : "md:ml-64"}`}>
                     <header className="concept-page-header">
                         <div className="flex min-w-0 items-center gap-3">
                             <button

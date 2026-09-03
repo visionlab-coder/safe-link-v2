@@ -309,6 +309,20 @@ body {
   min-width: 0;
 }
 
+/* /system은 고정 사이드바 때문에 main 영역이 오른쪽으로 밀린다.
+   공통 헤더의 100vw 폭을 그대로 쓰면 헤더만 사이드바 폭만큼 화면 밖으로
+   나가므로, 시스템 화면에서는 main 컨테이너 폭 안에서 렌더링한다. */
+.system-main-frame {
+  min-width: 0;
+}
+
+.system-main-frame > .concept-page-header {
+  width: 100%;
+  max-width: 100%;
+  margin-right: 0;
+  margin-left: 0;
+}
+
 @media (min-width: 640px) {
   .concept-page-header {
     padding-right: 2rem;
