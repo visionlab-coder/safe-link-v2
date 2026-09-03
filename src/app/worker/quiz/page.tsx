@@ -47,6 +47,14 @@ const i18n: Record<string, Record<string, string>> = {
     selectAll: "ตอบทุกข้อ", question: "ข้อ", of: "/",
     result: "ผล", excellent: "ยอดเยี่ยม", good: "ดี", tryAgain: "แนะนำให้อบรมซ้ำ", description: "ตรวจสอบเนื้อหาการอบรมความปลอดภัยวันนี้ด้วยแบบทดสอบ",
   },
+  km: {
+    title: "កម្រងសំណួរសុវត្ថិភាព", noQuiz: "មិនមានកម្រងសំណួរកំពុងដំណើរការទេ",
+    correct: "ត្រឹមត្រូវ!", wrong: "មិនត្រឹមត្រូវ", correctAnswer: "ចម្លើយត្រឹមត្រូវ",
+    back: "ត្រឡប់ក្រោយ", alreadyAnswered: "បានបញ្ជូនរួចហើយ", waiting: "កំពុងផ្ទុកកម្រងសំណួរ...",
+    submit: "បញ្ជូន", score: "ពិន្ទុ", outOf: "ក្នុងចំណោម", correct2: "ចម្លើយត្រឹមត្រូវ",
+    selectAll: "សូមឆ្លើយគ្រប់សំណួរ", question: "សំណួរ", of: "/",
+    result: "លទ្ធផល", excellent: "ល្អបំផុត", good: "ល្អ", tryAgain: "ណែនាំឱ្យបណ្តុះបណ្តាលឡើងវិញ", description: "ពិនិត្យខ្លឹមសារបណ្តុះបណ្តាលសុវត្ថិភាពថ្ងៃនេះដោយកម្រងសំណួរ។",
+  },
   id: {
     title: "KUIS KESELAMATAN", noQuiz: "Tidak ada kuis aktif",
     correct: "Benar!", wrong: "Salah", correctAnswer: "Jawaban benar",

@@ -44,6 +44,21 @@ const LIVE_COMMON: Record<string, Record<string, string>> = {
     zh: { info:"管理员的安全指导将以您选择的语言实时传达。", myVoice:"我的语音", manager:"管理员", stop:"停止说话", speak:"向管理员说话", wait:"等待管理员" },
     vi: { info:"Hướng dẫn an toàn của quản trị viên được truyền trực tiếp bằng ngôn ngữ bạn chọn.", myVoice:"Giọng nói của tôi", manager:"Quản trị viên", stop:"DỪNG NÓI", speak:"NÓI VỚI QUẢN TRỊ VIÊN", wait:"ĐANG CHỜ QUẢN TRỊ VIÊN" },
     ru: { info:"Указания по безопасности от администратора передаются в реальном времени на выбранном языке.", myVoice:"Мой голос", manager:"Администратор", stop:"ОСТАНОВИТЬ РЕЧЬ", speak:"ГОВОРИТЬ С АДМИНИСТРАТОРОМ", wait:"ОЖИДАНИЕ АДМИНИСТРАТОРА" },
+    th: { info:"คำแนะนำด้านความปลอดภัยจากผู้ดูแลจะส่งแบบสดในภาษาที่คุณเลือก", myVoice:"เสียงของฉัน", manager:"ผู้ดูแล", stop:"หยุดพูด", speak:"พูดกับผู้ดูแล", wait:"รอผู้ดูแล" },
+    uz: { info:"Administrator xavfsizlik ko'rsatmalari tanlangan tilingizda jonli uzatiladi.", myVoice:"Mening ovozim", manager:"Administrator", stop:"GAPIRISHNI TO'XTATISH", speak:"ADMINISTRATORGA GAPIRISH", wait:"ADMINISTRATOR KUTILMOQDA" },
+    ph: { info:"Ang gabay sa kaligtasan ng administrator ay ipinapadala nang live sa iyong napiling wika.", myVoice:"Aking boses", manager:"Administrator", stop:"ITIGIL ANG PAGSASALITA", speak:"KUMAUSAP SA ADMINISTRATOR", wait:"HINIHINTAY ANG ADMINISTRATOR" },
+    km: { info:"ការណែនាំសុវត្ថិភាពពីអ្នកគ្រប់គ្រងត្រូវបានបញ្ជូនផ្ទាល់ជាភាសាដែលអ្នកជ្រើសរើស។", myVoice:"សំឡេងរបស់ខ្ញុំ", manager:"អ្នកគ្រប់គ្រង", stop:"ឈប់និយាយ", speak:"និយាយទៅកាន់អ្នកគ្រប់គ្រង", wait:"កំពុងរង់ចាំអ្នកគ្រប់គ្រង" },
+    mn: { info:"Администраторын аюулгүй ажиллагааны заавар таны сонгосон хэлээр шууд дамжина.", myVoice:"Миний дуу", manager:"Администратор", stop:"ЯРИХАА ЗОГСООХ", speak:"АДМИНИСТРАТОРТ ЯРИХ", wait:"АДМИНИСТРАТОР ХҮЛЭЭЖ БАЙНА" },
+    my: { info:"စီမံခန့်ခွဲသူ၏ ဘေးကင်းရေးညွှန်ကြားချက်ကို သင်ရွေးချယ်သောဘာသာဖြင့် တိုက်ရိုက်ပို့ပေးသည်။", myVoice:"ကျွန်ုပ်၏အသံ", manager:"စီမံခန့်ခွဲသူ", stop:"စကားပြောရပ်ရန်", speak:"စီမံခန့်ခွဲသူထံ ပြောရန်", wait:"စီမံခန့်ခွဲသူကို စောင့်နေသည်" },
+    ne: { info:"प्रशासकको सुरक्षा निर्देशन तपाईंको छनोटको भाषामा प्रत्यक्ष पठाइन्छ।", myVoice:"मेरो आवाज", manager:"प्रशासक", stop:"बोल्न रोक्नुहोस्", speak:"प्रशासकसँग बोल्नुहोस्", wait:"प्रशासकको प्रतीक्षा" },
+    bn: { info:"প্রশাসকের নিরাপত্তা নির্দেশনা আপনার নির্বাচিত ভাষায় সরাসরি পাঠানো হয়।", myVoice:"আমার কণ্ঠ", manager:"প্রশাসক", stop:"কথা বলা বন্ধ করুন", speak:"প্রশাসকের সঙ্গে কথা বলুন", wait:"প্রশাসকের অপেক্ষায়" },
+    kk: { info:"Әкімшінің қауіпсіздік нұсқаулары таңдалған тіліңізде тікелей беріледі.", myVoice:"Менің дауысым", manager:"Әкімші", stop:"СӨЙЛЕУДІ ТОҚТАТУ", speak:"ӘКІМШІГЕ СӨЙЛЕУ", wait:"ӘКІМШІ КҮТІЛУДЕ" },
+    jp: { info:"管理者の安全案内を選択した言語でリアルタイムに伝えます。", myVoice:"自分の声", manager:"管理者", stop:"発話を停止", speak:"管理者に話す", wait:"管理者を待機中" },
+    fr: { info:"Les consignes de sécurité de l’administrateur sont transmises en direct dans la langue choisie.", myVoice:"Ma voix", manager:"Administrateur", stop:"ARRÊTER DE PARLER", speak:"PARLER À L’ADMINISTRATEUR", wait:"EN ATTENTE DE L’ADMINISTRATEUR" },
+    es: { info:"Las indicaciones de seguridad del administrador se transmiten en directo en el idioma seleccionado.", myVoice:"Mi voz", manager:"Administrador", stop:"DEJAR DE HABLAR", speak:"HABLAR CON EL ADMINISTRADOR", wait:"ESPERANDO AL ADMINISTRADOR" },
+    ar: { info:"تُنقل تعليمات السلامة من المسؤول مباشرةً باللغة التي اخترتها.", myVoice:"صوتي", manager:"المسؤول", stop:"إيقاف التحدث", speak:"التحدث إلى المسؤول", wait:"بانتظار المسؤول" },
+    hi: { info:"प्रशासक के सुरक्षा निर्देश आपकी चुनी हुई भाषा में लाइव भेजे जाते हैं।", myVoice:"मेरी आवाज़", manager:"प्रशासक", stop:"बोलना बंद करें", speak:"प्रशासक से बात करें", wait:"प्रशासक की प्रतीक्षा" },
+    id: { info:"Panduan keselamatan dari administrator disampaikan langsung dalam bahasa pilihan Anda.", myVoice:"Suara saya", manager:"Administrator", stop:"BERHENTI BERBICARA", speak:"BICARA KE ADMINISTRATOR", wait:"MENUNGGU ADMINISTRATOR" },
 };
 const LIVE_LOCALES: Record<string, string> = { ko:"ko-KR", en:"en-US", zh:"zh-CN", vi:"vi-VN", ru:"ru-RU" };
 
