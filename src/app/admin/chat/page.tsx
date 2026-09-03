@@ -8,7 +8,6 @@ import { analyzeMessageWithAI } from "@/utils/ai/watchdog";
 import { playPremiumAudio } from "@/utils/tts";
 import { playNotificationSound } from "@/utils/notifications";
 import { Trash2, QrCode } from "lucide-react";
-import { hangulize } from "@/utils/hangulize";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
 import { usePresence } from "@/hooks/usePresence";
 import ExportMenu from "@/components/ExportMenu";
@@ -864,7 +863,11 @@ function AdminChatContent() {
                                                         <div className="pt-3 border-t border-blue-200 flex flex-col gap-2">
                                                             {/* 2. 한글 발음 (영어 제외 — 관리자는 기초 영어 가능) */}
                                                             {activeWorker?.preferred_lang !== "en" && (() => {
-                                                                const pron = parsed.pron || hangulize(parsed.text, activeWorker?.preferred_lang || "en");
+                                                                // 채팅 전송은 속도를 위해 서버 발음 생성을 생략한다.
+                                                                // 빈 값을 화면에서 임의 병음 변환하면 "안센티미터"처럼
+                                                                // 실제 번역과 무관한 잘못된 발음이 생길 수 있으므로,
+                                                                // API가 제공한 발음만 표시한다.
+                                                                const pron = parsed.pron;
                                                                 return pron ? (
                                                                     <div className="flex items-start gap-1.5">
                                                                         <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-blue-200 text-blue-800 shrink-0 mt-0.5 font-black">{t.pron}</span>
