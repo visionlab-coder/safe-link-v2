@@ -556,9 +556,9 @@ function AuthContent() {
 
                 {existingUser && (
                   <div className="p-4 rounded-2xl"
-                    style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.2)" }}>
-                    <p className="text-amber-300 text-xs font-bold flex items-center gap-2 mb-3">
-                      <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0 animate-pulse" />
+                    style={{ background: "#fffbeb", border: "1px solid #f5d38b" }}>
+                    <p className="text-xs font-bold flex items-center gap-2 mb-3" style={{ color: "#b45309" }}>
+                      <span className="w-2 h-2 rounded-full flex-shrink-0 animate-pulse" style={{ background: "#f59e0b" }} />
                       <span className="truncate">{existingUser.email}</span>
                     </p>
                     <div className="flex gap-2">
@@ -568,8 +568,8 @@ function AuthContent() {
                         이 계정으로 계속
                       </button>
                       <button onClick={async () => { await logoutV3().catch(() => undefined); setExistingUser(null); }}
-                        className="flex-1 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200 rounded-xl transition-all active:scale-95"
-                        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                        className="flex-1 py-2 text-xs font-semibold rounded-xl transition-all active:scale-95"
+                        style={{ color: "#475569", background: "#fff", border: "1px solid #d9e1ea" }}>
                         다른 계정
                       </button>
                     </div>
@@ -580,47 +580,47 @@ function AuthContent() {
                 <div className="grid grid-cols-2 gap-3">
                   <button onClick={() => setMode("worker")}
                     className="group flex flex-col items-center gap-3 p-5 rounded-2xl text-center transition-all duration-300 active:scale-95"
-                    style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.2)" }}
+                    style={{ background: "#ecfdf5", border: "1px solid #86efac" }}
                     onMouseEnter={e => {
-                      e.currentTarget.style.background = "rgba(16,185,129,0.13)";
-                      e.currentTarget.style.borderColor = "rgba(16,185,129,0.4)";
-                      e.currentTarget.style.boxShadow = "0 8px 32px rgba(16,185,129,0.15)";
+                      e.currentTarget.style.background = "#d1fae5";
+                      e.currentTarget.style.borderColor = "#34d399";
+                      e.currentTarget.style.boxShadow = "0 8px 24px rgba(5,150,105,.14)";
                     }}
                     onMouseLeave={e => {
-                      e.currentTarget.style.background = "rgba(16,185,129,0.07)";
-                      e.currentTarget.style.borderColor = "rgba(16,185,129,0.2)";
+                      e.currentTarget.style.background = "#ecfdf5";
+                      e.currentTarget.style.borderColor = "#86efac";
                       e.currentTarget.style.boxShadow = "none";
                     }}>
                     <div className="w-12 h-12 rounded-xl flex items-center justify-center"
-                      style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.3)" }}>
-                      <HardHat className="w-6 h-6" style={{ color: "#6EE7B7" }} />
+                      style={{ background: "#d1fae5", border: "1px solid #6ee7b7" }}>
+                      <HardHat className="w-6 h-6" style={{ color: "#059669" }} />
                     </div>
                     <div>
-                      <span className="text-sm font-black block" style={{ color: "#6EE7B7" }}>{t.workerRole}</span>
-                      <span className="text-[11px] block mt-0.5 leading-snug" style={{ color: "#475569" }}>{t.workerRoleDesc}</span>
+                      <span className="text-sm font-black block" style={{ color: "#047857" }}>{t.workerRole}</span>
+                      <span className="text-[11px] block mt-0.5 leading-snug" style={{ color: "#334155" }}>{t.workerRoleDesc}</span>
                     </div>
                   </button>
 
                   <button onClick={() => { setAdminSignupMode(false); setMode("admin"); }}
                     className="group flex flex-col items-center gap-3 p-5 rounded-2xl text-center transition-all duration-300 active:scale-95"
-                    style={{ background: "rgba(59,130,246,0.07)", border: "1px solid rgba(59,130,246,0.2)" }}
+                    style={{ background: "#eff6ff", border: "1px solid #93c5fd" }}
                     onMouseEnter={e => {
-                      e.currentTarget.style.background = "rgba(59,130,246,0.13)";
-                      e.currentTarget.style.borderColor = "rgba(59,130,246,0.4)";
-                      e.currentTarget.style.boxShadow = "0 8px 32px rgba(59,130,246,0.15)";
+                      e.currentTarget.style.background = "#dbeafe";
+                      e.currentTarget.style.borderColor = "#60a5fa";
+                      e.currentTarget.style.boxShadow = "0 8px 24px rgba(37,99,235,.14)";
                     }}
                     onMouseLeave={e => {
-                      e.currentTarget.style.background = "rgba(59,130,246,0.07)";
-                      e.currentTarget.style.borderColor = "rgba(59,130,246,0.2)";
+                      e.currentTarget.style.background = "#eff6ff";
+                      e.currentTarget.style.borderColor = "#93c5fd";
                       e.currentTarget.style.boxShadow = "none";
                     }}>
                     <div className="w-12 h-12 rounded-xl flex items-center justify-center"
-                      style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)" }}>
-                      <ShieldCheck className="w-6 h-6" style={{ color: "#93C5FD" }} />
+                      style={{ background: "#dbeafe", border: "1px solid #93c5fd" }}>
+                      <ShieldCheck className="w-6 h-6" style={{ color: "#2563eb" }} />
                     </div>
                     <div>
-                      <span className="text-sm font-black block" style={{ color: "#93C5FD" }}>{t.adminRole}</span>
-                      <span className="text-[11px] block mt-0.5 leading-snug" style={{ color: "#475569" }}>{t.adminRoleDesc}</span>
+                      <span className="text-sm font-black block" style={{ color: "#1d4ed8" }}>{t.adminRole}</span>
+                      <span className="text-[11px] block mt-0.5 leading-snug" style={{ color: "#334155" }}>{t.adminRoleDesc}</span>
                     </div>
                   </button>
                 </div>
