@@ -24,10 +24,12 @@ public class AiMediaService {
     private final AiProperties properties;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
+    private final FlittoRttClient flitto;
 
-    public AiMediaService(AiProperties properties, ObjectMapper objectMapper) {
+    public AiMediaService(AiProperties properties, ObjectMapper objectMapper, FlittoRttClient flitto) {
         this.properties = properties;
         this.objectMapper = objectMapper;
+        this.flitto = flitto;
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     }
 
@@ -38,17 +40,26 @@ public class AiMediaService {
         int sampleRateHertz,
         boolean live,
         List<String> speechHints,
-        String prompt
+        String prompt,
+        List<String> targetLanguages
     ) {
         return switch (selectedSttProvider()) {
             case "auto" -> transcribeDefault(audio, mimeType, languageCode, sampleRateHertz, live, speechHints, prompt);
             case "google" -> transcribeGoogle(audio, mimeType, languageCode, sampleRateHertz, live, speechHints);
             case "openai" -> transcribeOpenAi(audio, mimeType, languageCode, prompt);
-            // 실제 API 규격·권한이 도착하기 전에는 기존 Google STT로 조용히 폴백하지 않습니다.
-            // 테스트 로그가 선택한 공급자와 정확히 일치하도록 하기 위함입니다.
-            case "flitto", "deepl" -> throw new ServiceUnavailableException(selectedSttProvider() + "_stt_adapter_not_configured");
+            case "flitto" -> transcribeFlitto(audio, mimeType, languageCode, targetLanguages);
+            case "deepl" -> throw new ServiceUnavailableException("deepl_stt_adapter_not_configured");
             default -> throw new IllegalArgumentException("unsupported_stt_provider");
         };
+    }
+
+    private SttResult transcribeFlitto(String audio, String mimeType, String languageCode, List<String> targetLanguages) {
+        if (mimeType == null || !mimeType.toLowerCase().contains("audio/pcm") || !FlittoRttClient.supports(languageCode)) {
+            // RTT 미지원 언어(예: 크메르어)와 기존 WebM 입력은 현행 Google STT로 유지한다.
+            return transcribeGoogle(audio, mimeType, languageCode, 48000, true, List.of());
+        }
+        FlittoRttClient.Result result = flitto.transcribe(audio, languageCode, targetLanguages == null ? List.of() : targetLanguages);
+        return new SttResult(result.transcript(), "flitto", "rtt-v2", result.translations());
     }
 
     private SttResult transcribeDefault(
@@ -112,7 +123,7 @@ public class AiMediaService {
             .POST(HttpRequest.BodyPublishers.ofByteArray(body))
             .build();
         JsonNode root = sendJson(request, "openai_stt_failed");
-        return new SttResult(root.path("text").asText("").trim(), "openai", "gpt-4o-mini-transcribe");
+        return new SttResult(root.path("text").asText("").trim(), "openai", "gpt-4o-mini-transcribe", Map.of());
     }
 
     private SttResult transcribeGoogle(String audio, String mimeType, String languageCode, int sampleRateHertz, boolean live, List<String> speechHints) {
@@ -125,7 +136,7 @@ public class AiMediaService {
             if (fallback.has("error")) throw new ServiceUnavailableException("google_stt_failed");
             transcript = readGoogleTranscript(fallback, live ? 0.65 : 0.6);
         }
-        return new SttResult(transcript, "google", "speech-v1");
+        return new SttResult(transcript, "google", "speech-v1", Map.of());
     }
 
     private JsonNode callGoogleSpeech(String audio, String encoding, String languageCode, int sampleRateHertz, boolean enhanced, List<String> speechHints) {
@@ -301,6 +312,6 @@ public class AiMediaService {
         T run();
     }
 
-    public record SttResult(String transcript, String vendor, String model) {}
+    public record SttResult(String transcript, String vendor, String model, Map<String, String> translations) {}
     public record AudioResult(String audioBase64, String contentType, String vendor, String model) {}
 }

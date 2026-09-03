@@ -194,12 +194,13 @@ public class AiGatewayController {
             normalizeSampleRate(request.sampleRateHertz()),
             request.live(),
             request.speechHints() == null ? List.of() : request.speechHints(),
-            request.prompt()
+            request.prompt(),
+            request.targetLanguages() == null ? List.of() : request.targetLanguages()
         );
         long durationMs = Duration.between(started, Instant.now()).toMillis();
         usage.log(actor.userId(), request.siteId(), "stt", result.vendor(), result.model(), request.audio().length(), result.transcript().length(), durationMs, AiCostEstimator.estimate("stt", result.vendor(), request.audio().length(), result.transcript().length()));
         audit.record(actor.userId(), request.siteId(), "ai.stt", "ai_vendor", result.vendor(), "ALLOWED", "transcribed", Map.of("model", result.model(), "quotaUsed", decision.used()));
-        return new SttResponse(result.transcript(), result.vendor(), result.model());
+        return new SttResponse(result.transcript(), result.vendor(), result.model(), result.translations());
     }
 
     @PostMapping("/tts")
@@ -378,8 +379,8 @@ public class AiGatewayController {
     public record VendorResponse(String text, String vendor, String model) {}
     public record VisionRequest(@NotNull Long siteId, @NotBlank String image, String mimeType, String targetLanguage, @NotBlank String prompt) {}
     public record VisionResponse(String text, String vendor, String model) {}
-    public record SttRequest(@NotNull Long siteId, @NotBlank String audio, String mimeType, String languageCode, Integer sampleRateHertz, boolean live, List<String> speechHints, String prompt) {}
-    public record SttResponse(String transcript, String vendor, String model) {}
+    public record SttRequest(@NotNull Long siteId, @NotBlank String audio, String mimeType, String languageCode, Integer sampleRateHertz, boolean live, List<String> speechHints, String prompt, List<String> targetLanguages) {}
+    public record SttResponse(String transcript, String vendor, String model, Map<String, String> translations) {}
     public record TtsRequest(@NotNull Long siteId, @NotBlank String text, String voiceLanguageCode, String voiceName, String gender, boolean preferOpenAi, String audioEncoding) {}
     public record TtsResponse(String audioBase64, String contentType, String vendor, String model) {}
     public record ReserveRequest(@NotBlank String feature, Long siteId, Long inputSize, Long outputSize, String vendor, String model) {}

@@ -89,13 +89,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { audio, lang, mimeType, live = false, sampleRateHertz, context = "safety" } = await request.json() as {
+    const { audio, lang, mimeType, live = false, sampleRateHertz, context = "safety", targetLanguages } = await request.json() as {
       audio?: string;
       lang?: string;
       mimeType?: string;
       live?: boolean;
       sampleRateHertz?: number;
       context?: "chat" | "safety";
+      targetLanguages?: string[];
     };
     if (!audio) return NextResponse.json({ error: "No audio data" }, { status: 400 });
     if (typeof audio !== "string" || audio.length > 10 * 1024 * 1024 * (4 / 3)) {
@@ -110,10 +111,11 @@ export async function POST(request: Request) {
       audio,
       mimeType,
       languageCode,
-      sampleRateHertz: normalizeOpusSampleRate(sampleRateHertz),
+      sampleRateHertz: String(mimeType || "").includes("audio/pcm") ? 16000 : normalizeOpusSampleRate(sampleRateHertz),
       live: Boolean(live),
       speechHints: !isChatContext && shortLang === "ko" ? CONSTRUCTION_SPEECH_HINTS.slice(0, 500) : [],
       prompt: !isChatContext && shortLang === "ko" ? WHISPER_CONTEXT_PROMPT : undefined,
+      targetLanguages: Array.isArray(targetLanguages) ? targetLanguages.filter((value): value is string => typeof value === "string").slice(0, 10) : [],
     });
     if (!upstream) return NextResponse.json({ error: "STT gateway unavailable" }, { status: 503 });
     if (!upstream.ok) {
@@ -123,20 +125,22 @@ export async function POST(request: Request) {
       });
     }
 
-    const data = await upstream.json() as { transcript?: string; vendor?: string };
+    const data = await upstream.json() as { transcript?: string; vendor?: string; translations?: Record<string, string> };
     const transcript = String(data.transcript || "").trim();
     // 무음/잡음 청크에서 Whisper가 안전 안내용 prompt 전체를 그대로 반환할 수 있다.
     // 채팅뿐 아니라 TBM·Live를 포함한 모든 한국어 STT 흐름에서 입력으로 취급하면 안 된다.
     if (!transcript || WAKE_WORD_RE.test(transcript) || isCrossTalkContamination(transcript, shortLang) || isTbmPromptEcho(transcript)) {
       return NextResponse.json({ transcript: "" });
     }
-    const engine = data.vendor === "openai" ? "whisper" : "google";
-    if (shortLang !== "ko") return NextResponse.json({ transcript, engine });
+    const engine = data.vendor === "openai" ? "whisper" : data.vendor === "flitto" ? "flitto" : "google";
+    const translations = data.translations && Object.keys(data.translations).length > 0 ? data.translations : undefined;
+    if (shortLang !== "ko") return NextResponse.json({ transcript, engine, ...(translations && { translations }) });
     const { normalized, changes } = normalizeServerSide(transcript);
     return NextResponse.json({
       transcript: normalized,
       ...(changes.length > 0 && { normalized: true, changes }),
       engine,
+      ...(translations && { translations }),
       ...(live && { live: true }),
     });
   } catch (error) {

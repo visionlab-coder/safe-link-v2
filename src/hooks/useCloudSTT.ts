@@ -11,6 +11,8 @@ const STT_LANG_MAP: Record<string, string> = {
     fr: "fr-FR", es: "es-ES", ar: "ar-SA", hi: "hi-IN",
 };
 
+const FLITTO_RTT_LANGS = new Set(["ko", "en", "zh", "ja", "jp", "ru", "vi", "fr", "it", "ar", "es"]);
+
 function getSTTLang(code: string): string {
     return STT_LANG_MAP[code] || code;
 }
@@ -36,6 +38,28 @@ async function blobToBase64(blob: Blob): Promise<string> {
     });
 }
 
+// Flitto RTT requires signed 16-bit little-endian PCM, 16kHz, mono.
+async function blobToPcm16Base64(blob: Blob): Promise<string> {
+    const AudioCtxCtor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtxCtor) throw new Error("audio_context_unavailable");
+    const context = new AudioCtxCtor();
+    try {
+        const decoded = await context.decodeAudioData((await blob.arrayBuffer()).slice(0));
+        const source = decoded.getChannelData(0);
+        const ratio = decoded.sampleRate / 16_000;
+        const bytes = new Uint8Array(Math.ceil(source.length / ratio) * 2);
+        for (let index = 0; index < bytes.length / 2; index += 1) {
+            const start = Math.floor(index * ratio), end = Math.min(source.length, Math.floor((index + 1) * ratio));
+            let sum = 0; for (let sample = start; sample < Math.max(start + 1, end); sample += 1) sum += source[sample] || 0;
+            const value = Math.max(-1, Math.min(1, sum / Math.max(1, end - start))) * 0x7fff;
+            bytes[index * 2] = value & 0xff; bytes[index * 2 + 1] = (value >> 8) & 0xff;
+        }
+        let binary = "";
+        for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+        return btoa(binary);
+    } finally { await context.close().catch(() => {}); }
+}
+
 export type STTErrorType = "mic_denied" | "network" | "api_error" | "stream_lost";
 
 interface UseCloudSTTOptions {
@@ -51,6 +75,7 @@ interface UseCloudSTTOptions {
     live?: boolean;
     /** 1:1 채팅은 TBM 예시 문구를 STT 프롬프트로 전달하지 않는다. */
     context?: "chat" | "safety";
+    getTranslationTargets?: () => string[];
 }
 
 /** 노이즈 환경(건설 현장)에 최적화된 오디오 제약조건 */
@@ -78,6 +103,7 @@ export function useCloudSTT({
     silenceDuration = 2000,
     live = false,
     context = "safety",
+    getTranslationTargets,
 }: UseCloudSTTOptions) {
     const [isRecording, setIsRecording] = useState(false);
     const [audioLevel, setAudioLevel] = useState(0);
@@ -96,6 +122,7 @@ export function useCloudSTT({
     const chunkIntervalRef   = useRef(chunkInterval);
     const liveRef            = useRef(live);
     const contextRef         = useRef(context);
+    const getTranslationTargetsRef = useRef(getTranslationTargets);
 
     // VAD (Voice Activity Detection) refs
     const audioCtxRef = useRef<AudioContext | null>(null);
@@ -113,6 +140,7 @@ export function useCloudSTT({
     useEffect(() => { chunkIntervalRef.current = chunkInterval; }, [chunkInterval]);
     useEffect(() => { liveRef.current = live; }, [live]);
     useEffect(() => { contextRef.current = context; }, [context]);
+    useEffect(() => { getTranslationTargetsRef.current = getTranslationTargets; }, [getTranslationTargets]);
 
     const stopVAD = useCallback(() => {
         if (vadFrameRef.current) { cancelAnimationFrame(vadFrameRef.current); vadFrameRef.current = null; }
@@ -196,7 +224,10 @@ export function useCloudSTT({
         }
 
         try {
-            const base64 = await blobToBase64(blob);
+            const sourceLang = langRef.current.toLowerCase().split("-")[0];
+            // Khmer 등 RTT 미지원 언어는 PCM으로 바꾸지 않고 기존 Google STT로 유지한다.
+            const useFlitto = process.env.NEXT_PUBLIC_REALTIME_STT_ENGINE === "flitto" && FLITTO_RTT_LANGS.has(sourceLang);
+            const base64 = useFlitto ? await blobToPcm16Base64(blob) : await blobToBase64(blob);
             if (!base64) return;
 
             const res = await fetch("/api/stt", {
@@ -205,12 +236,13 @@ export function useCloudSTT({
                 body: JSON.stringify({
                     audio: base64,
                     lang: getSTTLang(langRef.current),
-                    mimeType: blob.type,
-                    ...(typeof sampleRateHertz === "number" && Number.isFinite(sampleRateHertz)
+                    mimeType: useFlitto ? "audio/pcm;rate=16000" : blob.type,
+                    ...(useFlitto ? { sampleRateHertz: 16000 } : typeof sampleRateHertz === "number" && Number.isFinite(sampleRateHertz)
                         ? { sampleRateHertz: Math.round(sampleRateHertz) }
                         : {}),
                     ...(liveRef.current && { live: true }),
                     context: contextRef.current,
+                    ...(liveRef.current && getTranslationTargetsRef.current ? { targetLanguages: getTranslationTargetsRef.current() } : {}),
                 }),
             });
 
@@ -225,7 +257,7 @@ export function useCloudSTT({
                 emptyStreakRef.current = 0;
                 // muted 상태(TTS 재생 중 / 파트너 발화 중)면 결과 버림
                 if (!mutedRef.current) {
-                    onTranscriptRef.current(data.transcript.trim());
+                    onTranscriptRef.current(data.transcript.trim(), data.translations);
                 }
             } else {
                 emptyStreakRef.current += 1;
