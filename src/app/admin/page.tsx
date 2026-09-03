@@ -241,6 +241,7 @@ function AdminDashboardContent() {
         name: string;
         email: string;
         role: string;
+        roles: string[];
         prefLang: string;
         title?: string;
         site_code?: string;
@@ -271,6 +272,7 @@ function AdminDashboardContent() {
                         title?: string | null;
                         site_code?: string | null;
                     } | null;
+                    v3?: { roles?: string[] };
                 };
                 if (cancelled || !data.user || !data.profile) return;
 
@@ -287,6 +289,9 @@ function AdminDashboardContent() {
                     name: data.profile.display_name || "Manager",
                     email: data.user.email || "",
                     role: data.profile.role || "SAFETY_OFFICER",
+                    // 여러 역할을 가진 계정도 있으므로, 메뉴 노출은 대표 역할이 아니라
+                    // 서버가 반환한 전체 역할 목록으로 판단한다.
+                    roles: Array.isArray(data.v3?.roles) ? data.v3.roles.map((role) => role.toUpperCase()) : [String(data.profile.role || "")],
                     prefLang: finalLang,
                     title: data.profile.title ?? undefined,
                     site_code: data.profile.site_code ?? undefined,
@@ -321,6 +326,7 @@ function AdminDashboardContent() {
     const t = getUI(lang);
     const feature = getFeatureUI(lang);
     const roleDisplay = currentUser ? ((t.roleLabel as any)[currentUser.role] || currentUser.role) : "Admin";
+    const isRootAdmin = currentUser?.roles.includes("ROOT") === true;
     const siteId = searchParams.get("site_id");
     const siteName = null;
 
@@ -397,12 +403,12 @@ function AdminDashboardContent() {
                                         <button onClick={() => router.push('/auth/setup')} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-700">
                                             <UserRound className="h-4 w-4" />{t.profile}
                                         </button>
-                                        {(currentUser?.role === 'ROOT' || currentUser?.role === 'HQ_OFFICER') && (
+                                        {isRootAdmin && (
                                             <button onClick={() => router.push('/system')} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-700">
                                                 <Settings className="h-4 w-4" />{t.systemManagement}
                                             </button>
                                         )}
-                                        {currentUser?.role === 'HQ_ADMIN' && (
+                                        {isRootAdmin && (
                                             <button onClick={() => router.push('/control')} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-700">
                                                 <Settings className="h-4 w-4" />{t.integratedControl}
                                             </button>
