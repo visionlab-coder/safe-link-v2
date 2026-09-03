@@ -37,6 +37,26 @@ const AUTH_NOTICES: Record<string, Record<AuthNotice, string>> = {
   hi: { retry: "एक त्रुटि हुई। कृपया बाद में पुनः प्रयास करें।", network: "अपना नेटवर्क कनेक्शन जाँचें।", workerNotFound: "दर्ज जानकारी से मेल खाने वाला कर्मचारी नहीं मिला। व्यवस्थापक से NFC पंजीकरण का अनुरोध करें।", signupPending: "व्यवस्थापक पंजीकरण अनुरोध भेज दिया गया है। स्वीकृति के बाद लॉगिन कर सकते हैं।", multipleSites: "मिलान करने वाला कर्मचारी कई साइटों पर मिला। साइट चुनें।", nfcHint: "प्रवेश से पहले व्यवस्थापक से NFC पंजीकरण का अनुरोध करें।" },
 };
 
+/** 가입 검증 오류는 사용자가 바로 수정할 수 있는 정보만 안전하게 안내한다. */
+const ADMIN_SIGNUP_ERROR_NOTICES: Record<string, Record<"domain" | "duplicate" | "password" | "rate", string>> = {
+  ko: {
+    domain: "관리자 가입은 @seowonenc.co.kr 이메일로만 가능합니다.",
+    duplicate: "이미 가입 신청되었거나 등록된 이메일입니다. 기존 계정으로 로그인하거나 승인 상태를 확인해주세요.",
+    password: "비밀번호는 12자 이상으로 입력해주세요.",
+    rate: "가입 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
+  },
+  en: {
+    domain: "Administrator sign-up is available only with an @seowonenc.co.kr email address.",
+    duplicate: "This email is already registered or has a pending sign-up request. Sign in with the existing account or check its approval status.",
+    password: "Enter a password with at least 12 characters.",
+    rate: "Too many sign-up requests. Please try again shortly.",
+  },
+};
+
+function adminSignupErrorNotice(language: string, key: "domain" | "duplicate" | "password" | "rate"): string {
+  return (ADMIN_SIGNUP_ERROR_NOTICES[language] ?? ADMIN_SIGNUP_ERROR_NOTICES.en)[key];
+}
+
 /** 원시 API 에러를 사용자 친화적 문구로 변환. 내부 에러 메시지를 그대로 노출하지 않는다. */
 function sanitizeAuthError(msg: string, language: string): string {
   // production에서 원시 에러 로그 비활성화 — 민감 정보 노출 방지
@@ -51,13 +71,13 @@ function sanitizeAuthError(msg: string, language: string): string {
     return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
   }
   if (m.includes("already registered") || m.includes("already exists") || m.includes("duplicate") || m.includes("email_already_registered")) {
-    return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
+    return adminSignupErrorNotice(language, "duplicate");
   }
   if (m.includes("password_min_length") || m.includes("password_too_short")) {
-    return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
+    return adminSignupErrorNotice(language, "password");
   }
   if (m.includes("domain_not_allowed")) {
-    return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
+    return adminSignupErrorNotice(language, "domain");
   }
   if (m.includes("admin_signup_role_fields_not_allowed")) {
     return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
@@ -75,7 +95,7 @@ function sanitizeAuthError(msg: string, language: string): string {
     return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
   }
   if (m.includes("rate limit") || m.includes("rate_limited") || m.includes("too many")) {
-    return AUTH_NOTICES[language]?.retry ?? AUTH_NOTICES.en.retry;
+    return adminSignupErrorNotice(language, "rate");
   }
   if (m.includes("network") || m.includes("fetch") || m.includes("connection")) {
     return AUTH_NOTICES[language]?.network ?? AUTH_NOTICES.en.network;
