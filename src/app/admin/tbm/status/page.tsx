@@ -7,7 +7,7 @@ import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import ExportMenu from "@/components/ExportMenu";
 import { exportData, type ExportFormat } from "@/utils/export-files";
-import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { resolveDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 // 언어 폴백용 — nationality 가 없을 때만 사용
 const isoMap: Record<string, string> = {
@@ -431,7 +431,7 @@ function TBMStatusPageContent() {
             const me = await meRes.json() as {
                 profile?: { preferred_lang?: string | null; site_id?: string | null } | null;
             };
-            setAdminLang(urlLang || me.profile?.preferred_lang || "ko");
+            setAdminLang(resolveDisplayLanguage(me.profile?.preferred_lang, urlLang));
             adminSiteId = me.profile?.site_id || null;
         }
 

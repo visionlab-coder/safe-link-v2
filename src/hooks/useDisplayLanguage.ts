@@ -4,10 +4,18 @@ import { useEffect, useState } from "react";
 
 export const DISPLAY_LANGUAGE_CHANGED = "safe-link-language-changed";
 
+function readLanguageCookie(): string | null {
+  const prefix = "safe-link-lang=";
+  const value = document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith(prefix));
+  return value ? decodeURIComponent(value.slice(prefix.length)) : null;
+}
+
 export function readDisplayLanguage(fallback = "ko"): string {
   if (typeof window === "undefined") return fallback;
   const fromUrl = new URL(window.location.href).searchParams.get("lang");
-  return fromUrl || window.localStorage.getItem("safe-link-lang") || fallback;
+  // 마지막에 사용자가 선택한 언어는 페이지 URL이나 DB의 기본 언어보다 우선한다.
+  // 그렇지 않으면 /auth?lang=ko 같은 이전 링크가 새로고침 때 선택값을 덮어쓴다.
+  return window.localStorage.getItem("safe-link-lang") || readLanguageCookie() || fromUrl || fallback;
 }
 
 /**
@@ -33,6 +41,8 @@ export function useDisplayLanguage(fallback = "ko"): string {
 
 export function persistDisplayLanguage(language: string): void {
   window.localStorage.setItem("safe-link-lang", language);
+  // 앱 WebView가 localStorage를 늦게 복원하는 경우에도 같은 값을 다시 읽을 수 있게 한다.
+  document.cookie = `safe-link-lang=${encodeURIComponent(language)}; Path=/; Max-Age=31536000; SameSite=Lax`;
   window.dispatchEvent(new Event(DISPLAY_LANGUAGE_CHANGED));
 }
 
@@ -47,5 +57,5 @@ export function resolveDisplayLanguage(
   fallback = "ko",
 ): string {
   if (typeof window === "undefined") return urlLanguage || profileLanguage || fallback;
-  return urlLanguage || window.localStorage.getItem("safe-link-lang") || profileLanguage || fallback;
+  return window.localStorage.getItem("safe-link-lang") || readLanguageCookie() || urlLanguage || profileLanguage || fallback;
 }

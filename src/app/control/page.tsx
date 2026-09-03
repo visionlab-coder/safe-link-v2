@@ -7,6 +7,7 @@ import SwarmVisualizer from "@/components/agents/SwarmVisualizer";
 import { logoutV3 } from "@/lib/v3-auth";
 import Image from "next/image";
 import { ChevronDown, LogOut, Settings, UserRound } from "lucide-react";
+import { persistDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 const controlText = {
     ko: { hq: "본사 통합 관제", welcome: (name: string) => `반갑습니다, ${name}님`, loading: "사용자 정보를 확인하고 있습니다…", admin: "본사 관리자", signOut: "로그아웃", profile: "내 정보", adminOverview: "관리자 통합 현황", systemManagement: "시스템 관리", accountMenu: "계정 메뉴", dashboard: "통합 현황", description: "전체 현장 상태를 확인하고 증빙 로그를 내려받습니다.", monitor: "실시간 군집 모니터", monitorDescription: "활성 군집 에이전트 상태", nodes: "활성 노드", pipeline: "데이터 처리", translation: "번역 부하", threat: "위험 이벤트", high: "높음", statistics: "현장 통계", statisticsDescription: "전체 TBM 완료율과 사용 중인 언어 현황을 확인합니다.", export: "로그 내보내기", exportDescription: "감사 및 증빙을 위해 중요 통신·TBM 로그를 내려받습니다.", console: "본사 관제" },
@@ -36,7 +37,7 @@ function ControlDashboardContent() {
     const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 
     useEffect(() => {
-        setSelectedLang(searchParams.get("lang") || localStorage.getItem("safe-link-lang") || "ko");
+        setSelectedLang(localStorage.getItem("safe-link-lang") || searchParams.get("lang") || "ko");
     }, [searchParams]);
 
     useEffect(() => {
@@ -66,14 +67,14 @@ function ControlDashboardContent() {
     };
 
     const handleLanguageChange = (nextLang: string) => {
-        localStorage.setItem("safe-link-lang", nextLang);
+        persistDisplayLanguage(nextLang);
         setSelectedLang(nextLang);
         const params = new URLSearchParams(searchParams.toString());
         params.set("lang", nextLang);
         router.replace(`/control?${params.toString()}`);
     };
 
-    const activeLang = searchParams.get("lang") || selectedLang || currentUser?.prefLang || "ko";
+    const activeLang = selectedLang || searchParams.get("lang") || currentUser?.prefLang || "ko";
     const t = getControlText(activeLang);
     const isRootAdmin = currentUser?.roles.includes("ROOT") === true;
 

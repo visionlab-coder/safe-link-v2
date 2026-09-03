@@ -9,7 +9,7 @@ import { Suspense } from "react";
 import { normalizeKo, normalizeKoAsync } from "@/utils/normalize";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
 import SafetyLibraryModal from "@/components/SafetyLibraryModal";
-import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { resolveDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 const adminUI: Record<string, any> = {
     ko: {
@@ -166,7 +166,7 @@ function AdminTBMCreateContent() {
             profile?: { preferred_lang?: string | null; site_id?: string | null } | null;
         };
         if (!data.user) return;
-        setAdminLang(urlLang || data.profile?.preferred_lang || "ko");
+        setAdminLang(resolveDisplayLanguage(data.profile?.preferred_lang, urlLang));
         setAdminSiteId(data.profile?.site_id || null);
         setUserId(data.user.id);
     }, [urlLang]);

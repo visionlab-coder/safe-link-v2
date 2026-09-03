@@ -321,7 +321,7 @@ function AdminDashboardContent() {
         router.replace(`/admin?${params.toString()}`);
     };
 
-    const requestedLang = urlLang || selectedLang || currentUser?.prefLang || "ko";
+    const requestedLang = selectedLang || urlLang || currentUser?.prefLang || "ko";
     const lang = ADMIN_LANGUAGE_OPTIONS.some((option) => option.code === requestedLang) ? requestedLang : "ko";
     const t = getUI(lang);
     const feature = getFeatureUI(lang);
