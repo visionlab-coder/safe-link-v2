@@ -6,6 +6,29 @@ export interface NormalizeResult {
     changes: { from: string; to: string }[];
 }
 
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * 한 글자 용어는 다른 단어 안에 포함돼 있을 때 치환하면 안 된다.
+ * 예: 용어집의 `전 → 센티미터`가 `안전`의 `전`까지 바꾸면 안 된다.
+ */
+function replaceGlossaryTerm(text: string, slang: string, replacement: string): { text: string; matched: boolean } {
+    if (Array.from(slang).length !== 1) {
+        if (!text.includes(slang)) return { text, matched: false };
+        return { text: text.split(slang).join(replacement), matched: true };
+    }
+
+    const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(slang)}(?![\\p{L}\\p{N}])`, "gu");
+    let matched = false;
+    const normalized = text.replace(pattern, () => {
+        matched = true;
+        return replacement;
+    });
+    return { text: normalized, matched };
+}
+
 // ─────────────────────────────────────────────
 // 인메모리 캐시: DB에서 한 번 가져오면 재사용
 // ─────────────────────────────────────────────
@@ -70,11 +93,12 @@ export function normalizeKo(text: string, dict: Record<string, string> = CONSTRU
     let result = text;
 
     for (const [slang, standard] of sorted) {
-        if (result.includes(slang)) {
+        const ph = `\x00${placeholders.length}\x00`;
+        const replaced = replaceGlossaryTerm(result, slang, ph);
+        if (replaced.matched) {
             changes.push({ from: slang, to: standard });
-            const ph = `\x00${placeholders.length}\x00`;
             placeholders.push(standard);
-            result = result.split(slang).join(ph);
+            result = replaced.text;
         }
     }
 
