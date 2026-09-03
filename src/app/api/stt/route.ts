@@ -125,7 +125,9 @@ export async function POST(request: Request) {
 
     const data = await upstream.json() as { transcript?: string; vendor?: string };
     const transcript = String(data.transcript || "").trim();
-    if (!transcript || WAKE_WORD_RE.test(transcript) || isCrossTalkContamination(transcript, shortLang) || (isChatContext && isTbmPromptEcho(transcript))) {
+    // 무음/잡음 청크에서 Whisper가 안전 안내용 prompt 전체를 그대로 반환할 수 있다.
+    // 채팅뿐 아니라 TBM·Live를 포함한 모든 한국어 STT 흐름에서 입력으로 취급하면 안 된다.
+    if (!transcript || WAKE_WORD_RE.test(transcript) || isCrossTalkContamination(transcript, shortLang) || isTbmPromptEcho(transcript)) {
       return NextResponse.json({ transcript: "" });
     }
     const engine = data.vendor === "openai" ? "whisper" : "google";
