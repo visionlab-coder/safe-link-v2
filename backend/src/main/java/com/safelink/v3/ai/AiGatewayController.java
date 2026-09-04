@@ -215,6 +215,7 @@ public class AiGatewayController {
             cleanOptional(request.voiceName(), "ko-KR-Neural2-A"),
             cleanOptional(request.gender(), "female"),
             request.preferOpenAi(),
+            request.strictProvider(),
             cleanOptional(request.audioEncoding(), "MP3")
         );
         long durationMs = Duration.between(started, Instant.now()).toMillis();
@@ -381,7 +382,7 @@ public class AiGatewayController {
     public record VisionResponse(String text, String vendor, String model) {}
     public record SttRequest(@NotNull Long siteId, @NotBlank String audio, String mimeType, String languageCode, Integer sampleRateHertz, boolean live, List<String> speechHints, String prompt, List<String> targetLanguages) {}
     public record SttResponse(String transcript, String vendor, String model, Map<String, String> translations) {}
-    public record TtsRequest(@NotNull Long siteId, @NotBlank String text, String voiceLanguageCode, String voiceName, String gender, boolean preferOpenAi, String audioEncoding) {}
+    public record TtsRequest(@NotNull Long siteId, @NotBlank String text, String voiceLanguageCode, String voiceName, String gender, boolean preferOpenAi, boolean strictProvider, String audioEncoding) {}
     public record TtsResponse(String audioBase64, String contentType, String vendor, String model) {}
     public record ReserveRequest(@NotBlank String feature, Long siteId, Long inputSize, Long outputSize, String vendor, String model) {}
     public record ReserveResponse(boolean ok, String feature, Long siteId, long used, long limit, String mode) {}

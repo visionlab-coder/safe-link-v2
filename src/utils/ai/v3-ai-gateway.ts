@@ -239,6 +239,7 @@ export async function callV3AiTts(
     voiceName: string;
     gender: string;
     preferOpenAi: boolean;
+    strictProvider: boolean;
   },
 ): Promise<Response | null> {
   return callV3AiMedia(request, "/api/v1/ai/tts", payload);

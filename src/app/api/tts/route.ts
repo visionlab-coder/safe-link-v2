@@ -5,8 +5,10 @@ import { checkTtsLimit } from "@/utils/rate-limit";
 import { callV3AiTts } from "@/utils/ai/v3-ai-gateway";
 import { stripForSpeech } from "@/utils/tts";
 
-// Google Standard 전용 언어 — OpenAI tts-1-hd로 업그레이드 (Neural2 동급 품질)
-const OPENAI_TTS_LANGS = new Set(['uz', 'ne', 'km', 'my', 'mn', 'kk']);
+// Google Standard 전용 언어 중 Google 음성이 없는 언어만 OpenAI를 우선 사용한다.
+// 캄보디아어(km)는 Google의 km-KH-Standard-A가 있으므로 OpenAI 우선 경로를 타면
+// 기기·계정별 재생 실패가 생길 수 있다. Google 음성을 먼저 사용해야 한다.
+const OPENAI_TTS_LANGS = new Set(['uz', 'ne', 'my', 'mn', 'kk']);
 
 /**
  * [V3.1] Google Cloud TTS (Neural2/WaveNet) + OpenAI tts-1-hd 하이브리드
@@ -37,6 +39,9 @@ export async function GET(request: NextRequest) {
         voiceName: getBestCloudVoice(lang, gender),
         gender,
         preferOpenAi: OPENAI_TTS_LANGS.has(baseLang),
+        // 선택된 언어의 주 음성 제공자만 사용한다. 실패 시 다른 제공자·기기 음성으로
+        // 바뀌면 같은 문장의 음색이 달라지므로, 같은 제공자 요청만 재시도한다.
+        strictProvider: true,
     });
     if (!upstream) return new Response("TTS gateway unavailable", { status: 503 });
     if (!upstream.ok) {
