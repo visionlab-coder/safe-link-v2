@@ -385,7 +385,7 @@ function AdminTBMCreateContent() {
                     </section>
 
                     <section className="flex flex-col flex-1 gap-6">
-                        <div className="glass rounded-[48px] p-8 border-white/10 shadow-3xl flex flex-col gap-6 relative min-h-[400px]">
+                        <div className="glass tbm-compose-panel rounded-[48px] p-8 border-white/10 shadow-3xl flex flex-col gap-6 relative min-h-[400px]">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">{t.koreanDraft}</h3>
                                 <button onClick={toggleRecording} className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all tap-effect relative ${isRecording ? "bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)]" : "glass border-white/10 text-slate-400 hover:text-white"}`}>
@@ -486,7 +486,7 @@ function AdminTBMCreateContent() {
                         </div>
                     </section>
 
-                    <section className="mt-8 flex flex-col gap-6">
+                    <section className="tbm-history-section mt-8 flex flex-col gap-6">
                         <h3 className="text-xs font-black text-slate-600 uppercase tracking-[0.4em] px-4">{t.historyTitle}</h3>
                         <div className="flex flex-col gap-4">
                             {history.filter(tbm => !hiddenNoticeIds.includes(tbm.id)).length === 0 ? (

@@ -894,7 +894,7 @@ function WorkerHomeContent() {
                 {/* 🚀 New Notification (High Impact) */}
                 {hasNewTBM && (
                     <div
-                        className="relative overflow-hidden p-8 glass-red rounded-[40px] border-red-500 border-2 shadow-[0_0_60px_-15px_rgba(239,68,68,0.6)] cursor-pointer tap-effect group"
+                        className="tbm-new-notice relative overflow-hidden p-8 glass-red rounded-[40px] border-red-500 border-2 shadow-[0_0_60px_-15px_rgba(239,68,68,0.6)] cursor-pointer tap-effect group"
                         onClick={() => { setHasNewTBM(false); router.push("/worker/tbm/today"); }}
                     >
                         <div className="flex items-center gap-6 relative z-10">

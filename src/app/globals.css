@@ -182,9 +182,22 @@ body {
 }
 
 .admin-concept-theme section.glass,
-.admin-concept-theme main > section,
 .admin-concept-theme main [class*="rounded-"][class*="border"] {
   box-shadow: 0 10px 28px rgba(16, 42, 67, 0.1);
+}
+
+/* TBM 작성 영역은 입력 캔버스다. 카드 배경과 큰 외곽 그림자를 씌우면
+ * 실제 입력 영역 바깥까지 네모 상자가 생겨 밝은 콘셉트와 충돌한다. */
+.admin-concept-theme .tbm-compose-panel {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.admin-concept-theme .tbm-history-section {
+  box-shadow: none !important;
 }
 
 .admin-concept-theme section.glass {
@@ -247,6 +260,35 @@ body {
 
 .worker-concept-theme section.glass {
   border-radius: 0.75rem !important;
+}
+
+/* 새 TBM은 즉시 확인해야 하는 경고다. 반투명 빨간 유리는 밝은 배경에서
+ * 흐리게 보이므로 불투명한 표면과 명확한 대비로 표시한다. */
+.worker-concept-theme .tbm-new-notice {
+  background: #fff !important;
+  border: 2px solid #fca5a5 !important;
+  box-shadow: 0 14px 34px rgba(185, 28, 28, 0.16) !important;
+}
+
+.worker-concept-theme .tbm-new-notice h2 {
+  color: #b91c1c !important;
+  font-style: normal;
+}
+
+.worker-concept-theme .tbm-new-notice p {
+  color: #7f1d1d !important;
+}
+
+.worker-concept-theme .tbm-new-notice > div > div:first-child {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.worker-concept-theme .tbm-new-notice .glass {
+  background: #fff !important;
+  border-color: #fecaca !important;
+  color: #b91c1c !important;
+  box-shadow: none !important;
 }
 
 .worker-concept-theme .worker-home {
