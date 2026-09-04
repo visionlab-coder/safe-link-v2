@@ -8,6 +8,12 @@ const SAFE_LINK_V3_API_BASE_URL =
 
 const V3_ROLE_PRIORITY = ["ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER", "WORKER", "VIEWER"];
 
+function cookieForDevelopmentBrowser(setCookie: string): string {
+  return process.env.NODE_ENV === "development"
+    ? setCookie.replace(/;\s*Secure/gi, "")
+    : setCookie;
+}
+
 function pickV3PrimaryRole(roles: string[] | undefined): string | null {
   if (!Array.isArray(roles)) return null;
   return V3_ROLE_PRIORITY.find((role) => roles.includes(role)) ?? null;
@@ -68,7 +74,7 @@ async function handleV3Me(req: NextRequest): Promise<NextResponse> {
 
   const setCookie = upstream.headers.get("set-cookie");
   if (setCookie) {
-    response.headers.append("set-cookie", setCookie);
+    response.headers.append("set-cookie", cookieForDevelopmentBrowser(setCookie));
   }
   return response;
 }

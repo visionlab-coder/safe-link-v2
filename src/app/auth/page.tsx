@@ -345,9 +345,9 @@ function AuthContent() {
         }
         router.push(`/worker?lang=${activeLang}`);
       } else {
-        setWorkerLoginError(activeLang === "ko"
-          ? "로그인 정보는 확인됐지만 세션을 시작하지 못했습니다. 브라우저를 새로고침한 뒤 다시 시도해주세요."
-          : "Your details were verified, but the sign-in session could not start. Refresh the browser and try again.");
+        // 로그인 오류는 선택한 표시 언어로만 안내한다. 기술적인 세션 문구를
+        // 영어로 노출하지 않고, 언어별 기존 오류 사전을 재사용한다.
+        setWorkerLoginError(notices.retry);
       }
     } catch {
       setWorkerLoginError(sanitizeAuthError("network", activeLang));
