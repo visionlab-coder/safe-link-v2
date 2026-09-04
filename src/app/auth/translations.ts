@@ -14,6 +14,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "관리자 로그인", adminDesc: "이메일과 비밀번호를 입력하세요.",
     adminSignupLink: "처음이신가요? 가입하기", adminLoginLink: "이미 계정이 있으신가요? 로그인",
     back: "역할 선택으로 돌아가기", newUser: "전화번호와 이름만 있으면 됩니다",
+    workerNameRequired: "이니셜 또는 이름을 입력해주세요.", workerPhoneLast4Required: "휴대전화 뒷 4자리를 입력해주세요.", workerDuplicate: "동일한 정보의 근로자가 여러 명입니다. 관리자에게 등록 정보를 확인해주세요.",
   },
   vi: {
     phone: "Số điện thoại", name: "Tên", pass: "Mật khẩu", passConfirm: "Xác nhận mật khẩu",
@@ -28,6 +29,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "Đăng nhập quản lý", adminDesc: "Nhập email và mật khẩu.",
     adminSignupLink: "Lần đầu? Đăng ký", adminLoginLink: "Đã có tài khoản? Đăng nhập",
     back: "Quay lại chọn vai trò", newUser: "Chỉ cần số điện thoại và tên",
+    workerNameRequired: "Vui lòng nhập tên hoặc chữ viết tắt.", workerPhoneLast4Required: "Vui lòng nhập 4 số cuối của số điện thoại.", workerDuplicate: "Có nhiều công nhân trùng thông tin này. Vui lòng yêu cầu quản lý kiểm tra đăng ký.",
   },
   zh: {
     phone: "手机号码", name: "姓名", pass: "密码", passConfirm: "确认密码",
@@ -42,6 +44,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "管理员登录", adminDesc: "输入电子邮件和密码。",
     adminSignupLink: "首次使用？注册", adminLoginLink: "已有账户？登录",
     back: "返回角色选择", newUser: "只需手机号码和姓名",
+    workerNameRequired: "请输入姓名或姓名首字母。", workerPhoneLast4Required: "请输入手机号后 4 位。", workerDuplicate: "有多名工人的信息相同。请管理员核对登记信息。",
   },
   th: {
     phone: "หมายเลขโทรศัพท์", name: "ชื่อ", pass: "รหัสผ่าน", passConfirm: "ยืนยันรหัสผ่าน",
@@ -56,6 +59,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "เข้าสู่ระบบผู้ดูแล", adminDesc: "กรอกหมายเลขโทรศัพท์และรหัสผ่าน",
     adminSignupLink: "ครั้งแรก? สมัครสมาชิก", adminLoginLink: "มีบัญชีแล้ว? เข้าสู่ระบบ",
     back: "กลับเลือกบทบาท", newUser: "ผู้ใช้ใหม่จะสมัครอัตโนมัติ",
+    workerNameRequired: "โปรดกรอกชื่อหรืออักษรย่อ", workerPhoneLast4Required: "โปรดกรอกหมายเลขโทรศัพท์ 4 หลักท้าย", workerDuplicate: "พบคนงานหลายคนที่มีข้อมูลตรงกัน โปรดให้ผู้ดูแลตรวจสอบการลงทะเบียน",
   },
   uz: {
     phone: "Telefon raqami", name: "Ism", pass: "Parol", passConfirm: "Parolni tasdiqlash",
@@ -70,6 +74,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "Admin kirishi", adminDesc: "Telefon raqami va parolni kiriting.",
     adminSignupLink: "Birinchi marta? Ro'yxatdan o'ting", adminLoginLink: "Hisobingiz bormi? Kiring",
     back: "Rol tanlashga qaytish", newUser: "Yangi foydalanuvchi avtomatik ro'yxatdan o'tiladi",
+    workerNameRequired: "Ism yoki bosh harflarni kiriting.", workerPhoneLast4Required: "Telefon raqamingizning oxirgi 4 raqamini kiriting.", workerDuplicate: "Bu ma'lumotlarga mos bir nechta ishchi topildi. Administratordan ro'yxatdan o'tgan ma'lumotlarni tekshirishni so'rang.",
   },
   ph: {
     phone: "Numero ng Telepono", name: "Pangalan", pass: "Password", passConfirm: "Kumpirmahin ang Password",
@@ -84,6 +89,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "Admin Login", adminDesc: "Ilagay ang numero ng telepono at password.",
     adminSignupLink: "Bago? Mag-sign up", adminLoginLink: "May account na? Mag-login",
     back: "Bumalik sa pagpili ng role", newUser: "Ang bagong user ay awtomatikong ire-rehistro",
+    workerNameRequired: "Ilagay ang pangalan o mga inisyal.", workerPhoneLast4Required: "Ilagay ang huling 4 na numero ng telepono.", workerDuplicate: "May higit sa isang manggagawang tugma sa impormasyong ito. Hilinging suriin ng administrator ang pagpaparehistro.",
   },
   km: {
     phone: "លេខទូរស័ព្ទ", name: "ឈ្មោះ", pass: "ពាក្យសម្ងាត់", passConfirm: "បញ្ជាក់ពាក្យសម្ងាត់",
@@ -98,6 +104,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "ចូលអ្នកគ្រប់គ្រង", adminDesc: "បញ្ចូលលេខទូរស័ព្ទ និងពាក្យសម្ងាត់",
     adminSignupLink: "ដំបូង? ចុះឈ្មោះ", adminLoginLink: "មានគណនី? ចូល",
     back: "ត្រឡប់ជ្រើសតួនាទី", newUser: "អ្នកប្រើប្រាស់ថ្មីនឹងចុះឈ្មោះដោយស្វ័យប្រវត្តិ",
+    workerNameRequired: "សូមបញ្ចូលឈ្មោះ ឬអក្សរកាត់។", workerPhoneLast4Required: "សូមបញ្ចូលលេខ 4 ខ្ទង់ចុងក្រោយនៃលេខទូរស័ព្ទ។", workerDuplicate: "មានកម្មករច្រើននាក់ដែលត្រូវនឹងព័ត៌មាននេះ។ សូមស្នើអ្នកគ្រប់គ្រងពិនិត្យព័ត៌មានចុះឈ្មោះ។",
   },
   id: {
     phone: "Nomor Telepon", name: "Nama", pass: "Kata Sandi", passConfirm: "Konfirmasi Kata Sandi",
@@ -112,6 +119,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "Login Admin", adminDesc: "Masukkan nomor telepon dan kata sandi.",
     adminSignupLink: "Pertama kali? Daftar", adminLoginLink: "Sudah punya akun? Login",
     back: "Kembali pilih peran", newUser: "Pengguna baru akan didaftarkan secara otomatis",
+    workerNameRequired: "Masukkan nama atau inisial.", workerPhoneLast4Required: "Masukkan 4 digit terakhir nomor telepon.", workerDuplicate: "Ada lebih dari satu pekerja dengan informasi yang sama. Minta administrator memeriksa pendaftaran.",
   },
   mn: {
     phone: "Утасны дугаар", name: "Нэр", pass: "Нууц үг", passConfirm: "Нууц үг баталгаажуулах",
@@ -126,6 +134,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "Админ нэвтрэх", adminDesc: "Утасны дугаар болон нууц үгийг оруулна уу.",
     adminSignupLink: "Анх удаа? Бүртгүүлэх", adminLoginLink: "Аккаунт байна уу? Нэвтрэх",
     back: "Үүрэг сонгох руу буцах", newUser: "Шинэ хэрэглэгч автоматаар бүртгэгдэнэ",
+    workerNameRequired: "Нэр эсвэл товчилсон нэрээ оруулна уу.", workerPhoneLast4Required: "Утасны дугаарын сүүлийн 4 оронг оруулна уу.", workerDuplicate: "Ижил мэдээлэлтэй хэд хэдэн ажилтан байна. Админаас бүртгэлийн мэдээллийг шалгуулаарай.",
   },
   my: {
     phone: "ဖုန်းနံပါတ်", name: "အမည်", pass: "စကားဝှက်", passConfirm: "စကားဝှက် အတည်ပြု",
@@ -140,6 +149,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "စီမံခန့်ခွဲသူ ဝင်ရောက်ရန်", adminDesc: "ဖုန်းနံပါတ်နှင့် စကားဝှက်ထည့်ပါ",
     adminSignupLink: "ပထမဆုံး? မှတ်ပုံတင်ရန်", adminLoginLink: "အကောင့်ရှိပြီလား? ဝင်ရောက်ရန်",
     back: "အခန်းကဏ္ဍ ရွေးချယ်ရာသို့ ပြန်သွားရန်", newUser: "အသစ်သောသုံးစွဲသူ အလိုအလျောက် မှတ်ပုံတင်မည်",
+    workerNameRequired: "အမည် သို့မဟုတ် အတိုကောက်ကို ထည့်ပါ။", workerPhoneLast4Required: "ဖုန်းနံပါတ်၏ နောက်ဆုံး ၄ လုံးကို ထည့်ပါ။", workerDuplicate: "ဤအချက်အလက်နှင့် ကိုက်ညီသော အလုပ်သမားများစွာ ရှိပါသည်။ မှတ်ပုံတင်အချက်အလက်ကို စီမံခန့်ခွဲသူအား စစ်ဆေးခိုင်းပါ။",
   },
   ne: {
     phone: "फोन नम्बर", name: "नाम", pass: "पासवर्ड", passConfirm: "पासवर्ड पुष्टि गर्नुहोस्",
@@ -154,6 +164,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "प्रबंधक लगइन", adminDesc: "फोन नम्बर र पासवर्ड भर्नुहोस्।",
     adminSignupLink: "पहिलो पटक? दर्ता गर्नुहोस्", adminLoginLink: "खाता छ? लगइन गर्नुहोस्",
     back: "भूमिका चयनमा फर्कनुहोस्", newUser: "नया प्रयोगकर्ता स्वतः दर्ता हुनेछन्",
+    workerNameRequired: "नाम वा आद्याक्षर प्रविष्ट गर्नुहोस्।", workerPhoneLast4Required: "फोन नम्बरका अन्तिम ४ अंक प्रविष्ट गर्नुहोस्।", workerDuplicate: "यही विवरण भएका धेरै कामदार भेटिए। प्रशासकलाई दर्ता विवरण जाँच्न अनुरोध गर्नुहोस्।",
   },
   bn: {
     phone: "ফোন নম্বর", name: "নাম", pass: "পাসওয়ার্ড", passConfirm: "পাসওয়ার্ড নিশ্চিত করুন",
@@ -168,6 +179,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "প্রশাসক লগইন", adminDesc: "ফোন নম্বর ও পাসওয়ার্ড দিন।",
     adminSignupLink: "প্রথমবার? নিবন্ধন", adminLoginLink: "অ্যাকাউন্ট আছে? লগইন",
     back: "ভূমিকা নির্বাচনে ফিরুন", newUser: "নতুন ব্যবহারকারী স্বয়ংক্রিয়ভাবে নিবন্ধিত হবেন",
+    workerNameRequired: "নাম বা আদ্যক্ষর লিখুন।", workerPhoneLast4Required: "ফোন নম্বরের শেষ ৪ সংখ্যা লিখুন।", workerDuplicate: "এই তথ্যের সঙ্গে একাধিক কর্মী মিলে গেছে। প্রশাসককে নিবন্ধনের তথ্য যাচাই করতে বলুন।",
   },
   kk: {
     phone: "Телефон нөмірі", name: "Аты", pass: "Пароль", passConfirm: "Парольді растаңыз",
@@ -182,6 +194,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "Әкімші кіруі", adminDesc: "Телефон нөмірі мен парольді енгізіңіз.",
     adminSignupLink: "Алғаш рет? Тіркелу", adminLoginLink: "Аккаунт байна уу? Нэвтрэх",
     back: "Рөл таңдауға оралу", newUser: "Жаңа пайдаланушы автоматты тіркеледі",
+    workerNameRequired: "Атыңызды немесе бас әріптерді енгізіңіз.", workerPhoneLast4Required: "Телефон нөмірінің соңғы 4 санын енгізіңіз.", workerDuplicate: "Осы деректерге сәйкес бірнеше жұмысшы бар. Әкімшіден тіркеу деректерін тексеруді сұраңыз.",
   },
   ru: {
     phone: "Номер телефона", name: "Имя", pass: "Пароль", passConfirm: "Подтвердите пароль",
@@ -196,6 +209,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "Вход администратора", adminDesc: "Введите номер телефона и пароль.",
     adminSignupLink: "Впервые? Зарегистрироваться", adminLoginLink: "Есть аккаунт? Войти",
     back: "Вернуться к выбору роли", newUser: "Новый пользователь будет зарегистрирован автоматически",
+    workerNameRequired: "Введите имя или инициалы.", workerPhoneLast4Required: "Введите последние 4 цифры номера телефона.", workerDuplicate: "Найдено несколько работников с такими данными. Попросите администратора проверить регистрацию.",
   },
   en: {
     phone: "Phone Number", name: "Name", pass: "Password", passConfirm: "Confirm Password",
@@ -210,6 +224,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "Admin Login", adminDesc: "Enter your phone number and password.",
     adminSignupLink: "First time? Sign Up", adminLoginLink: "Have an account? Log In",
     back: "Back to role selection", newUser: "New users will be registered automatically",
+    workerNameRequired: "Enter your name or initials.", workerPhoneLast4Required: "Enter the last 4 digits of your phone number.", workerDuplicate: "More than one worker matches these details. Ask an administrator to verify the registration.",
   },
   jp: {
     phone: "電話番号", name: "名前", pass: "パスワード", passConfirm: "パスワード再入力",
@@ -224,6 +239,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "管理者ログイン", adminDesc: "電話番号とパスワードを入力してください。",
     adminSignupLink: "初めて？新規登録", adminLoginLink: "アカウントをお持ちの方？ログイン",
     back: "役割選択に戻る", newUser: "新しいユーザーは自動的に登録されます",
+    workerNameRequired: "氏名またはイニシャルを入力してください。", workerPhoneLast4Required: "電話番号の下4桁を入力してください。", workerDuplicate: "同じ情報に一致する作業員が複数います。管理者に登録情報の確認を依頼してください。",
   },
   fr: {
     phone: "Numéro de téléphone", name: "Nom", pass: "Mot de passe", passConfirm: "Confirmer le mot de passe",
@@ -238,6 +254,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "Connexion administrateur", adminDesc: "Entrez votre numéro de téléphone et mot de passe.",
     adminSignupLink: "Première fois? S'inscrire", adminLoginLink: "Vous avez un compte? Connexion",
     back: "Retour au choix de rôle", newUser: "Les nouveaux utilisateurs seront enregistrés automatiquement",
+    workerNameRequired: "Saisissez votre nom ou vos initiales.", workerPhoneLast4Required: "Saisissez les 4 derniers chiffres de votre téléphone.", workerDuplicate: "Plusieurs travailleurs correspondent à ces informations. Demandez à un administrateur de vérifier l'inscription.",
   },
   es: {
     phone: "Número de teléfono", name: "Nombre", pass: "Contraseña", passConfirm: "Confirmar contraseña",
@@ -252,6 +269,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "Inicio de sesión administrador", adminDesc: "Ingrese su número de teléfono y contraseña.",
     adminSignupLink: "¿Primera vez? Registrarse", adminLoginLink: "¿Tiene cuenta? Iniciar sesión",
     back: "Volver a selección de rol", newUser: "Los nuevos usuarios se registrarán automáticamente",
+    workerNameRequired: "Introduzca su nombre o iniciales.", workerPhoneLast4Required: "Introduzca los últimos 4 dígitos de su teléfono.", workerDuplicate: "Hay más de un trabajador con estos datos. Pida a un administrador que verifique el registro.",
   },
   ar: {
     phone: "رقم الهاتف", name: "الاسم", pass: "كلمة المرور", passConfirm: "تأكيد كلمة المرور",
@@ -266,6 +284,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "دخول المشرف", adminDesc: "أدخل رقم الهاتف وكلمة المرور.",
     adminSignupLink: "المرة الأولى؟ سجل", adminLoginLink: "لديك حساب؟ سجل الدخول",
     back: "العودة لاختيار الدور", newUser: "سيتم تسجيل المستخدمين الجدد تلقائياً",
+    workerNameRequired: "أدخل الاسم أو الأحرف الأولى.", workerPhoneLast4Required: "أدخل آخر 4 أرقام من رقم الهاتف.", workerDuplicate: "يوجد أكثر من عامل مطابق لهذه المعلومات. اطلب من المسؤول التحقق من التسجيل.",
   },
   hi: {
     phone: "फ़ोन नंबर", name: "नाम", pass: "पासवर्ड", passConfirm: "पासवर्ड की पुष्टि करें",
@@ -280,6 +299,7 @@ export const T: Record<string, Record<string, string>> = {
     adminTitle: "प्रबंधक लॉगिन", adminDesc: "अपना फ़ोन नंबर और पासवर्ड दर्ज करें।",
     adminSignupLink: "पहली बार? खाता बनाएं", adminLoginLink: "खाता है? लॉगिन करें",
     back: "भूमिका चयन पर वापस", newUser: "नए उपयोगकर्ता स्वतः पंजीकृत होंगे",
+    workerNameRequired: "नाम या आद्याक्षर दर्ज करें।", workerPhoneLast4Required: "फ़ोन नंबर के अंतिम 4 अंक दर्ज करें।", workerDuplicate: "इन विवरणों से एक से अधिक कर्मचारी मेल खाते हैं। व्यवस्थापक से पंजीकरण की जाँच करने को कहें।",
   },
 };
 

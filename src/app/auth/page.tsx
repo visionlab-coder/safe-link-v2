@@ -286,12 +286,12 @@ function AuthContent() {
     const notices = AUTH_NOTICES[activeLang] ?? AUTH_NOTICES.en;
 
     if (!initials.trim()) {
-      setWorkerLoginError(activeLang === "ko" ? "이니셜 또는 이름을 입력해주세요." : "Enter your initials or name.");
+      setWorkerLoginError(t.workerNameRequired);
       setLoading(false);
       return;
     }
     if (phoneLast4.length !== 4) {
-      setWorkerLoginError(activeLang === "ko" ? "휴대전화 뒷 4자리를 입력해주세요." : "Enter the last 4 digits of your phone number.");
+      setWorkerLoginError(t.workerPhoneLast4Required);
       setLoading(false);
       return;
     }
@@ -316,9 +316,7 @@ function AuthContent() {
         const sites = "sites" in result ? result.sites : [];
         setMultipleSites(sites);
         if (sites.length === 0) {
-          setWorkerLoginError(activeLang === "ko"
-            ? "동일한 이니셜과 휴대전화 뒷 4자리를 가진 근로자가 여러 명입니다. 관리자에게 등록 정보를 확인해주세요."
-            : "More than one worker matches these details. Ask an administrator to verify the registration.");
+          setWorkerLoginError(t.workerDuplicate);
         }
         setLoading(false);
         return;
