@@ -128,7 +128,7 @@ public class AiMediaService {
     ) {
         String encoding = "OGG_OPUS".equalsIgnoreCase(audioEncoding) ? "OGG_OPUS" : "MP3";
         if (preferOpenAi && "MP3".equals(encoding) && configured(properties.getOpenAiApiKey())) {
-            AudioResult openAi = tryCall(() -> synthesizeOpenAi(text, gender));
+            AudioResult openAi = tryCall(() -> synthesizeOpenAi(text, gender, voiceLanguageCode));
             if (openAi != null && !openAi.audioBase64().isBlank()) return openAi;
             if (strictProvider) throw new ServiceUnavailableException("openai_tts_failed");
         }
@@ -139,7 +139,7 @@ public class AiMediaService {
             // 설정된 OpenAI 음성으로 한 번 더 시도한다. 중국어 등 Google 우선 언어도
             // 이 경로를 타므로 앱/웹에서 무음으로 끝나지 않는다.
             if (!strictProvider && "MP3".equals(encoding) && configured(properties.getOpenAiApiKey())) {
-                AudioResult openAi = tryCall(() -> synthesizeOpenAi(text, gender));
+                AudioResult openAi = tryCall(() -> synthesizeOpenAi(text, gender, voiceLanguageCode));
                 if (openAi != null && !openAi.audioBase64().isBlank()) return openAi;
             }
             throw googleFailure;
@@ -223,15 +223,22 @@ public class AiMediaService {
         return sendJson(request, "google_stt_failed");
     }
 
-    private AudioResult synthesizeOpenAi(String text, String gender) {
+    private AudioResult synthesizeOpenAi(String text, String gender, String voiceLanguageCode) {
         requireConfigured(properties.getOpenAiApiKey(), "openai_tts_not_configured");
         String voice = "male".equalsIgnoreCase(gender) ? "onyx" : "nova";
-        String body = writeJson(Map.of(
-            "model", "tts-1-hd",
-            "input", text,
-            "voice", voice,
-            "response_format", "mp3"
-        ));
+        boolean khmer = voiceLanguageCode != null && voiceLanguageCode.toLowerCase().startsWith("km-");
+        String model = khmer ? "gpt-4o-mini-tts" : "tts-1-hd";
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("model", model);
+        payload.put("input", text);
+        payload.put("voice", voice);
+        payload.put("response_format", "mp3");
+        if (khmer) {
+            // GPT-4o Mini TTS에 원문 언어를 명확히 지정한다. 번역·한글 발음 표기를
+            // 읽지 않고 전달된 크메르어 텍스트만 자연스럽게 발화하도록 한다.
+            payload.put("instructions", "Speak the supplied Khmer (Cambodian) text naturally in Khmer. Do not translate, summarize, or add words.");
+        }
+        String body = writeJson(payload);
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create("https://api.openai.com/v1/audio/speech"))
             .timeout(Duration.ofMillis(Math.max(500, properties.getTtsTimeoutMs())))
@@ -240,7 +247,7 @@ public class AiMediaService {
             .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
             .build();
         byte[] audio = sendBytes(request, "openai_tts_failed");
-        return new AudioResult(Base64.getEncoder().encodeToString(audio), "audio/mpeg", "openai", "tts-1-hd");
+        return new AudioResult(Base64.getEncoder().encodeToString(audio), "audio/mpeg", "openai", model);
     }
 
     private AudioResult synthesizeGoogle(String text, String voiceLanguageCode, String voiceName, String gender, String audioEncoding) {
