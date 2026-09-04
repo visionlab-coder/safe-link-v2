@@ -126,6 +126,10 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
         const sourceLang = langMap[sl] || sl;
         const targetLang = langMap[tl] || tl;
         const forced = lab?.translateEngine;
+        // 크메르어는 OpenAI 문맥 번역의 문장 선택이 Google 번역과 달라
+        // 화면의 기준 번역문과 TTS 발음 확인이 혼동될 수 있다. Google 결과를
+        // 기준 번역문으로 고정하고, TTS는 그 결과만 읽도록 한다.
+        const preferGoogleTranslation = tl === 'km';
 
         // m2m100(로컬 오픈소스)은 서비스 URL이 설정됐거나 루트관리자가 명시 선택한 경우에만 시도.
         // (운영엔 127.0.0.1:8100 서비스가 없어 매 번역마다 실패·낭비되던 문제 수정)
@@ -166,7 +170,7 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
 
         // 일반 1:1 대화는 문맥과 현장 용어의 의미 보존을 우선한다.
         // fast는 발음·역번역만 생략할 뿐, quality=high 본문 번역의 정확도를 낮추지 않는다.
-        const useHighQualityContext = quality === "high" && forced !== "papago" && forced !== "google";
+        const useHighQualityContext = quality === "high" && forced !== "papago" && forced !== "google" && !preferGoogleTranslation;
         if (useHighQualityContext && v3AiVendorContext) {
             try {
                 const contextualTranslation = await contextualConstructionTranslate(processedText, sl, tl, v3AiVendorContext);
@@ -216,7 +220,7 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
         }
 
         // === 1.5. 비Papago 언어의 건설현장 문맥 번역 ===
-        if (!translatedText && forced !== "google" && v3AiVendorContext) {
+        if (!translatedText && forced !== "google" && !preferGoogleTranslation && v3AiVendorContext) {
             const contextualTranslation = await contextualConstructionTranslate(processedText, sl, tl, v3AiVendorContext);
             if (contextualTranslation) {
                 translatedText = contextualTranslation;

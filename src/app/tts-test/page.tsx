@@ -29,6 +29,8 @@ const SAMPLE: Record<string, string> = {
     en: "Always wear your safety helmet and watch for falls during high-altitude work.",
     vi: "Luôn đội mũ bảo hộ và cẩn thận khi làm việc trên cao.",
     zh: "请务必佩戴安全帽，高空作业时小心坠落。",
+    // Khmer: \"Please wear a safety helmet and be careful of falls when working at height.\"
+    km: "សូមពាក់មួកសុវត្ថិភាពជានិច្ច ហើយប្រុងប្រយ័ត្នការធ្លាក់នៅពេលធ្វើការនៅទីខ្ពស់។",
 };
 
 export default function TtsTestPage() {
