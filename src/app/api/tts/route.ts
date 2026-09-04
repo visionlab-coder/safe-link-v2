@@ -38,9 +38,10 @@ export async function GET(request: NextRequest) {
         voiceName: getBestCloudVoice(lang, gender),
         gender,
         preferOpenAi: OPENAI_TTS_LANGS.has(baseLang),
-        // 선택된 언어의 주 음성 제공자만 사용한다. 실패 시 다른 제공자·기기 음성으로
-        // 바뀌면 같은 문장의 음색이 달라지므로, 같은 제공자 요청만 재시도한다.
-        strictProvider: true,
+        // 중국어는 Google 보통화를 메인으로 사용한다. Google 요청 실패 시에는
+        // 무음으로 끝내지 않고 OpenAI 보조 TTS로 한 번만 대체한다.
+        // 그 외 언어는 선택된 주 제공자만 사용해 음색이 임의로 바뀌지 않게 한다.
+        strictProvider: baseLang !== 'zh',
     });
     if (!upstream) return new Response("TTS gateway unavailable", { status: 503 });
     if (!upstream.ok) {

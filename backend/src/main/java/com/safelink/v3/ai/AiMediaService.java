@@ -227,7 +227,8 @@ public class AiMediaService {
         requireConfigured(properties.getOpenAiApiKey(), "openai_tts_not_configured");
         String voice = "male".equalsIgnoreCase(gender) ? "onyx" : "nova";
         boolean khmer = voiceLanguageCode != null && voiceLanguageCode.toLowerCase().startsWith("km-");
-        String model = khmer ? "gpt-4o-mini-tts" : "tts-1-hd";
+        boolean simplifiedChinese = voiceLanguageCode != null && voiceLanguageCode.toLowerCase().startsWith("zh-cn");
+        String model = khmer || simplifiedChinese ? "gpt-4o-mini-tts" : "tts-1-hd";
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("model", model);
         payload.put("input", text);
@@ -237,6 +238,10 @@ public class AiMediaService {
             // GPT-4o Mini TTS에 원문 언어를 명확히 지정한다. 번역·한글 발음 표기를
             // 읽지 않고 전달된 크메르어 텍스트만 자연스럽게 발화하도록 한다.
             payload.put("instructions", "Speak the supplied Khmer (Cambodian) text naturally in Khmer. Do not translate, summarize, or add words.");
+        } else if (simplifiedChinese) {
+            // 보조 TTS도 중국어 UI 기준인 간체자·보통화로만 발화한다. 광둥어(yue/zh-HK)
+            // 사용을 명시적으로 금지해 제공자 전환 시에도 음성 언어가 바뀌지 않게 한다.
+            payload.put("instructions", "Speak the supplied Simplified Chinese text naturally in Mandarin Chinese (Putonghua). Do not use Cantonese. Do not translate, summarize, or add words.");
         }
         String body = writeJson(payload);
         HttpRequest request = HttpRequest.newBuilder()
