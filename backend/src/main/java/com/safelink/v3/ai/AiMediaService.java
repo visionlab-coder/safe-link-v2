@@ -10,21 +10,31 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AiMediaService {
+    private static final Duration TTS_CACHE_TTL = Duration.ofHours(1);
+    private static final int TTS_CACHE_MAX_ENTRIES = 512;
+
     private final AiProperties properties;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
     private final FlittoRttClient flitto;
+    // OpenAI TTS는 같은 입력도 매 호출마다 음색·억양이 조금 달라질 수 있다.
+    // 재생·새로고침 후에는 같은 현장/문장/음성 조합의 MP3를 재사용한다.
+    private final Map<String, TtsCacheEntry> ttsCache = new ConcurrentHashMap<>();
 
     public AiMediaService(AiProperties properties, ObjectMapper objectMapper, FlittoRttClient flitto) {
         this.properties = properties;
@@ -84,6 +94,30 @@ public class AiMediaService {
     }
 
     public AudioResult synthesize(
+        Long siteId,
+        String text,
+        String voiceLanguageCode,
+        String voiceName,
+        String gender,
+        boolean preferOpenAi,
+        boolean strictProvider,
+        String audioEncoding
+    ) {
+        String cacheKey = ttsCacheKey(siteId, text, voiceLanguageCode, voiceName, gender, preferOpenAi, strictProvider, audioEncoding);
+        Instant now = Instant.now();
+        TtsCacheEntry cached = ttsCache.get(cacheKey);
+        if (cached != null && cached.expiresAt().isAfter(now)) return cached.result();
+        if (cached != null) ttsCache.remove(cacheKey, cached);
+
+        AudioResult result = synthesizeUncached(text, voiceLanguageCode, voiceName, gender, preferOpenAi, strictProvider, audioEncoding);
+        evictExpiredTtsCacheEntries(now);
+        if (ttsCache.size() < TTS_CACHE_MAX_ENTRIES) {
+            ttsCache.put(cacheKey, new TtsCacheEntry(result, now.plus(TTS_CACHE_TTL)));
+        }
+        return result;
+    }
+
+    private AudioResult synthesizeUncached(
         String text,
         String voiceLanguageCode,
         String voiceName,
@@ -111,6 +145,33 @@ public class AiMediaService {
             throw googleFailure;
         }
     }
+
+    private void evictExpiredTtsCacheEntries(Instant now) {
+        ttsCache.entrySet().removeIf(entry -> !entry.getValue().expiresAt().isAfter(now));
+    }
+
+    private String ttsCacheKey(
+        Long siteId,
+        String text,
+        String voiceLanguageCode,
+        String voiceName,
+        String gender,
+        boolean preferOpenAi,
+        boolean strictProvider,
+        String audioEncoding
+    ) {
+        String source = String.join("|", String.valueOf(siteId), text, voiceLanguageCode, voiceName,
+            gender == null ? "female" : gender, String.valueOf(preferOpenAi), String.valueOf(strictProvider), audioEncoding);
+        try {
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(
+                MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8))
+            );
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("sha256_not_available", impossible);
+        }
+    }
+
+    private record TtsCacheEntry(AudioResult result, Instant expiresAt) {}
 
     private SttResult transcribeOpenAi(String audio, String mimeType, String languageCode, String prompt) {
         requireConfigured(properties.getOpenAiApiKey(), "openai_stt_not_configured");

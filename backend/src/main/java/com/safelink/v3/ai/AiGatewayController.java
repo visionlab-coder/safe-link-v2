@@ -210,6 +210,7 @@ public class AiGatewayController {
         var decision = requireQuota(actor, request.siteId(), "tts", request.text().length());
         Instant started = Instant.now();
         var result = media.synthesize(
+            request.siteId(),
             request.text(),
             cleanOptional(request.voiceLanguageCode(), "ko-KR"),
             cleanOptional(request.voiceName(), "ko-KR-Neural2-A"),
