@@ -54,6 +54,30 @@ const ADMIN_SIGNUP_ERROR_NOTICES: Record<string, Record<"domain" | "duplicate" |
   },
 };
 
+/** 관리자 로그인 실패는 승인·네트워크 오류와 구분해 선택 언어로 안내한다. */
+const ADMIN_LOGIN_INVALID_CREDENTIALS: Record<string, string> = {
+  ko: "이메일 또는 비밀번호가 올바르지 않습니다.",
+  vi: "Email hoặc mật khẩu không đúng.",
+  zh: "电子邮件或密码不正确。",
+  th: "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
+  uz: "Email yoki parol noto'g'ri.",
+  ph: "Mali ang email o password.",
+  km: "អ៊ីមែល ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវទេ។",
+  id: "Email atau kata sandi tidak benar.",
+  mn: "Имэйл эсвэл нууц үг буруу байна.",
+  my: "အီးမေးလ် သို့မဟုတ် စကားဝှက် မမှန်ကန်ပါ။",
+  ne: "इमेल वा पासवर्ड सही छैन।",
+  bn: "ইমেইল বা পাসওয়ার্ড সঠিক নয়।",
+  kk: "Электрондық пошта немесе құпиясөз дұрыс емес.",
+  ru: "Неверный email или пароль.",
+  en: "Email or password is incorrect.",
+  jp: "メールアドレスまたはパスワードが正しくありません。",
+  fr: "L'adresse e-mail ou le mot de passe est incorrect.",
+  es: "El correo electrónico o la contraseña son incorrectos.",
+  ar: "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+  hi: "ईमेल या पासवर्ड सही नहीं है।",
+};
+
 function adminSignupErrorNotice(language: string, key: "domain" | "duplicate" | "password" | "rate"): string {
   return (ADMIN_SIGNUP_ERROR_NOTICES[language] ?? ADMIN_SIGNUP_ERROR_NOTICES.en)[key];
 }
@@ -374,7 +398,16 @@ function AuthContent() {
       sessionStorage.setItem("safe-link-session-active", "true");
       redirectByRoleString(pickDefaultV3Role(user.roles), activeLang);
     } catch (err) {
-      setAuthFlash({ tone: "error", message: sanitizeAuthError(err instanceof Error ? err.message : "unknown", activeLang) });
+      const rawError = err instanceof Error ? err.message : "unknown";
+      const normalizedError = rawError.toLowerCase();
+      const message = normalizedError.includes("invalid login")
+        || normalizedError.includes("invalid credentials")
+        || normalizedError.includes("invalid_credentials")
+        || normalizedError.includes("wrong password")
+        || normalizedError.includes("v3_login_failed_401")
+        ? (ADMIN_LOGIN_INVALID_CREDENTIALS[activeLang] ?? ADMIN_LOGIN_INVALID_CREDENTIALS.en)
+        : sanitizeAuthError(rawError, activeLang);
+      setAuthFlash({ tone: "error", message });
       setLoading(false);
     }
   };
@@ -767,10 +800,10 @@ function AuthContent() {
                     <div className="relative" style={{
                       ...fieldBox,
                       border: `1px solid ${passConfirm && passConfirm !== password
-                        ? "rgba(239,68,68,0.5)"
+                        ? "#fca5a5"
                         : passConfirm && passConfirm === password
-                          ? "rgba(16,185,129,0.5)"
-                          : "rgba(255,255,255,0.08)"}`,
+                          ? "#86efac"
+                          : "#b9cbe4"}`,
                     }}>
                       <input type="password" aria-label={t.passConfirm} placeholder={t.passConfirm} value={passConfirm}
                         onChange={e => setPassConfirm(e.target.value)}
