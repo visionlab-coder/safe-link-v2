@@ -6,6 +6,17 @@ export const runtime = "nodejs";
 const SAFE_LINK_V3_API_BASE_URL =
   process.env.SAFE_LINK_INTERNAL_API_BASE_URL || process.env.NEXT_PUBLIC_SAFE_LINK_API_BASE_URL || "http://localhost:8080";
 
+/**
+ * 운영 API는 HTTPS 전용 Secure 세션 쿠키를 발급한다. 개발 서버를 휴대폰의
+ * http://192.168.x.x 주소로 열었을 때만 브라우저가 그 쿠키를 거부하므로,
+ * 개발 환경 프록시에서는 Secure 속성만 제거한다. 운영 빌드에는 적용되지 않는다.
+ */
+function cookieForDevelopmentBrowser(setCookie: string): string {
+  return process.env.NODE_ENV === "development"
+    ? setCookie.replace(/;\s*Secure/gi, "")
+    : setCookie;
+}
+
 export async function OPTIONS(req: NextRequest) {
   return handleMobilePreflight(req) ?? new NextResponse(null, { status: 405 });
 }
@@ -49,7 +60,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       { error: upstreamError ?? `v3_login_failed_${upstream.status}` },
       { status: upstream.status },
     );
-    if (setCookie) response.headers.append("set-cookie", setCookie);
+    if (setCookie) response.headers.append("set-cookie", cookieForDevelopmentBrowser(setCookie));
     return response;
   }
 
@@ -61,7 +72,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   });
 
   if (setCookie) {
-    response.headers.append("set-cookie", setCookie);
+    response.headers.append("set-cookie", cookieForDevelopmentBrowser(setCookie));
   }
 
   return response;
