@@ -12,7 +12,7 @@ import { hangulize } from "@/utils/hangulize";
 import { playPremiumAudio } from "@/utils/tts";
 import { playNotificationSound } from "@/utils/notifications";
 import { saveTbmCache, loadTbmCache, isOffline } from "@/utils/native/tbm-cache";
-import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { resolveDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 // ── 언어 코드 매핑 ── (미사용 — 향후 TTS 연동 예정)
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -33,13 +33,14 @@ const isoMap: Record<string, string> = {
 interface TransResult { text: string; pron: string; rev: string; }
 
 /** 단일 텍스트 번역 */
-const translateKo = async (text: string, targetLang: string): Promise<TransResult> => {
+const translateKo = async (text: string, targetLang: string, fast = false): Promise<TransResult> => {
     if (targetLang === "ko") return { text, pron: "", rev: "" };
     try {
         const res = await fetch('/api/translate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, sl: 'ko', tl: targetLang, useGlossary: true }),
+            // 본문을 먼저 표시할 때는 발음·역번역 API 왕복을 생략한다.
+            body: JSON.stringify({ text, sl: 'ko', tl: targetLang, useGlossary: true, fast, pronunciation: !fast }),
         });
         if (!res.ok) return { text, pron: "", rev: "" };
         const data = await res.json() as { translated?: string; pronunciation?: string; reverse_translated?: string };
@@ -78,19 +79,20 @@ const translateChunked = async (
     text: string,
     targetLang: string,
     onProgress: (partial: TransResult) => void,
+    fast = false,
 ): Promise<TransResult> => {
     if (targetLang === "ko") return { text, pron: "", rev: "" };
 
     const chunks = splitIntoChunks(text);
 
     // 짧은 텍스트(1 청크)는 그냥 한 번에 번역
-    if (chunks.length <= 1) return translateKo(text, targetLang);
+    if (chunks.length <= 1) return translateKo(text, targetLang, fast);
 
     // 병렬 번역 시작 — 각 청크가 완료되면 즉시 콜백
     const results: (TransResult | null)[] = new Array(chunks.length).fill(null);
 
     const promises = chunks.map((chunk, idx) =>
-        translateKo(chunk, targetLang).then((result) => {
+        translateKo(chunk, targetLang, fast).then((result) => {
             results[idx] = result;
 
             // 지금까지 번역 완료된 부분을 합쳐서 콜백
@@ -202,7 +204,9 @@ function WorkerTBMDetailContent() {
         };
         if (!me.user) { setLoading(false); return; }
 
-        const lang = displayLang || urlLang || me.profile?.preferred_lang || "ko";
+        // 저장된 화면 언어를 URL/프로필 기본값보다 먼저 사용한다.
+        // useDisplayLanguage의 최초 렌더 기본값(ko)이 API 요청을 덮지 않도록 resolver를 쓴다.
+        const lang = resolveDisplayLanguage(me.profile?.preferred_lang, urlLang, displayLang);
 
         setPreferredLang(lang);
 
@@ -253,7 +257,8 @@ function WorkerTBMDetailContent() {
                             cleaned.pron = hangulize(cleaned.text, lang);
                         }
                         setTransData(cleaned);
-                    }
+                    },
+                    true,
                 );
 
                 // 최종 결과 반영
@@ -264,6 +269,17 @@ function WorkerTBMDetailContent() {
 
                 setTransData(result);
                 setTranslating(false);
+
+                // 발음·역번역은 본문 표시를 지연시키지 않는다. 본문 전체에 대해 한 번만
+                // 보완 요청하므로 긴 TBM에서 문단마다 추가 API를 호출하던 문제도 제거한다.
+                void translateKo(tbmData.content_ko, lang).then((details) => {
+                    if (!details.pron && !details.rev) return;
+                    setTransData((current) => ({
+                        ...current,
+                        pron: details.pron || current.pron,
+                        rev: details.rev || current.rev,
+                    }));
+                });
             } else {
                 setTransData({ text: tbmData?.content_ko || "", pron: "", rev: "" });
             }

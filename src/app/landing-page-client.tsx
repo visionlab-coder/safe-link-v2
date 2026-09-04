@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { languages } from "@/constants";
 import BrandLogo from "@/components/BrandLogo";
 import { getT } from "./auth/translations";
+import { persistDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 const LANDING_UI: Record<string, Record<string, string | string[]>> = {
   ko: { os:"FIELD SAFETY OS", access:"SECURE ACCESS", title:"이름 중심의 간단하고\n안전한 현장 입장", desc:"근로자의 선호 언어와 현장 배정을 확인한 뒤, 필요한 안전 업무를 바로 시작합니다.", language:"언어 선택", languageDesc:"근로자의 선호 언어로 서비스를 시작합니다.", adminDesc:"현장 운영 및 안전관리", workerDesc:"교육 확인 및 안전 업무", login:"로그인 · 본인 확인", loginDesc:"웹과 모바일에서 같은 흐름으로 시작합니다.", steps:["정보 확인|이름과 최소 정보를 확인합니다.", "현장 연결|배정 현장을 자동으로 확인합니다.", "입장 완료|근로자 세션을 발급합니다."] },
@@ -41,7 +42,7 @@ function fallbackLandingUi(language: string): Record<string, string | string[]> 
 function LandingPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [selectedLang, setSelectedLang] = useState("ko");
+  const selectedLang = useDisplayLanguage();
   const [showRoles, setShowRoles] = useState(false);
   const qrRole = searchParams.get("role");
   const qrSiteId = searchParams.get("site_id");
@@ -77,7 +78,7 @@ function LandingPageInner() {
         <div className="mt-5 rounded-xl border border-[#d9e1ea] bg-white p-4 shadow-sm sm:p-5">
           <div className="flex items-start justify-between gap-4 border-b border-[#edf1f5] pb-4"><div><h2 className="text-sm font-black">{ui.language as string}</h2><p className="mt-1 text-[11px] text-[#758195]">{ui.languageDesc as string}</p></div><Languages className="h-5 w-5 shrink-0 text-[#0b5ed7]" /></div>
           <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-5">
-            {languages.map((language) => { const active = selectedLang === language.code; return <button key={language.code} onClick={() => setSelectedLang(language.code)} className={`flex min-h-[62px] flex-col items-center justify-center gap-1 rounded-lg border px-1 transition ${active ? "border-[#0b5ed7] bg-[#e9f2ff] text-[#063789]" : "border-[#edf1f5] bg-white text-[#526076] hover:border-[#bed7fa]"}`}><Image src={`/flags/${language.iso}.png`} alt={language.name} width={28} height={19} className="h-[19px] w-7 rounded object-cover" /><span className="text-[9px] font-bold leading-tight">{language.name}</span></button>; })}
+            {languages.map((language) => { const active = selectedLang === language.code; return <button key={language.code} onClick={() => persistDisplayLanguage(language.code)} className={`flex min-h-[62px] flex-col items-center justify-center gap-1 rounded-lg border px-1 transition ${active ? "border-[#0b5ed7] bg-[#e9f2ff] text-[#063789]" : "border-[#edf1f5] bg-white text-[#526076] hover:border-[#bed7fa]"}`}><Image src={`/flags/${language.iso}.png`} alt={language.name} width={28} height={19} className="h-[19px] w-7 rounded object-cover" /><span className="text-[9px] font-bold leading-tight">{language.name}</span></button>; })}
           </div>
         </div>
 

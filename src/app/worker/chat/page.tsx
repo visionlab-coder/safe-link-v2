@@ -11,7 +11,7 @@ import { playPremiumAudio } from "@/utils/tts";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
 import { usePresence } from "@/hooks/usePresence";
 import ChatPlayButton from "@/components/ChatPlayButton";
-import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { resolveDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 type ParsedMessage = { text: string; pron: string; rev: string };
 
@@ -335,7 +335,7 @@ function WorkerChatContent() {
         const mySiteId = payload.worker?.site_id ?? null;
         if (mySiteId) setSiteId(mySiteId);
 
-        const finalLang = displayLang || urlLang || payload.worker?.preferred_lang || "ko";
+        const finalLang = resolveDisplayLanguage(payload.worker?.preferred_lang, urlLang, displayLang);
         setLang(finalLang);
 
         // Load friend IDs from local storage

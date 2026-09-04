@@ -10,6 +10,7 @@ import BrandLogo from "@/components/BrandLogo";
 import { getDefaultRouteForProfileRole, type ProfileRole } from "@/lib/roles";
 import { adminSignupV3, getV3CurrentUser, loginV3, logoutV3, quickLoginWorkerV3 } from "@/lib/v3-auth";
 import type { V3Role } from "@/lib/v3-role-contract";
+import { persistDisplayLanguage, readDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 type AuthNotice = "retry" | "network" | "workerNotFound" | "signupPending" | "multipleSites" | "nfcHint";
 
@@ -228,11 +229,10 @@ function AuthContent() {
   const [authFlash, setAuthFlash] = useState<AuthFlash>(null);
 
   useEffect(() => {
-    const savedLang = localStorage.getItem("safe-link-lang");
-    if (!urlLang && savedLang) {
-      setLang(savedLang);
-      // setMode("role"); // 로컬 저장소가 있어도 항상 언어 선택부터 시작하도록 주석 처리
-    }
+    // URL은 최초 진입용일 뿐이다. 사용자가 이미 고른 언어가 있으면
+    // /auth?lang=ko 같은 이전 주소가 선택값을 한국어로 되돌리면 안 된다.
+    const resolvedLang = readDisplayLanguage(urlLang || "ko");
+    setLang(resolvedLang);
     
     // URL에 역할(role)이 있으면 즉시 해당 로그인 폼으로 진입 (자동 로그인 방지 및 진입 단계 단축)
     const urlRole = searchParams.get("role");
@@ -272,7 +272,7 @@ function AuthContent() {
 
   const handleLangSelect = (code: string) => {
     setLang(code);
-    localStorage.setItem("safe-link-lang", code);
+    persistDisplayLanguage(code);
     setMode("role");
   };
 
@@ -366,7 +366,7 @@ function AuthContent() {
       const user = await loginV3(adminEmail, password);
       // 로그인 화면에서 고른 언어를 다음 화면의 기본 언어로 유지하고,
       // 로그인한 사용자의 설정에도 저장한다. 저장 실패가 로그인을 막지는 않는다.
-      localStorage.setItem("safe-link-lang", activeLang);
+      persistDisplayLanguage(activeLang);
       await fetch("/api/auth/setup-profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

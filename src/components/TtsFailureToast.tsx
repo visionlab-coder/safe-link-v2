@@ -7,6 +7,7 @@ const MESSAGES: Record<string, string> = {
     ko: "음성을 재생할 수 없습니다. 기기의 미디어 음량과 TTS 설정을 확인해주세요.",
     en: "Unable to play audio. Check your device volume and text-to-speech settings.",
     zh: "无法播放语音。请检查设备音量和文字转语音设置。",
+    km: "មិនអាចចាក់សំឡេងបានទេ។ សូមពិនិត្យកម្រិតសំឡេង និងការកំណត់អត្ថបទទៅជាសំឡេង។",
     vi: "Không thể phát âm thanh. Hãy kiểm tra âm lượng và cài đặt chuyển văn bản thành giọng nói.",
     ru: "Не удалось воспроизвести звук. Проверьте громкость и настройки синтеза речи.",
 };

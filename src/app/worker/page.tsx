@@ -688,8 +688,21 @@ function WorkerHomeContent() {
                     if (!cancelled) setHasNewTBM(false);
                     return;
                 }
+
+                // 공지가 존재한다는 것과 아직 확인·서명해야 한다는 것은 다르다.
+                // 이전 구현은 최신 TBM이 있으면 무조건 알림을 표시해, 서명 완료 후에도
+                // 홈에 "새 안전 지침" 카드가 계속 남았다.
+                const signResponse = latest.id == null
+                    ? null
+                    : await fetch(`/api/tbm/sign?tbmId=${encodeURIComponent(String(latest.id))}`, {
+                        cache: "no-store",
+                        credentials: "include",
+                    }).catch(() => null);
+                const signStatus = signResponse?.ok
+                    ? await signResponse.json() as { signed?: boolean }
+                    : null;
                 if (!cancelled) {
-                    setHasNewTBM(true);
+                    setHasNewTBM(!signStatus?.signed);
                     const timestamp = latest.published_at ?? latest.created_at;
                     setNewTBMTime(timestamp ? new Date(timestamp).toLocaleTimeString() : "");
 
@@ -712,7 +725,8 @@ function WorkerHomeContent() {
         };
     }, []);
 
-    const lang = displayLang || profile?.preferred_lang || urlLang || "ko";
+    // 현재 브라우저에서 고른 언어가 프로필의 기본 한국어값보다 우선한다.
+    const lang = resolveDisplayLanguage(profile?.preferred_lang, urlLang, displayLang);
     const newChatCount = useUnreadChatCount(profile?.id);
     const t = getUI(lang);
     const common = getWorkerCommon(lang);
