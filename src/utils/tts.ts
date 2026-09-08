@@ -131,7 +131,8 @@ export const playLiveBroadcastAudio = (
         return;
     }
 
-    // 방송도 동일한 서버 음성을 사용한다. 기기별 음성 엔진으로 바꾸지 않는다.
+    // 실시간 방송은 전달 지연을 줄이기 위해서만 1.5배속으로 재생한다.
+    // 일반 채팅/TBM의 TTS 속도에는 영향을 주지 않는다.
     playProxyAudio(cleanText, langCode, gender, (success) => {
         if (success) {
             onEnd?.();
@@ -139,7 +140,7 @@ export const playLiveBroadcastAudio = (
         }
         notifyTtsFailure();
         onEnd?.();
-    }, onStart);
+    }, onStart, 1.5);
 };
 
 /**
@@ -153,6 +154,7 @@ export const playProxyAudio = (
     gender: VoiceGender,
     onDone?: (success: boolean) => void,
     onStart?: () => void,
+    playbackRate = 1,
 ) => {
     const tl = lang === 'zh' ? 'zh-CN' : lang;
     // chunkText는 언어별 문장 끝기호와 서버 요청 길이 제한을 함께 처리한다.
@@ -161,10 +163,12 @@ export const playProxyAudio = (
     if (segments.length === 0) { onDone?.(false); return; }
 
     // 모든 청크 동시 prefetch — 1번 재생 중에 2·3번이 이미 버퍼링됨 (순차 다운로드 지연 제거)
+    const normalizedPlaybackRate = Math.min(2, Math.max(0.5, playbackRate));
     const audios = segments.map(chunk => {
         const url = `/api/tts?text=${encodeURIComponent(chunk)}&lang=${tl}&gender=${gender}`;
         const audio = new Audio(url);
         audio.preload = 'auto';
+        audio.playbackRate = normalizedPlaybackRate;
         return { audio, chunk, url };
     });
 
