@@ -204,7 +204,8 @@ public class LiveInterpreterController {
     public Map<String, List<TranslationEvent>> translations(
         @AuthenticationPrincipal SessionPrincipal actor,
         @RequestParam(defaultValue = "0") String afterId,
-        @RequestParam(required = false) String siteId
+        @RequestParam(required = false) String siteId,
+        @RequestParam String sessionId
     ) {
         if (actor == null) {
             throw new AccessDeniedException("authentication_required");
@@ -216,16 +217,22 @@ public class LiveInterpreterController {
             throw new IllegalArgumentException("site_id_required");
         }
         Long parsedAfterId = parseLongOrZero(afterId);
+        String requestedSessionId = clean(sessionId);
+        if (requestedSessionId.isBlank()) {
+            throw new IllegalArgumentException("session_id_required");
+        }
         String siteClause = requestedSiteId == null ? "" : "and site_id = :siteId";
         var statement = jdbc.sql("""
                 select id, session_id, site_id, text_ko, translations::text as translations, created_by, created_at
                 from live_translation_events
                 where id > :afterId
+                  and session_id = :sessionId
                 %s
                 order by id asc
                 limit 100
             """.formatted(siteClause))
-            .param("afterId", parsedAfterId);
+            .param("afterId", parsedAfterId)
+            .param("sessionId", requestedSessionId);
         if (requestedSiteId != null) {
             statement = statement.param("siteId", requestedSiteId);
         }

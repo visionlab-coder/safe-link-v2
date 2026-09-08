@@ -38,7 +38,6 @@ function AdminLiveContent() {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [adminId, setAdminId] = useState("");
     const lastSentRef = useRef<{ text: string; at: number }>({ text: "", at: 0 });
-    const lastWorkerResponseIdRef = useRef(0);
     const seenWorkerResponseIdsRef = useRef<Set<string>>(new Set());
     // 현장 근로자 언어 목록 — 사전 번역 대상 (ref로 관리해 useCallback 재생성 방지)
     const siteWorkerLangsRef = useRef<string[]>([]);
@@ -163,7 +162,6 @@ function AdminLiveContent() {
         const handleResponse = (row: { id: string; sourceText: string; translatedText: string }) => {
             if (cancelled || seenWorkerResponseIdsRef.current.has(row.id)) return;
             seenWorkerResponseIdsRef.current.add(row.id);
-            lastWorkerResponseIdRef.current = Math.max(lastWorkerResponseIdRef.current, Number(row.id));
             const translated = String(row.translatedText || row.sourceText || "").trim();
             if (!translated) return;
             const time = new Date().toLocaleTimeString(locale, {
@@ -181,15 +179,6 @@ function AdminLiveContent() {
             playPremiumAudio(translated, "ko", "female", unmuteRecording);
         };
 
-        const loadMissedResponses = async () => {
-            const params = new URLSearchParams({ afterId: String(lastWorkerResponseIdRef.current) });
-            if (siteId) params.set("siteId", siteId);
-            const res = await fetch(`/api/live/worker-responses?${params.toString()}`, { cache: "no-store" });
-            if (!res.ok || cancelled) return;
-            const data = await res.json() as { responses?: Array<{ id: string; sourceText: string; translatedText: string }> };
-            (data.responses ?? []).forEach(handleResponse);
-        };
-
         const params = new URLSearchParams({ type: "worker-responses" });
         if (siteId) params.set("siteId", siteId);
         const events = new EventSource(`/api/live/events?${params.toString()}`);
@@ -197,10 +186,11 @@ function AdminLiveContent() {
             try {
                 handleResponse(JSON.parse((event as MessageEvent<string>).data));
             } catch {
-                // EventSource reconnects automatically; missed rows are loaded on the next mount.
+                // EventSource reconnects automatically. 이전 이력은 의도적으로 불러오지 않는다.
             }
         });
-        void loadMissedResponses();
+        // 라이브 화면은 대화 이력 화면이 아니다. 화면 진입 전 DB에 저장된
+        // 근로자 응답을 다시 불러오지 않고, 이 연결 이후의 실시간 이벤트만 표시한다.
 
         return () => {
             cancelled = true;
