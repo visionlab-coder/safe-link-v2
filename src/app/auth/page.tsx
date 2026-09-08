@@ -287,12 +287,15 @@ function AuthContent() {
     const rawSiteId = searchParams.get("site_id");
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const siteId = rawSiteId && UUID_RE.test(rawSiteId) ? rawSiteId : null;
-    if (!role) {
-      router.push(`/auth/setup?lang=${activeLang}${targetRole ? `&role=${targetRole}` : ""}${siteId ? `&site_id=${siteId}` : ""}`);
-      return;
-    }
-    router.push(`${getDefaultRouteForProfileRole(role as ProfileRole)}?lang=${activeLang}`);
-  }, [router, searchParams]);
+    const destination = !role
+      ? `/auth/setup?lang=${activeLang}${targetRole ? `&role=${targetRole}` : ""}${siteId ? `&site_id=${siteId}` : ""}`
+      : `${getDefaultRouteForProfileRole(role as ProfileRole)}?lang=${activeLang}`;
+
+    // 휴대폰에서 IP 기반 HTTP 개발 서버를 사용할 때 App Router의 클라이언트
+    // 전환이 세션 쿠키 직후 멈추는 경우가 있다. 로그인 완료 이동은 전체 이동으로
+    // 처리해 새 세션을 포함한 상태를 서버에서 다시 읽도록 한다.
+    window.location.assign(destination);
+  }, [searchParams]);
 
   const handleLangSelect = (code: string) => {
     setLang(code);

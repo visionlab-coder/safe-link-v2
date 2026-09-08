@@ -10,11 +10,11 @@ import { playPremiumAudio } from "@/utils/tts";
 import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 const LIVE_UI: Record<string, Record<string, string>> = {
-    ko: { title:"실시간 동시통역", desc:"말하면 근로자 스마트폰에서 번역된 음성이 자동 재생됩니다.", live:"실시간 통역 방송", onAir:"방송 중", listeners:"청취자", start:"방송 시작", stop:"방송 종료", speak:"말씀하세요... 자동으로 번역됩니다", worker:"근로자", recording:"녹음 중", microphoneStopped:"마이크가 중지되었습니다", notStarted:"미시작", site:"현장", utterances:"발화", status:"상태", time:"시각", original:"한국어 원문", ended:"종료", saveFailed:"저장 실패" },
-    en: { title:"Live Simultaneous Interpretation", desc:"Translated audio plays automatically on workers’ smartphones when you speak.", live:"Live interpretation broadcast", onAir:"ON AIR", listeners:"listeners", start:"START BROADCAST", stop:"STOP BROADCAST", speak:"Speak now… your words will be translated automatically", worker:"Worker", recording:"Recording", microphoneStopped:"Microphone stopped", notStarted:"Not started", site:"Site", utterances:"Utterances", status:"Status", time:"Time", original:"Korean original", ended:"Ended", saveFailed:"Save failed" },
-    zh: { title:"实时同声传译", desc:"您说话时，工人手机会自动播放翻译后的语音。", live:"实时口译广播", onAir:"直播中", listeners:"听众", start:"开始广播", stop:"结束广播", speak:"请说话…系统将自动翻译", worker:"工人", recording:"录音中", microphoneStopped:"麦克风已停止", notStarted:"未开始", site:"现场", utterances:"发言", status:"状态", time:"时间", original:"韩语原文", ended:"已结束", saveFailed:"保存失败" },
-    vi: { title:"Phiên dịch đồng thời trực tiếp", desc:"Khi bạn nói, âm thanh đã dịch sẽ tự động phát trên điện thoại của công nhân.", live:"Phát sóng phiên dịch trực tiếp", onAir:"ĐANG PHÁT", listeners:"người nghe", start:"BẮT ĐẦU PHÁT SÓNG", stop:"DỪNG PHÁT SÓNG", speak:"Hãy nói… nội dung sẽ được dịch tự động", worker:"Công nhân", recording:"Đang ghi âm", microphoneStopped:"Đã dừng micrô", notStarted:"Chưa bắt đầu", site:"Công trường", utterances:"Lượt phát biểu", status:"Trạng thái", time:"Thời gian", original:"Bản gốc tiếng Hàn", ended:"Đã kết thúc", saveFailed:"Lưu thất bại" },
-    ru: { title:"Синхронный перевод в реальном времени", desc:"Когда вы говорите, переведённое аудио автоматически воспроизводится на телефонах работников.", live:"Эфир синхронного перевода", onAir:"В ЭФИРЕ", listeners:"слушателей", start:"НАЧАТЬ ЭФИР", stop:"ОСТАНОВИТЬ ЭФИР", speak:"Говорите… речь будет переведена автоматически", worker:"Работник", recording:"Идёт запись", microphoneStopped:"Микрофон остановлен", notStarted:"Не начато", site:"Объект", utterances:"Высказывания", status:"Статус", time:"Время", original:"Оригинал на корейском", ended:"Завершено", saveFailed:"Ошибка сохранения" },
+    ko: { title:"실시간 동시통역", desc:"말하면 근로자 스마트폰에서 번역된 음성이 자동 재생됩니다.", live:"실시간 통역 방송", onAir:"방송 중", listeners:"청취자", start:"방송 시작", stop:"방송 종료", speak:"말씀하세요... 자동으로 번역됩니다", worker:"근로자", recording:"녹음 중", microphoneStopped:"마이크가 중지되었습니다", microphoneUnavailable:"마이크를 사용할 수 없습니다. 휴대폰 로컬 주소에서는 HTTPS 연결로 접속하거나 마이크 권한을 허용해주세요.", notStarted:"미시작", site:"현장", utterances:"발화", status:"상태", time:"시각", original:"한국어 원문", ended:"종료", saveFailed:"저장 실패" },
+    en: { title:"Live Simultaneous Interpretation", desc:"Translated audio plays automatically on workers’ smartphones when you speak.", live:"Live interpretation broadcast", onAir:"ON AIR", listeners:"listeners", start:"START BROADCAST", stop:"STOP BROADCAST", speak:"Speak now… your words will be translated automatically", worker:"Worker", recording:"Recording", microphoneStopped:"Microphone stopped", microphoneUnavailable:"Microphone unavailable. Use an HTTPS connection on a phone or allow microphone permission.", notStarted:"Not started", site:"Site", utterances:"Utterances", status:"Status", time:"Time", original:"Korean original", ended:"Ended", saveFailed:"Save failed" },
+    zh: { title:"实时同声传译", desc:"您说话时，工人手机会自动播放翻译后的语音。", live:"实时口译广播", onAir:"直播中", listeners:"听众", start:"开始广播", stop:"结束广播", speak:"请说话…系统将自动翻译", worker:"工人", recording:"录音中", microphoneStopped:"麦克风已停止", microphoneUnavailable:"无法使用麦克风。请通过 HTTPS 连接访问手机本地地址，或允许麦克风权限。", notStarted:"未开始", site:"现场", utterances:"发言", status:"状态", time:"时间", original:"韩语原文", ended:"已结束", saveFailed:"保存失败" },
+    vi: { title:"Phiên dịch đồng thời trực tiếp", desc:"Khi bạn nói, âm thanh đã dịch sẽ tự động phát trên điện thoại của công nhân.", live:"Phát sóng phiên dịch trực tiếp", onAir:"ĐANG PHÁT", listeners:"người nghe", start:"BẮT ĐẦU PHÁT SÓNG", stop:"DỪNG PHÁT SÓNG", speak:"Hãy nói… nội dung sẽ được dịch tự động", worker:"Công nhân", recording:"Đang ghi âm", microphoneStopped:"Đã dừng micrô", microphoneUnavailable:"Không thể dùng micrô. Hãy truy cập bằng HTTPS trên điện thoại hoặc cho phép quyền micrô.", notStarted:"Chưa bắt đầu", site:"Công trường", utterances:"Lượt phát biểu", status:"Trạng thái", time:"Thời gian", original:"Bản gốc tiếng Hàn", ended:"Đã kết thúc", saveFailed:"Lưu thất bại" },
+    ru: { title:"Синхронный перевод в реальном времени", desc:"Когда вы говорите, переведённое аудио автоматически воспроизводится на телефонах работников.", live:"Эфир синхронного перевода", onAir:"В ЭФИРЕ", listeners:"слушателей", start:"НАЧАТЬ ЭФИР", stop:"ОСТАНОВИТЬ ЭФИР", speak:"Говорите… речь будет переведена автоматически", worker:"Работник", recording:"Идёт запись", microphoneStopped:"Микрофон остановлен", microphoneUnavailable:"Микрофон недоступен. Откройте страницу на телефоне по HTTPS или разрешите доступ к микрофону.", notStarted:"Не начато", site:"Объект", utterances:"Высказывания", status:"Статус", time:"Время", original:"Корейский оригинал", ended:"Завершено", saveFailed:"Ошибка сохранения" },
 };
 
 const LIVE_LOCALES: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" };
@@ -25,6 +25,7 @@ function AdminLiveContent() {
     const t = LIVE_UI[lang] || LIVE_UI.en;
     const locale = LIVE_LOCALES[lang] || LIVE_LOCALES.en;
     const [isLive, setIsLive] = useState(false);
+    const [isStopping, setIsStopping] = useState(false);
     const [sessionId, setSessionId] = useState("");
     const [transcripts, setTranscripts] = useState<Array<{
         text: string;
@@ -117,6 +118,7 @@ function AdminLiveContent() {
             const saveRes = await fetch("/api/live/translations", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                signal: AbortSignal.timeout(10_000),
                 body: JSON.stringify({ sessionId, siteId, text_ko: cleanText, translations }),
             });
             if (!saveRes.ok) {
@@ -134,12 +136,16 @@ function AdminLiveContent() {
         isRecording,
         audioLevel,
         toggle: toggleRecording,
+        stopAndDrain,
         mute: muteRecording,
         unmute: unmuteRecording,
     } = useCloudSTT({
         lang: "ko",
         onTranscript: handleTranscript,
-        onError: (_type, message) => { setIsTranslating(false); setSttError(message); },
+        onError: (type, message) => {
+            setIsTranslating(false);
+            setSttError(type === "mic_denied" ? t.microphoneUnavailable : message);
+        },
         onSpeechStart: () => {
             setIsTranslating(true);
             if (!sessionId) return;
@@ -149,8 +155,7 @@ function AdminLiveContent() {
                 body: JSON.stringify({ sessionId, siteId }),
             });
         },
-        chunkInterval: 1500,   // 실시간 방송은 긴 문장보다 빠른 전달을 우선한다.
-        silenceDuration: 600,
+        // Shared live defaults: pause boundary, max 4s; never wait for broadcast stop.
         live: true,
         getTranslationTargets: () => siteWorkerLangsRef.current,
     });
@@ -221,19 +226,24 @@ function AdminLiveContent() {
             return;
         }
         // 마이크 권한 등이 거부되면 근로자 수신 화면도 즉시 대기 상태로 되돌린다.
+        setSttError(previous => previous || t.microphoneUnavailable);
         const params = new URLSearchParams({ sessionId: newSessionId });
         if (siteId) params.set("siteId", siteId);
         await fetch(`/api/live/sessions?${params.toString()}`, { method: "DELETE" });
     };
 
-    const handleStopBroadcast = () => {
-        if (isRecording) toggleRecording();
+    const handleStopBroadcast = async () => {
+        if (isStopping) return;
+        setIsStopping(true);
+        // Publish the final clip before listeners receive broadcast-stop.
+        await stopAndDrain();
         if (sessionId) {
             const params = new URLSearchParams({ sessionId });
             if (siteId) params.set("siteId", siteId);
-            void fetch(`/api/live/sessions?${params.toString()}`, { method: "DELETE" });
+            await fetch(`/api/live/sessions?${params.toString()}`, { method: "DELETE" }).catch(() => setSttError(t.saveFailed));
         }
         setIsLive(false);
+        setIsStopping(false);
     };
 
     const handleExport = async (format: ExportFormat) => {
@@ -259,7 +269,7 @@ function AdminLiveContent() {
             <div className="visualization-light min-h-screen font-sans flex flex-col selection:bg-blue-500/30">
                 <header className="concept-page-header safe-area-sticky-top sticky z-50">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => { if (isLive) handleStopBroadcast(); router.back(); }} className="p-2 -ml-2 rounded-full hover:bg-white/5 tap-effect text-slate-400">
+                        <button disabled={isStopping} onClick={async () => { if (isLive) await handleStopBroadcast(); router.back(); }} className="p-2 -ml-2 rounded-full hover:bg-white/5 tap-effect text-slate-400">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
                             </svg>
@@ -367,6 +377,8 @@ function AdminLiveContent() {
 
                             <button
                                 onClick={handleStopBroadcast}
+                                disabled={isStopping}
+                                aria-busy={isStopping}
                                 className="w-full py-7 bg-red-600 rounded-[32px] text-xl font-black text-white shadow-[0_20px_50px_-15px_rgba(239,68,68,0.4)] tap-effect hover:bg-red-500 transition-all flex items-center justify-center gap-3"
                             >
                                 <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">

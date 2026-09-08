@@ -300,11 +300,14 @@ public class LiveInterpreterController {
 
     @GetMapping("/events")
     public SseEmitter events(
+        jakarta.servlet.http.HttpServletResponse response,
         @AuthenticationPrincipal SessionPrincipal actor,
         @RequestParam String type,
         @RequestParam(required = false) String siteId
     ) {
         if (actor == null) throw new AccessDeniedException("authentication_required");
+        response.setHeader("X-Accel-Buffering", "no");
+        response.setHeader("Cache-Control", "no-cache, no-transform");
         Long requestedSiteId = siteId == null || siteId.isBlank() ? firstSiteId(actor) : parseLong(siteId, "siteId_invalid");
         if ("translations".equals(type)) {
             if (requestedSiteId == null) throw new IllegalArgumentException("site_id_required");

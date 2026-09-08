@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect } from "react";
-import { createVadState, stepVad, VAD_DEFAULTS } from "@/lib/vad/finalize-decision.mjs";
+import { createVadState, stepVad, VAD_DEFAULTS, LIVE_CAPTURE, canSendLiveChunk } from "@/lib/vad/finalize-decision.mjs";
 
 const STT_LANG_MAP: Record<string, string> = {
     ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN",
@@ -64,7 +64,7 @@ export type STTErrorType = "mic_denied" | "network" | "api_error" | "stream_lost
 
 interface UseCloudSTTOptions {
     lang: string;
-    onTranscript: (text: string, translations?: Record<string, string>) => void;
+    onTranscript: (text: string, translations?: Record<string, string>) => void | Promise<void>;
     onError?: (type: STTErrorType, message: string) => void;
     /** VAD가 음성 시작을 감지하는 즉시 호출 — STT 완료 전 파트너에게 조기 신호 전달용 */
     onSpeechStart?: () => void;
@@ -99,8 +99,8 @@ export function useCloudSTT({
     onTranscript,
     onError,
     onSpeechStart,
-    chunkInterval = 10_000,
-    silenceDuration = 2000,
+    chunkInterval,
+    silenceDuration,
     live = false,
     context = "safety",
     getTranslationTargets,
@@ -118,8 +118,10 @@ export function useCloudSTT({
     const onSpeechStartRef = useRef(onSpeechStart);
     const emptyStreakRef = useRef(0);
     // prop refs: VAD 루프가 항상 최신 값을 읽음 (모드 전환 시 콜백 재생성 불필요)
-    const silenceDurationRef = useRef(silenceDuration);
-    const chunkIntervalRef   = useRef(chunkInterval);
+    const effectiveInterval = chunkInterval ?? (live ? LIVE_CAPTURE.maxChunkMs : 10_000);
+    const effectiveSilence = silenceDuration ?? (live ? LIVE_CAPTURE.silenceMs : 2000);
+    const silenceDurationRef = useRef(effectiveSilence);
+    const chunkIntervalRef   = useRef(effectiveInterval);
     const liveRef            = useRef(live);
     const contextRef         = useRef(context);
     const getTranslationTargetsRef = useRef(getTranslationTargets);
@@ -128,6 +130,12 @@ export function useCloudSTT({
     const audioCtxRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
     const vadFrameRef = useRef<number | null>(null);
+    const liveVadTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const ambientRef = useRef<ReturnType<typeof createVadState> | null>(null);
+    const generationRef = useRef(0);
+    const deliveryTailRef = useRef<Promise<void>>(Promise.resolve());
+    const pendingChunksRef = useRef(new Set<Promise<void>>());
+    const recorderStoppedRef = useRef<Promise<void>>(Promise.resolve());
     const silenceStartRef = useRef<number | null>(null);
     const maxChunkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const recordingStartRef = useRef<number>(0);
@@ -136,13 +144,14 @@ export function useCloudSTT({
     useEffect(() => { onTranscriptRef.current = onTranscript; }, [onTranscript]);
     useEffect(() => { onErrorRef.current = onError; }, [onError]);
     useEffect(() => { onSpeechStartRef.current = onSpeechStart; }, [onSpeechStart]);
-    useEffect(() => { silenceDurationRef.current = silenceDuration; }, [silenceDuration]);
-    useEffect(() => { chunkIntervalRef.current = chunkInterval; }, [chunkInterval]);
+    useEffect(() => { silenceDurationRef.current = effectiveSilence; }, [effectiveSilence]);
+    useEffect(() => { chunkIntervalRef.current = effectiveInterval; }, [effectiveInterval]);
     useEffect(() => { liveRef.current = live; }, [live]);
     useEffect(() => { contextRef.current = context; }, [context]);
     useEffect(() => { getTranslationTargetsRef.current = getTranslationTargets; }, [getTranslationTargets]);
 
     const stopVAD = useCallback(() => {
+        if (liveVadTimerRef.current) { clearInterval(liveVadTimerRef.current); liveVadTimerRef.current = null; }
         if (vadFrameRef.current) { cancelAnimationFrame(vadFrameRef.current); vadFrameRef.current = null; }
         if (maxChunkTimerRef.current) { clearTimeout(maxChunkTimerRef.current); maxChunkTimerRef.current = null; }
         if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
@@ -169,7 +178,7 @@ export function useCloudSTT({
     }, [stopVAD]);
 
     useEffect(() => {
-        return () => { stopInternal(); };
+        return () => { generationRef.current += 1; stopInternal(); };
     }, [stopInternal]);
 
     const acquireStream = useCallback(async (): Promise<MediaStream> => {
@@ -223,6 +232,14 @@ export function useCloudSTT({
             return;
         }
 
+        const generation = generationRef.current;
+        const onTranscriptForChunk = onTranscriptRef.current;
+        // Upload clips concurrently, but publish recognition results in capture order.
+        const previousDelivery = deliveryTailRef.current;
+        let releaseDelivery!: () => void;
+        deliveryTailRef.current = new Promise<void>(resolve => { releaseDelivery = resolve; });
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 20_000);
         try {
             const sourceLang = langRef.current.toLowerCase().split("-")[0];
             // Khmer 등 RTT 미지원 언어는 PCM으로 바꾸지 않고 기존 Google STT로 유지한다.
@@ -233,6 +250,7 @@ export function useCloudSTT({
             const res = await fetch("/api/stt", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                signal: controller.signal,
                 body: JSON.stringify({
                     audio: base64,
                     lang: getSTTLang(langRef.current),
@@ -247,6 +265,8 @@ export function useCloudSTT({
             });
 
             const data = await res.json();
+            await previousDelivery;
+            if (generation !== generationRef.current) return;
 
             if (data.error) {
                 onErrorRef.current?.("api_error", data.error);
@@ -257,7 +277,7 @@ export function useCloudSTT({
                 emptyStreakRef.current = 0;
                 // muted 상태(TTS 재생 중 / 파트너 발화 중)면 결과 버림
                 if (!mutedRef.current) {
-                    onTranscriptRef.current(data.transcript.trim(), data.translations);
+                    await onTranscriptForChunk(data.transcript.trim(), data.translations);
                 }
             } else {
                 emptyStreakRef.current += 1;
@@ -270,11 +290,16 @@ export function useCloudSTT({
                 }
             }
         } catch (e: unknown) {
+            if (generation !== generationRef.current) return;
             console.error("[Cloud STT] Error:", e);
             onErrorRef.current?.(
                 "network",
                 "음성 인식 서버에 연결하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.",
             );
+        } finally {
+            clearTimeout(timeout);
+            await previousDelivery;
+            releaseDelivery();
         }
     }, []);
 
@@ -292,15 +317,24 @@ export function useCloudSTT({
                 ? new MediaRecorder(streamRef.current, { mimeType })
                 : new MediaRecorder(streamRef.current);
             const chunks: Blob[] = [];
+            const generation = generationRef.current;
+            let speechFiredThisCycle = false;
+            let contaminated = mutedRef.current;
+            let resolveStopped!: () => void;
+            recorderStoppedRef.current = new Promise<void>(resolve => { resolveStopped = resolve; });
 
             recorder.ondataavailable = (e) => {
                 if (e.data.size > 0) chunks.push(e.data);
             };
             recorder.onstop = () => {
-                if (chunks.length > 0) {
+                if (generation !== generationRef.current) { resolveStopped(); return; }
+                if (chunks.length > 0 && (!liveRef.current || canSendLiveChunk(speechFiredThisCycle, contaminated))) {
                     const blob = new Blob(chunks, { type: mimeType });
-                    sendChunk(blob);
+                    const pending = sendChunk(blob);
+                    pendingChunksRef.current.add(pending);
+                    void pending.finally(() => pendingChunksRef.current.delete(pending));
                 }
+                resolveStopped();
                 // 녹음 완료 후 active 상태면 다음 사이클 즉시 시작
                 if (activeRef.current) {
                     cyclingRef.current = false;
@@ -315,6 +349,7 @@ export function useCloudSTT({
             // ── VAD 침묵 감지 시작 ──────────────────────────────────
             // 이전 VAD 정리
             if (vadFrameRef.current) { cancelAnimationFrame(vadFrameRef.current); vadFrameRef.current = null; }
+            if (liveVadTimerRef.current) { clearInterval(liveVadTimerRef.current); liveVadTimerRef.current = null; }
             if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
                 audioCtxRef.current.close().catch(() => {});
             }
@@ -323,6 +358,8 @@ export function useCloudSTT({
             const AudioCtxCtor = window.AudioContext || (window as any).webkitAudioContext as typeof AudioContext;
             const ctx = new AudioCtxCtor();
             audioCtxRef.current = ctx;
+            if (ctx.state === "suspended") await ctx.resume();
+            if (!activeRef.current || generation !== generationRef.current) return;
             const analyser = ctx.createAnalyser();
             analyser.fftSize = 512;
             analyserRef.current = analyser;
@@ -331,8 +368,12 @@ export function useCloudSTT({
             silenceStartRef.current = null;
 
             const floatBuf = new Float32Array(analyser.fftSize);
-            let speechFiredThisCycle = false; // 사이클당 1회만 onSpeechStart 호출
             let vadState = createVadState();
+            // Do not relearn continuous speech as background noise at every cut.
+            if (liveRef.current && ambientRef.current) {
+                vadState.noiseFloor = ambientRef.current.noiseFloor;
+                vadState.calibrationUntil = ambientRef.current.calibrationUntil;
+            }
 
             const vadLoop = () => {
                 if (!activeRef.current || recorder.state !== "recording") return;
@@ -343,6 +384,7 @@ export function useCloudSTT({
                 const rms = Math.sqrt(sum / floatBuf.length);
 
                 const now = Date.now();
+                contaminated ||= mutedRef.current;
                 const decision = stepVad(vadState, rms, now, {
                     ...VAD_DEFAULTS,
                     absoluteFloor: SILENCE_RMS_THRESHOLD,
@@ -350,6 +392,7 @@ export function useCloudSTT({
                     maxUtteranceMs: chunkIntervalRef.current,
                 });
                 vadState = decision;
+                if (liveRef.current) ambientRef.current = decision;
                 setAudioLevel(Math.min(1, rms / Math.max(decision.threshold, 0.02)));
 
                 // 녹음 직후의 조용한 구간만으로 청크를 잘라버리지 않는다.
@@ -358,14 +401,17 @@ export function useCloudSTT({
                     speechFiredThisCycle = true;
                     onSpeechStartRef.current?.();
                 }
-                if (decision.action !== "none") {
+                if (decision.action !== "none" && (!liveRef.current || now - recordingStartRef.current >= LIVE_CAPTURE.minChunkMs)) {
                     if (recorder.state === "recording") recorder.stop();
                     return;
                 }
 
-                vadFrameRef.current = requestAnimationFrame(vadLoop);
+                if (!liveRef.current) vadFrameRef.current = requestAnimationFrame(vadLoop);
             };
-            vadFrameRef.current = requestAnimationFrame(vadLoop);
+            // Animation frames can stop when the page is obscured. Audio delivery
+            // must not depend on rendering frames (mobile OS suspension still applies).
+            if (liveRef.current) liveVadTimerRef.current = setInterval(vadLoop, 50);
+            else vadFrameRef.current = requestAnimationFrame(vadLoop);
 
             // 최대 청크 길이 안전장치 (말을 너무 길게 하는 경우)
             if (maxChunkTimerRef.current) clearTimeout(maxChunkTimerRef.current);
@@ -389,6 +435,9 @@ export function useCloudSTT({
 
         try {
             streamRef.current = await acquireStream();
+            generationRef.current += 1;
+            ambientRef.current = null;
+            deliveryTailRef.current = Promise.resolve();
             activeRef.current = true;
             emptyStreakRef.current = 0;
             setIsRecording(true);
@@ -411,6 +460,13 @@ export function useCloudSTT({
 
     const mute   = useCallback(() => { mutedRef.current = true;  }, []);
     const unmute = useCallback(() => { mutedRef.current = false; }, []);
+    const stopAndDrain = useCallback(async () => {
+        const stopped = recorderStoppedRef.current;
+        stopInternal();
+        setIsRecording(false);
+        await stopped;
+        await Promise.all([...pendingChunksRef.current]);
+    }, [stopInternal]);
 
-    return { isRecording, audioLevel, toggle, mute, unmute };
+    return { isRecording, audioLevel, toggle, mute, unmute, stopAndDrain };
 }

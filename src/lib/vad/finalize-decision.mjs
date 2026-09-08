@@ -21,6 +21,13 @@ export const VAD_DEFAULTS = {
     calibrationMs: 400,
 };
 
+// Stay below the existing 30 STT requests/minute budget, including long silence.
+// Prefer a pause boundary; force a complete, independently decodable clip at 4s.
+export const LIVE_CAPTURE = { minChunkMs: 2100, maxChunkMs: 4000, silenceMs: 600 };
+export function canSendLiveChunk(speechDetected, contaminated) {
+    return speechDetected && !contaminated;
+}
+
 /** @typedef {Object} VadState
  * @property {number} noiseFloor
  * @property {boolean} speechDetected
