@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCookieUser } from "@/utils/auth/cookie-user";
 import { checkSttLimit } from "@/utils/rate-limit";
 import { callV3AiStt } from "@/utils/ai/v3-ai-gateway";
+import { SAFE_LINK_V3_API_BASE_URL } from "@/utils/auth/v3-proxy";
 import { CONSTRUCTION_SPEECH_HINTS, WHISPER_CONTEXT_PROMPT } from "@/constants/construction-terms";
 import { CONSTRUCTION_GLOSSARY } from "@/constants/glossary";
 
@@ -31,24 +32,61 @@ function normalizeKoreanSttMisrecognitions(text: string): { normalized: string; 
   return { normalized, changes };
 }
 
-function normalizeServerSide(text: string): { normalized: string; changes: { from: string; to: string }[] } {
+const GLOSSARY_CACHE_TTL_MS = 60_000;
+let activeGlossaryCache: Record<string, string> | null = null;
+let activeGlossaryCacheAt = 0;
+
+async function fetchActiveGlossary(): Promise<Record<string, string>> {
+  if (activeGlossaryCache && Date.now() - activeGlossaryCacheAt < GLOSSARY_CACHE_TTL_MS) {
+    return activeGlossaryCache;
+  }
+
+  try {
+    const response = await fetch(`${SAFE_LINK_V3_API_BASE_URL}/api/v1/glossary?active=true`, {
+      cache: "no-store",
+    });
+    const payload = response.ok
+      ? await response.json() as { terms?: Array<{ slang?: string; standard?: string }> }
+      : null;
+    const dictionary: Record<string, string> = { ...CONSTRUCTION_GLOSSARY };
+    for (const row of payload?.terms ?? []) {
+      const slang = row.slang?.trim();
+      const standard = row.standard?.trim();
+      if (slang && standard) dictionary[slang] = standard;
+    }
+    activeGlossaryCache = dictionary;
+  } catch {
+    // 용어집 API가 일시적으로 응답하지 않아도 기존 기본 사전으로 STT는 계속 처리한다.
+    activeGlossaryCache = { ...CONSTRUCTION_GLOSSARY };
+  }
+  activeGlossaryCacheAt = Date.now();
+  return activeGlossaryCache;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function normalizeServerSide(text: string): Promise<{ normalized: string; changes: { from: string; to: string }[] }> {
   const sttCorrection = normalizeKoreanSttMisrecognitions(text);
   const changes: { from: string; to: string }[] = [...sttCorrection.changes];
-  const sorted = Object.entries(CONSTRUCTION_GLOSSARY)
+  const glossary = await fetchActiveGlossary();
+  const sorted = Object.entries(glossary)
     .filter(([, standard]) => !standard.includes("("))
     .sort((a, b) => b[0].length - a[0].length);
-  const placeholders: string[] = [];
   let result = sttCorrection.normalized;
   for (const [slang, standard] of sorted) {
-    if (!result.includes(slang)) continue;
-    changes.push({ from: slang, to: standard });
-    const placeholder = `\x00${placeholders.length}\x00`;
-    placeholders.push(standard);
-    result = result.split(slang).join(placeholder);
+    const escapedSlang = escapeRegExp(slang);
+    // 한 글자 용어는 독립된 단어일 때만 치환한다. "전"이 "안전" 내부까지
+    // 바뀌는 식의 오인식 보정 오류를 막는다.
+    const pattern = Array.from(slang).length === 1
+      ? new RegExp(`(?<![\\p{L}\\p{N}])${escapedSlang}(?![\\p{L}\\p{N}])`, "gu")
+      : new RegExp(escapedSlang, "gu");
+    result = result.replace(pattern, (matched) => {
+      changes.push({ from: matched, to: standard });
+      return standard;
+    });
   }
-  placeholders.forEach((standard, index) => {
-    result = result.split(`\x00${index}\x00`).join(standard);
-  });
   return { normalized: result, changes };
 }
 
@@ -135,7 +173,7 @@ export async function POST(request: Request) {
     const engine = data.vendor === "openai" ? "whisper" : data.vendor === "flitto" ? "flitto" : "google";
     const translations = data.translations && Object.keys(data.translations).length > 0 ? data.translations : undefined;
     if (shortLang !== "ko") return NextResponse.json({ transcript, engine, ...(translations && { translations }) });
-    const { normalized, changes } = normalizeServerSide(transcript);
+    const { normalized, changes } = await normalizeServerSide(transcript);
     return NextResponse.json({
       transcript: normalized,
       ...(changes.length > 0 && { normalized: true, changes }),
