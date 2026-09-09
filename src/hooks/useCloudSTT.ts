@@ -64,6 +64,8 @@ export type STTErrorType = "mic_denied" | "network" | "api_error" | "stream_lost
 
 interface UseCloudSTTOptions {
     lang: string;
+    /** ROOT 관리자가 라이브 화면에서 선택한 방송 현장 */
+    siteId?: string | number | null;
     onTranscript: (text: string, translations?: Record<string, string>) => void | Promise<void>;
     onError?: (type: STTErrorType, message: string) => void;
     /** VAD가 음성 시작을 감지하는 즉시 호출 — STT 완료 전 파트너에게 조기 신호 전달용 */
@@ -96,6 +98,7 @@ const SILENCE_RMS_THRESHOLD = 0.015;
 
 export function useCloudSTT({
     lang,
+    siteId,
     onTranscript,
     onError,
     onSpeechStart,
@@ -113,6 +116,7 @@ export function useCloudSTT({
     const cyclingRef = useRef(false);
     const mutedRef = useRef(false); // muted: 녹음은 유지하되 결과 버림 (TTS/파트너 발화 중)
     const langRef = useRef(lang);
+    const siteIdRef = useRef<string | number | null | undefined>(siteId);
     const onTranscriptRef = useRef(onTranscript);
     const onErrorRef = useRef(onError);
     const onSpeechStartRef = useRef(onSpeechStart);
@@ -141,6 +145,7 @@ export function useCloudSTT({
     const recordingStartRef = useRef<number>(0);
 
     useEffect(() => { langRef.current = lang; }, [lang]);
+    useEffect(() => { siteIdRef.current = siteId; }, [siteId]);
     useEffect(() => { onTranscriptRef.current = onTranscript; }, [onTranscript]);
     useEffect(() => { onErrorRef.current = onError; }, [onError]);
     useEffect(() => { onSpeechStartRef.current = onSpeechStart; }, [onSpeechStart]);
@@ -259,6 +264,7 @@ export function useCloudSTT({
                         ? { sampleRateHertz: Math.round(sampleRateHertz) }
                         : {}),
                     ...(liveRef.current && { live: true }),
+                    ...(siteIdRef.current != null ? { siteId: siteIdRef.current } : {}),
                     context: contextRef.current,
                     ...(liveRef.current && getTranslationTargetsRef.current ? { targetLanguages: getTranslationTargetsRef.current() } : {}),
                 }),

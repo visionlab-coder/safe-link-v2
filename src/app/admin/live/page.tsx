@@ -171,6 +171,7 @@ function AdminLiveContent() {
         unmute: unmuteRecording,
     } = useCloudSTT({
         lang: "ko",
+        siteId,
         onTranscript: handleTranscript,
         onError: (type, message) => {
             setIsTranslating(false);

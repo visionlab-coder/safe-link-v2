@@ -121,13 +121,8 @@ export async function POST(request: Request) {
   if (!(await checkSttLimit(user.id))) {
     return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
   }
-  const siteId = user.siteIds?.[0];
-  if (user.source !== "v3" || typeof siteId !== "number") {
-    return NextResponse.json({ error: "V3_SITE_SESSION_REQUIRED" }, { status: 403 });
-  }
-
   try {
-    const { audio, lang, mimeType, live = false, sampleRateHertz, context = "safety", targetLanguages } = await request.json() as {
+    const { audio, lang, mimeType, live = false, sampleRateHertz, context = "safety", targetLanguages, siteId: requestedSiteId } = await request.json() as {
       audio?: string;
       lang?: string;
       mimeType?: string;
@@ -135,7 +130,22 @@ export async function POST(request: Request) {
       sampleRateHertz?: number;
       context?: "chat" | "safety";
       targetLanguages?: string[];
+      siteId?: string | number;
     };
+    const parsedRequestedSiteId = typeof requestedSiteId === "number"
+      ? requestedSiteId
+      : typeof requestedSiteId === "string" && /^\d+$/.test(requestedSiteId)
+        ? Number(requestedSiteId)
+        : null;
+    const isRoot = user.roles?.includes("ROOT") === true;
+    // 현장 계정은 절대 요청값으로 현장을 바꿀 수 없다. ROOT만 라이브 화면에서
+    // 선택한 현장을 사용할 수 있으며, 백엔드 AI 게이트웨이도 해당 권한을 재검증한다.
+    const siteId = isRoot && Number.isInteger(parsedRequestedSiteId)
+      ? parsedRequestedSiteId
+      : user.siteIds?.[0];
+    if (user.source !== "v3" || typeof siteId !== "number" || !Number.isInteger(siteId) || siteId <= 0) {
+      return NextResponse.json({ error: "V3_SITE_SESSION_REQUIRED" }, { status: 403 });
+    }
     if (!audio) return NextResponse.json({ error: "No audio data" }, { status: 400 });
     if (typeof audio !== "string" || audio.length > 10 * 1024 * 1024 * (4 / 3)) {
       return NextResponse.json({ error: "Audio payload too large (max 10MB)" }, { status: 413 });
