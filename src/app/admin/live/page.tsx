@@ -10,8 +10,8 @@ import { playPremiumAudio } from "@/utils/tts";
 import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 const LIVE_UI: Record<string, Record<string, string>> = {
-    ko: { title:"실시간 동시통역", desc:"말하면 근로자 스마트폰에서 번역된 음성이 자동 재생됩니다.", live:"실시간 통역 방송", onAir:"방송 중", listeners:"청취자", start:"방송 시작", stop:"방송 종료", speak:"말씀하세요... 자동으로 번역됩니다", worker:"근로자", recording:"녹음 중", microphoneStopped:"마이크가 중지되었습니다", microphoneUnavailable:"마이크를 사용할 수 없습니다. 휴대폰 로컬 주소에서는 HTTPS 연결로 접속하거나 마이크 권한을 허용해주세요.", notStarted:"미시작", site:"현장", utterances:"발화", status:"상태", time:"시각", original:"한국어 원문", ended:"종료", saveFailed:"저장 실패" },
-    en: { title:"Live Simultaneous Interpretation", desc:"Translated audio plays automatically on workers’ smartphones when you speak.", live:"Live interpretation broadcast", onAir:"ON AIR", listeners:"listeners", start:"START BROADCAST", stop:"STOP BROADCAST", speak:"Speak now… your words will be translated automatically", worker:"Worker", recording:"Recording", microphoneStopped:"Microphone stopped", microphoneUnavailable:"Microphone unavailable. Use an HTTPS connection on a phone or allow microphone permission.", notStarted:"Not started", site:"Site", utterances:"Utterances", status:"Status", time:"Time", original:"Korean original", ended:"Ended", saveFailed:"Save failed" },
+    ko: { title:"실시간 동시통역", desc:"말하면 근로자 스마트폰에서 번역된 음성이 자동 재생됩니다.", live:"실시간 통역 방송", onAir:"방송 중", listeners:"청취자", start:"방송 시작", starting:"방송을 시작하는 중…", stop:"방송 종료", speak:"말씀하세요... 자동으로 번역됩니다", worker:"근로자", recording:"녹음 중", microphoneStopped:"마이크가 중지되었습니다", microphoneUnavailable:"마이크를 사용할 수 없습니다. 휴대폰 로컬 주소에서는 HTTPS 연결로 접속하거나 마이크 권한을 허용해주세요.", siteUnavailable:"방송할 현장 정보를 확인하지 못했습니다. 다시 로그인한 뒤 시도해주세요.", notStarted:"미시작", site:"현장", utterances:"발화", status:"상태", time:"시각", original:"한국어 원문", ended:"종료", saveFailed:"방송 세션을 시작하지 못했습니다. 잠시 후 다시 시도해주세요." },
+    en: { title:"Live Simultaneous Interpretation", desc:"Translated audio plays automatically on workers’ smartphones when you speak.", live:"Live interpretation broadcast", onAir:"ON AIR", listeners:"listeners", start:"START BROADCAST", starting:"Starting broadcast…", stop:"STOP BROADCAST", speak:"Speak now… your words will be translated automatically", worker:"Worker", recording:"Recording", microphoneStopped:"Microphone stopped", microphoneUnavailable:"Microphone unavailable. Use an HTTPS connection on a phone or allow microphone permission.", siteUnavailable:"Could not determine the broadcast site. Sign in again and try once more.", notStarted:"Not started", site:"Site", utterances:"Utterances", status:"Status", time:"Time", original:"Korean original", ended:"Ended", saveFailed:"Could not start the broadcast session. Please try again shortly." },
     zh: { title:"实时同声传译", desc:"您说话时，工人手机会自动播放翻译后的语音。", live:"实时口译广播", onAir:"直播中", listeners:"听众", start:"开始广播", stop:"结束广播", speak:"请说话…系统将自动翻译", worker:"工人", recording:"录音中", microphoneStopped:"麦克风已停止", microphoneUnavailable:"无法使用麦克风。请通过 HTTPS 连接访问手机本地地址，或允许麦克风权限。", notStarted:"未开始", site:"现场", utterances:"发言", status:"状态", time:"时间", original:"韩语原文", ended:"已结束", saveFailed:"保存失败" },
     vi: { title:"Phiên dịch đồng thời trực tiếp", desc:"Khi bạn nói, âm thanh đã dịch sẽ tự động phát trên điện thoại của công nhân.", live:"Phát sóng phiên dịch trực tiếp", onAir:"ĐANG PHÁT", listeners:"người nghe", start:"BẮT ĐẦU PHÁT SÓNG", stop:"DỪNG PHÁT SÓNG", speak:"Hãy nói… nội dung sẽ được dịch tự động", worker:"Công nhân", recording:"Đang ghi âm", microphoneStopped:"Đã dừng micrô", microphoneUnavailable:"Không thể dùng micrô. Hãy truy cập bằng HTTPS trên điện thoại hoặc cho phép quyền micrô.", notStarted:"Chưa bắt đầu", site:"Công trường", utterances:"Lượt phát biểu", status:"Trạng thái", time:"Thời gian", original:"Bản gốc tiếng Hàn", ended:"Đã kết thúc", saveFailed:"Lưu thất bại" },
     ru: { title:"Синхронный перевод в реальном времени", desc:"Когда вы говорите, переведённое аудио автоматически воспроизводится на телефонах работников.", live:"Эфир синхронного перевода", onAir:"В ЭФИРЕ", listeners:"слушателей", start:"НАЧАТЬ ЭФИР", stop:"ОСТАНОВИТЬ ЭФИР", speak:"Говорите… речь будет переведена автоматически", worker:"Работник", recording:"Идёт запись", microphoneStopped:"Микрофон остановлен", microphoneUnavailable:"Микрофон недоступен. Откройте страницу на телефоне по HTTPS или разрешите доступ к микрофону.", notStarted:"Не начато", site:"Объект", utterances:"Высказывания", status:"Статус", time:"Время", original:"Корейский оригинал", ended:"Завершено", saveFailed:"Ошибка сохранения" },
@@ -26,6 +26,7 @@ function AdminLiveContent() {
     const locale = LIVE_LOCALES[lang] || LIVE_LOCALES.en;
     const [isLive, setIsLive] = useState(false);
     const [isStopping, setIsStopping] = useState(false);
+    const [isStarting, setIsStarting] = useState(false);
     const [sessionId, setSessionId] = useState("");
     const [transcripts, setTranscripts] = useState<Array<{
         text: string;
@@ -47,9 +48,16 @@ function AdminLiveContent() {
         const load = async () => {
             const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
             if (!res.ok) return;
-            const data = await res.json() as { user?: { id: string }; profile?: { site_id?: string | null } | null };
+            const data = await res.json() as {
+                user?: { id: string };
+                profile?: { site_id?: string | null } | null;
+                v3?: { siteIds?: Array<string | number> } | null;
+            };
             if (data.user?.id) setAdminId(data.user.id);
-            setSiteId(data.profile?.site_id || null);
+            const profileSiteId = data.profile?.site_id?.trim();
+            const fallbackSiteId = data.v3?.siteIds?.[0];
+            const resolvedSiteId = profileSiteId || (fallbackSiteId == null ? null : String(fallbackSiteId));
+            setSiteId(resolvedSiteId && /^\d+$/.test(resolvedSiteId) ? resolvedSiteId : null);
         };
         load();
     }, []);
@@ -204,16 +212,33 @@ function AdminLiveContent() {
     }, [adminId, siteId, muteRecording, unmuteRecording, locale]);
 
     const handleStartBroadcast = async () => {
+        if (isStarting) return;
+        setIsStarting(true);
+        setSttError("");
+        if (!siteId) {
+            setSttError(t.siteUnavailable || t.saveFailed);
+            setIsStarting(false);
+            return;
+        }
         const newSessionId = `live_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        const sessionRes = await fetch("/api/live/sessions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sessionId: newSessionId, siteId }),
-        });
+        let sessionRes: Response;
+        try {
+            sessionRes = await fetch("/api/live/sessions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sessionId: newSessionId, siteId }),
+            });
+        } catch {
+            setSttError(t.saveFailed);
+            setIsStarting(false);
+            return;
+        }
         // 운영 백엔드가 아직 세션 API 배포 전인 동안에도 기존 실시간 발화 전파는
         // 멈추지 않도록 404만 호환 모드로 허용한다. 그 외 오류는 방송을 시작하지 않는다.
         if (!sessionRes.ok && sessionRes.status !== 404) {
-            setSttError(t.saveFailed);
+            const failure = await sessionRes.json().catch(() => null) as { error?: string } | null;
+            setSttError(failure?.error === "site_id_required" || failure?.error === "siteId_invalid" ? (t.siteUnavailable || t.saveFailed) : t.saveFailed);
+            setIsStarting(false);
             return;
         }
         setSessionId(newSessionId);
@@ -223,6 +248,7 @@ function AdminLiveContent() {
         const started = await toggleRecording();
         if (started === true) {
             setIsLive(true);
+            setIsStarting(false);
             return;
         }
         // 마이크 권한 등이 거부되면 근로자 수신 화면도 즉시 대기 상태로 되돌린다.
@@ -230,6 +256,7 @@ function AdminLiveContent() {
         const params = new URLSearchParams({ sessionId: newSessionId });
         if (siteId) params.set("siteId", siteId);
         await fetch(`/api/live/sessions?${params.toString()}`, { method: "DELETE" });
+        setIsStarting(false);
     };
 
     const handleStopBroadcast = async () => {
@@ -312,10 +339,17 @@ function AdminLiveContent() {
                             </div>
                             <button
                                 onClick={handleStartBroadcast}
-                                className="px-16 py-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-[40px] text-2xl font-black text-white shadow-[0_20px_60px_-15px_rgba(99,102,241,0.5)] tap-effect hover:scale-[1.02] transition-all"
+                                disabled={isStarting}
+                                aria-busy={isStarting}
+                                className="px-16 py-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-[40px] text-2xl font-black text-white shadow-[0_20px_60px_-15px_rgba(99,102,241,0.5)] tap-effect hover:scale-[1.02] transition-all disabled:cursor-wait disabled:opacity-70"
                             >
-                                {t.start}
+                                {isStarting ? (t.starting || t.start) : t.start}
                             </button>
+                            {sttError && (
+                                <div role="alert" className="max-w-md rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-center text-sm font-bold text-red-200">
+                                    {sttError}
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <>
