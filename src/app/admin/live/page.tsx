@@ -35,7 +35,6 @@ function AdminLiveContent() {
         sourceText?: string;
     }>>([]);
     const [siteId, setSiteId] = useState<string | null>(null);
-    const [availableSiteIds, setAvailableSiteIds] = useState<string[]>([]);
     const [isSiteLoading, setIsSiteLoading] = useState(true);
     const [sttError, setSttError] = useState("");
     const [isTranslating, setIsTranslating] = useState(false);
@@ -75,7 +74,6 @@ function AdminLiveContent() {
                         .map((worker) => worker.site_id?.trim() ?? "")
                         .filter((id) => /^\d+$/.test(id))
                 )];
-                setAvailableSiteIds(siteIds);
                 setSiteId(siteIds[0] ?? null);
             } finally {
                 setIsSiteLoading(false);
@@ -368,18 +366,6 @@ function AdminLiveContent() {
                             >
                                 {isSiteLoading ? (t.loadingSite || t.start) : isStarting ? (t.starting || t.start) : t.start}
                             </button>
-                            {availableSiteIds.length > 1 && (
-                                <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm">
-                                    <span>{t.site}</span>
-                                    <select
-                                        value={siteId ?? ""}
-                                        onChange={(event) => setSiteId(event.target.value || null)}
-                                        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-bold text-slate-900 outline-none focus:border-blue-500"
-                                    >
-                                        {availableSiteIds.map((id) => <option key={id} value={id}>{`${t.site} ${id}`}</option>)}
-                                    </select>
-                                </label>
-                            )}
                             {sttError && (
                                 <div role="alert" className="max-w-md rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-center text-sm font-bold text-red-200">
                                     {sttError}
