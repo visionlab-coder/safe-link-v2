@@ -131,7 +131,7 @@ export const playLiveBroadcastAudio = (
         return;
     }
 
-    // 실시간 방송은 전달 지연을 줄이기 위해서만 1.5배속으로 재생한다.
+    // 실시간 방송은 전달 지연을 줄이기 위해서만 1.2배속으로 재생한다.
     // 일반 채팅/TBM의 TTS 속도에는 영향을 주지 않는다.
     playProxyAudio(cleanText, langCode, gender, (success) => {
         if (success) {
@@ -140,7 +140,7 @@ export const playLiveBroadcastAudio = (
         }
         notifyTtsFailure();
         onEnd?.();
-    }, onStart, 1.5);
+    }, onStart, 1.2);
 };
 
 /**
