@@ -10,8 +10,8 @@ import { playPremiumAudio } from "@/utils/tts";
 import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 const LIVE_UI: Record<string, Record<string, string>> = {
-    ko: { title:"실시간 동시통역", desc:"말하면 근로자 스마트폰에서 번역된 음성이 자동 재생됩니다.", live:"실시간 통역 방송", onAir:"방송 중", listeners:"청취자", start:"방송 시작", loadingSite:"현장 정보를 불러오는 중…", starting:"방송을 시작하는 중…", stop:"방송 종료", speak:"말씀하세요... 자동으로 번역됩니다", worker:"근로자", recording:"녹음 중", microphoneStopped:"마이크가 중지되었습니다", microphoneUnavailable:"마이크를 사용할 수 없습니다. 휴대폰 로컬 주소에서는 HTTPS 연결로 접속하거나 마이크 권한을 허용해주세요.", siteUnavailable:"이 관리자 계정에는 방송할 현장이 연결되어 있지 않습니다. 최고 관리자에게 현장 권한 연결을 요청해주세요.", notStarted:"미시작", site:"현장", utterances:"발화", status:"상태", time:"시각", original:"한국어 원문", ended:"종료", saveFailed:"방송 세션을 시작하지 못했습니다. 잠시 후 다시 시도해주세요." },
-    en: { title:"Live Simultaneous Interpretation", desc:"Translated audio plays automatically on workers’ smartphones when you speak.", live:"Live interpretation broadcast", onAir:"ON AIR", listeners:"listeners", start:"START BROADCAST", loadingSite:"Loading site information…", starting:"Starting broadcast…", stop:"STOP BROADCAST", speak:"Speak now… your words will be translated automatically", worker:"Worker", recording:"Recording", microphoneStopped:"Microphone stopped", microphoneUnavailable:"Microphone unavailable. Use an HTTPS connection on a phone or allow microphone permission.", siteUnavailable:"This administrator account has no site assigned for broadcasting. Ask a root administrator to assign a site.", notStarted:"Not started", site:"Site", utterances:"Utterances", status:"Status", time:"Time", original:"Korean original", ended:"Ended", saveFailed:"Could not start the broadcast session. Please try again shortly." },
+    ko: { title:"실시간 동시통역", desc:"말하면 근로자 스마트폰에서 번역된 음성이 자동 재생됩니다.", live:"실시간 통역 방송", onAir:"방송 중", listeners:"청취자", start:"방송 시작", loadingSite:"현장 정보를 불러오는 중…", starting:"방송을 시작하는 중…", stop:"방송 종료", speak:"말씀하세요... 자동으로 번역됩니다", worker:"근로자", recording:"녹음 중", microphoneStopped:"마이크가 중지되었습니다", microphoneUnavailable:"마이크를 사용할 수 없습니다. 휴대폰 로컬 주소에서는 HTTPS 연결로 접속하거나 마이크 권한을 허용해주세요.", siteUnavailable:"방송할 현장을 확인하지 못했습니다. 해당 현장에 등록된 근로자가 있는지 확인해주세요.", notStarted:"미시작", site:"현장", utterances:"발화", status:"상태", time:"시각", original:"한국어 원문", ended:"종료", saveFailed:"방송 세션을 시작하지 못했습니다. 잠시 후 다시 시도해주세요." },
+    en: { title:"Live Simultaneous Interpretation", desc:"Translated audio plays automatically on workers’ smartphones when you speak.", live:"Live interpretation broadcast", onAir:"ON AIR", listeners:"listeners", start:"START BROADCAST", loadingSite:"Loading site information…", starting:"Starting broadcast…", stop:"STOP BROADCAST", speak:"Speak now… your words will be translated automatically", worker:"Worker", recording:"Recording", microphoneStopped:"Microphone stopped", microphoneUnavailable:"Microphone unavailable. Use an HTTPS connection on a phone or allow microphone permission.", siteUnavailable:"Could not find a site for broadcasting. Check that the site has registered workers.", notStarted:"Not started", site:"Site", utterances:"Utterances", status:"Status", time:"Time", original:"Korean original", ended:"Ended", saveFailed:"Could not start the broadcast session. Please try again shortly." },
     zh: { title:"实时同声传译", desc:"您说话时，工人手机会自动播放翻译后的语音。", live:"实时口译广播", onAir:"直播中", listeners:"听众", start:"开始广播", stop:"结束广播", speak:"请说话…系统将自动翻译", worker:"工人", recording:"录音中", microphoneStopped:"麦克风已停止", microphoneUnavailable:"无法使用麦克风。请通过 HTTPS 连接访问手机本地地址，或允许麦克风权限。", notStarted:"未开始", site:"现场", utterances:"发言", status:"状态", time:"时间", original:"韩语原文", ended:"已结束", saveFailed:"保存失败" },
     vi: { title:"Phiên dịch đồng thời trực tiếp", desc:"Khi bạn nói, âm thanh đã dịch sẽ tự động phát trên điện thoại của công nhân.", live:"Phát sóng phiên dịch trực tiếp", onAir:"ĐANG PHÁT", listeners:"người nghe", start:"BẮT ĐẦU PHÁT SÓNG", stop:"DỪNG PHÁT SÓNG", speak:"Hãy nói… nội dung sẽ được dịch tự động", worker:"Công nhân", recording:"Đang ghi âm", microphoneStopped:"Đã dừng micrô", microphoneUnavailable:"Không thể dùng micrô. Hãy truy cập bằng HTTPS trên điện thoại hoặc cho phép quyền micrô.", notStarted:"Chưa bắt đầu", site:"Công trường", utterances:"Lượt phát biểu", status:"Trạng thái", time:"Thời gian", original:"Bản gốc tiếng Hàn", ended:"Đã kết thúc", saveFailed:"Lưu thất bại" },
     ru: { title:"Синхронный перевод в реальном времени", desc:"Когда вы говорите, переведённое аудио автоматически воспроизводится на телефонах работников.", live:"Эфир синхронного перевода", onAir:"В ЭФИРЕ", listeners:"слушателей", start:"НАЧАТЬ ЭФИР", stop:"ОСТАНОВИТЬ ЭФИР", speak:"Говорите… речь будет переведена автоматически", worker:"Работник", recording:"Идёт запись", microphoneStopped:"Микрофон остановлен", microphoneUnavailable:"Микрофон недоступен. Откройте страницу на телефоне по HTTPS или разрешите доступ к микрофону.", notStarted:"Не начато", site:"Объект", utterances:"Высказывания", status:"Статус", time:"Время", original:"Корейский оригинал", ended:"Завершено", saveFailed:"Ошибка сохранения" },
@@ -35,6 +35,7 @@ function AdminLiveContent() {
         sourceText?: string;
     }>>([]);
     const [siteId, setSiteId] = useState<string | null>(null);
+    const [availableSiteIds, setAvailableSiteIds] = useState<string[]>([]);
     const [isSiteLoading, setIsSiteLoading] = useState(true);
     const [sttError, setSttError] = useState("");
     const [isTranslating, setIsTranslating] = useState(false);
@@ -48,21 +49,37 @@ function AdminLiveContent() {
     useEffect(() => {
         const load = async () => {
             const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
-            if (!res.ok) {
+            try {
+                if (!res.ok) return;
+                const data = await res.json() as {
+                    user?: { id: string };
+                    profile?: { site_id?: string | null } | null;
+                    v3?: { siteIds?: Array<string | number> } | null;
+                };
+                if (data.user?.id) setAdminId(data.user.id);
+                const profileSiteId = data.profile?.site_id?.trim();
+                const fallbackSiteId = data.v3?.siteIds?.[0];
+                const resolvedSiteId = profileSiteId || (fallbackSiteId == null ? null : String(fallbackSiteId));
+                if (resolvedSiteId && /^\d+$/.test(resolvedSiteId)) {
+                    setSiteId(resolvedSiteId);
+                    return;
+                }
+
+                // ROOT는 현장 멤버십이 없어도 채팅에서 모든 현장의 근로자를 조회할 수 있다.
+                // 라이브도 같은 대상 목록에서 방송 현장을 정한다.
+                const workersRes = await fetch("/api/admin/chat/workers", { cache: "no-store" });
+                if (!workersRes.ok) return;
+                const workersPayload = await workersRes.json() as { workers?: Array<{ site_id?: string | null }> };
+                const siteIds = [...new Set(
+                    (workersPayload.workers ?? [])
+                        .map((worker) => worker.site_id?.trim() ?? "")
+                        .filter((id) => /^\d+$/.test(id))
+                )];
+                setAvailableSiteIds(siteIds);
+                setSiteId(siteIds[0] ?? null);
+            } finally {
                 setIsSiteLoading(false);
-                return;
             }
-            const data = await res.json() as {
-                user?: { id: string };
-                profile?: { site_id?: string | null } | null;
-                v3?: { siteIds?: Array<string | number> } | null;
-            };
-            if (data.user?.id) setAdminId(data.user.id);
-            const profileSiteId = data.profile?.site_id?.trim();
-            const fallbackSiteId = data.v3?.siteIds?.[0];
-            const resolvedSiteId = profileSiteId || (fallbackSiteId == null ? null : String(fallbackSiteId));
-            setSiteId(resolvedSiteId && /^\d+$/.test(resolvedSiteId) ? resolvedSiteId : null);
-            setIsSiteLoading(false);
         };
         load().catch(() => setIsSiteLoading(false));
     }, []);
@@ -350,6 +367,18 @@ function AdminLiveContent() {
                             >
                                 {isSiteLoading ? (t.loadingSite || t.start) : isStarting ? (t.starting || t.start) : t.start}
                             </button>
+                            {availableSiteIds.length > 1 && (
+                                <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm">
+                                    <span>{t.site}</span>
+                                    <select
+                                        value={siteId ?? ""}
+                                        onChange={(event) => setSiteId(event.target.value || null)}
+                                        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-bold text-slate-900 outline-none focus:border-blue-500"
+                                    >
+                                        {availableSiteIds.map((id) => <option key={id} value={id}>{`${t.site} ${id}`}</option>)}
+                                    </select>
+                                </label>
+                            )}
                             {sttError && (
                                 <div role="alert" className="max-w-md rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-center text-sm font-bold text-red-200">
                                     {sttError}
