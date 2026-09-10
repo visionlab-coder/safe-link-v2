@@ -20,6 +20,8 @@ jobs:
     environment: production
     timeout-minutes: 30
     env:
+      # NEXT_PUBLIC 값은 프런트 빌드 시 고정되므로 운영 백엔드 STT와 동일하게 유지한다.
+      NEXT_PUBLIC_REALTIME_STT_ENGINE: flitto
       NEXT_PUBLIC_SAFE_LINK_API_BASE_URL: https://api.safe-link.co.kr
       SAFE_LINK_PUBLIC_APP_URL: https://app.safe-link.co.kr
       DEPLOY_HOST: ${{ secrets.SAFE_LINK_DEPLOY_HOST }}
