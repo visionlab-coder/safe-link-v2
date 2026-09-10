@@ -37,6 +37,27 @@ export default function DownloadPage() {
           </section>
 
         </div>
+        <section className="mt-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="signup-heading">
+          <h2 id="signup-heading" className="text-xl font-black">처음 이용하시나요?</h2>
+          <div className="mt-5 space-y-6 text-sm leading-relaxed text-slate-700">
+            <div>
+              <h3 className="mb-2 font-bold text-emerald-800">근로자 등록 및 로그인</h3>
+              <ol className="list-decimal space-y-2 pl-5">
+                <li>현장 관리자에게 근로자·NFC 등록을 요청해 주세요.</li>
+                <li>앱에서 언어를 선택하고 <strong>근로자</strong>로 들어갑니다.</li>
+                <li>등록된 <strong>이니셜과 휴대전화 뒷 4자리</strong>를 입력해 로그인합니다.</li>
+              </ol>
+            </div>
+            <div className="border-t border-slate-200 pt-5">
+              <h3 className="mb-2 font-bold text-blue-800">관리자 가입</h3>
+              <ol className="list-decimal space-y-2 pl-5">
+                <li>앱에서 언어를 선택하고 <strong>관리자 → 가입하기</strong>를 누릅니다.</li>
+                <li><strong>회사 이메일(@seowonenc.co.kr), 비밀번호, 비밀번호 확인</strong>을 입력해 신청합니다.</li>
+                <li><strong>승인 후</strong> 신청한 이메일과 비밀번호로 로그인합니다.</li>
+              </ol>
+            </div>
+          </div>
+        </section>
         <footer className="mt-8 text-center text-sm leading-relaxed text-slate-600">로그인 계정이나 소속 현장을 모르는 경우 현장 관리자에게 문의해 주세요.</footer>
       </div>
     </main>
