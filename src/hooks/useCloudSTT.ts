@@ -92,6 +92,7 @@ const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
 // 짧은 인사말도 버리지 않는다. 일부 Android 기기는 1~2초 Opus 청크가 2KB 미만이다.
 const MIN_CHUNK_SIZE = 400;
 const MAX_EMPTY_STREAK = 2;
+const MAX_TRANSIENT_FAILURES = 3;
 
 /** 침묵 판정 RMS 임계값 (0~1) — 건설 현장 배경음 고려해 낮게 설정 */
 const SILENCE_RMS_THRESHOLD = 0.015;
@@ -121,6 +122,7 @@ export function useCloudSTT({
     const onErrorRef = useRef(onError);
     const onSpeechStartRef = useRef(onSpeechStart);
     const emptyStreakRef = useRef(0);
+    const transientFailuresRef = useRef(0);
     // prop refs: VAD 루프가 항상 최신 값을 읽음 (모드 전환 시 콜백 재생성 불필요)
     const effectiveInterval = chunkInterval ?? (live ? LIVE_CAPTURE.maxChunkMs : 10_000);
     const effectiveSilence = silenceDuration ?? (live ? LIVE_CAPTURE.silenceMs : 2000);
@@ -274,11 +276,25 @@ export function useCloudSTT({
             await previousDelivery;
             if (generation !== generationRef.current) return;
 
-            if (data.error) {
-                onErrorRef.current?.("api_error", data.error);
+            if (data.error || !res.ok) {
+                const error = String(data.error || `stt_http_${res.status}`);
+                // RTT currently collapses upstream errors/timeouts into this code.
+                // Suppress isolated failures, but report sustained recognition loss once.
+                const transient = ["flitto_rtt_failed", "google_stt_failed", "openai_stt_failed"].includes(error)
+                    || [502, 503, 504].includes(res.status);
+                if (transient) {
+                    transientFailuresRef.current += 1;
+                    if (transientFailuresRef.current === MAX_TRANSIENT_FAILURES) {
+                        onErrorRef.current?.("network", "음성 인식이 지연되고 있습니다. 다시 시도해 주세요.");
+                    }
+                } else {
+                    transientFailuresRef.current = 0;
+                    onErrorRef.current?.("api_error", error);
+                }
                 return;
             }
 
+            transientFailuresRef.current = 0;
             if (data.transcript?.trim()) {
                 emptyStreakRef.current = 0;
                 // muted 상태(TTS 재생 중 / 파트너 발화 중)면 결과 버림
@@ -296,8 +312,11 @@ export function useCloudSTT({
                 }
             }
         } catch (e: unknown) {
+            await previousDelivery;
             if (generation !== generationRef.current) return;
             console.error("[Cloud STT] Error:", e);
+            transientFailuresRef.current += 1;
+            if (transientFailuresRef.current !== MAX_TRANSIENT_FAILURES) return;
             onErrorRef.current?.(
                 "network",
                 "음성 인식 서버에 연결하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.",
@@ -442,6 +461,7 @@ export function useCloudSTT({
         try {
             streamRef.current = await acquireStream();
             generationRef.current += 1;
+            transientFailuresRef.current = 0;
             ambientRef.current = null;
             deliveryTailRef.current = Promise.resolve();
             activeRef.current = true;
