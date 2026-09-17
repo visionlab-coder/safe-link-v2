@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   const user = await getCookieUser({ allowV3: true });
   if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-  const siteId = user.siteIds?.[0];
+  const siteId = user.activeSiteId ?? user.siteIds?.[0];
   if (user.source !== "v3" || typeof siteId !== "number") {
     return NextResponse.json({ error: "V3_SITE_SESSION_REQUIRED" }, { status: 403 });
   }

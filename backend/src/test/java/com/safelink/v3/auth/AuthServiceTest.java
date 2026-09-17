@@ -238,7 +238,7 @@ class AuthServiceTest {
             principal,
             "Site Manager",
             "ko",
-            java.util.Map.of("requestedSetupRole", "root", "requestedSiteId", "999"),
+            java.util.Map.of("requestedSetupRole", "root"),
             "127.0.0.1"
         );
 
@@ -247,6 +247,51 @@ class AuthServiceTest {
         assertThat(updated.siteIds()).isEmpty();
         verify(users).updateProfile(23L, "Site Manager", "ko");
         verify(audit).record(eq(23L), eq(null), eq("auth.profile_setup"), eq("user"), eq("23"), eq("ALLOWED"), eq("self_profile_update"), any());
+    }
+
+    @Test
+    void profileSetupRejectsUnassignedSite() {
+        var principal = new SessionPrincipal(23L, "admin@seowonenc.co.kr", "Admin", Set.of(Role.SITE_ADMIN), Set.of(2L));
+        assertThatThrownBy(() -> authService.updateOwnProfile(principal, "Admin", "ko",
+            java.util.Map.of("requestedSiteId", "999"), "127.0.0.1"))
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.mockito.Mockito.verify(users, org.mockito.Mockito.never()).updateProfile(any(), any(), any());
+    }
+
+    @Test
+    void hqCanSaveActiveSiteWithoutChangingMembershipOrRole() {
+        var account = new UserAccount(23L, "hq@seowonenc.co.kr", "HQ", "ACTIVE", "$hash", Set.of(Role.HQ_ADMIN), Set.of());
+        when(users.findById(23L)).thenReturn(Optional.of(account));
+        var result = authService.updateOwnProfile(account.toPrincipal(), "HQ", "ko",
+            java.util.Map.of("requestedSiteId", "157", "requestedTitle", "부장", "requestedTrade", "철근", "requestedPhone", "01012345678"), "127.0.0.1");
+        verify(users).assertActiveSite(157L);
+        verify(users).saveProfileDetails(23L, 157L, "부장", "철근", "01012345678", "");
+        assertThat(result.roles()).containsExactly(Role.HQ_ADMIN);
+        assertThat(result.siteIds()).isEmpty();
+    }
+
+    @Test
+    void assignedSiteCanBeSelected() {
+        var account = new UserAccount(23L, "admin@seowonenc.co.kr", "Admin", "ACTIVE", "$hash", Set.of(Role.SITE_ADMIN), Set.of(2L));
+        when(users.findById(23L)).thenReturn(Optional.of(account));
+        authService.updateOwnProfile(account.toPrincipal(), "Admin", "ko", java.util.Map.of("requestedSiteId", "2"), "127.0.0.1");
+        verify(users).saveProfileDetails(23L, 2L, "", "", "", "");
+    }
+
+    @Test
+    void inactiveSiteCannotBeSelectedEvenByHq() {
+        var principal = new SessionPrincipal(23L, "hq@seowonenc.co.kr", "HQ", Set.of(Role.HQ_ADMIN), Set.of());
+        org.mockito.Mockito.doThrow(new IllegalArgumentException("target_site_not_found")).when(users).assertActiveSite(157L);
+        assertThatThrownBy(() -> authService.updateOwnProfile(principal, "HQ", "ko", java.util.Map.of("requestedSiteId", "157"), "127.0.0.1"))
+            .hasMessage("target_site_not_found");
+        org.mockito.Mockito.verify(users, org.mockito.Mockito.never()).saveProfileDetails(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void removedMembershipCannotUseSavedActiveSite() {
+        var principal = new SessionPrincipal(23L, "admin@seowonenc.co.kr", "Admin", Set.of(Role.SITE_ADMIN), Set.of(2L));
+        when(users.findProfileDetails(23L)).thenReturn(new UserAccountRepository.ProfileDetails(999L, "부장", "", "", ""));
+        assertThat(authService.profileDetails(principal).activeSiteId()).isNull();
     }
 
     @Test

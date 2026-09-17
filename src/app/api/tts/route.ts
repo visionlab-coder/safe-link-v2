@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     const gender = request.nextUrl.searchParams.get('gender') ?? 'female';
     if (!text) return new Response('Missing text', { status: 400 });
     if (text.length > 1000) return new Response('Text too long (max 1000 characters)', { status: 400 });
-    const siteId = user.siteIds?.[0];
+    const siteId = user.activeSiteId ?? user.siteIds?.[0];
     if (user.source !== "v3" || typeof siteId !== "number") {
         return new Response("V3_SITE_SESSION_REQUIRED", { status: 403 });
     }

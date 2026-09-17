@@ -46,6 +46,7 @@ async function handleV3Me(req: NextRequest): Promise<NextResponse> {
     preferredLanguage?: string | null;
     roles?: string[];
     siteIds?: number[];
+    profileDetails?: { activeSiteId?: number | null; title?: string; trade?: string; phoneNumber?: string; siteCode?: string };
   };
   if (typeof currentUser.id !== "number") {
     return NextResponse.json({ error: "v3_current_user_invalid" }, { status: 502 });
@@ -62,10 +63,11 @@ async function handleV3Me(req: NextRequest): Promise<NextResponse> {
           role,
           preferred_lang: currentUser.preferredLanguage ?? null,
           display_name: currentUser.displayName ?? null,
-          title: null,
-          site_code: null,
-          site_id: currentUser.siteIds?.[0] != null ? String(currentUser.siteIds[0]) : null,
-          trade: null,
+          title: currentUser.profileDetails?.title ?? null,
+          site_code: currentUser.profileDetails?.siteCode ?? null,
+          site_id: (currentUser.profileDetails?.activeSiteId ?? currentUser.siteIds?.[0]) != null ? String(currentUser.profileDetails?.activeSiteId ?? currentUser.siteIds?.[0]) : null,
+          trade: currentUser.profileDetails?.trade ?? null,
+          phone_number: currentUser.profileDetails?.phoneNumber ?? null,
           nationality: null,
         }
       : null,

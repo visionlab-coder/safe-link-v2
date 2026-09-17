@@ -11,6 +11,7 @@ export type V3SessionUser = {
   preferredLanguage: string | null;
   roles: string[];
   siteIds: number[];
+  profileDetails?: { activeSiteId?: number | null };
 };
 
 function buildCookieHeader(cookieStore: Awaited<ReturnType<typeof cookies>>): string {
@@ -41,6 +42,7 @@ export async function getV3SessionUser(): Promise<V3SessionUser | null> {
       preferredLanguage: typeof user.preferredLanguage === "string" ? user.preferredLanguage : null,
       roles: user.roles.map(String),
       siteIds: Array.isArray(user.siteIds) ? user.siteIds.map(Number).filter(Number.isFinite) : [],
+      profileDetails: user.profileDetails,
     };
   } catch {
     return null;

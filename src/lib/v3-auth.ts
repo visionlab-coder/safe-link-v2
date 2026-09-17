@@ -6,6 +6,7 @@ export type V3CurrentUser = {
   displayName: string;
   roles: V3Role[];
   siteIds: number[];
+  profileDetails?: { activeSiteId?: number | null; title?: string; trade?: string; phoneNumber?: string; siteCode?: string };
 };
 
 export type V3WorkerQuickLoginSite = {

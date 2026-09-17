@@ -163,6 +163,31 @@ public class UserAccountRepository {
             .update();
     }
 
+    public record ProfileDetails(Long activeSiteId, String title, String trade, String phoneNumber, String siteCode) {}
+
+    public ProfileDetails findProfileDetails(Long userId) {
+        return jdbc.sql("select active_site_id, title, trade, phone_number, site_code from user_profile_details where user_id=:id")
+            .param("id", userId)
+            .query((rs, n) -> new ProfileDetails(rs.getObject("active_site_id", Long.class), rs.getString("title"), rs.getString("trade"), rs.getString("phone_number"), rs.getString("site_code")))
+            .optional().orElse(new ProfileDetails(null, "", "", "", ""));
+    }
+
+    public void saveProfileDetails(Long userId, Long siteId, String title, String trade, String phone, String siteCode) {
+        // Empty compatibility/login fields must not erase previously saved selections.
+        jdbc.sql("""
+            insert into user_profile_details(user_id, active_site_id, title, trade, phone_number, site_code)
+            values (:id, :site, :title, :trade, :phone, :code)
+            on conflict(user_id) do update set
+              active_site_id=coalesce(excluded.active_site_id,user_profile_details.active_site_id),
+              title=coalesce(nullif(excluded.title,''),user_profile_details.title),
+              trade=coalesce(nullif(excluded.trade,''),user_profile_details.trade),
+              phone_number=coalesce(nullif(excluded.phone_number,''),user_profile_details.phone_number),
+              site_code=coalesce(nullif(excluded.site_code,''),user_profile_details.site_code)
+            """)
+            .param("id", userId).param("site", siteId).param("title", title).param("trade", trade)
+            .param("phone", phone).param("code", siteCode).update();
+    }
+
     public void updatePassword(Long userId, String passwordHash) {
         int updated = jdbc.sql("""
                 update user_credentials

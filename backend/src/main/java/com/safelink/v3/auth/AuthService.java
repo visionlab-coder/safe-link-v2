@@ -122,7 +122,23 @@ public class AuthService {
         }
         String resolvedDisplayName = requireDisplayName(displayName);
         String resolvedLanguage = resolvePreferredLanguage(preferredLanguage);
+        String requestedSite = requestedProfile.getOrDefault("requestedSiteId", "").trim();
+        Long activeSiteId = null;
+        if (!requestedSite.isBlank()) {
+            try { activeSiteId = Long.valueOf(requestedSite); }
+            catch (NumberFormatException ex) { throw new IllegalArgumentException("site_id_invalid"); }
+            if (activeSiteId <= 0) throw new IllegalArgumentException("site_id_invalid");
+            if (!principal.hasAnyGlobalRole() && !principal.siteIds().contains(activeSiteId)) {
+                throw new org.springframework.security.access.AccessDeniedException("cross_site_access_denied");
+            }
+            users.assertActiveSite(activeSiteId);
+        }
         users.updateProfile(principal.userId(), resolvedDisplayName, resolvedLanguage);
+        users.saveProfileDetails(principal.userId(), activeSiteId,
+            requestedProfile.getOrDefault("requestedTitle", "").trim(),
+            requestedProfile.getOrDefault("requestedTrade", "").trim(),
+            requestedProfile.getOrDefault("requestedPhone", "").trim(),
+            requestedProfile.getOrDefault("requestedSiteCode", "").trim());
         audit.record(
             principal.userId(),
             null,
@@ -134,13 +150,27 @@ public class AuthService {
             Map.of(
                 "ip", ipAddress,
                 "roleAssignment", "server_controlled",
-                "siteAssignment", "server_controlled",
+                "siteAssignment", "authorized_active_site_only",
                 "requestedProfile", requestedProfile.toString()
             )
         );
         return users.findById(principal.userId())
             .orElseThrow(() -> new IllegalStateException("updated_user_not_found"))
             .toPrincipal();
+    }
+
+    public UserAccountRepository.ProfileDetails profileDetails(SessionPrincipal principal) {
+        var details = users.findProfileDetails(principal.userId());
+        if (details == null) return new UserAccountRepository.ProfileDetails(null, "", "", "", "");
+        Long site = details.activeSiteId();
+        if (site != null) {
+            if (!principal.hasAnyGlobalRole() && !principal.siteIds().contains(site)) site = null;
+            else {
+                try { users.assertActiveSite(site); }
+                catch (IllegalArgumentException ex) { site = null; }
+            }
+        }
+        return new UserAccountRepository.ProfileDetails(site, details.title(), details.trade(), details.phoneNumber(), details.siteCode());
     }
 
     public WorkerQuickLoginResult authenticateWorkerQuickLogin(

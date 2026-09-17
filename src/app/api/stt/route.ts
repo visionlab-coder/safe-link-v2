@@ -142,7 +142,7 @@ export async function POST(request: Request) {
     // 선택한 현장을 사용할 수 있으며, 백엔드 AI 게이트웨이도 해당 권한을 재검증한다.
     const siteId = isRoot && Number.isInteger(parsedRequestedSiteId)
       ? parsedRequestedSiteId
-      : user.siteIds?.[0];
+      : user.activeSiteId ?? user.siteIds?.[0];
     if (user.source !== "v3" || typeof siteId !== "number" || !Number.isInteger(siteId) || siteId <= 0) {
       return NextResponse.json({ error: "V3_SITE_SESSION_REQUIRED" }, { status: 403 });
     }

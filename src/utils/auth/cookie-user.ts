@@ -8,6 +8,7 @@ export type CookieUser = {
     source: "v3";
     roles?: string[];
     siteIds?: number[];
+    activeSiteId?: number | null;
 };
 
 export async function getCookieUser(options: { allowV3?: boolean } = {}): Promise<CookieUser | null> {
@@ -21,5 +22,6 @@ export async function getCookieUser(options: { allowV3?: boolean } = {}): Promis
         source: "v3",
         roles: v3User.roles,
         siteIds: v3User.siteIds,
+        activeSiteId: v3User.profileDetails?.activeSiteId,
     };
 }

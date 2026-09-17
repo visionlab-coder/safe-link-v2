@@ -319,6 +319,14 @@ function SetupContent() {
       }
 
       if (user.displayName) setName((current) => current || user.displayName);
+      const saved = user.profileDetails;
+      if (saved) {
+        setTitle(saved.title || "");
+        setTrade(saved.trade || "");
+        setPhone(saved.phoneNumber || "");
+        setSiteCode(saved.siteCode || "");
+        if (saved.activeSiteId != null) setSelectedSiteId(String(saved.activeSiteId));
+      }
       const hasRoot = user.roles.includes("ROOT");
       const hasHq = user.roles.includes("HQ_ADMIN");
       setIsMasterEmail(hasRoot);
@@ -642,11 +650,11 @@ function SetupContent() {
                 >
                   <div>
                     <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest" style={{ color:"#475569" }}>
-                      {isAdminSiteRole && siteList.length > 0
+                      {(isAdminSiteRole || isMasterEmail || isHQAuthorized) && siteList.length > 0
                         ? (language === "ko" ? "현장 선택 *" : "Select Site *")
                         : t.siteTitle}
                     </label>
-                    {isAdminSiteRole && siteList.length > 0 ? (
+                    {(isAdminSiteRole || isMasterEmail || isHQAuthorized) && siteList.length > 0 ? (
                       <>
                         <div style={fieldBox}>
                           <select

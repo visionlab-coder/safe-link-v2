@@ -14,6 +14,15 @@
 
 ## 기본 원칙
 
+### 2026-09-17 프로필 저장 및 작업 현장
+
+- V030 `user_profile_details`에 직책·공종·연락처·현장 표시명·작업 현장 ID를 저장한다.
+- 작업 현장 선택은 소속/권한 부여가 아니다. ROOT/HQ_ADMIN은 활성 현장, 그 외 역할은 기존 소속 현장만 선택할 수 있다. 역할은 기존 승인 흐름만 변경한다.
+- `/auth/me`의 `profileDetails.activeSiteId`는 조회 시 권한과 현장 활성 상태를 재검증한다. `siteIds`는 기존 소속 목록을 유지한다.
+- Next.js compatibility profile의 `site_id`, STT/TTS/vision은 검증된 작업 현장을 우선 사용하며, 실제 API 실행 시 Spring SiteGuard가 다시 검증한다.
+- 로그인 호환 요청의 빈 필드는 기존 프로필을 지우지 않는다. 이전 감사 로그의 선택값은 일괄 자동 복원하지 않는다. 사용자 승인 시 계정·마지막 명시적 현장 선택·현장 활성 상태를 검증하고 해당 계정의 작업 현장만 감사 로그와 함께 복원한다. 역할과 소속 권한은 변경하지 않는다.
+- 프런트와 V030 적용 백엔드를 함께 반영해야 한다. 검증: AuthServiceTest(본사 선택/현장 범위 차단/권한 유지/비활성 현장 차단), 전체 Gradle 테스트, ESLint.
+
 이 워크스페이스는 파일명에 V2가 남아 있어도 활성 SQ Link V3 개발 대상이다. 이 프로젝트는 타 회사가 빠르게 만든 제품을 상용화하기 위한 외주 개발 프로젝트다. 실제 레거시 프로젝트는 별도 경로에 있다.
 
 이 워크스페이스 안의 V2 명칭, PoC 문서, Supabase migration, Next.js route, Cloudflare/OpenNext 설정은 사용자가 명시적으로 이전/삭제를 요청하지 않는 한 참고 자료로만 본다. 이를 authoritative legacy source로 간주하지 않는다.
