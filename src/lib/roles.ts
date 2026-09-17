@@ -119,6 +119,12 @@ export function hasAllowedRole(role: ProfileRole, allowedRole: AllowedRole): boo
   return v3Role === "WORKER";
 }
 
+/** Account navigation must use the same access rules as middleware. */
+export function getAccountNavigationAccess(roles: readonly string[] = []) {
+  const allows = (target: AllowedRole) => roles.some(role => hasAllowedRole(role as ProfileRole, target));
+  return { admin: allows("admin"), system: allows("system"), control: allows("hq") };
+}
+
 /** TEAM_LEADER 여부 — admin 페이지에서 본인 팀(trade) 필터 적용에 사용 */
 export function isTeamLeader(role: ProfileRole): boolean {
   return role === "TEAM_LEADER";

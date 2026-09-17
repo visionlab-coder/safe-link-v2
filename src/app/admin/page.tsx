@@ -10,6 +10,7 @@ import SiteAgentBriefing from "@/components/agents/SiteAgentBriefing";
 import SystemHealthCheck from "@/components/SystemHealthCheck";
 import ResponsiveFeatureHero from "@/components/ResponsiveFeatureHero";
 import { logoutV3 } from "@/lib/v3-auth";
+import { getAccountNavigationAccess } from "@/lib/roles";
 import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
 import { persistDisplayLanguage } from "@/hooks/useDisplayLanguage";
 import { languages } from "@/constants";
@@ -326,7 +327,7 @@ function AdminDashboardContent() {
     const t = getUI(lang);
     const feature = getFeatureUI(lang);
     const roleDisplay = currentUser ? ((t.roleLabel as any)[currentUser.role] || currentUser.role) : "Admin";
-    const isRootAdmin = currentUser?.roles.includes("ROOT") === true;
+    const navigationAccess = getAccountNavigationAccess(currentUser?.roles);
     const siteId = searchParams.get("site_id");
     const siteName = null;
 
@@ -403,12 +404,12 @@ function AdminDashboardContent() {
                                         <button onClick={() => router.push('/auth/setup')} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-700">
                                             <UserRound className="h-4 w-4" />{t.profile}
                                         </button>
-                                        {isRootAdmin && (
+                                        {navigationAccess.system && (
                                             <button onClick={() => router.push('/system')} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-700">
                                                 <Settings className="h-4 w-4" />{t.systemManagement}
                                             </button>
                                         )}
-                                        {isRootAdmin && (
+                                        {navigationAccess.control && (
                                             <button onClick={() => router.push('/control')} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-700">
                                                 <Settings className="h-4 w-4" />{t.integratedControl}
                                             </button>

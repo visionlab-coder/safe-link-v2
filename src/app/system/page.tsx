@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import SystemHealthCheck from "@/components/SystemHealthCheck";
-import { canAccessSystem, type ProfileRole } from "@/lib/roles";
+import { canAccessSystem, getAccountNavigationAccess, type ProfileRole } from "@/lib/roles";
 import { logoutV3 } from "@/lib/v3-auth";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -671,7 +671,7 @@ export default function SystemAdminPage() {
         window.location.href = "/auth";
     };
 
-    const isRootAdmin = currentUser?.roles?.includes("ROOT") === true;
+    const navigationAccess = getAccountNavigationAccess(currentUser?.roles);
 
     const handleOpenAddModal = () => {
         setEditingSite(null);
@@ -921,8 +921,8 @@ export default function SystemAdminPage() {
                                 {isAccountMenuOpen && (
                                     <div className="absolute right-0 top-[calc(100%+0.5rem)] z-[90] w-48 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 text-slate-700 shadow-[0_16px_40px_rgba(16,42,67,.16)]">
                                         <button onClick={() => window.location.href = "/auth/setup"} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors hover:bg-blue-50 hover:text-blue-700"><UserRound className="h-4 w-4" />{accountMenu.profile}</button>
-                                        {isRootAdmin && <button onClick={() => window.location.href = "/admin"} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors hover:bg-blue-50 hover:text-blue-700"><Settings className="h-4 w-4" />{accountMenu.admin}</button>}
-                                        {isRootAdmin && <button onClick={() => window.location.href = "/control"} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors hover:bg-blue-50 hover:text-blue-700"><Settings className="h-4 w-4" />{accountMenu.control}</button>}
+                                        {navigationAccess.admin && <button onClick={() => window.location.href = "/admin"} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors hover:bg-blue-50 hover:text-blue-700"><Settings className="h-4 w-4" />{accountMenu.admin}</button>}
+                                        {navigationAccess.control && <button onClick={() => window.location.href = "/control"} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors hover:bg-blue-50 hover:text-blue-700"><Settings className="h-4 w-4" />{accountMenu.control}</button>}
                                         <div className="my-1 border-t border-slate-100" />
                                         <button onClick={handleSignOut} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold text-red-600 transition-colors hover:bg-red-50"><LogOut className="h-4 w-4" />{t.common.signOut}</button>
                                     </div>

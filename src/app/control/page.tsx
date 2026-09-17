@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import HQCommandSwarm from "@/components/agents/HQCommandSwarm";
 import SwarmVisualizer from "@/components/agents/SwarmVisualizer";
 import { logoutV3 } from "@/lib/v3-auth";
+import { getAccountNavigationAccess } from "@/lib/roles";
 import Image from "next/image";
 import { ChevronDown, LogOut, Settings, UserRound } from "lucide-react";
 import { persistDisplayLanguage } from "@/hooks/useDisplayLanguage";
@@ -76,7 +77,7 @@ function ControlDashboardContent() {
 
     const activeLang = selectedLang || searchParams.get("lang") || currentUser?.prefLang || "ko";
     const t = getControlText(activeLang);
-    const isRootAdmin = currentUser?.roles.includes("ROOT") === true;
+    const navigationAccess = getAccountNavigationAccess(currentUser?.roles);
 
     return (
         <RoleGuard allowedRole="hq">
@@ -118,8 +119,8 @@ function ControlDashboardContent() {
                             {isAccountMenuOpen && (
                                 <div className="absolute right-0 top-[calc(100%+0.5rem)] z-[80] w-48 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 text-slate-700 shadow-[0_16px_40px_rgba(16,42,67,.16)]">
                                     <button onClick={() => router.push("/auth/setup")} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors hover:bg-blue-50 hover:text-blue-700"><UserRound className="h-4 w-4" />{t.profile}</button>
-                                    {isRootAdmin && <button onClick={() => router.push("/admin")} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors hover:bg-blue-50 hover:text-blue-700"><Settings className="h-4 w-4" />{t.adminOverview}</button>}
-                                    {isRootAdmin && <button onClick={() => router.push("/system")} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors hover:bg-indigo-50 hover:text-indigo-700"><Settings className="h-4 w-4" />{t.systemManagement}</button>}
+                                    {navigationAccess.admin && <button onClick={() => router.push("/admin")} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors hover:bg-blue-50 hover:text-blue-700"><Settings className="h-4 w-4" />{t.adminOverview}</button>}
+                                    {navigationAccess.system && <button onClick={() => router.push("/system")} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors hover:bg-indigo-50 hover:text-indigo-700"><Settings className="h-4 w-4" />{t.systemManagement}</button>}
                                     <div className="my-1 border-t border-slate-100" />
                                     <button onClick={handleSignOut} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold text-red-600 transition-colors hover:bg-red-50"><LogOut className="h-4 w-4" />{t.signOut}</button>
                                 </div>
