@@ -1,4 +1,5 @@
 "use client";
+import { tbmDraftSummaryUI } from "@/lib/tbm-draft-summary-ui";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -8,6 +9,8 @@ import RoleGuard from "@/components/RoleGuard";
 import { Suspense } from "react";
 import { normalizeKo, normalizeKoAsync } from "@/utils/normalize";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
+import { TbmLiveBroadcast } from "@/utils/tbm-live-broadcast";
+import { appendTbmTranscript, cleanTbmTranscriptFragment } from "@/utils/tbm-transcript";
 import SafetyLibraryModal from "@/components/SafetyLibraryModal";
 import { resolveDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
@@ -138,6 +141,40 @@ function AdminTBMCreateContent() {
     const searchParams = useSearchParams();
     const displayLang = useDisplayLanguage();
     const [tbmText, setTbmText] = useState("");
+    const [draftTextarea, setDraftTextarea] = useState<HTMLTextAreaElement | null>(null);
+    const resizeDraft = useCallback(() => {
+        const field = draftTextarea;
+        if (!field) return;
+        field.style.height = "auto";
+        const borderHeight = field.offsetHeight - field.clientHeight;
+        field.style.height = `${field.scrollHeight + borderHeight}px`;
+    }, [draftTextarea]);
+
+    useEffect(() => { resizeDraft(); }, [tbmText, resizeDraft]);
+    useEffect(() => {
+        const field = draftTextarea;
+        if (!field) return;
+        let previousWidth = field.getBoundingClientRect().width;
+        const observer = new ResizeObserver(() => {
+            const width = field.getBoundingClientRect().width;
+            if (width !== previousWidth) {
+                previousWidth = width;
+                resizeDraft();
+            }
+        });
+        observer.observe(field);
+        let mounted = true;
+        document.fonts.ready.then(() => { if (mounted) resizeDraft(); });
+        return () => { mounted = false; observer.disconnect(); };
+    }, [draftTextarea, resizeDraft]);
+    const [summaryText, setSummaryText] = useState("");
+    const [summarySource, setSummarySource] = useState("");
+    const [summaryEnabled, setSummaryEnabled] = useState(false);
+    const [summaryBusy, setSummaryBusy] = useState(false);
+    const [summaryError, setSummaryError] = useState(false);
+    const [summaryRetry, setSummaryRetry] = useState(0);
+    const [isDraining, setIsDraining] = useState(false);
+    const recordingActionRef = useRef(false);
     const [isSending, setIsSending] = useState(false);
     const [history, setHistory] = useState<any[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
@@ -226,13 +263,26 @@ function AdminTBMCreateContent() {
     }, [tbmText]);
 
     const [sttError, setSttError] = useState<string | null>(null);
+    const broadcaster = useRef(new TbmLiveBroadcast());
+    const [broadcastBusy, setBroadcastBusy] = useState(false);
+    const [broadcastActive, setBroadcastActive] = useState(false);
+    useEffect(() => {
+        const current = broadcaster.current;
+        return () => { void current.stop().catch(() => {}); };
+    }, []);
 
-    const handleTranscript = useCallback((text: string) => {
+    const handleTranscript = useCallback(async (text: string) => {
+        const liveText = cleanTbmTranscriptFragment(text);
+        if (!liveText) return;
         setSttError(null);
-        setTbmText((prev) => {
-            const base = prev.trim();
-            return base ? base + " " + text : text;
-        });
+        setTbmText((prev) => appendTbmTranscript(prev, liveText));
+        // 라이브 STT는 1초 안팎의 조각마다 임의의 마침표를 붙일 수 있다.
+        // 그 값을 그대로 전송하면 수신 화면에서 단어마다 문장이 끊긴 것처럼 보인다.
+        try {
+            await broadcaster.current.publish(liveText);
+        } catch {
+            setSttError("일부 음성을 실시간 전송하지 못했습니다. 초안은 보존되며 종료 후 최종 전파할 수 있습니다.");
+        }
     }, []);
 
     const handleSTTError = useCallback((_type: string, message: string) => {
@@ -240,11 +290,126 @@ function AdminTBMCreateContent() {
         setTimeout(() => setSttError(null), 5000);
     }, []);
 
-    const { isRecording, toggle: toggleRecording } = useCloudSTT({
-        lang: adminLang,
+    const { isRecording, toggle: toggleRecording, stopAndDrain } = useCloudSTT({
+        lang: "ko",
+        siteId: adminSiteId,
+        live: true,
+        // TBM은 문장 전체가 끝날 때까지 기다리지 않고 짧은 발화 조각 단위로 전달한다.
+        chunkInterval: 1800,
+        silenceDuration: 500,
+        liveMinChunkMs: 1200,
         onTranscript: handleTranscript,
         onError: handleSTTError,
+        onSpeechStart: () => { void broadcaster.current.announceSpeaking(); },
     });
+
+    const showBroadcastError = (error: unknown) => {
+        const code = error instanceof Error ? error.message : "";
+        console.error(`[TBM live] broadcast action failed: ${code || String(error)} (siteId=${adminSiteId ?? "none"})`);
+        if (code.endsWith("_401") || code.endsWith("_403")) {
+            setSttError("TBM 방송 권한 또는 현장 연결을 확인하지 못했습니다. 다시 로그인한 뒤 시도해 주세요.");
+        } else if (code.endsWith("_404")) {
+            setSttError("실시간 TBM 방송 기능이 서버에 반영되지 않았습니다. 서버 상태를 확인해 주세요.");
+        } else if (code.endsWith("_502") || code.endsWith("_503") || code.endsWith("_504")) {
+            setSttError("실시간 TBM 방송 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        } else {
+            setSttError("TBM 실시간 방송을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        }
+    };
+
+    const handleRecording = async () => {
+        if (recordingActionRef.current) return;
+        recordingActionRef.current = true;
+        setBroadcastBusy(true);
+        try {
+            if (isRecording) {
+                setIsDraining(true);
+                await stopAndDrain();
+                try {
+                    await broadcaster.current.stop();
+                } catch (error) {
+                    showBroadcastError(error);
+                }
+                setBroadcastActive(false);
+                setSummaryEnabled(true);
+            } else {
+                if (!adminSiteId) {
+                    setSttError("방송할 현장 정보를 확인하지 못했습니다. 다시 로그인한 뒤 시도해 주세요.");
+                    return;
+                }
+                if (broadcastActive) {
+                    try {
+                        await broadcaster.current.stop();
+                    } catch (error) {
+                        showBroadcastError(error);
+                        return;
+                    }
+                    setBroadcastActive(false);
+                }
+                try {
+                    await broadcaster.current.start(adminSiteId);
+                } catch (error) {
+                    showBroadcastError(error);
+                    return;
+                }
+                setBroadcastActive(true);
+                setSummaryEnabled(false);
+                setSummaryText("");
+                setSummarySource("");
+                const started = await toggleRecording();
+                if (started === true) setBroadcastActive(true);
+                else {
+                    // toggleRecording은 마이크 권한/연결 오류를 이미 화면에 정확히 표시한다.
+                    // 그 메시지를 일반적인 방송 오류로 덮어쓰지 않는다.
+                    await broadcaster.current.stop().catch(() => {});
+                    setBroadcastActive(false);
+                }
+            }
+        } catch (error) {
+            showBroadcastError(error);
+        } finally {
+            setBroadcastBusy(false);
+            setIsDraining(false);
+            recordingActionRef.current = false;
+        }
+    };
+
+    useEffect(() => {
+        setSummaryText("");
+        setSummarySource("");
+        setSummaryError(false);
+        if (!summaryEnabled || isRecording || isDraining || !tbmText.trim()) {
+            setSummaryBusy(false);
+            return;
+        }
+        const controller = new AbortController();
+        let cancelled = false;
+        setSummaryBusy(true);
+        const timer = setTimeout(async () => {
+            const timeout = setTimeout(() => controller.abort(), 35000);
+            try {
+                if (!adminSiteId) throw new Error("site_required");
+                const res = await fetch("/api/tbm/summary", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ siteId: Number(adminSiteId), text: tbmText.trim() }),
+                    signal: controller.signal,
+                });
+                if (!res.ok) throw new Error("summary_failed");
+                const data = await res.json() as { text?: string };
+                if (!data.text?.trim()) throw new Error("summary_empty");
+                if (!cancelled) {
+                    setSummaryText(data.text);
+                    setSummarySource(tbmText);
+                }
+            } catch {
+                if (!cancelled) setSummaryError(true);
+            } finally {
+                clearTimeout(timeout);
+                if (!cancelled) setSummaryBusy(false);
+            }
+        }, 700);
+        return () => { cancelled = true; clearTimeout(timer); controller.abort(); };
+    }, [summaryEnabled, isRecording, isDraining, tbmText, adminSiteId, summaryRetry]);
 
     // ── 녹음 경과 시간 (isRecording 선언 후) ──
     const [recSeconds, setRecSeconds] = useState(0);
@@ -269,6 +434,7 @@ function AdminTBMCreateContent() {
     };
 
     const handleSendTBM = async () => {
+        if (isRecording || isDraining || summaryBusy || (summaryEnabled && (summarySource !== tbmText || !summaryText.trim()))) return;
         if (!tbmText.trim()) return;
         setIsSending(true);
         setBroadcastResult(null);
@@ -284,6 +450,7 @@ function AdminTBMCreateContent() {
                 },
                 body: JSON.stringify({
                     content_ko: normalized,
+                    summary_ko: summarySource === tbmText ? summaryText.trim() || undefined : undefined,
                     site_id: adminSiteId ?? undefined,
                 }),
             });
@@ -313,6 +480,7 @@ function AdminTBMCreateContent() {
     };
 
     const t = getUI(displayLang || adminLang);
+    const summaryUI = tbmDraftSummaryUI(displayLang || adminLang);
     const locale = ({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[displayLang || adminLang] || "en-US";
 
     return (
@@ -388,7 +556,7 @@ function AdminTBMCreateContent() {
                         <div className="glass tbm-compose-panel rounded-[48px] p-8 border-white/10 shadow-3xl flex flex-col gap-6 relative min-h-[400px]">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">{t.koreanDraft}</h3>
-                                <button onClick={toggleRecording} className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all tap-effect relative ${isRecording ? "bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)]" : "glass border-white/10 text-slate-400 hover:text-white"}`}>
+                                <button onClick={handleRecording} disabled={isDraining || isSending || broadcastBusy || !adminSiteId} className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all tap-effect relative ${isRecording ? "bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)]" : "glass border-white/10 text-slate-400 hover:text-white"}`}>
                                     {isRecording && (
                                         <span className="absolute inset-0 rounded-full bg-red-500/40 animate-ping" />
                                     )}
@@ -398,7 +566,7 @@ function AdminTBMCreateContent() {
                                                 <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
                                                 {t.recTime} {formatRecTime(recSeconds)}
                                             </>
-                                        ) : t.voiceInput}
+                                        ) : (broadcastBusy ? t.processing : (adminLang === "ko" ? "TBM 방송 시작" : t.voiceInput))}
                                     </span>
                                 </button>
                             </div>
@@ -408,11 +576,26 @@ function AdminTBMCreateContent() {
                                 </div>
                             )}
                             <textarea
+                                ref={setDraftTextarea}
+                                rows={5}
                                 value={tbmText}
                                 onChange={(e) => setTbmText(e.target.value)}
                                 placeholder={isRecording ? `${t.listening} [${displayLang || adminLang}]` : t.placeholder}
-                                className="flex-1 w-full bg-transparent text-2xl md:text-3xl font-bold text-white placeholder-slate-800 outline-none resize-none leading-snug tracking-tight"
+                                className="w-full min-h-[180px] shrink-0 overflow-hidden bg-transparent text-2xl md:text-3xl font-bold text-white placeholder-slate-800 outline-none resize-none leading-snug tracking-tight"
                             />
+
+                            {(summaryEnabled || isDraining) && <section className="rounded-2xl border border-blue-200 bg-white p-5 text-slate-900">
+                                <label htmlFor="tbm-summary-draft" className="block font-bold mb-3">{summaryUI.title}</label>
+                                {(summaryBusy || isDraining) && <p role="status" className="text-blue-800">{summaryUI.busy}</p>}
+                                {summaryError && <div role="status" className="text-red-800">
+                                    <p>{summaryUI.failed}</p>
+                                    <button type="button" onClick={() => setSummaryRetry(v => v + 1)} className="mt-2 rounded-xl bg-blue-700 px-4 py-2 text-white">{summaryUI.retry}</button>
+                                </div>}
+                                <textarea id="tbm-summary-draft" value={summarySource === tbmText ? summaryText : ""}
+                                    onChange={e => setSummaryText(e.target.value)}
+                                    disabled={summaryBusy || isDraining || summarySource !== tbmText}
+                                    rows={6} className="w-full rounded-xl border border-slate-300 bg-white p-4 text-base leading-relaxed text-slate-900 disabled:opacity-60" />
+                            </section>}
 
                             {/* 실시간 정규화 미리보기 (전송 전) */}
                             {previewChanges.length > 0 && !normalizeResult && (
@@ -465,7 +648,7 @@ function AdminTBMCreateContent() {
                             )}
 
                             <div className="mt-auto pt-6 border-t border-white/5 flex flex-col gap-3">
-                                <button onClick={handleSendTBM} disabled={isSending || tbmText.length === 0} className="w-full py-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-[32px] text-2xl font-black text-slate-950 shadow-[0_20px_50px_-15px_rgba(59,130,246,0.4)] tap-effect flex items-center justify-center gap-4 disabled:opacity-30 disabled:grayscale transition-all">
+                                <button onClick={handleSendTBM} disabled={isSending || !tbmText.trim() || isRecording || isDraining || summaryBusy || (summaryEnabled && (summarySource !== tbmText || !summaryText.trim()))} className="w-full py-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-[32px] text-2xl font-black text-slate-950 shadow-[0_20px_50px_-15px_rgba(59,130,246,0.4)] tap-effect flex items-center justify-center gap-4 disabled:opacity-30 disabled:grayscale transition-all">
                                     {isSending ? <div className="w-8 h-8 border-4 border-slate-950 border-t-transparent rounded-full animate-spin" /> : <><svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>{t.pushBtn}</>}
                                 </button>
                                 <button

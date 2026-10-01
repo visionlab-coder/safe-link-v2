@@ -1,0 +1,15 @@
+name: sq-enrollment-sandbox
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports: ["127.0.0.1:55439:5432"]
+    environment:
+      POSTGRES_DB: sq_enrollment_sandbox
+      POSTGRES_USER: sq_enrollment
+      POSTGRES_PASSWORD: local-fixture-only
+    volumes: ["enrollment-db:/var/lib/postgresql/data"]
+  redis:
+    image: redis:7
+    ports: ["127.0.0.1:56389:6379"]
+volumes:
+  enrollment-db:

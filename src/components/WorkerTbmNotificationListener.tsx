@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { playNotificationSound } from "@/utils/notifications";
 import { ensureLocalNotifyPermission, notifyNative } from "@/utils/native/local-notify";
 
@@ -18,8 +18,23 @@ type TbmNotice = {
  */
 export default function WorkerTbmNotificationListener() {
   const latestTbmIdRef = useRef<string | null>(null);
+  const [allowed, setAllowed] = useState(false);
+  const [siteId, setSiteId] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/auth/me", { cache: "no-store", credentials: "include" })
+      .then(async (response) => response.ok ? response.json() : null)
+      .then((data) => {
+        if (cancelled) return;
+        setAllowed(Boolean(data?.user && data?.profile?.role && data.profile.role !== "TEMP_WORKER" && !data?.v3?.roles?.includes("TEMP_WORKER")));
+        setSiteId(data?.profile?.site_id ? String(data.profile.site_id) : null);
+      }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!allowed) return;
     let cancelled = false;
 
     const alertWorker = (notice: TbmNotice) => {
@@ -66,7 +81,45 @@ export default function WorkerTbmNotificationListener() {
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, []);
+  }, [allowed]);
+
+  // 최종 TBM 전파 전에도, 방송 시작 신호를 즉시 근로자에게 알린다.
+  // SSE는 앱이 실행 중일 때 실시간으로 수신한다. 앱이 완전히 종료된 상태의 원격 푸시는
+  // 별도 FCM/APNs 연동이 필요하므로 여기서 흉내 내지 않는다.
+  useEffect(() => {
+    if (!siteId) return;
+    const announced = new Set<string>();
+    const events = new EventSource("/api/live/events?" + new URLSearchParams({ type: "translations", siteId }));
+    events.addEventListener("broadcast-start", event => {
+      try {
+        const broadcast = JSON.parse((event as MessageEvent<string>).data) as { session_id?: string };
+        const sessionId = broadcast.session_id;
+        if (!sessionId?.startsWith("tbm_") || announced.has(sessionId)) return;
+        announced.add(sessionId);
+        playNotificationSound();
+        navigator.vibrate?.([300, 120, 300]);
+        void notifyNative(
+          "TBM 실시간 방송 시작",
+          "관리자가 실시간 안전교육을 시작했습니다. 통역 내용을 확인해 주세요.",
+        );
+        // 근로자 홈은 이 이벤트를 받아 기존 TBM 전파 알림 카드와 동일한 UI를 표시한다.
+        window.dispatchEvent(new CustomEvent("sq-link:tbm-live-start", { detail: { sessionId } }));
+      } catch {
+        // 다음 방송 시작 신호를 기다린다.
+      }
+    });
+    events.addEventListener("broadcast-stop", event => {
+      try {
+        const broadcast = JSON.parse((event as MessageEvent<string>).data) as { session_id?: string };
+        const sessionId = broadcast.session_id;
+        if (!sessionId?.startsWith("tbm_")) return;
+        window.dispatchEvent(new CustomEvent("sq-link:tbm-live-stop", { detail: { sessionId } }));
+      } catch {
+        // 다음 방송 시작 신호를 기다린다.
+      }
+    });
+    return () => events.close();
+  }, [siteId]);
 
   return null;
 }

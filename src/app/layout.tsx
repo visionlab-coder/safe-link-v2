@@ -135,6 +135,7 @@ export default function RootLayout({
             `,
           }}
         />
+        {process.env.NODE_ENV === "development" && process.env.SQ_ENROLLMENT_SANDBOX === "1" && <div className="sticky top-0 z-[9999] bg-amber-100 px-4 py-3 text-center text-sm font-bold text-amber-950">로컬 가입 테스트 · 운영 DB와 분리 · 실제 개인정보 입력 금지</div>}
         <OfflineBanner />
         <AuthListener />
         <ChatPresenceHeartbeat />

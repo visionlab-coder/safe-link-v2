@@ -4,6 +4,7 @@ export const V3_ROLES = [
   "SITE_ADMIN",
   "SAFETY_MANAGER",
   "WORKER",
+  "TEMP_WORKER",
   "VIEWER",
 ] as const;
 
@@ -15,6 +16,7 @@ export const V3_ROLE_LABELS: Record<V3Role, string> = {
   SITE_ADMIN: "현장 관리자",
   SAFETY_MANAGER: "안전 관리자",
   WORKER: "근로자",
+  TEMP_WORKER: "임시 근로자",
   VIEWER: "조회 전용",
 };
 

@@ -79,6 +79,44 @@ class TbmControllerTest {
     }
 
     @Test
+    void workerTbmIncludesPersistedSenderForQuestions() throws Exception {
+        var actor = new SessionPrincipal(20L, "worker@example.com", "근로자", Set.of(Role.WORKER), Set.of(2L));
+        var notice = new TbmRepository.NoticeRow(7L, 2L, "현장", 10L, "TBM", "원문", "원문", "PUBLISHED",
+            java.time.Instant.now(), java.time.Instant.now());
+        when(tbm.getNotice(7L)).thenReturn(notice);
+        var result = controller.today(actor, "7", 1);
+        org.assertj.core.api.Assertions.assertThat(result.tbms().getFirst().createdBy()).isEqualTo("10");
+        var json = new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(result);
+        org.assertj.core.api.Assertions.assertThat(json.at("/tbms/0/created_by").asText()).isEqualTo("10");
+        verify(siteGuard).requireSiteAccess(actor, 2L, "tbm.notice.read", "tbm_notice", "7");
+    }
+
+    @Test
+    void questionsDoNotBypassTbmSiteAccess() {
+        var actor = new SessionPrincipal(20L, "worker@example.com", "근로자", Set.of(Role.WORKER), Set.of(2L));
+        when(tbm.getNotice(7L)).thenReturn(new TbmRepository.NoticeRow(7L, 3L, "다른 현장", 11L, "TBM", "원문", "원문", "PUBLISHED",
+            java.time.Instant.now(), java.time.Instant.now()));
+        doThrow(new org.springframework.security.access.AccessDeniedException("site_access_denied"))
+            .when(siteGuard).requireSiteAccess(actor, 3L, "tbm.notice.read", "tbm_notice", "7");
+        assertThatThrownBy(() -> controller.today(actor, "7", 1))
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
+    @Test
+    void broadcastsEditedSummaryWithoutReplacingOriginal() {
+        var actor = new SessionPrincipal(10L, "admin@example.com", "관리자", Set.of(Role.SITE_ADMIN), Set.of(2L));
+        when(tbm.listWorkers(false, Set.of(2L), 2L)).thenReturn(java.util.List.of(new TbmRepository.WorkerRow(20L, "근로자", "zh", 2L)));
+        var notice = new TbmRepository.NoticeRow(7L, 2L, "현장", 10L, "TBM", "원문", "원문", "PUBLISHED",
+            java.time.Instant.now(), java.time.Instant.now(), "수정된 요약");
+        when(tbm.createPublished(2L, 10L, "TBM", "원문", "summary-test", "수정된 요약")).thenReturn(notice);
+        var result = controller.broadcast(actor, "summary-test", new TbmController.BroadcastRequest("원문", "2", "TBM", "수정된 요약"));
+        org.assertj.core.api.Assertions.assertThat(result.tbm().contentKo()).isEqualTo("원문");
+        org.assertj.core.api.Assertions.assertThat(result.tbm().summaryKo()).isEqualTo("수정된 요약");
+        org.assertj.core.api.Assertions.assertThat(result.tbm().createdBy()).isEqualTo("10");
+        verify(tbm).createPublished(2L, 10L, "TBM", "원문", "summary-test", "수정된 요약");
+    }
+
+    @Test
     void storageFailureDoesNotCreateSignatureMetadataOrAcknowledgement() {
         var actor = new SessionPrincipal(
             20L,

@@ -78,6 +78,7 @@ export default function WorkerLivePage() {
         profileId: string;
         siteId: string | null;
         displayName: string;
+        temporary?: boolean;
     } | null>(null);
     const [activeAdminId, setActiveAdminId] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -216,7 +217,7 @@ export default function WorkerLivePage() {
             if (!res.ok) return;
             const data = await res.json() as {
                 user?: { id: string };
-                profile?: { preferred_lang?: string | null; site_id?: string | null; display_name?: string | null } | null;
+                profile?: { role?: string; preferred_lang?: string | null; site_id?: string | null; display_name?: string | null } | null;
             };
             if (data.user?.id) {
                 const preferredLang = resolveDisplayLanguage(data.profile?.preferred_lang);
@@ -226,6 +227,7 @@ export default function WorkerLivePage() {
                     profileId: data.user.id,
                     siteId: data.profile?.site_id || null,
                     displayName: data.profile?.display_name || "Worker",
+                    temporary: data.profile?.role === "TEMP_WORKER",
                 });
             }
         };
@@ -235,7 +237,7 @@ export default function WorkerLivePage() {
     // 관리자가 아직 말을 시작하지 않았어도 같은 현장의 관리자에게 먼저 응답할 수 있다.
     // 방송 시작 이벤트가 오면 해당 관리자 ID로 즉시 교체된다.
     useEffect(() => {
-        if (!authReady?.siteId || activeAdminId) return;
+        if (!authReady?.siteId || activeAdminId || authReady.temporary) return;
         let cancelled = false;
         const loadSiteAdmin = async () => {
             const res = await fetch("/api/worker/chat/admins", { cache: "no-store" });

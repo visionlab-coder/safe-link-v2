@@ -178,6 +178,11 @@ public class LiveInterpreterController {
             throw new IllegalArgumentException("text_ko_required");
         }
         String sessionId = clean(request.sessionId()).isBlank() ? "live" : clean(request.sessionId());
+        var sessionOwner = jdbc.sql("select started_by from live_broadcast_sessions where session_id=:id and site_id=:site and active=true for update")
+            .param("id",sessionId).param("site",siteId).query(Long.class).optional();
+        if (sessionOwner.isEmpty() || !sessionOwner.get().equals(actor.userId())) {
+            throw new AccessDeniedException("live_session_not_active_or_owned");
+        }
         Map<String, String> translations = request.translations() == null ? Map.of() : request.translations();
         Long id = jdbc.sql("""
                 insert into live_translation_events(session_id, site_id, text_ko, translations, created_by)
@@ -260,6 +265,11 @@ public class LiveInterpreterController {
             throw new IllegalArgumentException("site_id_required");
         }
         siteGuard.requireSiteAccess(actor, siteId, "live.worker_response.create", "live_worker_response", null);
+        if (actor.hasRole(Role.TEMP_WORKER)) {
+            boolean active = jdbc.sql("select exists(select 1 from live_broadcast_sessions where site_id=:site and started_by=:admin and active=true)")
+                .param("site",siteId).param("admin",adminId).query(Boolean.class).single();
+            if (!active) throw new AccessDeniedException("active_live_session_required");
+        }
         String sourceText = clean(request.sourceText());
         String translatedText = clean(request.translatedText());
         if (sourceText.isBlank() || translatedText.isBlank()) {
@@ -375,7 +385,7 @@ public class LiveInterpreterController {
 
     private static void requireWorker(SessionPrincipal actor) {
         if (actor == null) throw new AccessDeniedException("authentication_required");
-        if (!actor.hasRole(Role.WORKER)) throw new AccessDeniedException("worker_required");
+        if (!actor.hasRole(Role.WORKER) && !actor.hasRole(Role.TEMP_WORKER)) throw new AccessDeniedException("worker_required");
     }
 
     private static Long firstSiteId(SessionPrincipal actor) {

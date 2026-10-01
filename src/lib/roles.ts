@@ -36,6 +36,7 @@ export type TradeType =
 export const ROLE_HIERARCHY: Record<ProfileRole, number> = {
   VIEWER: 0,
   WORKER: 1,
+  TEMP_WORKER: 0,
   TEAM_LEADER: 2,
   SAFETY_MANAGER: 2,
   SAFETY_OFFICER: 2,
@@ -61,6 +62,7 @@ export const PROFILE_ROLE_DEFAULT_ROUTE: Record<ProfileRole, string> = {
   SITE_ADMIN: "/admin",
   SAFETY_MANAGER: "/admin",
   WORKER: "/worker",
+  TEMP_WORKER: "/worker/temporary",
   VIEWER: "/admin",
   ROOT: "/system",
   SAFETY_OFFICER: "/admin",
@@ -116,7 +118,7 @@ export function hasAllowedRole(role: ProfileRole, allowedRole: AllowedRole): boo
     return v3Role === "HQ_ADMIN";
   }
 
-  return v3Role === "WORKER";
+  return v3Role === "WORKER" || v3Role === "TEMP_WORKER";
 }
 
 /** Account navigation must use the same access rules as middleware. */

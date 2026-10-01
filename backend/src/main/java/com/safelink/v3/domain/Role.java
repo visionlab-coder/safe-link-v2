@@ -8,6 +8,7 @@ public enum Role {
     SITE_ADMIN,
     SAFETY_MANAGER,
     WORKER,
+    TEMP_WORKER,
     VIEWER;
 
     public static Role parse(String value) {

@@ -83,6 +83,10 @@ export async function middleware(request: NextRequest) {
     return publicRedirect("/auth", request);
   }
 
+  if (v3Auth.roles.includes("TEMP_WORKER") && !["/worker/temporary", "/worker/live", "/worker/upgrade"].includes(pathname)) {
+    return publicRedirect("/worker/temporary", request);
+  }
+
   if (pathname.startsWith("/system")) {
     if (!v3Auth.roles.some((role) => canAccessSystem(role))) {
       return publicRedirect("/", request);

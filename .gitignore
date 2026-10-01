@@ -50,6 +50,7 @@
 /backend/*.iml
 
 # misc
+.next-enrollment/
 .DS_Store
 *.pem
 

@@ -9,7 +9,7 @@ class RoleTest {
     void roleContractIsFrozenForV3() {
         assertThat(Role.values())
             .extracting(Enum::name)
-            .containsExactly("ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER", "WORKER", "VIEWER");
+            .containsExactly("ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER", "WORKER", "TEMP_WORKER", "VIEWER");
     }
 
     @Test
@@ -18,5 +18,7 @@ class RoleTest {
         assertThat(Role.HQ_ADMIN.hasGlobalSiteScope()).isTrue();
         assertThat(Role.SITE_ADMIN.hasGlobalSiteScope()).isFalse();
         assertThat(Role.WORKER.hasGlobalSiteScope()).isFalse();
+        assertThat(Role.TEMP_WORKER.hasGlobalSiteScope()).isFalse();
+        assertThat(Role.TEMP_WORKER.canManageSiteUsers()).isFalse();
     }
 }

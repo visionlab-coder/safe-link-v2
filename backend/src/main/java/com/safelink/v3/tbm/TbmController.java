@@ -159,7 +159,11 @@ public class TbmController {
         }
 
         String cleanIdempotencyKey = cleanIdempotencyKey(idempotencyKey);
-        var notice = tbm.createPublished(siteId, actor.userId(), title, content, cleanIdempotencyKey);
+        String summary = request.summaryKo() == null || request.summaryKo().isBlank() ? null : request.summaryKo().trim();
+        if (summary != null && summary.length() > 12000) throw new IllegalArgumentException("tbm_summary_too_long");
+        var notice = summary == null
+            ? tbm.createPublished(siteId, actor.userId(), title, content, cleanIdempotencyKey)
+            : tbm.createPublished(siteId, actor.userId(), title, content, cleanIdempotencyKey, summary);
         audit.record(actor.userId(), siteId, "tbm.notice.create", "tbm_notice", String.valueOf(notice.id()), "ALLOWED", "compat_server_api", Map.of());
         return new TbmBroadcastResponse(toCompatNotice(notice));
     }
@@ -282,7 +286,9 @@ public class TbmController {
             notice.normalizedText(),
             notice.status(),
             notice.publishedAt() == null ? null : notice.publishedAt().toString(),
-            notice.createdAt().toString()
+            notice.createdAt().toString(),
+            notice.summaryText(),
+            notice.createdBy() == null ? null : String.valueOf(notice.createdBy())
         );
     }
 
@@ -433,7 +439,9 @@ public class TbmController {
     public record TbmBroadcastResponse(CompatNoticeResponse tbm) {}
     public record AckListResponse(List<CompatAckResponse> acks) {}
     public record WorkerListResponse(List<CompatWorkerResponse> workers) {}
-    public record BroadcastRequest(@JsonProperty("content_ko") String contentKo, @JsonProperty("site_id") String siteId, String title) {}
+    public record BroadcastRequest(@JsonProperty("content_ko") String contentKo, @JsonProperty("site_id") String siteId, String title, @JsonProperty("summary_ko") String summaryKo) {
+        public BroadcastRequest(String contentKo, String siteId, String title) { this(contentKo, siteId, title, null); }
+    }
     public record SignRequest(@JsonProperty("tbm_id") @NotBlank String tbmId, @JsonProperty("signature_data") @NotBlank String signatureData) {}
     public record DecodedSignature(String mimeType, byte[] bytes) {}
     public record CompatNoticeResponse(
@@ -446,7 +454,9 @@ public class TbmController {
         @JsonProperty("normalized_text") String normalizedText,
         String status,
         @JsonProperty("published_at") String publishedAt,
-        @JsonProperty("created_at") String createdAt
+        @JsonProperty("created_at") String createdAt,
+        @JsonProperty("summary_ko") String summaryKo,
+        @JsonProperty("created_by") String createdBy
     ) {}
     public record CompatAckResponse(
         @JsonProperty("worker_id") String workerId,

@@ -132,6 +132,7 @@ public class AiGatewayController {
         }
 
         String feature = cleanFeature(request.feature() == null || request.feature().isBlank() ? "translate" : request.feature());
+        requireTemporaryFeature(actor, feature);
         siteGuard.requireSiteAccess(actor, request.siteId(), "ai.%s.vendor".formatted(feature), "site", String.valueOf(request.siteId()));
         var decision = quota.checkAndIncrement(feature, request.siteId(), actor.userId());
         if (!decision.allowed()) {
@@ -152,6 +153,24 @@ public class AiGatewayController {
         audit.record(actor.userId(), request.siteId(), "ai.%s.vendor".formatted(feature), "ai_vendor", result.vendor(), "ALLOWED", "vendor_call", Map.of("provider", request.provider(), "model", result.model()));
         return new VendorResponse(result.text(), result.vendor(), result.model());
     }
+
+    // Draft-only: does not publish a notice or alter session-linked summary records.
+    @PostMapping("/tbm-summary")
+    public VendorResponse summarizeTbm(@AuthenticationPrincipal SessionPrincipal actor, @Valid @RequestBody SummaryRequest request) {
+        siteGuard.requireGlobalOrSiteAdmin(actor, request.siteId(), "ai.tbm_summary", "site", String.valueOf(request.siteId()));
+        requireAiAccess(actor, request.siteId(), "tbm_summary");
+        requireQuota(actor, request.siteId(), "tbm_summary", request.text().length());
+        Instant started = Instant.now();
+        var result = vendor.summarizeTbm(request.text());
+        if (result.text().isBlank() || result.text().length() > 12000) throw new ServiceUnavailableException("tbm_summary_invalid");
+        usage.log(actor.userId(), request.siteId(), "tbm_summary", result.vendor(), result.model(), request.text().length(), result.text().length(),
+            Duration.between(started, Instant.now()).toMillis(), AiCostEstimator.estimate("tbm_summary", result.vendor(), request.text().length(), result.text().length()));
+        audit.record(actor.userId(), request.siteId(), "ai.tbm_summary", "ai_vendor", result.vendor(), "ALLOWED", "draft_only", Map.of("model", result.model()));
+        return new VendorResponse(result.text(), result.vendor(), result.model());
+    }
+
+    public record SummaryRequest(@NotNull @jakarta.validation.constraints.Positive Long siteId,
+        @NotBlank @jakarta.validation.constraints.Size(max=60000) String text) {}
 
     @PostMapping("/vision")
     public VisionResponse vision(@AuthenticationPrincipal SessionPrincipal actor, @Valid @RequestBody VisionRequest request) {
@@ -235,6 +254,7 @@ public class AiGatewayController {
         }
 
         String feature = cleanFeature(request.feature());
+        requireTemporaryFeature(actor, feature);
         Long siteId = request.siteId() == null ? firstSiteId(actor) : request.siteId();
         if (siteId != null) {
             siteGuard.requireSiteAccess(actor, siteId, "ai.%s.reserve".formatted(feature), "site", String.valueOf(siteId));
@@ -264,6 +284,13 @@ public class AiGatewayController {
             properties.getDefaultLimitCount(),
             List.copyOf(SUPPORTED_FEATURES)
         );
+    }
+
+    private static void requireTemporaryFeature(SessionPrincipal actor, String feature) {
+        if (actor.hasRole(com.safelink.v3.domain.Role.TEMP_WORKER)
+            && !java.util.Set.of("translate", "stt", "tts").contains(feature)) {
+            throw new AccessDeniedException("temporary_worker_live_only");
+        }
     }
 
     private static String cleanFeature(String feature) {

@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const safeLinkApiBaseUrl = process.env.NEXT_PUBLIC_SAFE_LINK_API_BASE_URL;
 
 const nextConfig: NextConfig = {
+  distDir: process.env.SQ_ENROLLMENT_SANDBOX === "1" && process.env.NODE_ENV === "development" ? ".next-enrollment" : ".next",
   output: "standalone",
   outputFileTracingRoot: process.cwd(),
   images: {

@@ -53,6 +53,7 @@ export default function AdminWorkersPage() {
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [adminSiteId, setAdminSiteId] = useState("");
+  const [canReviewUpgrades, setCanReviewUpgrades] = useState(false);
   const [qrModal, setQrModal] = useState<QrModal | null>(null);
 
   const fetchWorkers = useCallback(async () => {
@@ -75,9 +76,10 @@ export default function AdminWorkersPage() {
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store", credentials: "include" })
       .then((res) => res.ok ? res.json() : null)
-      .then((data: { profile?: { site_id?: string | null } | null } | null) => {
+      .then((data: { profile?: { site_id?: string | null } | null; v3?: { roles?: string[] } } | null) => {
         const siteId = data?.profile?.site_id;
         if (siteId) setAdminSiteId(siteId);
+        setCanReviewUpgrades(!!data?.v3?.roles?.some(role => ["ROOT", "HQ_ADMIN", "SITE_ADMIN"].includes(role)));
       })
       .catch(() => undefined);
   }, []);
@@ -154,6 +156,7 @@ export default function AdminWorkersPage() {
             </div>
             <div className="flex items-center gap-2">
               <ExportMenu disabled={workers.length === 0} onExport={handleExport} />
+              {canReviewUpgrades && <button onClick={() => router.push("/admin/workers/upgrades")} className="rounded-lg border border-blue-400 px-4 py-2 text-sm font-medium text-blue-200">정식 전환 신청</button>}
             <button
               onClick={() => router.push("/admin/workers/enroll")}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-sm font-medium transition-colors"

@@ -26,7 +26,7 @@ const ROLE_GUARD_MESSAGE: Record<string, string> = {
 // Spring Boot V3 세션을 우선 확인하고 /api/auth/me 호환 응답을 fallback으로 사용한다.
 //
 // 미들웨어가 이미 서버측에서 인증+역할 검증을 통과시킨 상태에서 실행되므로
-const V3_ROLE_PRIORITY: V3Role[] = ["ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER", "WORKER", "VIEWER"];
+const V3_ROLE_PRIORITY: V3Role[] = ["ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER", "WORKER", "TEMP_WORKER", "VIEWER"];
 
 function pickV3RouteRole(roles: V3Role[], allowedRole: AllowedRole): V3Role | null {
     return roles.find((role) => hasAllowedRole(role, allowedRole)) ??

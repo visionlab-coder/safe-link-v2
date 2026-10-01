@@ -4,8 +4,11 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import TbmReceivedSummary from "@/components/TbmReceivedSummary";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import RoleGuard from "@/components/RoleGuard";
+import TbmLiveReceiver from "@/components/TbmLiveReceiver";
+import TbmQuestionLink from "@/components/TbmQuestionLink";
 import { Suspense } from "react";
 import SignatureCanvas from "react-signature-canvas";
 import { hangulize } from "@/utils/hangulize";
@@ -180,6 +183,8 @@ function WorkerTBMDetailContent() {
     const [loading, setLoading] = useState(true);
     const [translating, setTranslating] = useState(false);
     const [preferredLang, setPreferredLang] = useState("ko");
+    const [liveSiteId, setLiveSiteId] = useState<string | null>(null);
+    const [liveReceiving, setLiveReceiving] = useState(false);
     const [transData, setTransData] = useState<{ text: string, pron: string, rev: string }>({ text: "", pron: "", rev: "" });
     const [isSigned, setIsSigned] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -209,6 +214,7 @@ function WorkerTBMDetailContent() {
         const lang = resolveDisplayLanguage(me.profile?.preferred_lang, urlLang, displayLang);
 
         setPreferredLang(lang);
+        setLiveSiteId(me.profile?.site_id || null);
 
         let tbmData: any = null;
         const tbmParams = new URLSearchParams();
@@ -386,7 +392,6 @@ function WorkerTBMDetailContent() {
     return (
         <RoleGuard allowedRole="worker">
             <div className="visualization-light min-h-screen text-slate-900 flex flex-col font-sans selection:bg-red-500/30">
-
                 {/* 💎 Header */}
                 <header className="concept-page-header safe-area-sticky-top sticky z-50">
                     <div className="flex items-center gap-4">
@@ -439,6 +444,7 @@ function WorkerTBMDetailContent() {
                 </header>
 
                 <main className="flex-1 flex flex-col pt-8 pb-32 px-4 md:px-8 max-w-2xl mx-auto w-full gap-8">
+                    {tbmId === "today" && <TbmLiveReceiver siteId={liveSiteId} lang={preferredLang} busyLabel={t.translating} listenLabel={t.voice} onActiveChange={setLiveReceiving} allowQuestions />}
 
                     {fromCache && (
                         <div className="rounded-2xl bg-amber-500/15 border border-amber-400/30 text-amber-200 text-sm px-4 py-3">
@@ -450,7 +456,7 @@ function WorkerTBMDetailContent() {
                         <div className="flex-1 flex items-center justify-center">
                             <div className="w-12 h-12 border-4 border-slate-700 border-t-red-500 rounded-full animate-spin" />
                         </div>
-                    ) : !tbm ? (
+                    ) : !tbm ? (liveReceiving ? null : (
                         <div className="flex-1 flex flex-col items-center justify-center text-center gap-6 glass rounded-[40px] p-12 border-white/5">
                             <div className="w-24 h-24 bg-slate-800/50 rounded-full flex items-center justify-center text-slate-600">
                                 <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -459,7 +465,7 @@ function WorkerTBMDetailContent() {
                             </div>
                             <h2 className="text-2xl font-black text-slate-400">{t.noTBM}</h2>
                         </div>
-                    ) : (
+                    )) : (
                         <>
                             {/* 🚨 NEW TBM ARRIVED ALERT */}
                             <div className="admin-concept-hero relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
@@ -474,6 +480,8 @@ function WorkerTBMDetailContent() {
                                     <p className="mt-2 text-sm font-bold text-slate-100">{new Date(tbm.created_at).toLocaleDateString(({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[preferredLang] || "en-US", { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                                 </div>
                             </div>
+
+                            {!liveReceiving && <TbmQuestionLink adminId={tbm.created_by} tbmId={String(tbm.id)} lang={preferredLang} />}
 
                             {hasNewTBM && (
                                 <div className="animate-in slide-in-from-top-4 fade-in duration-500 w-full mb-6 relative overflow-hidden p-6 glass-red rounded-3xl border-red-500 border-2 shadow-[0_0_60px_-15px_rgba(239,68,68,0.6)] flex items-center justify-center gap-4 text-white z-50">
@@ -502,7 +510,7 @@ function WorkerTBMDetailContent() {
                                             <span className="w-1.5 h-6 bg-red-500 rounded-full" />
                                             <h3 className="text-sm font-black text-red-400 uppercase tracking-widest">{t.translated}</h3>
                                         </div>
-                                        {translating ? (
+                                        {!liveReceiving && (translating ? (
                                             <div className="h-20 flex items-center gap-4 bg-white/5 rounded-3xl px-6 animate-pulse-soft">
                                                 <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
                                                 <span className="text-slate-400 font-bold">{t.translating}</span>
@@ -556,11 +564,12 @@ function WorkerTBMDetailContent() {
                                                     </div>
                                                 )}
                                             </div>
-                                        )}
+                                        ))}
                                     </div>
 
                                     {/* 원문 (The Origin) */}
                                     <div className="p-6 bg-white/[0.03] rounded-[32px] border border-white/5 group/orig transition-colors hover:bg-white/[0.05]">
+                                        <TbmReceivedSummary text={tbm.summary_ko} lang={preferredLang} loadingLabel={t.translating} />
                                         <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3">{t.original}</h3>
                                         <p className="text-lg text-slate-400 font-medium leading-relaxed group-hover/orig:text-slate-300 transition-colors">{tbm.content_ko}</p>
                                     </div>

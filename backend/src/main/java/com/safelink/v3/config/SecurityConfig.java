@@ -33,6 +33,7 @@ public class SecurityConfig {
         HttpSecurity http,
         CurrentAccountSessionFilter currentAccountSessionFilter,
         ViewerReadOnlyFilter viewerReadOnlyFilter,
+        com.safelink.v3.security.TemporaryWorkerAccessFilter temporaryWorkerAccessFilter,
         @Value("${server.servlet.session.cookie.secure:false}") boolean secureCookie
     ) throws Exception {
         var csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
@@ -69,11 +70,13 @@ public class SecurityConfig {
         );
         http.addFilterAfter(currentAccountSessionFilter, SecurityContextHolderFilter.class);
         http.addFilterAfter(viewerReadOnlyFilter, CurrentAccountSessionFilter.class);
+        http.addFilterAfter(temporaryWorkerAccessFilter, ViewerReadOnlyFilter.class);
         http.authorizeHttpRequests(auth -> auth
             .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/auth/admin-signup").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/v1/auth/temporary-worker").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/auth/worker-quick-login").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/auth/password-reset/**").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/admin/invitations/accept").permitAll()

@@ -87,9 +87,13 @@ public class TbmRepository {
     }
 
     public NoticeRow createPublished(Long siteId, Long createdBy, String title, String content, String idempotencyKey) {
+        return createPublished(siteId, createdBy, title, content, idempotencyKey, null);
+    }
+
+    public NoticeRow createPublished(Long siteId, Long createdBy, String title, String content, String idempotencyKey, String summary) {
         Long id = jdbc.sql("""
-                insert into tbm_notices(site_id, created_by, title, source_text, normalized_text, status, published_at, idempotency_key)
-                values (:siteId, :createdBy, :title, :sourceText, :normalizedText, 'PUBLISHED', now(), :idempotencyKey)
+                insert into tbm_notices(site_id, created_by, title, source_text, normalized_text, status, published_at, idempotency_key, summary_text)
+                values (:siteId, :createdBy, :title, :sourceText, :normalizedText, 'PUBLISHED', now(), :idempotencyKey, :summary)
                 on conflict (site_id, idempotency_key) where idempotency_key is not null
                 do update set idempotency_key = excluded.idempotency_key
                 returning id
@@ -100,6 +104,7 @@ public class TbmRepository {
             .param("sourceText", content)
             .param("normalizedText", content)
             .param("idempotencyKey", idempotencyKey)
+            .param("summary", summary)
             .query(Long.class)
             .single();
         return getNotice(id);
@@ -202,7 +207,7 @@ public class TbmRepository {
     private JdbcClient.StatementSpec noticeStatement(String clause) {
         return jdbc.sql("""
                 select t.id, t.site_id, s.name as site_name, t.created_by, t.title, t.source_text,
-                       t.normalized_text, t.status, t.published_at, t.created_at
+                       t.normalized_text, t.status, t.published_at, t.created_at, t.summary_text
                 from tbm_notices t
                 join sites s on s.id = t.site_id
                 %s
@@ -220,7 +225,8 @@ public class TbmRepository {
             rs.getString("normalized_text"),
             rs.getString("status"),
             rs.getTimestamp("published_at") == null ? null : rs.getTimestamp("published_at").toInstant(),
-            rs.getTimestamp("created_at").toInstant()
+            rs.getTimestamp("created_at").toInstant(),
+            rs.getString("summary_text")
         );
     }
 
@@ -235,7 +241,11 @@ public class TbmRepository {
         );
     }
 
-    public record NoticeRow(Long id, Long siteId, String siteName, Long createdBy, String title, String sourceText, String normalizedText, String status, Instant publishedAt, Instant createdAt) {}
+    public record NoticeRow(Long id, Long siteId, String siteName, Long createdBy, String title, String sourceText, String normalizedText, String status, Instant publishedAt, Instant createdAt, String summaryText) {
+        public NoticeRow(Long id, Long siteId, String siteName, Long createdBy, String title, String sourceText, String normalizedText, String status, Instant publishedAt, Instant createdAt) {
+            this(id, siteId, siteName, createdBy, title, sourceText, normalizedText, status, publishedAt, createdAt, null);
+        }
+    }
     public record AckRow(Long id, Long noticeId, Long workerId, Long siteId, Instant acknowledgedAt, Long signatureFileId) {}
     public record WorkerRow(Long id, String displayName, String preferredLanguage, Long siteId) {}
 }

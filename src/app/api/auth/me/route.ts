@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 const SAFE_LINK_V3_API_BASE_URL =
   process.env.SAFE_LINK_INTERNAL_API_BASE_URL || process.env.NEXT_PUBLIC_SAFE_LINK_API_BASE_URL || "http://localhost:8080";
 
-const V3_ROLE_PRIORITY = ["ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER", "WORKER", "VIEWER"];
+const V3_ROLE_PRIORITY = ["ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER", "WORKER", "TEMP_WORKER", "VIEWER"];
 
 function cookieForDevelopmentBrowser(setCookie: string): string {
   return process.env.NODE_ENV === "development"

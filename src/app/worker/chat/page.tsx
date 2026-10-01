@@ -2,6 +2,8 @@
 import { useEffect, useState, Suspense, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
+import { findTbmChatAdmin, tbmChatUI, tbmReturnHref } from "@/lib/tbm-chat";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import RoleGuard from "@/components/RoleGuard";
 
@@ -237,7 +239,11 @@ function WorkerChatContent() {
     const searchParams = useSearchParams();
     const urlLang = searchParams.get("lang");
     const addFriendId = searchParams.get("add_friend");
+    const requestedAdminId = searchParams.get("admin_id");
+    const sourceTbmId = searchParams.get("tbm_id");
     const displayLang = useDisplayLanguage();
+    const handledDeepLink = useRef<string | null>(null);
+    const [recipientUnavailable, setRecipientUnavailable] = useState(false);
 
     const [lang, setLang] = useState("ko");
     const [messages, setMessages] = useState<Message[]>([]);
@@ -324,6 +330,7 @@ function WorkerChatContent() {
         if (!adminsRes.ok) {
             if (adminsRes.status === 401) router.push("/auth");
             setAdmins([]);
+            if (requestedAdminId) { setActiveAdmin(null); setRecipientUnavailable(true); }
             return;
         }
 
@@ -357,7 +364,16 @@ function WorkerChatContent() {
             return isFriendA - isFriendB;
         });
         setAdmins(prioritized);
-    }, [router, urlLang, addFriendId, displayLang]);
+        // URL is only a selection hint: the authenticated API remains the authority.
+        // Never substitute the first administrator if the TBM sender is unavailable.
+        if (requestedAdminId && handledDeepLink.current !== requestedAdminId) {
+            const recipient = findTbmChatAdmin(prioritized, requestedAdminId);
+            setActiveAdmin(recipient);
+            setRecipientUnavailable(!recipient);
+            setShowSidebar(false);
+            handledDeepLink.current = requestedAdminId;
+        }
+    }, [router, urlLang, addFriendId, displayLang, requestedAdminId]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -624,6 +640,10 @@ function WorkerChatContent() {
                     </div>
                 </header>
 
+                {sourceTbmId && tbmReturnHref(sourceTbmId, lang) && <div className="border-b border-blue-200 bg-blue-50 px-4 py-3">
+                    <Link href={tbmReturnHref(sourceTbmId, lang)!} className="inline-flex min-h-11 items-center gap-2 font-bold text-blue-800 hover:underline">← {tbmChatUI(lang).back}</Link>
+                </div>}
+                {recipientUnavailable && <p role="status" className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">{tbmChatUI(displayLang).unavailable}</p>}
                 <main className="min-h-0 flex-1 flex w-full max-w-6xl mx-auto overflow-hidden relative">
                     <div className={`${!activeAdmin || showSidebar ? 'flex' : 'hidden'} md:flex w-full md:w-80 flex-col border-r border-slate-200 bg-white p-4 overflow-y-auto shrink-0 z-30`}>
                         <div className="flex items-center justify-between mb-4 px-2">
@@ -646,7 +666,7 @@ function WorkerChatContent() {
                                 filteredAdmins.map(a => (
                                     <button
                                         key={a.id}
-                                        onClick={() => { setActiveAdmin(a); setShowSidebar(false); }}
+                                        onClick={() => { setActiveAdmin(a); setShowSidebar(false); setRecipientUnavailable(false); }}
                                         className={`flex items-center gap-4 p-4 rounded-3xl transition-all border ${activeAdmin?.id === a.id ? 'bg-blue-100 border-blue-200 text-slate-900 shadow-lg' : 'bg-slate-50 border-slate-100 hover:bg-slate-100 text-slate-700'}`}
                                     >
                                         <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-xs shrink-0 relative ${activeAdmin?.id === a.id ? 'bg-blue-200' : 'bg-white/20'} ${onlineUsers.has(a.id) ? 'ring-2 ring-green-400/60' : ''}`}>

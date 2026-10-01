@@ -2,7 +2,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, Suspense } from "react";
 import RoleGuard from "@/components/RoleGuard";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import { playNotificationSound } from "@/utils/notifications";
@@ -566,8 +567,11 @@ function WorkerHomeContent() {
     const searchParams = useSearchParams();
     const displayLang = useDisplayLanguage();
     const [profile, setProfile] = useState<any>(null);
+    const pathname = usePathname();
+    const temporary = pathname === "/worker/temporary" || profile?.role === "TEMP_WORKER";
     const [hasNewTBM, setHasNewTBM] = useState(false);
     const [newTBMTime, setNewTBMTime] = useState<string>("");
+    const [liveTbmActive, setLiveTbmActive] = useState(false);
 
     const [showStopWorkModal, setShowStopWorkModal] = useState(false);
     const [stopWorkReason, setStopWorkReason] = useState("");
@@ -596,7 +600,7 @@ function WorkerHomeContent() {
     };
 
     const handleStopWork = async () => {
-        if (!profile) return;
+        if (!profile || temporary) return;
         let gps: { lat: number; lng: number; accuracy?: number } | undefined;
         try {
             const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
@@ -665,12 +669,29 @@ function WorkerHomeContent() {
         fetchProfile();
 
         // 네이티브 앱에서만 로컬 알림 권한 요청(브라우저 no-op)
-        ensureLocalNotifyPermission();
-    }, [urlLang]);
+        if (!temporary) ensureLocalNotifyPermission();
+    }, [urlLang, temporary]);
+
+    // 실시간 TBM 방송 시작도 기존 TBM 전파 알림 카드로 보여 준다.
+    useEffect(() => {
+        const onLiveStart = () => {
+            setLiveTbmActive(true);
+            setHasNewTBM(true);
+            setNewTBMTime(new Date().toLocaleTimeString());
+        };
+        const onLiveStop = () => setLiveTbmActive(false);
+        window.addEventListener("sq-link:tbm-live-start", onLiveStart);
+        window.addEventListener("sq-link:tbm-live-stop", onLiveStop);
+        return () => {
+            window.removeEventListener("sq-link:tbm-live-start", onLiveStart);
+            window.removeEventListener("sq-link:tbm-live-stop", onLiveStop);
+        };
+    }, []);
 
     // 관리자 PC에서 발송한 TBM은 근로자 앱/웹이 같은 API에서 주기적으로 확인한다.
     // 기존 구현은 hasNewTBM 상태를 한 번도 갱신하지 않아 알림 카드가 영구히 숨겨졌다.
     useEffect(() => {
+        if (!profile || temporary) return;
         let cancelled = false;
 
         const refreshTbm = async () => {
@@ -685,7 +706,7 @@ function WorkerHomeContent() {
                 };
                 const latest = payload.tbms?.[0];
                 if (!latest) {
-                    if (!cancelled) setHasNewTBM(false);
+                    if (!cancelled && !liveTbmActive) setHasNewTBM(false);
                     return;
                 }
 
@@ -702,7 +723,7 @@ function WorkerHomeContent() {
                     ? await signResponse.json() as { signed?: boolean }
                     : null;
                 if (!cancelled) {
-                    setHasNewTBM(!signStatus?.signed);
+                    setHasNewTBM(liveTbmActive || !signStatus?.signed);
                     const timestamp = latest.published_at ?? latest.created_at;
                     setNewTBMTime(timestamp ? new Date(timestamp).toLocaleTimeString() : "");
 
@@ -723,11 +744,11 @@ function WorkerHomeContent() {
             window.clearInterval(interval);
             document.removeEventListener("visibilitychange", onVisibilityChange);
         };
-    }, []);
+    }, [profile, temporary, liveTbmActive]);
 
     // 현재 브라우저에서 고른 언어가 프로필의 기본 한국어값보다 우선한다.
     const lang = resolveDisplayLanguage(profile?.preferred_lang, urlLang, displayLang);
-    const newChatCount = useUnreadChatCount(profile?.id);
+    const newChatCount = useUnreadChatCount(temporary ? null : profile?.id);
     const t = getUI(lang);
     const common = getWorkerCommon(lang);
     const iso = isoMap[lang] || isoMap.ko;
@@ -788,7 +809,8 @@ function WorkerHomeContent() {
                             />
                             <span className="text-[10px] text-[#172033] font-black">{lang.toUpperCase()}</span>
                         </div>
-                        <button onClick={() => router.push('/auth/setup')} className="whitespace-nowrap rounded-lg px-2 py-2 text-[9px] font-black text-blue-600 hover:bg-blue-50 uppercase tracking-widest transition-colors">
+                        <button disabled={temporary} onClick={() => router.push('/auth/setup')} className="whitespace-nowrap rounded-lg px-2 py-2 text-[9px] font-black text-blue-600 hover:bg-blue-50 uppercase tracking-widest transition-colors disabled:text-slate-400">
+                            {temporary && <span aria-hidden="true">🔒 </span>}
                             {common.profile}
                         </button>
                         <button onClick={handleSignOut} className="whitespace-nowrap rounded-lg px-2 py-2 text-[9px] font-black text-slate-500 hover:bg-red-50 hover:text-red-500 uppercase tracking-widest transition-colors">
@@ -818,7 +840,8 @@ function WorkerHomeContent() {
                     </div>
                 </div>
 
-                <section className="relative">
+                {temporary && <aside className="rounded-3xl border border-blue-200 bg-blue-50 p-5 text-slate-800"><h2 className="text-lg font-black">임시 근로자</h2><p className="mt-2 text-sm leading-relaxed">실시간 통역만 이용할 수 있습니다. 잠긴 기능은 정식 근로자 전환 후 이용 가능합니다.</p><Link href="/worker/upgrade" className="mt-4 inline-flex rounded-xl border border-blue-300 bg-white px-4 py-3 text-sm font-bold text-blue-800">정식 근로자 전환 신청 · 승인 상태 확인 →</Link></aside>}
+                <section inert={temporary || undefined} data-worker-locked={temporary || undefined} className="relative">
                     <button
                         onClick={() => setShowStopWorkModal(true)}
                         className="w-full py-6 bg-gradient-to-r from-red-700 via-red-600 to-red-700 rounded-[32px] border-2 border-red-400/50 shadow-[0_0_40px_-10px_rgba(239,68,68,0.6)] flex items-center justify-center gap-4 tap-effect hover:scale-[1.02] transition-all active:scale-95"
@@ -909,7 +932,7 @@ function WorkerHomeContent() {
                 {hasNewTBM && (
                     <div
                         className="tbm-new-notice relative overflow-hidden p-8 glass-red rounded-[40px] border-red-500 border-2 shadow-[0_0_60px_-15px_rgba(239,68,68,0.6)] cursor-pointer tap-effect group"
-                        onClick={() => { setHasNewTBM(false); router.push("/worker/tbm/today"); }}
+                        onClick={() => { if (!liveTbmActive) setHasNewTBM(false); router.push("/worker/tbm/today"); }}
                     >
                         <div className="flex items-center gap-6 relative z-10">
                             <div className="w-16 h-16 bg-white/10 rounded-3xl flex items-center justify-center text-white relative">
@@ -931,7 +954,7 @@ function WorkerHomeContent() {
                     </div>
                 )}
                 {/* 🎯 Daily TBM (The Main Mission) */}
-                <section className="glass rounded-[36px] p-6 md:p-8 border-white/10 shadow-3xl relative overflow-hidden flex flex-col gap-6">
+                <section inert={temporary || undefined} data-worker-locked={temporary || undefined} className="glass rounded-[36px] p-6 md:p-8 border-white/10 shadow-3xl relative overflow-hidden flex flex-col gap-6">
                     <div className="absolute top-0 right-0 w-40 h-40 bg-green-500/10 blur-[70px] rounded-full -mr-20 -mt-20 pointer-events-none" />
 
                     <div className="relative flex flex-col gap-2">
@@ -963,6 +986,7 @@ function WorkerHomeContent() {
 
                 {/* 📸 AI Vision Section */}
                 <section
+                    inert={temporary || undefined} data-worker-locked={temporary || undefined}
                     onClick={() => router.push('/worker/vision')}
                     className="glass rounded-[28px] p-5 border-white/10 hover:border-purple-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
                 >
@@ -983,6 +1007,7 @@ function WorkerHomeContent() {
 
                 {/* 🧠 Safety Quiz Section */}
                 <section
+                    inert={temporary || undefined} data-worker-locked={temporary || undefined}
                     onClick={() => router.push('/worker/quiz')}
                     className="glass rounded-[28px] p-5 border-white/10 hover:border-amber-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
                 >
@@ -1002,6 +1027,7 @@ function WorkerHomeContent() {
 
                 {/* ✍️ Safety Pledge Section */}
                 <section
+                    inert={temporary || undefined} data-worker-locked={temporary || undefined}
                     onClick={() => router.push('/worker/pledge')}
                     className="glass rounded-[28px] p-5 border-white/10 hover:border-blue-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
                 >
@@ -1025,6 +1051,8 @@ function WorkerHomeContent() {
 
                 {/* 🎙️ Live Interpretation Section */}
                 <section
+                    data-worker-live={temporary || undefined} role="link" tabIndex={0}
+                    onKeyDown={(event) => { if (event.key === "Enter") router.push('/worker/live'); }}
                     onClick={() => router.push('/worker/live')}
                     className="glass rounded-[28px] p-5 border-white/10 hover:border-green-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
                 >
@@ -1044,6 +1072,7 @@ function WorkerHomeContent() {
 
                 {/* 💬 Communication Section */}
                 <section
+                    inert={temporary || undefined} data-worker-locked={temporary || undefined}
                     onClick={() => router.push('/worker/chat')}
                     className="glass rounded-[28px] p-5 border-white/10 hover:border-blue-500/30 relative overflow-hidden group cursor-pointer tap-effect transition-all"
                 >
@@ -1064,7 +1093,7 @@ function WorkerHomeContent() {
                             <p className="text-slate-400 font-bold text-xs tracking-tight">{t.chatDesc}</p>
                         </div>
                     </div>
-                    <button className="w-full py-4 bg-blue-600/20 text-blue-300 font-black flex items-center justify-center gap-3 group-hover:bg-blue-600/30 transition-colors rounded-2xl relative z-10">
+                    <button className="w-full py-4 bg-blue-600 text-[#ffffff] font-black flex items-center justify-center gap-3 group-hover:bg-blue-700 active:bg-blue-800 transition-colors rounded-2xl relative z-10">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
@@ -1073,7 +1102,7 @@ function WorkerHomeContent() {
                 </section>
 
                 {/* 🤖 Tier 3 Ambient Edge Agent */}
-                <SwarmAgentHUD lang={lang} placement="worker-home" />
+                {!temporary && <SwarmAgentHUD lang={lang} placement="worker-home" />}
 
             </div>
         </RoleGuard>

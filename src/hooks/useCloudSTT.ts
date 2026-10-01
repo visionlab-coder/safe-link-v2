@@ -73,6 +73,8 @@ interface UseCloudSTTOptions {
     chunkInterval?: number;
     /** 침묵 감지 ms — 이 시간 이상 조용하면 자동 전송 (기본 2000ms) */
     silenceDuration?: number;
+    /** 라이브 모드에서 발화 조각을 전송하기 전의 최소 녹음 길이. TBM만 더 짧게 설정한다. */
+    liveMinChunkMs?: number;
     /** 실시간 통역 모드: latest_long 모델 + 서버 용어집 정규화 */
     live?: boolean;
     /** 1:1 채팅은 TBM 예시 문구를 STT 프롬프트로 전달하지 않는다. */
@@ -105,6 +107,7 @@ export function useCloudSTT({
     onSpeechStart,
     chunkInterval,
     silenceDuration,
+    liveMinChunkMs,
     live = false,
     context = "safety",
     getTranslationTargets,
@@ -129,6 +132,7 @@ export function useCloudSTT({
     const silenceDurationRef = useRef(effectiveSilence);
     const chunkIntervalRef   = useRef(effectiveInterval);
     const liveRef            = useRef(live);
+    const liveMinChunkMsRef  = useRef(liveMinChunkMs ?? LIVE_CAPTURE.minChunkMs);
     const contextRef         = useRef(context);
     const getTranslationTargetsRef = useRef(getTranslationTargets);
 
@@ -154,6 +158,7 @@ export function useCloudSTT({
     useEffect(() => { silenceDurationRef.current = effectiveSilence; }, [effectiveSilence]);
     useEffect(() => { chunkIntervalRef.current = effectiveInterval; }, [effectiveInterval]);
     useEffect(() => { liveRef.current = live; }, [live]);
+    useEffect(() => { liveMinChunkMsRef.current = liveMinChunkMs ?? LIVE_CAPTURE.minChunkMs; }, [liveMinChunkMs]);
     useEffect(() => { contextRef.current = context; }, [context]);
     useEffect(() => { getTranslationTargetsRef.current = getTranslationTargets; }, [getTranslationTargets]);
 
@@ -426,7 +431,7 @@ export function useCloudSTT({
                     speechFiredThisCycle = true;
                     onSpeechStartRef.current?.();
                 }
-                if (decision.action !== "none" && (!liveRef.current || now - recordingStartRef.current >= LIVE_CAPTURE.minChunkMs)) {
+                if (decision.action !== "none" && (!liveRef.current || now - recordingStartRef.current >= liveMinChunkMsRef.current)) {
                     if (recorder.state === "recording") recorder.stop();
                     return;
                 }

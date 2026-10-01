@@ -22,6 +22,8 @@
 
 ### 2. Role Contract 통일
 
+- 2026-09-28 승인된 추가 역할 `TEMP_WORKER`: 라이브 전용 제한 역할. 임시 가입의 개인정보 동의 기록과 서버 API allowlist를 필수로 검증한다. 출시 전 미완료 사항은 `TEMPORARY_WORKER.md`에 기록한다.
+
 - UI, API, DB, Seed, 운영 문서의 역할 문자열을 통일한다.
 - 기준 역할은 아래를 기본으로 한다.
 

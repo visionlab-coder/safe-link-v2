@@ -8,10 +8,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  return proxyV3Api(req, "/api/v1/live/sessions", {
+  const response = await proxyV3Api(req, "/api/v1/live/sessions", {
     method: "POST",
     body: await req.text(),
   });
+  if (!response.ok) {
+    console.error("[TBM live proxy] session start failed", { status: response.status });
+  }
+  return response;
 }
 
 export async function DELETE(req: NextRequest) {

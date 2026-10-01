@@ -5,6 +5,7 @@ import { callV3AiStt } from "@/utils/ai/v3-ai-gateway";
 import { SAFE_LINK_V3_API_BASE_URL } from "@/utils/auth/v3-proxy";
 import { CONSTRUCTION_SPEECH_HINTS, WHISPER_CONTEXT_PROMPT } from "@/constants/construction-terms";
 import { CONSTRUCTION_GLOSSARY } from "@/constants/glossary";
+import { canReuseLiveTranslation } from "@/utils/live-glossary-policy";
 
 export const runtime = "nodejs";
 
@@ -184,11 +185,13 @@ export async function POST(request: Request) {
     const translations = data.translations && Object.keys(data.translations).length > 0 ? data.translations : undefined;
     if (shortLang !== "ko") return NextResponse.json({ transcript, engine, ...(translations && { translations }) });
     const { normalized, changes } = await normalizeServerSide(transcript);
+    // RTT output predates local normalization. Affected live speech must use the glossary translation path.
+    const reuseTranslations = !live || canReuseLiveTranslation(transcript, normalized, await fetchActiveGlossary());
     return NextResponse.json({
       transcript: normalized,
       ...(changes.length > 0 && { normalized: true, changes }),
       engine,
-      ...(translations && { translations }),
+      ...(reuseTranslations && translations && { translations }),
       ...(live && { live: true }),
     });
   } catch (error) {

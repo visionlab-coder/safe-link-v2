@@ -131,7 +131,7 @@ function sanitizeAuthError(msg: string, language: string): string {
 type Mode = "lang" | "role" | "worker" | "admin";
 type AuthFlash = { tone: "error" | "success"; message: string } | null;
 
-const V3_ROLE_PRIORITY: V3Role[] = ["ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER", "WORKER", "VIEWER"];
+const V3_ROLE_PRIORITY: V3Role[] = ["ROOT", "HQ_ADMIN", "SITE_ADMIN", "SAFETY_MANAGER", "WORKER", "TEMP_WORKER", "VIEWER"];
 
 const RESET_PASSWORD_LABELS: Record<string, string> = {
   ko: "비밀번호를 잊으셨나요?",
@@ -748,6 +748,10 @@ function AuthContent() {
                 </button>
 
                 {/* Back */}
+                <button type="button" onClick={() => router.push(`/auth/temporary?lang=${encodeURIComponent(lang || "ko")}`)}
+                  className="w-full rounded-xl border border-emerald-600 bg-white px-4 py-3 text-sm font-bold text-emerald-800 hover:bg-emerald-50">
+                  {t.workerRole} · {t.doSignup}
+                </button>
                 <button onClick={() => setMode("role")}
                   className="min-h-11 flex items-center justify-center gap-1.5 px-3 text-xs font-semibold text-slate-600 hover:text-slate-300 transition-colors mx-auto">
                   <ArrowLeft className="w-3.5 h-3.5" />
