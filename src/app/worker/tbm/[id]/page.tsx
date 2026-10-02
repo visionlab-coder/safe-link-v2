@@ -8,6 +8,8 @@ import TbmReceivedSummary from "@/components/TbmReceivedSummary";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import RoleGuard from "@/components/RoleGuard";
 import TbmLiveReceiver from "@/components/TbmLiveReceiver";
+import { canSignTbm, type TbmLiveSummary } from "@/lib/tbm-live-completion";
+import { tbmSummaryUI } from "@/lib/tbm-summary-ui";
 import TbmQuestionLink from "@/components/TbmQuestionLink";
 import { Suspense } from "react";
 import SignatureCanvas from "react-signature-canvas";
@@ -185,6 +187,12 @@ function WorkerTBMDetailContent() {
     const [preferredLang, setPreferredLang] = useState("ko");
     const [liveSiteId, setLiveSiteId] = useState<string | null>(null);
     const [liveReceiving, setLiveReceiving] = useState(false);
+    const [observedSession, setObservedSession] = useState<string | null>(null);
+    const [liveSummary, setLiveSummary] = useState<TbmLiveSummary | null>(null);
+    const [summaryReadyKey, setSummaryReadyKey] = useState("");
+    const [summaryReviewedKey, setSummaryReviewedKey] = useState("");
+    const [summaryWaitLong, setSummaryWaitLong] = useState(false);
+    const loadVersionRef = useRef(0);
     const [transData, setTransData] = useState<{ text: string, pron: string, rev: string }>({ text: "", pron: "", rev: "" });
     const [isSigned, setIsSigned] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -194,6 +202,29 @@ function WorkerTBMDetailContent() {
     const [showRev, setShowRev] = useState(false);
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const voiceGenderRef = useRef<'male' | 'female'>('female');
+    const isLiveSummary = Boolean(liveSummary && String(tbm?.id) === liveSummary.tbmId);
+    const summaryKey = `${tbm?.id}:${preferredLang}:${tbm?.summary_ko || ""}`;
+    const waitingForSummary = Boolean(observedSession && !isLiveSummary);
+    useEffect(() => {
+        setSummaryWaitLong(false);
+        if (!waitingForSummary || liveReceiving) return;
+        const timer = setTimeout(() => setSummaryWaitLong(true), 60000);
+        return () => clearTimeout(timer);
+    }, [waitingForSummary, liveReceiving, observedSession]);
+    const canSign = canSignTbm({ liveActive: liveReceiving, pending: waitingForSummary,
+        liveSummary: isLiveSummary, summaryReady: summaryReadyKey === summaryKey,
+        summaryReviewed: summaryReviewedKey === summaryKey, audioFinished: isAudioFinished });
+    const onSummaryReady = useCallback((ready: boolean) => {
+        setSummaryReadyKey(ready ? summaryKey : "");
+    }, [summaryKey]);
+    const onLiveSession = useCallback((id: string) => {
+        setObservedSession(id);
+        setLiveSummary(null);
+        setSummaryReadyKey("");
+        setSummaryReviewedKey("");
+        setIsAudioFinished(false);
+        signaturePadRef.current?.clear();
+    }, []);
 
     const changeGender = (g: 'male' | 'female') => {
         voiceGenderRef.current = g;
@@ -201,12 +232,19 @@ function WorkerTBMDetailContent() {
     };
 
     const loadTBM = useCallback(async () => {
+        const version = ++loadVersionRef.current;
+        setLoading(true);
+        setIsAudioFinished(false);
+        setIsSigned(false);
+        setTransData({ text: "", pron: "", rev: "" });
+        signaturePadRef.current?.clear();
         const meRes = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
         if (!meRes.ok) { setLoading(false); return; }
         const me = (await meRes.json()) as {
             user?: { id: string };
             profile?: { preferred_lang?: string | null; site_id?: string | null; display_name?: string | null } | null;
         };
+        if (version !== loadVersionRef.current) return;
         if (!me.user) { setLoading(false); return; }
 
         // 저장된 화면 언어를 URL/프로필 기본값보다 먼저 사용한다.
@@ -218,7 +256,9 @@ function WorkerTBMDetailContent() {
 
         let tbmData: any = null;
         const tbmParams = new URLSearchParams();
-        if (tbmId && tbmId !== "today") {
+        if (liveSummary) {
+            tbmParams.set("id", liveSummary.tbmId);
+        } else if (tbmId && tbmId !== "today") {
             tbmParams.set("id", tbmId);
         } else {
             tbmParams.set("limit", "1");
@@ -226,6 +266,7 @@ function WorkerTBMDetailContent() {
         const tbmRes = await fetch(`/api/tbm/today?${tbmParams.toString()}`, { cache: "no-store", credentials: "include" });
         const tbmJson = tbmRes.ok ? await tbmRes.json() as { tbms?: any[] } : { tbms: [] };
         tbmData = tbmJson.tbms?.[0] || null;
+        if (version !== loadVersionRef.current) return;
 
         setTbm(tbmData);
 
@@ -245,7 +286,16 @@ function WorkerTBMDetailContent() {
         if (tbmData) {
             const ackRes = await fetch(`/api/tbm/sign?tbmId=${encodeURIComponent(tbmData.id)}`, { cache: "no-store", credentials: "include" });
             const ackData = ackRes.ok ? await ackRes.json() as { signed?: boolean } : null;
+            if (version !== loadVersionRef.current) return;
             setIsSigned(Boolean(ackData?.signed));
+
+            if (liveSummary?.tbmId === String(tbmData.id)) {
+                // Only the summary is translated for live attendees. Full text is retained
+                // for reference; do not run the old full-audio gate a second time.
+                setTranslating(false);
+                setLoading(false);
+                return;
+            }
 
             if (tbmData.content_ko && lang !== "ko" && !isOffline()) {
                 setTranslating(true);
@@ -255,6 +305,7 @@ function WorkerTBMDetailContent() {
                     lang,
                     // 점진적 콜백: 번역이 하나씩 완료될 때마다 화면 갱신
                     (partial) => {
+                        if (version !== loadVersionRef.current) return;
                         const cleaned = {
                             ...partial,
                             text: cleanupText(partial.text),
@@ -266,6 +317,7 @@ function WorkerTBMDetailContent() {
                     },
                     true,
                 );
+                if (version !== loadVersionRef.current) return;
 
                 // 최종 결과 반영
                 if (!result.pron || result.pron.trim() === "") {
@@ -279,6 +331,7 @@ function WorkerTBMDetailContent() {
                 // 발음·역번역은 본문 표시를 지연시키지 않는다. 본문 전체에 대해 한 번만
                 // 보완 요청하므로 긴 TBM에서 문단마다 추가 API를 호출하던 문제도 제거한다.
                 void translateKo(tbmData.content_ko, lang).then((details) => {
+                    if (version !== loadVersionRef.current) return;
                     if (!details.pron && !details.rev) return;
                     setTransData((current) => ({
                         ...current,
@@ -292,9 +345,13 @@ function WorkerTBMDetailContent() {
         }
 
         setLoading(false);
-    }, [tbmId, urlLang, displayLang]);
+    }, [tbmId, urlLang, displayLang, liveSummary]);
 
-    useEffect(() => { loadTBM(); }, [loadTBM]);
+    useEffect(() => {
+        const versions = loadVersionRef;
+        void loadTBM().catch(() => { setLoading(false); setSummaryWaitLong(true); });
+        return () => { versions.current++; };
+    }, [loadTBM]);
 
     const [hasNewTBM] = useState(false);
 
@@ -310,9 +367,11 @@ function WorkerTBMDetailContent() {
         const estimatedMs = Math.max(3000, textLen * perChar * 1000);
         const minRequiredMs = estimatedMs * 0.7;
         const startedAt = Date.now();
+        const version = loadVersionRef.current;
 
         setIsPlaying(true);
         playPremiumAudio(transData.text, preferredLang, voiceGenderRef.current, () => {
+            if (version !== loadVersionRef.current) return;
             setIsPlaying(false);
             const elapsed = Date.now() - startedAt;
             if (elapsed >= minRequiredMs) {
@@ -322,7 +381,7 @@ function WorkerTBMDetailContent() {
                 // 남은 시간만큼 기다려서 게이트 해제 (실제 청취 강제)
                 const remaining = minRequiredMs - elapsed;
                 console.warn(`[TBM Audio] Early callback detected (${elapsed}ms < ${minRequiredMs.toFixed(0)}ms). Forcing wait.`);
-                setTimeout(() => setIsAudioFinished(true), remaining);
+                setTimeout(() => { if (version === loadVersionRef.current) setIsAudioFinished(true); }, remaining);
             }
         });
     };
@@ -333,7 +392,7 @@ function WorkerTBMDetailContent() {
 
         const t = getUI(preferredLang);
 
-        if (!isAudioFinished) {
+        if (!canSign) {
             alert(t.listenFirst);
             return;
         }
@@ -444,7 +503,11 @@ function WorkerTBMDetailContent() {
                 </header>
 
                 <main className="flex-1 flex flex-col pt-8 pb-32 px-4 md:px-8 max-w-2xl mx-auto w-full gap-8">
-                    {tbmId === "today" && <TbmLiveReceiver siteId={liveSiteId} lang={preferredLang} busyLabel={t.translating} listenLabel={t.voice} onActiveChange={setLiveReceiving} allowQuestions />}
+                    {tbmId === "today" && <TbmLiveReceiver siteId={liveSiteId} lang={preferredLang} busyLabel={t.translating} listenLabel={t.voice} onActiveChange={setLiveReceiving} onSession={onLiveSession} onSummary={setLiveSummary} allowQuestions />}
+                    {!liveReceiving && waitingForSummary && <div role="status" className="rounded-3xl border border-blue-200 bg-blue-50 p-6 font-bold text-blue-900">
+                        <p>{summaryWaitLong ? tbmSummaryUI(preferredLang).failed : tbmSummaryUI(preferredLang).busy}</p>
+                        {summaryWaitLong && <button type="button" className="mt-3 underline" onClick={() => { void loadTBM().catch(() => setLoading(false)); }}>{tbmSummaryUI(preferredLang).retry}</button>}
+                    </div>}
 
                     {fromCache && (
                         <div className="rounded-2xl bg-amber-500/15 border border-amber-400/30 text-amber-200 text-sm px-4 py-3">
@@ -452,7 +515,7 @@ function WorkerTBMDetailContent() {
                         </div>
                     )}
 
-                    {loading ? (
+                    {liveReceiving || waitingForSummary ? null : loading ? (
                         <div className="flex-1 flex items-center justify-center">
                             <div className="w-12 h-12 border-4 border-slate-700 border-t-red-500 rounded-full animate-spin" />
                         </div>
@@ -505,7 +568,7 @@ function WorkerTBMDetailContent() {
 
                                 <div className="space-y-8">
                                     {/* 번역본 (The King) */}
-                                    <div className="space-y-4">
+                                    {!isLiveSummary && <div className="space-y-4">
                                         <div className="flex items-center gap-2">
                                             <span className="w-1.5 h-6 bg-red-500 rounded-full" />
                                             <h3 className="text-sm font-black text-red-400 uppercase tracking-widest">{t.translated}</h3>
@@ -565,18 +628,26 @@ function WorkerTBMDetailContent() {
                                                 )}
                                             </div>
                                         ))}
-                                    </div>
+                                    </div>}
 
                                     {/* 원문 (The Origin) */}
                                     <div className="p-6 bg-white/[0.03] rounded-[32px] border border-white/5 group/orig transition-colors hover:bg-white/[0.05]">
-                                        <TbmReceivedSummary text={tbm.summary_ko} lang={preferredLang} loadingLabel={t.translating} />
-                                        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3">{t.original}</h3>
-                                        <p className="text-lg text-slate-400 font-medium leading-relaxed group-hover/orig:text-slate-300 transition-colors">{tbm.content_ko}</p>
+                                        <TbmReceivedSummary key={summaryKey} text={tbm.summary_ko} lang={preferredLang} loadingLabel={t.translating} onReady={onSummaryReady} />
+                                        {isLiveSummary && !isSigned && <label className="mb-6 flex items-start gap-3 rounded-2xl border border-blue-200 bg-white p-4 font-bold text-blue-900">
+                                            <input type="checkbox" className="mt-1 h-5 w-5 shrink-0" disabled={summaryReadyKey !== summaryKey}
+                                                checked={summaryReviewedKey === summaryKey}
+                                                onChange={event => setSummaryReviewedKey(event.target.checked ? summaryKey : "")} />
+                                            {tbmSummaryUI(preferredLang).read}
+                                        </label>}
+                                        <details open={!isLiveSummary}>
+                                            <summary className="cursor-pointer text-sm font-bold text-slate-500">{t.original}</summary>
+                                            <p className="mt-3 text-lg text-slate-500 font-medium leading-relaxed">{tbm.content_ko}</p>
+                                        </details>
                                     </div>
                                 </div>
 
                                 {/* 🔊 TTS Button */}
-                                <button
+                                {!isLiveSummary && <button
                                     onClick={handlePlayAudio}
                                     disabled={isPlaying || translating}
                                     className="mt-10 w-full py-6 glass rounded-block transition-all tap-effect flex flex-col items-center justify-center gap-2 group/btn border-blue-500/20 hover:border-blue-500/40 hover:bg-blue-500/5 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -607,40 +678,40 @@ function WorkerTBMDetailContent() {
                                             </>
                                         )}
                                     </div>
-                                </button>
+                                </button>}
                             </section>
 
                             {/* ✍️ Signature Section */}
                             {!isSigned && (
-                                <section className={`flex flex-col gap-6 transition-all duration-700 ${isAudioFinished ? 'animate-float opacity-100' : 'opacity-60 grayscale'}`}>
+                                <section className={`flex flex-col gap-6 transition-all duration-700 ${canSign ? 'animate-float opacity-100' : 'opacity-60 grayscale'}`}>
                                     <div className="flex justify-between items-end px-4">
                                         <div className="flex flex-col gap-1">
                                             <div className="flex items-center gap-2">
                                                 <h3 className="text-xl font-black text-white">{t.signHere}</h3>
-                                                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${isAudioFinished ? 'bg-green-500 text-white' : 'bg-red-500 text-white animate-pulse'}`}>
-                                                    {isAudioFinished ? '✅ READY' : '⚠️ ' + t.listenStatus}
+                                                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${canSign ? 'bg-green-500 text-white' : 'bg-red-500 text-white animate-pulse'}`}>
+                                                    {canSign ? '✅' : '⚠️ ' + (isLiveSummary ? tbmSummaryUI(preferredLang).read : t.listenStatus)}
                                                 </span>
                                             </div>
                                             <p className="text-xs text-slate-500 font-bold uppercase tracking-widest tracking-tighter">Your signature will be stored legally</p>
                                         </div>
                                         <button
                                             onClick={() => signaturePadRef.current?.clear()}
-                                            disabled={!isAudioFinished}
+                                            disabled={!canSign}
                                             className="px-5 py-2 glass rounded-xl text-xs font-black text-slate-400 hover:text-white transition-all tap-effect disabled:opacity-30"
                                         >
                                             {t.clear.toUpperCase()}
                                         </button>
                                     </div>
-                                    <div className={`bg-white rounded-[40px] border-[6px] transition-all duration-500 overflow-hidden aspect-[2/1] relative ${isAudioFinished ? 'border-slate-900 shadow-2xl' : 'border-slate-800 opacity-50 pointer-events-none'}`}>
+                                    <div className={`bg-white rounded-[40px] border-[6px] transition-all duration-500 overflow-hidden aspect-[2/1] relative ${canSign ? 'border-slate-900 shadow-2xl' : 'border-slate-800 opacity-50 pointer-events-none'}`}>
                                         <SignatureCanvas
                                             ref={signaturePadRef}
                                             penColor="#0f172a"
                                             canvasProps={{ className: "w-full h-full cursor-crosshair" }}
                                         />
-                                        {!isAudioFinished && (
+                                        {!canSign && (
                                             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center p-6 text-center">
                                                 <p className="text-white text-sm font-black uppercase tracking-widiest leading-relaxed drop-shadow-lg">
-                                                    🔒 {t.listenFirst}
+                                                    🔒 {isLiveSummary ? tbmSummaryUI(preferredLang).read : t.listenFirst}
                                                 </p>
                                             </div>
                                         )}
@@ -670,15 +741,15 @@ function WorkerTBMDetailContent() {
                 </main>
 
                 {/* 🚀 Sticky CTA Button */}
-                {!loading && tbm && (
+                {!loading && tbm && !liveReceiving && !waitingForSummary && (
                     <div className="safe-area-fixed-bottom fixed bottom-0 inset-x-0 md:p-10 pointer-events-none">
                         <div className="max-w-2xl mx-auto pointer-events-auto">
                             <button
                                 onClick={handleSubmit}
-                                disabled={isSigned || isSubmitting || !isAudioFinished}
+                                disabled={isSigned || isSubmitting || !canSign}
                                 className={`w-full py-7 rounded-[32px] text-2xl font-black tracking-tight shadow-3xl transition-all tap-effect flex items-center justify-center gap-4 ${isSigned
                                     ? "bg-slate-900 text-slate-600 border border-white/5"
-                                    : (!isAudioFinished ? "bg-slate-800 text-slate-500 border border-white/5 opacity-50" : "bg-gradient-to-br from-green-400 to-green-600 text-slate-950 shadow-green-500/20")
+                                    : (!canSign ? "bg-slate-800 text-slate-500 border border-white/5 opacity-50" : "bg-gradient-to-br from-green-400 to-green-600 text-slate-950 shadow-green-500/20")
                                     }`}
                             >
                                 {isSubmitting ? (
@@ -690,8 +761,8 @@ function WorkerTBMDetailContent() {
                                         </svg>
                                         <span>{t.signed}</span>
                                     </>
-                                ) : !isAudioFinished ? (
-                                    <span>🔒 {t.listenStatus}</span>
+                                ) : !canSign ? (
+                                    <span>🔒 {isLiveSummary ? tbmSummaryUI(preferredLang).read : t.listenStatus}</span>
                                 ) : (
                                     <>
                                         {t.confirm.split(' ')[0]}

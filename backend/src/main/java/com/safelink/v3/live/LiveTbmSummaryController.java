@@ -67,6 +67,9 @@ public class LiveTbmSummaryController {
         String transcript = jdbc.sql("select text_ko from live_translation_events where session_id=:id and site_id=:site and created_by=:owner order by id")
             .param("id",request.sessionId()).param("site",request.siteId()).param("owner",session.owner())
             .query(String.class).list().stream().collect(java.util.stream.Collectors.joining("\n"));
+        // The owner's drained draft also contains library items and any clips whose live
+        // delivery failed. Never lose these by summarizing only the delivered events.
+        if (request.contentKo() != null) transcript = request.contentKo().trim();
         validateTranscript(transcript);
         if (!properties.isVendorEnabled()) throw new ServiceUnavailableException("ai_vendor_not_configured");
         if (!quota.checkAndIncrement("tbm_summary",request.siteId(),actor.userId()).allowed())
@@ -75,7 +78,7 @@ public class LiveTbmSummaryController {
         var result = vendor.summarizeTbm(transcript);
         String summary = result.text().trim();
         if (summary.isBlank() || summary.length()>12000) throw new ServiceUnavailableException("tbm_summary_invalid");
-        var notice = tbm.createPublished(request.siteId(), actor.userId(), "TBM · AI 요약", summary, "live-summary:"+request.sessionId());
+        var notice = tbm.createPublished(request.siteId(), actor.userId(), "TBM 안전 브리핑", transcript, "live-summary:"+request.sessionId(), summary);
         jdbc.sql("insert into live_tbm_summaries(session_id,site_id,created_by,source_transcript,summary_text,model,tbm_notice_id) values(:id,:site,:owner,:source,:summary,:model,:notice)")
             .param("id",request.sessionId()).param("site",request.siteId()).param("owner",actor.userId())
             .param("source",transcript).param("summary",summary).param("model",result.model()).param("notice",notice.id()).update();
@@ -105,6 +108,9 @@ public class LiveTbmSummaryController {
         if (transcript.length()>60000) throw new IllegalArgumentException("tbm_transcript_too_long");
     }
     private record Session(Long owner,boolean active) {}
-    public record Request(@NotBlank @Size(max=120) String sessionId,@NotNull @Positive Long siteId) {}
+    public record Request(@NotBlank @Size(max=120) String sessionId,@NotNull @Positive Long siteId,
+            @com.fasterxml.jackson.annotation.JsonProperty("content_ko") @Size(max=60000) String contentKo) {
+        public Request(String sessionId, Long siteId) { this(sessionId, siteId, null); }
+    }
     public record Summary(String sessionId,String tbmId,String text) {}
 }

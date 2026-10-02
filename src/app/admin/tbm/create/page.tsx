@@ -1,5 +1,6 @@
 "use client";
 import { tbmDraftSummaryUI } from "@/lib/tbm-draft-summary-ui";
+import { tbmSummaryUI } from "@/lib/tbm-summary-ui";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -169,10 +170,14 @@ function AdminTBMCreateContent() {
     }, [draftTextarea, resizeDraft]);
     const [summaryText, setSummaryText] = useState("");
     const [summarySource, setSummarySource] = useState("");
-    const [summaryEnabled, setSummaryEnabled] = useState(false);
     const [summaryBusy, setSummaryBusy] = useState(false);
     const [summaryError, setSummaryError] = useState(false);
-    const [summaryRetry, setSummaryRetry] = useState(0);
+    const [liveFinalizing, setLiveFinalizing] = useState(false);
+    const [liveCompleted, setLiveCompleted] = useState(false);
+    const finalDraftRef = useRef("");
+    // Updated by STT synchronously, including the final callback before React renders.
+    const draftRef = useRef(tbmText);
+    draftRef.current = tbmText;
     const [isDraining, setIsDraining] = useState(false);
     const recordingActionRef = useRef(false);
     const [isSending, setIsSending] = useState(false);
@@ -232,11 +237,12 @@ function AdminTBMCreateContent() {
     }, [userId]);
 
     const handleLibrarySelect = useCallback((text: string) => {
+        if (liveFinalizing) return;
         setTbmText((prev) => {
             const base = prev.trim();
             return base ? base + "\n\n" + text : text;
         });
-    }, []);
+    }, [liveFinalizing]);
 
     useEffect(() => {
         if (!userId) return;
@@ -275,7 +281,8 @@ function AdminTBMCreateContent() {
         const liveText = cleanTbmTranscriptFragment(text);
         if (!liveText) return;
         setSttError(null);
-        setTbmText((prev) => appendTbmTranscript(prev, liveText));
+        draftRef.current = appendTbmTranscript(draftRef.current, liveText);
+        setTbmText(draftRef.current);
         // 라이브 STT는 1초 안팎의 조각마다 임의의 마침표를 붙일 수 있다.
         // 그 값을 그대로 전송하면 수신 화면에서 단어마다 문장이 끊긴 것처럼 보인다.
         try {
@@ -317,6 +324,25 @@ function AdminTBMCreateContent() {
         }
     };
 
+    const completeLiveTbm = async () => {
+        setSummaryBusy(true);
+        setSummaryError(false);
+        try {
+            const { normalized, changes } = await normalizeKoAsync(finalDraftRef.current.trim());
+            const result = await broadcaster.current.complete(normalized);
+            setSummaryText(result.text);
+            setSummarySource(finalDraftRef.current);
+            setNormalizeResult({ normalized, changes });
+            setLiveCompleted(true);
+            setBroadcastResult({ type: "success", message: tbmSummaryUI(displayLang || adminLang).done });
+            void fetchHistory();
+        } catch {
+            setSummaryError(true);
+        } finally {
+            setSummaryBusy(false);
+        }
+    };
+
     const handleRecording = async () => {
         if (recordingActionRef.current) return;
         recordingActionRef.current = true;
@@ -325,13 +351,17 @@ function AdminTBMCreateContent() {
             if (isRecording) {
                 setIsDraining(true);
                 await stopAndDrain();
-                try {
-                    await broadcaster.current.stop();
-                } catch (error) {
-                    showBroadcastError(error);
-                }
+                finalDraftRef.current = draftRef.current;
+                setLiveFinalizing(true);
+                await broadcaster.current.stop().catch(() => {}); // complete retries a failed stop
                 setBroadcastActive(false);
-                setSummaryEnabled(true);
+                setIsDraining(false);
+                if (!finalDraftRef.current.trim()) {
+                    setLiveFinalizing(false);
+                    setSttError(getBroadcastErrorMessage(displayLang || adminLang, "content_required"));
+                    return;
+                }
+                await completeLiveTbm();
             } else {
                 if (!adminSiteId) {
                     setSttError("방송할 현장 정보를 확인하지 못했습니다. 다시 로그인한 뒤 시도해 주세요.");
@@ -353,7 +383,14 @@ function AdminTBMCreateContent() {
                     return;
                 }
                 setBroadcastActive(true);
-                setSummaryEnabled(false);
+                if (liveCompleted) {
+                    draftRef.current = "";
+                    setTbmText("");
+                }
+                setLiveFinalizing(false);
+                setLiveCompleted(false);
+                setSummaryError(false);
+                setBroadcastResult(null);
                 setSummaryText("");
                 setSummarySource("");
                 const started = await toggleRecording();
@@ -373,43 +410,6 @@ function AdminTBMCreateContent() {
             recordingActionRef.current = false;
         }
     };
-
-    useEffect(() => {
-        setSummaryText("");
-        setSummarySource("");
-        setSummaryError(false);
-        if (!summaryEnabled || isRecording || isDraining || !tbmText.trim()) {
-            setSummaryBusy(false);
-            return;
-        }
-        const controller = new AbortController();
-        let cancelled = false;
-        setSummaryBusy(true);
-        const timer = setTimeout(async () => {
-            const timeout = setTimeout(() => controller.abort(), 35000);
-            try {
-                if (!adminSiteId) throw new Error("site_required");
-                const res = await fetch("/api/tbm/summary", {
-                    method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ siteId: Number(adminSiteId), text: tbmText.trim() }),
-                    signal: controller.signal,
-                });
-                if (!res.ok) throw new Error("summary_failed");
-                const data = await res.json() as { text?: string };
-                if (!data.text?.trim()) throw new Error("summary_empty");
-                if (!cancelled) {
-                    setSummaryText(data.text);
-                    setSummarySource(tbmText);
-                }
-            } catch {
-                if (!cancelled) setSummaryError(true);
-            } finally {
-                clearTimeout(timeout);
-                if (!cancelled) setSummaryBusy(false);
-            }
-        }, 700);
-        return () => { cancelled = true; clearTimeout(timer); controller.abort(); };
-    }, [summaryEnabled, isRecording, isDraining, tbmText, adminSiteId, summaryRetry]);
 
     // ── 녹음 경과 시간 (isRecording 선언 후) ──
     const [recSeconds, setRecSeconds] = useState(0);
@@ -434,7 +434,7 @@ function AdminTBMCreateContent() {
     };
 
     const handleSendTBM = async () => {
-        if (isRecording || isDraining || summaryBusy || (summaryEnabled && (summarySource !== tbmText || !summaryText.trim()))) return;
+        if (liveFinalizing || isRecording || isDraining || summaryBusy) return;
         if (!tbmText.trim()) return;
         setIsSending(true);
         setBroadcastResult(null);
@@ -556,7 +556,7 @@ function AdminTBMCreateContent() {
                         <div className="glass tbm-compose-panel rounded-[48px] p-8 border-white/10 shadow-3xl flex flex-col gap-6 relative min-h-[400px]">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">{t.koreanDraft}</h3>
-                                <button onClick={handleRecording} disabled={isDraining || isSending || broadcastBusy || !adminSiteId} className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all tap-effect relative ${isRecording ? "bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)]" : "glass border-white/10 text-slate-400 hover:text-white"}`}>
+                                <button onClick={handleRecording} disabled={isDraining || isSending || broadcastBusy || summaryBusy || (liveFinalizing && !liveCompleted) || !adminSiteId} className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all tap-effect relative ${isRecording ? "bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)]" : "glass border-white/10 text-slate-400 hover:text-white"}`}>
                                     {isRecording && (
                                         <span className="absolute inset-0 rounded-full bg-red-500/40 animate-ping" />
                                     )}
@@ -579,21 +579,22 @@ function AdminTBMCreateContent() {
                                 ref={setDraftTextarea}
                                 rows={5}
                                 value={tbmText}
+                                readOnly={liveFinalizing}
                                 onChange={(e) => setTbmText(e.target.value)}
                                 placeholder={isRecording ? `${t.listening} [${displayLang || adminLang}]` : t.placeholder}
                                 className="w-full min-h-[180px] shrink-0 overflow-hidden bg-transparent text-2xl md:text-3xl font-bold text-white placeholder-slate-800 outline-none resize-none leading-snug tracking-tight"
                             />
 
-                            {(summaryEnabled || isDraining) && <section className="rounded-2xl border border-blue-200 bg-white p-5 text-slate-900">
+                            {(isDraining || liveFinalizing) && <section className="rounded-2xl border border-blue-200 bg-white p-5 text-slate-900">
                                 <label htmlFor="tbm-summary-draft" className="block font-bold mb-3">{summaryUI.title}</label>
                                 {(summaryBusy || isDraining) && <p role="status" className="text-blue-800">{summaryUI.busy}</p>}
                                 {summaryError && <div role="status" className="text-red-800">
-                                    <p>{summaryUI.failed}</p>
-                                    <button type="button" onClick={() => setSummaryRetry(v => v + 1)} className="mt-2 rounded-xl bg-blue-700 px-4 py-2 text-white">{summaryUI.retry}</button>
+                                    <p>{tbmSummaryUI(displayLang || adminLang).failed}</p>
+                                    <button type="button" disabled={summaryBusy} onClick={() => void completeLiveTbm()} className="mt-2 rounded-xl bg-blue-700 px-4 py-2 text-white">{summaryUI.retry}</button>
                                 </div>}
                                 <textarea id="tbm-summary-draft" value={summarySource === tbmText ? summaryText : ""}
                                     onChange={e => setSummaryText(e.target.value)}
-                                    disabled={summaryBusy || isDraining || summarySource !== tbmText}
+                                    disabled={summaryBusy || isDraining || liveCompleted || summarySource !== tbmText}
                                     rows={6} className="w-full rounded-xl border border-slate-300 bg-white p-4 text-base leading-relaxed text-slate-900 disabled:opacity-60" />
                             </section>}
 
@@ -648,7 +649,7 @@ function AdminTBMCreateContent() {
                             )}
 
                             <div className="mt-auto pt-6 border-t border-white/5 flex flex-col gap-3">
-                                <button onClick={handleSendTBM} disabled={isSending || !tbmText.trim() || isRecording || isDraining || summaryBusy || (summaryEnabled && (summarySource !== tbmText || !summaryText.trim()))} className="w-full py-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-[32px] text-2xl font-black text-slate-950 shadow-[0_20px_50px_-15px_rgba(59,130,246,0.4)] tap-effect flex items-center justify-center gap-4 disabled:opacity-30 disabled:grayscale transition-all">
+                                <button onClick={handleSendTBM} disabled={liveFinalizing || isSending || !tbmText.trim() || isRecording || isDraining || summaryBusy} className="w-full py-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-[32px] text-2xl font-black text-slate-950 shadow-[0_20px_50px_-15px_rgba(59,130,246,0.4)] tap-effect flex items-center justify-center gap-4 disabled:opacity-30 disabled:grayscale transition-all">
                                     {isSending ? <div className="w-8 h-8 border-4 border-slate-950 border-t-transparent rounded-full animate-spin" /> : <><svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>{t.pushBtn}</>}
                                 </button>
                                 <button

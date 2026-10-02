@@ -14,6 +14,16 @@ GitHub Actions의 `Deploy SQ Link V3 production` workflow는 `refactor/v3-commer
 
 ## 비밀값 관리 기준
 
+### 2026-10-02 TBM 종료·요약·서명 배포
+
+- 사용자 승인: TBM 연속 흐름 수정분을 프론트/백엔드 함께 배포하고 변경 전후를 안내한다.
+- 변경 전: 종료 후 요약은 작성 화면에 생성되지만 최종 전파는 별도이며, 근로자 화면의 새 공지 수신/서명 청취 조건이 라이브 종료와 연결되지 않았다.
+- 변경 후: 종료 시 마지막 STT 큐 처리 후 서버가 원문과 요약을 별도 저장하고 자동 전파한다. 근로자는 같은 방송 ID의 요약을 같은 화면에서 번역·확인하고 직접 서명한다. 전체 음성을 다시 듣는 단계는 라이브 참석 연속 흐름에서 제외한다.
+- 기존 일반 공지 청취 조건, 현장/발송자 권한, 임시 근로자 제한, 서명 저장소 유지. 새 마이그레이션/키/공급자/APK 변경 없음.
+- 배포 전 확인: 최근 15분 이내 활동한 활성 방송 0건, 기존 release `d3fd23f15bfb2d333084d3c9a4a66fef4d6e5c18`, 두 서비스 active.
+- 로컬 검증: 백엔드 88개 통과(건너뜀 0), 프론트 11개 테스트 통과, 타입/ESLint 검사 통과. 중국어 근로자 화면에서 요약 이벤트 유실 polling 복구·번역 실패 후 재시도·확인 및 서명 브라우저 검사 통과.
+- 배포용 standalone 패키징은 GitHub Actions의 깨끗한 체크아웃에서 재검증한다. 성공한 빌드만 운영에 전송한다. 성공 여부는 해당 커밋의 Actions 실행과 운영 `current` release, readiness로 확인한다.
+
 ### GitHub Actions Secrets
 
 GitHub 저장소 **Settings → Secrets and variables → Actions → Secrets**에 아래 세 값만 넣는다.

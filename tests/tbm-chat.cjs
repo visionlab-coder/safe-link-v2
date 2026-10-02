@@ -46,5 +46,5 @@ test("live sender is taken from session API/events, never the previous published
   const page = fs.readFileSync("src/app/worker/tbm/[id]/page.tsx", "utf8");
   assert.match(page, /!liveReceiving && <TbmQuestionLink adminId=\{tbm.created_by\}/);
   assert.equal(page.match(/<TbmLiveReceiver /g).length, 1);
-  assert.ok(page.indexOf("<TbmLiveReceiver ") < page.indexOf("{loading ?")); // live works before first publication
+  assert.ok(page.indexOf("<TbmLiveReceiver ") < page.indexOf("{liveReceiving || waitingForSummary ?")); // live works before first publication
 });

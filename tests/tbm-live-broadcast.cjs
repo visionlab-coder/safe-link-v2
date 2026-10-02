@@ -47,3 +47,24 @@ test("start failure does not publish, send failure does not prevent stop", async
   await broadcaster.stop();
   assert.deepEqual(methods, ["POST", "POST", "DELETE"]);
 });
+test("completion stops first and retries the same summary session after a timeout", async () => {
+  const calls = [];
+  let summaryAttempts = 0;
+  const broadcaster = new TbmLiveBroadcast(async (url, options) => {
+    calls.push({ url, ...options });
+    if (url.includes('/summary')) {
+      if (++summaryAttempts === 1) throw new Error('network timeout');
+      const body = JSON.parse(options.body);
+      return { ok: true, json: async () => ({sessionId: body.sessionId, tbmId: '9', text: '- 요약'}) };
+    }
+    return {ok: true};
+  });
+  await broadcaster.start('2');
+  await broadcaster.publish('last clip');
+  await assert.rejects(broadcaster.complete('drained draft including library'));
+  const summary = await broadcaster.complete('drained draft including library');
+  assert.equal(summary.tbmId, '9');
+  assert.equal(calls[2].method, 'DELETE');
+  assert.deepEqual(JSON.parse(calls[3].body), JSON.parse(calls[4].body));
+  assert.equal(JSON.parse(calls[4].body).content_ko, 'drained draft including library');
+});

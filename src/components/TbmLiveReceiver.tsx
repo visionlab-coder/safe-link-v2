@@ -4,14 +4,17 @@ import { stripForSpeech } from "@/utils/tts";
 import { appendTbmTranscript, cleanTbmTranscriptFragment } from "@/utils/tbm-transcript";
 import TbmQuestionLink from "@/components/TbmQuestionLink";
 import { tbmAdminId } from "@/lib/tbm-chat";
+import { matchedTbmSummary, type TbmLiveSummary } from "@/lib/tbm-live-completion";
 
 /** Live events only: never fetch or replay historical utterances. */
-export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, onActiveChange, allowQuestions = false }: {
+export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, onActiveChange, onSession, onSummary, allowQuestions = false }: {
   siteId: string | null;
   lang: string;
   busyLabel: string;
   listenLabel: string;
   onActiveChange?: (active: boolean) => void;
+  onSession?: (sessionId: string) => void;
+  onSummary?: (summary: TbmLiveSummary) => void;
   allowQuestions?: boolean;
 }) {
   const [active, setActive] = useState(false);
@@ -23,6 +26,9 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
   const [failed, setFailed] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+  const callbacks = useRef({ onSession, onSummary });
+  callbacks.current = { onSession, onSummary };
+  const observation = useRef<{ siteId: string; sessionId: string } | null>(null);
 
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ block: "nearest" });
@@ -35,6 +41,10 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
   useEffect(() => {
     if (!siteId) return;
     let disposed = false, session: string | null = null, generation = 0;
+    // Keep the pending handoff when the display language changes, never across sites.
+    let observedSession: string | null = observation.current?.siteId === siteId ? observation.current.sessionId : null;
+    let completedSession: string | null = null;
+    let checkingSummary = false;
     let audioQueue = Promise.resolve();
     let speakingTimer: ReturnType<typeof setTimeout> | null = null;
     let sentenceCommitTimer: ReturnType<typeof setTimeout> | null = null;
@@ -52,6 +62,12 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
       setBroadcasterId(id ? tbmAdminId(startedBy) : null);
       if (session === id) return;
       session = id; generation++; seen.clear(); setLines([]); setActive(Boolean(id)); setSpeaking(false);
+      if (id) {
+        observedSession = id;
+        observation.current = { siteId, sessionId: id };
+        completedSession = null;
+        callbacks.current.onSession?.(id);
+      }
       activeLineId = null; activeSource = ""; activeRevision = 0;
       committedLineIds.clear(); spokenLineIds.clear(); latestTextByLine.clear(); latestRevisionByLine.clear();
       displayedRevisionByLine.clear();
@@ -99,6 +115,35 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
     const normalizeFragment = cleanTbmTranscriptFragment;
     const appendFragment = appendTbmTranscript;
     const events = new EventSource("/api/live/events?" + new URLSearchParams({ type: "translations", siteId }));
+    const checkSummary = async () => {
+      const expected = observedSession;
+      if (!expected || completedSession === expected || checkingSummary) return;
+      checkingSummary = true;
+      const timeout = new AbortController();
+      const timer = setTimeout(() => timeout.abort(), 10000);
+      try {
+        const response = await fetch("/api/live/summary?" + new URLSearchParams({ sessionId: expected, siteId }), {
+          cache: "no-store", signal: timeout.signal,
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        const summary = matchedTbmSummary(data.summary, expected);
+        if (disposed || expected !== observedSession || !summary) return;
+        completedSession = expected;
+        // End the live audio queue, not replay the final notice as another recording.
+        generation++;
+        audioRef.current?.pause();
+        if (sentenceCommitTimer) { clearTimeout(sentenceCommitTimer); sentenceCommitTimer = null; }
+        if (speakingTimer) { clearTimeout(speakingTimer); speakingTimer = null; }
+        activeLineId = null;
+        session = null;
+        setActive(false); setSpeaking(false);
+        callbacks.current.onSummary?.(summary);
+      } catch { /* polling recovers SSE loss, backgrounding and delayed publication */ }
+      finally { clearTimeout(timer); checkingSummary = false; }
+    };
+    events.addEventListener("tbm-summary", () => { void checkSummary(); });
+    const summaryPoll = setInterval(() => { void checkSummary(); }, 3000);
     let lifecycleVersion = 0;
     events.addEventListener("broadcast-start", event => {
       lifecycleVersion++;
@@ -188,7 +233,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
           reset(id?.startsWith("tbm_") ? id : null, data.session?.started_by);
         }).catch(() => {});
     };
-    return () => { disposed = true; generation++; if (speakingTimer) clearTimeout(speakingTimer); if (sentenceCommitTimer) clearTimeout(sentenceCommitTimer); abort.abort(); events.close(); audioRef.current?.pause(); audioRef.current = null; };
+    return () => { disposed = true; generation++; clearInterval(summaryPoll); if (speakingTimer) clearTimeout(speakingTimer); if (sentenceCommitTimer) clearTimeout(sentenceCommitTimer); abort.abort(); events.close(); audioRef.current?.pause(); audioRef.current = null; };
   }, [siteId, lang]);
   if (!active) return null;
 

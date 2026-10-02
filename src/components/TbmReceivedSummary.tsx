@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 const labels: Record<string, string[]> = {"ko":["요약본","요약 번역 실패 — 다시 시도"],"en":["Summary","Summary translation failed — retry"],"zh":["摘要","摘要翻译失败 — 重试"],"vi":["Tóm tắt","Dịch tóm tắt thất bại — thử lại"],"km":["សេចក្តីសង្ខេប","ការបកប្រែបរាជ័យ — ព្យាយាមម្តងទៀត"],"th":["สรุป","แปลสรุปไม่สำเร็จ — ลองอีกครั้ง"],"id":["Ringkasan","Terjemahan gagal — coba lagi"],"uz":["Xulosa","Tarjima bajarilmadi — qayta urinish"],"ph":["Buod","Nabigo ang pagsasalin — subukang muli"],"mn":["Хураангуй","Орчуулга амжилтгүй — дахин оролдох"],"my":["အကျဉ်းချုပ်","ဘာသာပြန်မရပါ — ထပ်ကြိုးစားရန်"],"ne":["सारांश","अनुवाद असफल — फेरि प्रयास"],"bn":["সারসংক্ষেপ","অনুবাদ ব্যর্থ — আবার চেষ্টা"],"kk":["Қорытынды","Аударма сәтсіз — қайта көру"],"ru":["Итог","Ошибка перевода — повторить"],"jp":["要約","翻訳失敗 — 再試行"],"fr":["Résumé","Échec de traduction — réessayer"],"es":["Resumen","Error de traducción — reintentar"],"ar":["الملخص","فشلت الترجمة — إعادة المحاولة"],"hi":["सारांश","अनुवाद विफल — फिर कोशिश करें"]};
 
-export default function TbmReceivedSummary({ text, lang, loadingLabel }: { text?: string; lang: string; loadingLabel: string }) {
+export default function TbmReceivedSummary({ text, lang, loadingLabel, onReady }: { text?: string; lang: string; loadingLabel: string; onReady?: (ready: boolean) => void }) {
     const [result, setResult] = useState<{ source: string; lang: string; text: string } | null>(null);
     const [failed, setFailed] = useState(false);
     const [retry, setRetry] = useState(0);
@@ -29,9 +29,10 @@ export default function TbmReceivedSummary({ text, lang, loadingLabel }: { text?
         })();
         return () => { cancelled = true; clearTimeout(timeout); controller.abort(); };
     }, [text, lang, retry]);
+    const translated = lang === "ko" ? text : result && result.source === text && result.lang === lang ? result.text : "";
+    useEffect(() => { onReady?.(Boolean(translated)); }, [translated, onReady]);
     if (!text) return null;
     const [title, error] = labels[lang] || labels.en;
-    const translated = lang === "ko" ? text : result?.source === text && result.lang === lang ? result.text : "";
     return <section className="mb-6 rounded-3xl border border-blue-200 bg-blue-50 p-6 text-slate-900" aria-live="polite">
         <h3 className="mb-3 text-lg font-bold">{title}</h3>
         {translated ? <p className="whitespace-pre-wrap break-words text-xl font-bold leading-relaxed">{translated}</p>

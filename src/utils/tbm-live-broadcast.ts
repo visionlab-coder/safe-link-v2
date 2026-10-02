@@ -1,15 +1,16 @@
 /** Preserve STT callback order, and drain before announcing the end of a broadcast. */
 export class TbmLiveBroadcast {
   private session: { sessionId: string; siteId: string } | null = null;
+  private stoppedSession: { sessionId: string; siteId: string } | null = null;
   private queue: Promise<void> = Promise.resolve();
   constructor(private request: typeof fetch = fetch) {}
 
-  private async requestWithTimeout(input: RequestInfo | URL, init: RequestInit) {
+  private async requestWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs = 10_000) {
     // AbortSignal.timeout()은 일부 iOS/Android WebView에 없어 fetch 이전에 예외가 난다.
     // AbortController까지 없는 구형 WebView에서는 요청 자체를 우선 보장한다.
     if (typeof AbortController === "undefined") return this.request.call(globalThis, input, init);
     const controller = new AbortController();
-    const timeout = globalThis.setTimeout(() => controller.abort(), 10_000);
+    const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
     try {
       // window.fetch는 반드시 window를 this로 유지해 호출해야 한다.
       return await this.request.call(globalThis, input, { ...init, signal: controller.signal });
@@ -40,6 +41,7 @@ export class TbmLiveBroadcast {
       throw new Error(`broadcast_start_failed_${response.status}`);
     }
     this.session = session;
+    this.stoppedSession = null;
   }
   async announceSpeaking() {
     const session = this.session;
@@ -80,6 +82,24 @@ export class TbmLiveBroadcast {
       console.error("[TBM live] session stop rejected", { status: response.status, detail, session });
       throw new Error(`broadcast_stop_failed_${response.status}`);
     }
+    this.stoppedSession = session;
     this.session = null;
+  }
+
+  async complete(content: string): Promise<{ sessionId: string; tbmId: string; text: string }> {
+    // Retry a failed stop first; reuse the same server session for idempotent publication.
+    await this.stop();
+    const session = this.stoppedSession;
+    if (!session) throw new Error("broadcast_session_required");
+    const response = await this.requestWithTimeout("/api/live/summary", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...session, content_ko: content }),
+    }, 65_000);
+    if (!response.ok) throw new Error(`broadcast_summary_failed_${response.status}`);
+    const result = await response.json();
+    if (result.sessionId !== session.sessionId || !result.tbmId || !result.text?.trim()) {
+      throw new Error("broadcast_summary_invalid");
+    }
+    return result;
   }
 }
