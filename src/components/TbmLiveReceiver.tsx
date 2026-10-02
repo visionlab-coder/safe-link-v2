@@ -5,13 +5,19 @@ import { appendTbmTranscript, cleanTbmTranscriptFragment } from "@/utils/tbm-tra
 import TbmQuestionLink from "@/components/TbmQuestionLink";
 import { tbmAdminId } from "@/lib/tbm-chat";
 import { matchedTbmSummary, type TbmLiveSummary } from "@/lib/tbm-live-completion";
+import { joinTbmLive } from "@/utils/tbm-participation";
+import { tbmLiveStateUI } from "@/lib/tbm-summary-ui";
+import TbmFullTranscript from "@/components/TbmFullTranscript";
 
 /** Live events only: never fetch or replay historical utterances. */
-export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, onActiveChange, onSession, onSummary, allowQuestions = false }: {
+export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, translatedLabel, originalLabel, pending = false, onActiveChange, onSession, onSummary, allowQuestions = false }: {
   siteId: string | null;
   lang: string;
   busyLabel: string;
   listenLabel: string;
+  translatedLabel: string;
+  originalLabel: string;
+  pending?: boolean;
   onActiveChange?: (active: boolean) => void;
   onSession?: (sessionId: string) => void;
   onSummary?: (summary: TbmLiveSummary) => void;
@@ -21,6 +27,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
   const [broadcasterId, setBroadcasterId] = useState<string | null>(null);
   const [speaking, setSpeaking] = useState(false);
   const [lines, setLines] = useState<Array<{ id: string; source: string; translated?: string }>>([]);
+  const [editedDraft, setEditedDraft] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -45,6 +52,16 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
     let observedSession: string | null = observation.current?.siteId === siteId ? observation.current.sessionId : null;
     let completedSession: string | null = null;
     let checkingSummary = false;
+    let registeredSession: string | null = null;
+    let registering = false;
+    let draftRevision = 0;
+    let checkingDraft = false;
+    const register = async (id: string) => {
+      if (registering || registeredSession === id) return;
+      registering = true;
+      try { if (await joinTbmLive(id, siteId)) registeredSession = id; }
+      finally { registering = false; }
+    };
     let audioQueue = Promise.resolve();
     let speakingTimer: ReturnType<typeof setTimeout> | null = null;
     let sentenceCommitTimer: ReturnType<typeof setTimeout> | null = null;
@@ -63,10 +80,13 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
       if (session === id) return;
       session = id; generation++; seen.clear(); setLines([]); setActive(Boolean(id)); setSpeaking(false);
       if (id) {
+        draftRevision = 0;
+        setEditedDraft(null);
         observedSession = id;
         observation.current = { siteId, sessionId: id };
         completedSession = null;
         callbacks.current.onSession?.(id);
+        void register(id);
       }
       activeLineId = null; activeSource = ""; activeRevision = 0;
       committedLineIds.clear(); spokenLineIds.clear(); latestTextByLine.clear(); latestRevisionByLine.clear();
@@ -115,6 +135,36 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
     const normalizeFragment = cleanTbmTranscriptFragment;
     const appendFragment = appendTbmTranscript;
     const events = new EventSource("/api/live/events?" + new URLSearchParams({ type: "translations", siteId }));
+    const acceptDraft = (draft: { sessionId?: string; content?: unknown; revision?: number }) => {
+      if (disposed || !observedSession || draft.sessionId !== observedSession || completedSession === observedSession
+          || typeof draft.content !== "string" || !draft.revision || draft.revision <= draftRevision) return;
+      draftRevision = draft.revision;
+      // Corrections replace the displayed document; never replay the entire corrected TBM.
+      setEditedDraft(draft.content);
+      generation++;
+      audioRef.current?.pause();
+      if (sentenceCommitTimer) { clearTimeout(sentenceCommitTimer); sentenceCommitTimer = null; }
+      activeLineId = null; activeSource = ""; activeRevision = 0;
+      setBusy(false); setSpeaking(false);
+    };
+    const checkDraft = async () => {
+      const expected = observedSession;
+      if (!expected || completedSession === expected || checkingDraft) return;
+      checkingDraft = true;
+      const timeout = new AbortController();
+      const timer = setTimeout(() => timeout.abort(), 10000);
+      try {
+        const response = await fetch("/api/live/tbm-draft?" + new URLSearchParams({sessionId: expected, siteId}), {cache: "no-store", signal: timeout.signal});
+        if (response.ok && observedSession === expected) {
+          const data = await response.json();
+          if (data.draft) acceptDraft(data.draft);
+        }
+      } catch { /* next poll recovers a missed edit */ }
+      finally { clearTimeout(timer); checkingDraft = false; }
+    };
+    events.addEventListener("tbm-draft", event => {
+      try { acceptDraft(JSON.parse((event as MessageEvent).data)); } catch { /* malformed */ }
+    });
     const checkSummary = async () => {
       const expected = observedSession;
       if (!expected || completedSession === expected || checkingSummary) return;
@@ -143,7 +193,11 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
       finally { clearTimeout(timer); checkingSummary = false; }
     };
     events.addEventListener("tbm-summary", () => { void checkSummary(); });
-    const summaryPoll = setInterval(() => { void checkSummary(); }, 3000);
+    const summaryPoll = setInterval(() => {
+      if (session) void register(session);
+      void checkDraft();
+      void checkSummary();
+    }, 3000);
     let lifecycleVersion = 0;
     events.addEventListener("broadcast-start", event => {
       lifecycleVersion++;
@@ -151,6 +205,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
         const data = JSON.parse((event as MessageEvent).data);
         const id = data.session_id as string;
         reset(id?.startsWith("tbm_") ? id : null, data.started_by);
+        void checkDraft();
       } catch { /* ignore malformed events */ }
     });
     events.addEventListener("broadcast-stop", event => {
@@ -158,7 +213,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
       try {
         if (JSON.parse((event as MessageEvent).data).session_id === session) {
           finalizeCurrentSentence();
-          session = null; setActive(false); setSpeaking(false); setBroadcasterId(null); // drain already received final speech
+          session = null; setActive(false); setSpeaking(false); // retain this TBM's speaker and transcript until publication
         }
       } catch { /* ignore malformed events */ }
     });
@@ -191,7 +246,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
         setLines(previous => {
           const existing = previous.find(line => line.id === lineId);
           if (existing) return previous.map(line => line.id === lineId ? { ...line, source, translated: lang === "ko" ? source : line.translated } : line);
-          return [...previous.slice(-7), { id: lineId, source, translated: lang === "ko" ? source : undefined }];
+          return [...previous, { id: lineId, source, translated: lang === "ko" ? source : undefined }];
         });
         if (sentenceCommitTimer) clearTimeout(sentenceCommitTimer);
         // 네트워크·번역 처리 간격이 1초를 넘을 수 있으므로, 짧은 STT 조각을
@@ -231,28 +286,49 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
           if (disposed || lifecycleVersion !== version || !data) return;
           const id = data.active ? data.session?.session_id : null;
           reset(id?.startsWith("tbm_") ? id : null, data.session?.started_by);
+          void checkDraft();
+          if (!id && !observedSession) {
+            // A reload between recording-stop and manual publication keeps the same pending session.
+            void fetch("/api/live/tbm-participation?" + new URLSearchParams({ siteId }), { cache: "no-store", signal: abort.signal })
+              .then(response => response.ok ? response.json() : null).then(participation => {
+                if (disposed || lifecycleVersion !== version || observedSession || !participation?.attended || !participation.sessionId) return;
+                observedSession = participation.sessionId;
+                observation.current = { siteId, sessionId: participation.sessionId };
+                callbacks.current.onSession?.(participation.sessionId);
+                void checkDraft();
+                void checkSummary();
+              }).catch(() => {});
+          }
         }).catch(() => {});
     };
     return () => { disposed = true; generation++; clearInterval(summaryPoll); if (speakingTimer) clearTimeout(speakingTimer); if (sentenceCommitTimer) clearTimeout(sentenceCommitTimer); abort.abort(); events.close(); audioRef.current?.pause(); audioRef.current = null; };
   }, [siteId, lang]);
-  if (!active) return null;
+  if (!active && !pending) return null;
+  const status = tbmLiveStateUI(lang);
 
-  return <div className="space-y-4" aria-label="TBM live translation">
-    <div className="flex items-center justify-between gap-3">
-      <p role="status" className="text-sm font-bold text-red-300">{speaking || busy ? busyLabel : ""}</p>
-      <button type="button" className="shrink-0 rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-sm font-black text-blue-200" aria-label={listenLabel} onClick={() => {
+  return <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-label="TBM live translation">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+      <div className="flex items-center gap-3">
+        <h2 className="text-lg font-extrabold text-slate-900">{translatedLabel}</h2>
+        <span data-testid="tbm-live-state" role="status" className={`rounded-full px-3 py-1.5 text-xs font-bold ${active ? "bg-red-50 text-red-700" : "bg-slate-100 text-slate-700"}`}>{active ? status.live : status.pending}</span>
+      </div>
+      <button type="button" className="min-h-11 shrink-0 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-900" aria-label={listenLabel} onClick={() => {
         void audioRef.current?.play().then(() => setAudioBlocked(false)).catch(() => setAudioBlocked(true));
       }}>🔊 {audioBlocked ? "▶" : listenLabel}</button>
     </div>
-    {failed && <p role="status" className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-bold text-amber-200">{lang === "ko" ? "일부 통역 또는 음성을 처리하지 못했습니다. 최종 TBM 내용을 확인해 주세요." : "⚠"}</p>}
-    <div className="max-h-[26rem] space-y-4 overflow-y-auto pr-1" aria-live="polite">
-      {lines.length === 0 && <div className="h-20 flex items-center gap-4 bg-white/5 rounded-3xl px-6 animate-pulse-soft"><div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin" /><span className="text-slate-400 font-bold">{busyLabel}</span></div>}
-      {lines.slice(-8).map(line => <div key={line.id} className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-        {lang !== "ko" && <p className="mb-2 text-sm font-semibold text-slate-400">{line.source}</p>}
-        <p className="text-2xl md:text-4xl font-black text-white leading-[1.2]">{line.translated ?? busyLabel}</p>
+    {failed && <p role="status" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">{lang === "ko" ? "일부 통역 또는 음성을 처리하지 못했습니다. 최종 TBM 내용을 확인해 주세요." : "⚠"}</p>}
+    {editedDraft !== null ? <div aria-live="polite" data-testid="tbm-live-edited-draft"><TbmFullTranscript text={editedDraft} lang={lang} enabled translatedLabel={translatedLabel} originalLabel={originalLabel} loadingLabel={busyLabel} /></div> : <div className="space-y-3" aria-live="polite">
+      {lines.length === 0 && <div className="flex min-h-32 items-center justify-center gap-3 rounded-2xl bg-slate-50 p-5">{active && <div className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />}<span className="font-semibold text-slate-700">{active ? busyLabel : status.pending}</span></div>}
+      {lines.map((line, index, visible) => <div key={line.id} className={`rounded-2xl p-4 ${index === visible.length - 1 ? "border border-blue-200 bg-blue-50" : "bg-slate-50"}`}>
+        <p dir="auto" className="whitespace-pre-wrap break-words text-xl font-bold leading-relaxed text-slate-900 sm:text-2xl">{line.translated ?? busyLabel}</p>
       </div>)}
+      {active && (speaking || busy) && lines.length > 0 && <p role="status" className="text-sm font-semibold text-slate-600">{busyLabel}</p>}
       <div ref={transcriptEndRef} />
-    </div>
-    {allowQuestions && <TbmQuestionLink adminId={broadcasterId} tbmId="today" lang={lang} />}
-  </div>;
+    </div>}
+    {editedDraft === null && lines.length > 0 && lang !== "ko" && <div className="mt-6 border-t border-slate-200 pt-5">
+      <h3 className="mb-3 text-base font-bold text-slate-900">{originalLabel}</h3>
+      <p lang="ko" className="whitespace-pre-wrap break-words text-base leading-relaxed text-slate-700">{lines.map(line => line.source).join("\n")}</p>
+    </div>}
+    {allowQuestions && broadcasterId && <div className="mt-4 border-t border-slate-200 pt-4"><TbmQuestionLink adminId={broadcasterId} tbmId="today" lang={lang} /></div>}
+  </section>;
 }

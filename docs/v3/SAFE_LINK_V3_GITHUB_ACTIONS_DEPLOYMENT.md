@@ -4,6 +4,15 @@
 
 GitHub Actions의 `Deploy SQ Link V3 production` workflow는 `refactor/v3-commercialization-20260710` 브랜치 push 또는 수동 실행으로 frontend와 backend를 테스트·빌드하고 운영 서버에 불변 release로 배포한다. 이 브랜치에 push하기 전 운영 배포 권한과 백업 상태를 확인한다. 배포 중에는 release 디렉터리를 새로 만들고 `current` 심볼릭 링크만 교체하므로, 실패한 빌드를 현재 운영 파일 위에 덮어쓰지 않는다.
 
+## 2026-10-02 TBM 참여 구분·초안 정정 배포 준비
+
+- 사용자 승인: 보류하던 프론트·백엔드·DB 변경 전체 운영 배포. 동작 명세는 `TBM_REALTIME_DELIVERY.md`의 최신 절을 따른다. 방송 종료는 요약 생성, 최종 전파는 관리자 브로드캐스트 클릭으로 구분한다.
+- V035는 활성 TBM 참여 기록, V036은 버전이 있는 실시간 수정 초안 테이블만 추가한다. 기존 공지·서명·계정은 변경하지 않는다. 이전 실행본으로 롤백할 때 추가 테이블은 보존하며 운영 데이터 전체 복원은 자동 수행하지 않는다.
+- 배포 전: 최근 15분 활동 활성 방송 0건, 프론트/백엔드 서비스 active, 마이그레이션 V034까지 성공. 이전 릴리스 `3a7ddc7e79bf11d58d4a9187253b21fa067d3a22`.
+- DB 백업 `/home/ubuntu/safelink-v3/backups/tbm-draft-20261002-9Bcw0T/database.dump` (9.5MB). 서버 내 권한 제한, pg_restore 목록 검사 성공. SHA256 `1d3ed363b8d11409626d82535648ac2ee28d81c675445accc2f11ac40a4ac3a4`. 이전 릴리스 경로도 같은 디렉터리에 보존.
+- 로컬 검증: 백엔드 테스트 91개(실패/건너뜀 0)와 bootJar, 타입/변경 파일 ESLint, 프론트 전파·서명 테스트 13개 통과. 최신 코드의 격리 브라우저에서 초안 수정 SSE/누락 polling/종료 후 수정/재입장/참여자·미참여자 서명 분기 통과.
+- GitHub Actions에서 standalone 프론트와 백엔드를 다시 빌드한 후 배포한다. APK 네이티브 변경·재빌드 없음. 운영 성공은 Actions 결과, release 경로, readiness, V035/V036 성공을 별도로 확인한다.
+
 ## 2026-10-01 배포 범위와 제외 사항
 
 - 사용자 요청: 현재 미커밋 변경 전체를 커밋·push하고 프론트/백엔드를 함께 운영 반영한다.

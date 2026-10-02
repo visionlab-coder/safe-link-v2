@@ -1,4 +1,5 @@
 "use client";
+import { joinTbmLive } from "@/utils/tbm-participation";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -345,6 +346,7 @@ export default function WorkerLivePage() {
             try {
                 const broadcast = JSON.parse((event as MessageEvent<string>).data) as { session_id?: string; started_by?: string };
                 activeSessionIdRef.current = broadcast.session_id ?? null;
+                if (broadcast.session_id && siteId) void joinTbmLive(broadcast.session_id, String(siteId));
                 if (broadcast.started_by) setActiveAdminId(broadcast.started_by);
                 setIsConnected(Boolean(activeSessionIdRef.current));
             } catch {
@@ -396,12 +398,17 @@ export default function WorkerLivePage() {
             const data = await res.json() as { active?: boolean; session?: { session_id?: string; started_by?: string } };
             if (!data.active || !data.session?.session_id) return;
             activeSessionIdRef.current = data.session.session_id;
+            if (siteId) void joinTbmLive(data.session.session_id, String(siteId));
             if (data.session.started_by) setActiveAdminId(data.session.started_by);
             setIsConnected(true);
         };
         void loadCurrentBroadcast();
+        const participationTimer = setInterval(() => {
+            if (activeSessionIdRef.current && siteId) void joinTbmLive(activeSessionIdRef.current, String(siteId));
+        }, 10000);
         return () => {
             cancelled = true;
+            clearInterval(participationTimer);
             if (translatingTimerRef.current) clearTimeout(translatingTimerRef.current);
             events.close();
         };

@@ -86,14 +86,28 @@ export class TbmLiveBroadcast {
     this.session = null;
   }
 
-  async complete(content: string): Promise<{ sessionId: string; tbmId: string; text: string }> {
+  syncDraft(content: string) {
+    const session = this.session || this.stoppedSession;
+    if (!session) return Promise.resolve();
+    const task = this.queue.then(async () => {
+      const response = await this.requestWithTimeout("/api/live/tbm-draft", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...session, content }),
+      });
+      if (!response.ok) throw new Error(`broadcast_draft_failed_${response.status}`);
+    });
+    this.queue = task.catch(() => {});
+    return task;
+  }
+
+  async complete(content: string, summary?: string): Promise<{ sessionId: string; tbmId: string; text: string }> {
     // Retry a failed stop first; reuse the same server session for idempotent publication.
     await this.stop();
     const session = this.stoppedSession;
     if (!session) throw new Error("broadcast_session_required");
     const response = await this.requestWithTimeout("/api/live/summary", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...session, content_ko: content }),
+      body: JSON.stringify({ ...session, content_ko: content, summary_ko: summary }),
     }, 65_000);
     if (!response.ok) throw new Error(`broadcast_summary_failed_${response.status}`);
     const result = await response.json();

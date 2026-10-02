@@ -71,19 +71,31 @@ public class LiveTbmSummaryController {
         // delivery failed. Never lose these by summarizing only the delivered events.
         if (request.contentKo() != null) transcript = request.contentKo().trim();
         validateTranscript(transcript);
-        if (!properties.isVendorEnabled()) throw new ServiceUnavailableException("ai_vendor_not_configured");
-        if (!quota.checkAndIncrement("tbm_summary",request.siteId(),actor.userId()).allowed())
-            throw new AccessDeniedException("ai_quota_exceeded");
-        Instant start = Instant.now();
-        var result = vendor.summarizeTbm(transcript);
-        String summary = result.text().trim();
+        var savedDraft = jdbc.sql("select content_ko from tbm_live_drafts where session_id=:id and site_id=:site")
+            .param("id",request.sessionId()).param("site",request.siteId()).query(String.class).optional();
+        if (savedDraft.isPresent() && !savedDraft.get().trim().equals(transcript))
+            throw new IllegalArgumentException("tbm_draft_changed");
+        String summary;
+        String model;
+        if (request.summaryKo() != null) {
+            summary = request.summaryKo().trim();
+            model = "admin-reviewed";
+        } else {
+            if (!properties.isVendorEnabled()) throw new ServiceUnavailableException("ai_vendor_not_configured");
+            if (!quota.checkAndIncrement("tbm_summary",request.siteId(),actor.userId()).allowed())
+                throw new AccessDeniedException("ai_quota_exceeded");
+            Instant start = Instant.now();
+            var result = vendor.summarizeTbm(transcript);
+            summary = result.text().trim();
+            model = result.model();
+            usage.log(actor.userId(),request.siteId(),"tbm_summary",result.vendor(),result.model(),transcript.length(),summary.length(),Duration.between(start,Instant.now()).toMillis(),AiCostEstimator.estimate("tbm_summary",result.vendor(),transcript.length(),summary.length()));
+        }
         if (summary.isBlank() || summary.length()>12000) throw new ServiceUnavailableException("tbm_summary_invalid");
         var notice = tbm.createPublished(request.siteId(), actor.userId(), "TBM 안전 브리핑", transcript, "live-summary:"+request.sessionId(), summary);
         jdbc.sql("insert into live_tbm_summaries(session_id,site_id,created_by,source_transcript,summary_text,model,tbm_notice_id) values(:id,:site,:owner,:source,:summary,:model,:notice)")
             .param("id",request.sessionId()).param("site",request.siteId()).param("owner",actor.userId())
-            .param("source",transcript).param("summary",summary).param("model",result.model()).param("notice",notice.id()).update();
-        usage.log(actor.userId(),request.siteId(),"tbm_summary",result.vendor(),result.model(),transcript.length(),summary.length(),Duration.between(start,Instant.now()).toMillis(),AiCostEstimator.estimate("tbm_summary",result.vendor(),transcript.length(),summary.length()));
-        audit.record(actor.userId(),request.siteId(),"tbm.notice.create","tbm_notice",notice.id().toString(),"ALLOWED","live_summary",Map.of("sessionId",request.sessionId(),"model",result.model()));
+            .param("source",transcript).param("summary",summary).param("model",model).param("notice",notice.id()).update();
+        audit.record(actor.userId(),request.siteId(),"tbm.notice.create","tbm_notice",notice.id().toString(),"ALLOWED","live_summary",Map.of("sessionId",request.sessionId(),"model",model));
         var response = new Summary(request.sessionId(),notice.id().toString(),summary);
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void afterCommit() {
@@ -109,8 +121,10 @@ public class LiveTbmSummaryController {
     }
     private record Session(Long owner,boolean active) {}
     public record Request(@NotBlank @Size(max=120) String sessionId,@NotNull @Positive Long siteId,
-            @com.fasterxml.jackson.annotation.JsonProperty("content_ko") @Size(max=60000) String contentKo) {
-        public Request(String sessionId, Long siteId) { this(sessionId, siteId, null); }
+            @com.fasterxml.jackson.annotation.JsonProperty("content_ko") @Size(max=60000) String contentKo,
+            @com.fasterxml.jackson.annotation.JsonProperty("summary_ko") @Size(max=12000) String summaryKo) {
+        public Request(String sessionId, Long siteId) { this(sessionId, siteId, null, null); }
+        public Request(String sessionId, Long siteId, String contentKo) { this(sessionId, siteId, contentKo, null); }
     }
     public record Summary(String sessionId,String tbmId,String text) {}
 }

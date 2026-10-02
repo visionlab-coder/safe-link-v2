@@ -21,10 +21,10 @@ public class TemporaryWorkerAccessFilter extends OncePerRequestFilter {
         "/api/v1/auth/me", "/api/v1/auth/csrf",
         "/api/v1/worker-upgrade", "/api/v1/worker-upgrade/sites",
         "/api/v1/glossary", "/api/v1/glossary/translations",
-        "/api/v1/live/sessions", "/api/v1/live/events", "/api/v1/live/translations"
+        "/api/v1/live/sessions", "/api/v1/live/events", "/api/v1/live/translations", "/api/v1/live/tbm-participation", "/api/v1/live/tbm-draft"
     );
     private static final Set<String> WRITE = Set.of(
-        "/api/v1/auth/logout", "/api/v1/live/worker-responses",
+        "/api/v1/auth/logout", "/api/v1/live/worker-responses", "/api/v1/live/tbm-participation",
         "/api/v1/worker-upgrade",
         "/api/v1/ai/translate", "/api/v1/ai/stt", "/api/v1/ai/tts",
         "/api/v1/ai/vendor", "/api/v1/ai/reserve"

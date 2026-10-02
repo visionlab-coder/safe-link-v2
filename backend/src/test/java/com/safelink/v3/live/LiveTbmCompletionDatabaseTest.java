@@ -40,7 +40,8 @@ class LiveTbmCompletionDatabaseTest {
         var populator = new ResourceDatabasePopulator();
         for (String file : new String[]{"V001__create_identity_and_site_core.sql", "V002__create_file_objects.sql",
                 "V003__create_tbm_core.sql", "V015__create_live_interpreter.sql", "V025__add_tbm_notice_idempotency.sql",
-                "V028__create_live_broadcast_sessions.sql", "V031__live_tbm_summaries.sql", "V032__tbm_notice_summary.sql"})
+                "V028__create_live_broadcast_sessions.sql", "V031__live_tbm_summaries.sql", "V032__tbm_notice_summary.sql",
+                "V035__tbm_live_participation.sql", "V036__tbm_live_drafts.sql"})
             populator.addScript(new ClassPathResource("db/migration/" + file));
         populator.execute(ds);
         jdbc.sql("insert into organizations(id,name) values(1,'Test')").update();
@@ -65,6 +66,31 @@ class LiveTbmCompletionDatabaseTest {
     }
     LiveTbmSummaryController.Summary finish(String text) {
         return tx.execute(status -> controller.finish(admin,new LiveTbmSummaryController.Request("tbm_test",2L,text)));
+    }
+    @Test void draftCorrectionsAreVersionedScopedAndImmutableAfterPublication() {
+        var drafts = new TbmLiveDraftController(jdbc,new SiteGuard(mock(AuditService.class)),events);
+        var first = tx.execute(status -> {
+            var saved = drafts.save(admin,new TbmLiveDraftController.Request("tbm_test",2L,"수정된 원문"));
+            verifyNoInteractions(events);
+            return saved;
+        });
+        assertEquals(1L,first.revision());
+        verify(events).publish("translations:2","tbm-draft",first);
+        assertEquals(first,drafts.get(worker,"tbm_test",2L).get("draft"));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+            () -> drafts.get(worker,"tbm_test",3L));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+            () -> tx.execute(status -> drafts.save(worker,new TbmLiveDraftController.Request("tbm_test",2L,"조작"))));
+        var otherAdmin = new SessionPrincipal(12L,null,"Other",Set.of(Role.SITE_ADMIN),Set.of(2L));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+            () -> tx.execute(status -> drafts.save(otherAdmin,new TbmLiveDraftController.Request("tbm_test",2L,"조작"))));
+        var second = tx.execute(status -> drafts.save(admin,new TbmLiveDraftController.Request("tbm_test",2L,"최종 수정")));
+        assertEquals(2L,second.revision());
+        assertThrows(IllegalArgumentException.class,() -> finish("수정 전 원문"));
+        var published = finish("최종 수정");
+        assertEquals("최종 수정",repository.getNotice(Long.valueOf(published.tbmId())).sourceText());
+        assertThrows(IllegalArgumentException.class,
+            () -> tx.execute(status -> drafts.save(admin,new TbmLiveDraftController.Request("tbm_test",2L,"전파 후 변경"))));
     }
     @Test void publishesFullDrainedDraftAndSummaryOnceAndNotifiesAfterCommit() {
         var result = finish("첫 발화\n마지막 발화와 위험성평가 항목");
@@ -108,5 +134,37 @@ class LiveTbmCompletionDatabaseTest {
     @Test void emptyDraftCannotFallBackToEarlierSpeech() {
         assertThrows(IllegalArgumentException.class, () -> finish(" "));
         verifyNoInteractions(vendor,events);
+    }
+    @Test void reviewedSummaryPublishesOnlyOnExplicitRequestAndRetriesAreIdempotent() {
+        assertEquals(0L,jdbc.sql("select count(*) from tbm_notices").query(Long.class).single());
+        var request = new LiveTbmSummaryController.Request("tbm_test",2L,"수정한 원문","- 관리자가 검토한 요약");
+        var result = tx.execute(status -> controller.finish(admin,request));
+        assertEquals(result,tx.execute(status -> controller.finish(admin,request)));
+        assertEquals("수정한 원문",repository.getNotice(Long.valueOf(result.tbmId())).sourceText());
+        assertEquals("- 관리자가 검토한 요약",result.text());
+        verifyNoInteractions(vendor);
+        verify(events,times(1)).publish("translations:2","tbm-summary",result);
+    }
+    @Test void participationSurvivesReloadAndOnlyAppliesToTheExactNoticeAndWorker() {
+        var participation = new TbmLiveParticipationController(jdbc,new SiteGuard(mock(AuditService.class)));
+        var join = new TbmLiveParticipationController.Join("tbm_test",2L);
+        jdbc.sql("update live_broadcast_sessions set active=true where session_id='tbm_test'").update();
+        tx.execute(status -> participation.join(worker,join));
+        tx.execute(status -> participation.join(worker,join));
+        assertEquals(1L,jdbc.sql("select count(*) from tbm_live_participation").query(Long.class).single());
+        jdbc.sql("update live_broadcast_sessions set active=false where session_id='tbm_test'").update();
+        assertEquals("tbm_test",participation.read(worker,2L,null).get("sessionId"));
+        assertThrows(IllegalArgumentException.class,() -> tx.execute(status -> participation.join(worker,join)));
+        var notice = finish("전체 원문");
+        var reloadedController = new TbmLiveParticipationController(jdbc,new SiteGuard(mock(AuditService.class)));
+        assertEquals(true,reloadedController.read(worker,2L,Long.valueOf(notice.tbmId())).get("attended"));
+        assertEquals(false,reloadedController.read(worker,2L,9999L).get("attended"));
+        var lateWorker = new SessionPrincipal(12L,null,"Late worker",Set.of(Role.WORKER),Set.of(2L));
+        assertEquals(false,reloadedController.read(lateWorker,2L,Long.valueOf(notice.tbmId())).get("attended"));
+        assertThrows(IllegalArgumentException.class,() -> tx.execute(status -> participation.join(lateWorker,join)));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+            () -> reloadedController.read(worker,3L,Long.valueOf(notice.tbmId())));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+            () -> tx.execute(status -> participation.join(admin,join)));
     }
 }

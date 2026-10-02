@@ -21,3 +21,46 @@ ar: {"start":"بث TBM مباشر · ملخص عند الانتهاء","busy":"�
 hi: {"start":"लाइव TBM · समाप्ति पर सारांश","busy":"अंतिम बात सहेजकर सारांश भेजा जा रहा है…","done":"TBM सारांश भेज दिया गया।","retry":"सारांश फिर से भेजें","failed":"सारांश नहीं भेजा जा सका। फिर कोशिश करें।","read":"TBM सारांश पढ़ें और हस्ताक्षर करें"},
 };
 export function tbmSummaryUI(lang: string) { return copy[lang] || copy.en; }
+
+const publicationWaiting: Record<string, string> = {
+  ko: "방송이 종료되었습니다. 관리자가 최종 TBM을 전파하면 요약 확인 후 서명할 수 있습니다.",
+  en: "The live broadcast has ended. Once the administrator publishes the final TBM, review the summary and sign.",
+  zh: "直播已结束。管理员发布最终 TBM 后，请查看摘要并签名。",
+  vi: "Buổi phát trực tiếp đã kết thúc. Khi quản lý gửi TBM cuối cùng, hãy đọc tóm tắt và ký.",
+  km: "ការផ្សាយផ្ទាល់បានបញ្ចប់។ បន្ទាប់ពីអ្នកគ្រប់គ្រងផ្ញើ TBM ចុងក្រោយ សូមអានសេចក្តីសង្ខេប និងចុះហត្ថលេខា។",
+  th: "การถ่ายทอดสดสิ้นสุดแล้ว เมื่อผู้ดูแลส่ง TBM ฉบับสุดท้าย โปรดอ่านสรุปและลงชื่อ",
+  id: "Siaran langsung selesai. Setelah admin mengirim TBM akhir, baca ringkasan dan tanda tangani.",
+  uz: "Jonli efir tugadi. Administrator yakuniy TBMni yuborgach, xulosani o‘qing va imzolang.",
+  ph: "Tapos na ang live broadcast. Kapag ipinadala ng admin ang huling TBM, basahin ang buod at pumirma.",
+  mn: "Шууд нэвтрүүлэг дууслаа. Администратор эцсийн TBM-ийг илгээсний дараа хураангуйг уншиж гарын үсэг зурна уу.",
+  my: "တိုက်ရိုက်ထုတ်လွှင့်မှု ပြီးဆုံးပါပြီ။ စီမံခန့်ခွဲသူက နောက်ဆုံး TBM ပို့ပြီးနောက် အကျဉ်းချုပ်ကိုဖတ်၍ လက်မှတ်ထိုးပါ။",
+  ne: "प्रत्यक्ष प्रसारण सकियो। प्रशासकले अन्तिम TBM पठाएपछि सारांश पढेर हस्ताक्षर गर्नुहोस्।",
+  bn: "সরাসরি সম্প্রচার শেষ হয়েছে। প্রশাসক চূড়ান্ত TBM পাঠালে সারসংক্ষেপ পড়ে স্বাক্ষর করুন।",
+  kk: "Тікелей эфир аяқталды. Әкімші соңғы TBM жібергеннен кейін қорытындыны оқып, қол қойыңыз.",
+  ru: "Прямой эфир завершён. После отправки итогового TBM администратором прочитайте сводку и подпишите.",
+  jp: "ライブ配信が終了しました。管理者が最終TBMを送信したら、要約を確認して署名してください。",
+  fr: "Le direct est terminé. Après l’envoi du TBM final par l’administrateur, lisez le résumé et signez.",
+  es: "La transmisión terminó. Cuando el administrador envíe el TBM final, revise el resumen y firme.",
+  ar: "انتهى البث المباشر. بعد أن يرسل المسؤول TBM النهائي، اقرأ الملخص ووقّع.",
+  hi: "लाइव प्रसारण समाप्त हो गया है। व्यवस्थापक के अंतिम TBM भेजने के बाद सारांश पढ़ें और हस्ताक्षर करें।",
+};
+export function tbmPublicationWaitingUI(lang: string) { return publicationWaiting[lang] || publicationWaiting.en; }
+
+const liveState: Record<string, [string, string]> = {
+  ko: ["방송 중", "최종 전파 대기"], en: ["Live", "Awaiting final TBM"],
+  zh: ["直播中", "等待最终 TBM"], vi: ["Đang phát trực tiếp", "Chờ TBM cuối cùng"],
+  km: ["កំពុងផ្សាយផ្ទាល់", "កំពុងរង់ចាំ TBM ចុងក្រោយ"],
+  th: ["กำลังถ่ายทอดสด", "รอ TBM ฉบับสุดท้าย"], id: ["Siaran langsung", "Menunggu TBM akhir"],
+  uz: ["Jonli efir", "Yakuniy TBM kutilmoqda"], ph: ["Live", "Hinihintay ang huling TBM"],
+  mn: ["Шууд дамжуулж байна", "Эцсийн TBM-ийг хүлээж байна"],
+  my: ["တိုက်ရိုက်ထုတ်လွှင့်နေသည်", "နောက်ဆုံး TBM ကို စောင့်နေသည်"],
+  ne: ["प्रत्यक्ष प्रसारण", "अन्तिम TBM को प्रतीक्षामा"], bn: ["সরাসরি সম্প্রচার", "চূড়ান্ত TBM-এর অপেক্ষায়"],
+  kk: ["Тікелей эфир", "Соңғы TBM күтілуде"], ru: ["Прямой эфир", "Ожидание итогового TBM"],
+  jp: ["配信中", "最終TBMの配信待ち"], fr: ["En direct", "En attente du TBM final"],
+  es: ["En directo", "Esperando el TBM final"], ar: ["بث مباشر", "بانتظار TBM النهائي"],
+  hi: ["लाइव प्रसारण", "अंतिम TBM की प्रतीक्षा"],
+};
+export function tbmLiveStateUI(lang: string) {
+  const [live, pending] = liveState[lang] || liveState.en;
+  return { live, pending };
+}

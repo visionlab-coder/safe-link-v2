@@ -33,9 +33,13 @@ export default function TbmReceivedSummary({ text, lang, loadingLabel, onReady }
     useEffect(() => { onReady?.(Boolean(translated)); }, [translated, onReady]);
     if (!text) return null;
     const [title, error] = labels[lang] || labels.en;
-    return <section className="mb-6 rounded-3xl border border-blue-200 bg-blue-50 p-6 text-slate-900" aria-live="polite">
-        <h3 className="mb-3 text-lg font-bold">{title}</h3>
-        {translated ? <p className="whitespace-pre-wrap break-words text-xl font-bold leading-relaxed">{translated}</p>
+    const items = translated?.split(/\r?\n/).filter(line => line.trim()) || [];
+    const isList = items.length > 0 && items.every(line => /^\s*[-•*]\s+/.test(line));
+    return <section className="rounded-2xl bg-blue-50 p-4 text-slate-900 sm:p-5" aria-live="polite">
+        <h3 className="mb-3 text-lg font-bold text-blue-900">{title}</h3>
+        {translated ? isList ? <ul dir="auto" className="list-disc space-y-2 ps-5 text-lg font-semibold leading-relaxed text-slate-900">
+            {items.map((line, index) => <li key={index} className="break-words">{line.replace(/^\s*[-•*]\s+/, "")}</li>)}
+        </ul> : <p dir="auto" className="whitespace-pre-wrap break-words text-lg font-semibold leading-relaxed text-slate-900">{translated}</p>
             : failed ? <button type="button" onClick={() => setRetry(v => v + 1)} className="text-red-800 underline">{error}</button>
             : <p role="status">{loadingLabel}</p>}
     </section>;

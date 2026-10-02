@@ -9,6 +9,39 @@ vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.Mo
   exports: exportsObject, crypto: require("node:crypto").webcrypto, AbortSignal, URLSearchParams, fetch,
 });
 const { TbmLiveBroadcast } = exportsObject;
+test("draft edits preserve request order and final publication waits for the last correction", async () => {
+  const calls = [];
+  const broadcaster = new TbmLiveBroadcast(async (url, options) => {
+    calls.push({url, ...options});
+    return {ok: true, json: async () => ({sessionId: JSON.parse(options.body).sessionId, tbmId: '11', text: '- final'})};
+  });
+  await broadcaster.start('2');
+  const first = broadcaster.syncDraft('first');
+  const second = broadcaster.syncDraft('second');
+  await broadcaster.stop();
+  await Promise.all([first, second]);
+  await broadcaster.syncDraft('corrected after stop');
+  await broadcaster.complete('corrected after stop', '- final');
+  assert.deepEqual(calls.filter(call => call.url.includes('/tbm-draft')).map(call => JSON.parse(call.body).content),
+    ['first', 'second', 'corrected after stop']);
+  assert.equal(calls.at(-1).url, '/api/live/summary');
+});
+test("stopping does not publish a notice; explicit publication preserves the edited summary", async () => {
+  const calls = [];
+  const broadcaster = new TbmLiveBroadcast(async (url, options) => {
+    calls.push({url, ...options});
+    return {ok: true, json: async () => ({sessionId: JSON.parse(options.body).sessionId, tbmId: '10', text: '- edited'})};
+  });
+  await broadcaster.start('2');
+  await broadcaster.publish('full source');
+  await broadcaster.stop();
+  assert.equal(calls.filter(call => call.url.includes('/summary')).length, 0);
+  await broadcaster.complete('full source', '- edited');
+  const published = calls.filter(call => call.url.includes('/summary'));
+  assert.equal(published.length, 1);
+  assert.equal(JSON.parse(published[0].body).summary_ko, '- edited');
+  assert.equal(JSON.parse(published[0].body).content_ko, 'full source');
+});
 test("publishes while active, preserves order and sends stop after final clip", async () => {
   const calls = [];
   let release;

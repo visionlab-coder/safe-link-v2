@@ -1,6 +1,5 @@
 "use client";
 import { tbmDraftSummaryUI } from "@/lib/tbm-draft-summary-ui";
-import { tbmSummaryUI } from "@/lib/tbm-summary-ui";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -172,6 +171,9 @@ function AdminTBMCreateContent() {
     const [summarySource, setSummarySource] = useState("");
     const [summaryBusy, setSummaryBusy] = useState(false);
     const [summaryError, setSummaryError] = useState(false);
+    const summaryRequestRef = useRef(0);
+    const summaryAttemptRef = useRef("");
+    const [draftEdited, setDraftEdited] = useState(false);
     const [liveFinalizing, setLiveFinalizing] = useState(false);
     const [liveCompleted, setLiveCompleted] = useState(false);
     const finalDraftRef = useRef("");
@@ -273,6 +275,16 @@ function AdminTBMCreateContent() {
     const [broadcastBusy, setBroadcastBusy] = useState(false);
     const [broadcastActive, setBroadcastActive] = useState(false);
     useEffect(() => {
+        if (!draftEdited || (!broadcastActive && !liveFinalizing) || liveCompleted || isSending) return;
+        // Coalesce typing and, after an edit, keep subsequent STT additions in the same snapshot.
+        const timer = setTimeout(() => {
+            void broadcaster.current.syncDraft(tbmText).catch(() => {
+                setBroadcastResult({ type: "error", message: getBroadcastErrorMessage(displayLang || adminLang) });
+            });
+        }, 700);
+        return () => clearTimeout(timer);
+    }, [tbmText, draftEdited, broadcastActive, liveFinalizing, liveCompleted, isSending, displayLang, adminLang]);
+    useEffect(() => {
         const current = broadcaster.current;
         return () => { void current.stop().catch(() => {}); };
     }, []);
@@ -324,24 +336,41 @@ function AdminTBMCreateContent() {
         }
     };
 
-    const completeLiveTbm = async () => {
+    const completeLiveTbm = useCallback(async () => {
+        const requestId = ++summaryRequestRef.current;
         setSummaryBusy(true);
         setSummaryError(false);
+        const source = draftRef.current;
+        summaryAttemptRef.current = source;
         try {
-            const { normalized, changes } = await normalizeKoAsync(finalDraftRef.current.trim());
-            const result = await broadcaster.current.complete(normalized);
+            const { normalized, changes } = await normalizeKoAsync(source.trim());
+            const response = await fetch("/api/tbm/summary", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ siteId: adminSiteId, text: normalized }),
+                signal: AbortSignal.timeout(65000),
+            });
+            if (!response.ok) throw new Error("summary_failed");
+            const result = await response.json();
+            if (!result.text?.trim()) throw new Error("summary_empty");
+            if (requestId !== summaryRequestRef.current || draftRef.current !== source) return null;
             setSummaryText(result.text);
-            setSummarySource(finalDraftRef.current);
+            setSummarySource(source);
             setNormalizeResult({ normalized, changes });
-            setLiveCompleted(true);
-            setBroadcastResult({ type: "success", message: tbmSummaryUI(displayLang || adminLang).done });
-            void fetchHistory();
+            return result.text as string;
         } catch {
-            setSummaryError(true);
+            if (requestId === summaryRequestRef.current && draftRef.current === source) setSummaryError(true);
+            return null;
         } finally {
-            setSummaryBusy(false);
+            if (requestId === summaryRequestRef.current) setSummaryBusy(false);
         }
-    };
+    }, [adminSiteId]);
+
+    useEffect(() => {
+        if (!liveFinalizing || liveCompleted || isDraining || isSending || summaryBusy || !tbmText.trim()
+            || summarySource === tbmText || summaryAttemptRef.current === tbmText) return;
+        const timer = setTimeout(() => { void completeLiveTbm(); }, 900);
+        return () => clearTimeout(timer);
+    }, [tbmText, liveFinalizing, liveCompleted, isDraining, isSending, summaryBusy, summarySource, completeLiveTbm]);
 
     const handleRecording = async () => {
         if (recordingActionRef.current) return;
@@ -389,6 +418,8 @@ function AdminTBMCreateContent() {
                 }
                 setLiveFinalizing(false);
                 setLiveCompleted(false);
+                setDraftEdited(false);
+                summaryAttemptRef.current = "";
                 setSummaryError(false);
                 setBroadcastResult(null);
                 setSummaryText("");
@@ -434,13 +465,28 @@ function AdminTBMCreateContent() {
     };
 
     const handleSendTBM = async () => {
-        if (liveFinalizing || isRecording || isDraining || summaryBusy) return;
+        if (isSending || liveCompleted || isRecording || isDraining || summaryBusy) return;
         if (!tbmText.trim()) return;
         setIsSending(true);
         setBroadcastResult(null);
         setNormalizeResult(null);
         try {
             const { normalized, changes } = await normalizeKoAsync(tbmText.trim());
+
+            if (liveFinalizing) {
+                // Save the same final source first, then publish only a summary of that source.
+                await broadcaster.current.syncDraft(normalized);
+                const reviewedSummary = summarySource === tbmText && summaryText.trim()
+                    ? summaryText.trim() : await completeLiveTbm();
+                if (!reviewedSummary) return;
+                // Manual publication links the final notice to this exact live session.
+                await broadcaster.current.complete(normalized, reviewedSummary);
+                setNormalizeResult({ normalized, changes });
+                setLiveCompleted(true);
+                setBroadcastResult({ type: "success", message: t.pushSuccess });
+                await fetchHistory();
+                return;
+            }
 
             const res = await fetch("/api/tbm/broadcast", {
                 method: "POST",
@@ -579,8 +625,8 @@ function AdminTBMCreateContent() {
                                 ref={setDraftTextarea}
                                 rows={5}
                                 value={tbmText}
-                                readOnly={liveFinalizing}
-                                onChange={(e) => setTbmText(e.target.value)}
+                                readOnly={isSending || liveCompleted}
+                                onChange={(e) => { draftRef.current = e.target.value; setTbmText(e.target.value); setDraftEdited(true); }}
                                 placeholder={isRecording ? `${t.listening} [${displayLang || adminLang}]` : t.placeholder}
                                 className="w-full min-h-[180px] shrink-0 overflow-hidden bg-transparent text-2xl md:text-3xl font-bold text-white placeholder-slate-800 outline-none resize-none leading-snug tracking-tight"
                             />
@@ -588,8 +634,8 @@ function AdminTBMCreateContent() {
                             {(isDraining || liveFinalizing) && <section className="rounded-2xl border border-blue-200 bg-white p-5 text-slate-900">
                                 <label htmlFor="tbm-summary-draft" className="block font-bold mb-3">{summaryUI.title}</label>
                                 {(summaryBusy || isDraining) && <p role="status" className="text-blue-800">{summaryUI.busy}</p>}
-                                {summaryError && <div role="status" className="text-red-800">
-                                    <p>{tbmSummaryUI(displayLang || adminLang).failed}</p>
+                                {(summaryError || (!summaryBusy && !liveCompleted && summarySource !== tbmText)) && <div role="status" className="text-red-800">
+                                    {summaryError && <p>{summaryUI.failed}</p>}
                                     <button type="button" disabled={summaryBusy} onClick={() => void completeLiveTbm()} className="mt-2 rounded-xl bg-blue-700 px-4 py-2 text-white">{summaryUI.retry}</button>
                                 </div>}
                                 <textarea id="tbm-summary-draft" value={summarySource === tbmText ? summaryText : ""}
@@ -649,8 +695,8 @@ function AdminTBMCreateContent() {
                             )}
 
                             <div className="mt-auto pt-6 border-t border-white/5 flex flex-col gap-3">
-                                <button onClick={handleSendTBM} disabled={liveFinalizing || isSending || !tbmText.trim() || isRecording || isDraining || summaryBusy} className="w-full py-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-[32px] text-2xl font-black text-slate-950 shadow-[0_20px_50px_-15px_rgba(59,130,246,0.4)] tap-effect flex items-center justify-center gap-4 disabled:opacity-30 disabled:grayscale transition-all">
-                                    {isSending ? <div className="w-8 h-8 border-4 border-slate-950 border-t-transparent rounded-full animate-spin" /> : <><svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>{t.pushBtn}</>}
+                                <button onClick={handleSendTBM} disabled={liveCompleted || isSending || !tbmText.trim() || isRecording || isDraining || summaryBusy} className="w-full py-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-[32px] text-2xl font-black text-slate-950 shadow-[0_20px_50px_-15px_rgba(59,130,246,0.4)] tap-effect flex items-center justify-center gap-4 disabled:opacity-30 disabled:grayscale transition-all">
+                                    {isSending ? <div className="w-8 h-8 border-4 border-slate-950 border-t-transparent rounded-full animate-spin" /> : <><svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>{liveCompleted ? t.pushSuccess : t.pushBtn}</>}
                                 </button>
                                 <button
                                     onClick={() => router.push("/admin/chat")}

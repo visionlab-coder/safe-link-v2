@@ -5,6 +5,7 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import TbmReceivedSummary from "@/components/TbmReceivedSummary";
+import TbmFullTranscript from "@/components/TbmFullTranscript";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import RoleGuard from "@/components/RoleGuard";
 import TbmLiveReceiver from "@/components/TbmLiveReceiver";
@@ -189,6 +190,7 @@ function WorkerTBMDetailContent() {
     const [liveReceiving, setLiveReceiving] = useState(false);
     const [observedSession, setObservedSession] = useState<string | null>(null);
     const [liveSummary, setLiveSummary] = useState<TbmLiveSummary | null>(null);
+    const [participatedNoticeId, setParticipatedNoticeId] = useState<string | null>(null);
     const [summaryReadyKey, setSummaryReadyKey] = useState("");
     const [summaryReviewedKey, setSummaryReviewedKey] = useState("");
     const [summaryWaitLong, setSummaryWaitLong] = useState(false);
@@ -202,14 +204,11 @@ function WorkerTBMDetailContent() {
     const [showRev, setShowRev] = useState(false);
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const voiceGenderRef = useRef<'male' | 'female'>('female');
-    const isLiveSummary = Boolean(liveSummary && String(tbm?.id) === liveSummary.tbmId);
+    const isLiveSummary = Boolean(tbm?.summary_ko && participatedNoticeId === String(tbm?.id));
     const summaryKey = `${tbm?.id}:${preferredLang}:${tbm?.summary_ko || ""}`;
-    const waitingForSummary = Boolean(observedSession && !isLiveSummary);
+    const waitingForSummary = Boolean(observedSession && !liveSummary);
     useEffect(() => {
         setSummaryWaitLong(false);
-        if (!waitingForSummary || liveReceiving) return;
-        const timer = setTimeout(() => setSummaryWaitLong(true), 60000);
-        return () => clearTimeout(timer);
     }, [waitingForSummary, liveReceiving, observedSession]);
     const canSign = canSignTbm({ liveActive: liveReceiving, pending: waitingForSummary,
         liveSummary: isLiveSummary, summaryReady: summaryReadyKey === summaryKey,
@@ -234,6 +233,7 @@ function WorkerTBMDetailContent() {
     const loadTBM = useCallback(async () => {
         const version = ++loadVersionRef.current;
         setLoading(true);
+        setParticipatedNoticeId(null);
         setIsAudioFinished(false);
         setIsSigned(false);
         setTransData({ text: "", pron: "", rev: "" });
@@ -284,14 +284,20 @@ function WorkerTBMDetailContent() {
         }
 
         if (tbmData) {
+            const participationParams = new URLSearchParams({ siteId: String(tbmData.site_id), tbmId: String(tbmData.id) });
+            const participation = await fetch(`/api/live/tbm-participation?${participationParams}`, { cache: "no-store" })
+                .then(response => response.ok ? response.json() : null).catch(() => null);
+            if (version !== loadVersionRef.current) return;
+            const attended = participation?.attended === true && String(participation.tbmId) === String(tbmData.id);
+            setParticipatedNoticeId(attended ? String(tbmData.id) : null);
             const ackRes = await fetch(`/api/tbm/sign?tbmId=${encodeURIComponent(tbmData.id)}`, { cache: "no-store", credentials: "include" });
             const ackData = ackRes.ok ? await ackRes.json() as { signed?: boolean } : null;
             if (version !== loadVersionRef.current) return;
             setIsSigned(Boolean(ackData?.signed));
 
-            if (liveSummary?.tbmId === String(tbmData.id)) {
-                // Only the summary is translated for live attendees. Full text is retained
-                // for reference; do not run the old full-audio gate a second time.
+            if (attended && tbmData.summary_ko) {
+                // Summary renders first. Supplementary full translation runs independently
+                // in TbmFullTranscript and must not delay review or require a second listen.
                 setTranslating(false);
                 setLoading(false);
                 return;
@@ -462,7 +468,7 @@ function WorkerTBMDetailContent() {
                         <div className="flex flex-col">
                             <div className="flex items-center gap-2">
                                 <span className="text-xl font-black tracking-tight text-white uppercase italic">SQ Link</span>
-                                <span className="px-2 py-0.5 bg-red-500 text-[10px] font-black rounded text-white animate-pulse">LIVE</span>
+                                {liveReceiving && <span data-testid="tbm-live-badge" className="px-2 py-0.5 bg-red-600 text-[10px] font-black rounded text-white animate-pulse">LIVE</span>}
                             </div>
                             <span className="text-xs text-slate-500 font-bold tracking-widest uppercase truncate max-w-[150px]">
                                 {tbm?.site_name || "Field Center"}
@@ -503,10 +509,22 @@ function WorkerTBMDetailContent() {
                 </header>
 
                 <main className="flex-1 flex flex-col pt-8 pb-32 px-4 md:px-8 max-w-2xl mx-auto w-full gap-8">
-                    {tbmId === "today" && <TbmLiveReceiver siteId={liveSiteId} lang={preferredLang} busyLabel={t.translating} listenLabel={t.voice} onActiveChange={setLiveReceiving} onSession={onLiveSession} onSummary={setLiveSummary} allowQuestions />}
-                    {!liveReceiving && waitingForSummary && <div role="status" className="rounded-3xl border border-blue-200 bg-blue-50 p-6 font-bold text-blue-900">
-                        <p>{summaryWaitLong ? tbmSummaryUI(preferredLang).failed : tbmSummaryUI(preferredLang).busy}</p>
-                        {summaryWaitLong && <button type="button" className="mt-3 underline" onClick={() => { void loadTBM().catch(() => setLoading(false)); }}>{tbmSummaryUI(preferredLang).retry}</button>}
+                    {(tbm || liveReceiving || waitingForSummary) && <div data-testid="tbm-briefing-hero" className="admin-concept-hero relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
+                        <picture>
+                            <source media="(max-width: 639px)" srcSet="/images/mobile-v4/mobile/tbm/03.webp" />
+                            <Image src="/images/mobile-v4/web/tbm/03.webp" alt="TBM worker briefing" fill className="object-cover" priority />
+                        </picture>
+                        <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
+                        <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+                            <p className="text-[10px] font-black tracking-[.18em] text-red-200">SQ LINK TBM</p>
+                            <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
+                            <p className="mt-2 text-sm font-bold text-slate-100">{new Date(liveReceiving || waitingForSummary ? Date.now() : tbm.created_at).toLocaleDateString(({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[preferredLang] || "en-US", { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                        </div>
+                    </div>}
+                    {tbmId === "today" && <TbmLiveReceiver siteId={liveSiteId} lang={preferredLang} busyLabel={t.translating} listenLabel={t.voice} translatedLabel={t.translated} originalLabel={t.original} pending={waitingForSummary} onActiveChange={setLiveReceiving} onSession={onLiveSession} onSummary={setLiveSummary} allowQuestions />}
+                    {summaryWaitLong && waitingForSummary && <div role="status" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 font-bold text-amber-900">
+                        <p>{tbmSummaryUI(preferredLang).failed}</p>
+                        <button type="button" className="mt-3 underline" onClick={() => { void loadTBM().catch(() => setLoading(false)); }}>{tbmSummaryUI(preferredLang).retry}</button>
                     </div>}
 
                     {fromCache && (
@@ -530,20 +548,6 @@ function WorkerTBMDetailContent() {
                         </div>
                     )) : (
                         <>
-                            {/* 🚨 NEW TBM ARRIVED ALERT */}
-                            <div className="admin-concept-hero relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
-                                <picture>
-                                    <source media="(max-width: 639px)" srcSet="/images/mobile-v4/mobile/tbm/03.webp" />
-                                    <Image src="/images/mobile-v4/web/tbm/03.webp" alt="TBM worker briefing" fill className="object-cover" priority />
-                                </picture>
-                                <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
-                                <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
-                                    <p className="text-[10px] font-black tracking-[.18em] text-red-200">SQ LINK TBM</p>
-                                    <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
-                                    <p className="mt-2 text-sm font-bold text-slate-100">{new Date(tbm.created_at).toLocaleDateString(({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[preferredLang] || "en-US", { month: 'long', day: 'numeric', year: 'numeric' })}</p>
-                                </div>
-                            </div>
-
                             {!liveReceiving && <TbmQuestionLink adminId={tbm.created_by} tbmId={String(tbm.id)} lang={preferredLang} />}
 
                             {hasNewTBM && (
@@ -554,7 +558,8 @@ function WorkerTBMDetailContent() {
                             )}
 
                             {/* 🎯 Main TBM Card */}
-                            <section className="glass rounded-[48px] p-8 border-white/10 shadow-2xl relative overflow-hidden group">
+                            <section className={isLiveSummary ? "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" : "glass rounded-[48px] p-8 border-white/10 shadow-2xl relative overflow-hidden group"}>
+                                {!isLiveSummary && <>
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 blur-[60px] rounded-full -mr-16 -mt-16 group-hover:bg-red-500/20 transition-all duration-1000" />
 
 
@@ -566,7 +571,8 @@ function WorkerTBMDetailContent() {
                                     </div>
                                 </div>
 
-                                <div className="space-y-8">
+                                </>}
+                                <div className="space-y-6">
                                     {/* 번역본 (The King) */}
                                     {!isLiveSummary && <div className="space-y-4">
                                         <div className="flex items-center gap-2">
@@ -631,18 +637,21 @@ function WorkerTBMDetailContent() {
                                     </div>}
 
                                     {/* 원문 (The Origin) */}
-                                    <div className="p-6 bg-white/[0.03] rounded-[32px] border border-white/5 group/orig transition-colors hover:bg-white/[0.05]">
+                                    <div className={isLiveSummary ? "space-y-5" : "p-6 bg-white/[0.03] rounded-[32px] border border-white/5 group/orig transition-colors hover:bg-white/[0.05]"}>
                                         <TbmReceivedSummary key={summaryKey} text={tbm.summary_ko} lang={preferredLang} loadingLabel={t.translating} onReady={onSummaryReady} />
-                                        {isLiveSummary && !isSigned && <label className="mb-6 flex items-start gap-3 rounded-2xl border border-blue-200 bg-white p-4 font-bold text-blue-900">
-                                            <input type="checkbox" className="mt-1 h-5 w-5 shrink-0" disabled={summaryReadyKey !== summaryKey}
+                                        {isLiveSummary && !isSigned && <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-base font-bold text-blue-900">
+                                            <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0 accent-blue-700" disabled={summaryReadyKey !== summaryKey}
                                                 checked={summaryReviewedKey === summaryKey}
                                                 onChange={event => setSummaryReviewedKey(event.target.checked ? summaryKey : "")} />
                                             {tbmSummaryUI(preferredLang).read}
                                         </label>}
-                                        <details open={!isLiveSummary}>
-                                            <summary className="cursor-pointer text-sm font-bold text-slate-500">{t.original}</summary>
-                                            <p className="mt-3 text-lg text-slate-500 font-medium leading-relaxed">{tbm.content_ko}</p>
-                                        </details>
+                                        {isLiveSummary ? <TbmFullTranscript text={tbm.content_ko || ""} lang={preferredLang}
+                                            enabled={summaryReadyKey === summaryKey} translatedLabel={t.translated}
+                                            originalLabel={t.original} loadingLabel={t.translating} />
+                                            : <section aria-label={t.original}>
+                                                <h3 className="text-sm font-bold text-slate-700">{t.original}</h3>
+                                                <p className="mt-3 whitespace-pre-wrap break-words text-lg text-slate-700 font-medium leading-relaxed">{tbm.content_ko}</p>
+                                            </section>}
                                     </div>
                                 </div>
 
