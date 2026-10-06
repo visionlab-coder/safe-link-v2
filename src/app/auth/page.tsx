@@ -1,4 +1,6 @@
 "use client";
+import EnglishNameField from "@/components/EnglishNameField";
+import { englishNameUI } from "@/lib/english-name";
 
 import { useEffect, useState, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -245,6 +247,8 @@ function AuthContent() {
   const [hoveredLang, setHoveredLang] = useState<string | null>(null);
   const [adminSignupMode, setAdminSignupMode] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
+  const [adminName, setAdminName] = useState("");
+  const [adminNameReady, setAdminNameReady] = useState(false);
 
   const [initials, setInitials] = useState("");
   const [phoneLast4, setPhoneLast4] = useState("");
@@ -416,7 +420,7 @@ function AuthContent() {
   };
 
   const handleAdminSignup = async () => {
-    if (!adminEmail || !password || !passConfirm) return;
+    if (!adminEmail || !password || !passConfirm || !adminNameReady) return;
     if (password !== passConfirm) {
       setAuthFlash({ tone: "error", message: t.noMatch });
       return;
@@ -427,6 +431,7 @@ function AuthContent() {
     const activeLang = lang || "ko";
     try {
       const signup = await adminSignupV3({
+        displayName: adminName,
         email: adminEmail,
         password,
         preferredLang: activeLang,
@@ -672,7 +677,7 @@ function AuthContent() {
                   </div>
                   <div>
                     <h2 className="text-base font-black" style={{ color: "#6EE7B7" }}>{t.workerTitle}</h2>
-                    <p className="text-xs text-slate-500 mt-0.5 leading-snug">{t.workerDesc}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 leading-snug">{englishNameUI(lang).loginId} · {t.phone} (1234)</p>
                   </div>
                 </div>
 
@@ -680,8 +685,8 @@ function AuthContent() {
                 <div style={fieldBox}>
                   <input
                     type="text"
-                    aria-label={t.name}
-                    placeholder={`${t.name} (BK, NGUYEN)`}
+                    aria-label={englishNameUI(lang).loginId}
+                    placeholder={`${englishNameUI(lang).loginId} (BK, NGUYEN)`}
                     value={initials}
                     onChange={e => {
                       setInitials(e.target.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toUpperCase());
@@ -785,6 +790,7 @@ function AuthContent() {
                 </div>
 
                 {/* Password */}
+                {adminSignupMode && <EnglishNameField language={lang || "ko"} value={adminName} onChange={setAdminName} onReadyChange={setAdminNameReady} />}
                 <div style={fieldBox}>
                   <input type="password" aria-label={t.pass} placeholder={t.pass} value={password}
                     onChange={e => setPassword(e.target.value)}
@@ -834,7 +840,7 @@ function AuthContent() {
 
                 {/* CTA */}
                 <button onClick={adminSignupMode ? handleAdminSignup : handleAdminLogin}
-                  disabled={loading || !adminEmail || !password || (adminSignupMode && !passConfirm)}
+                  disabled={loading || !adminEmail || !password || (adminSignupMode && (!passConfirm || !adminNameReady))}
                   className="w-full py-3.5 font-black text-sm text-white rounded-xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: "linear-gradient(135deg,#2563EB 0%,#3B82F6 100%)", boxShadow: "0 4px 24px rgba(59,130,246,0.28)" }}>
                   {loading ? <Spinner /> : adminSignupMode ? t.doSignup : t.doLogin}

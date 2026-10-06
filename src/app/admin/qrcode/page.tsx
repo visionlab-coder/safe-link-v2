@@ -1,4 +1,5 @@
 "use client";
+import EnglishNameField from "@/components/EnglishNameField";
 
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
@@ -57,6 +58,7 @@ export default function QRDistributionPage() {
 
     // NFC 상태
     const [nfcWorkerName, setNfcWorkerName] = useState("");
+    const [nameReady, setNameReady] = useState(false);
     const [nfcNameInitials, setNfcNameInitials] = useState("");
     const [nfcPhoneLast4, setNfcPhoneLast4] = useState("");
     const [nfcStep, setNfcStep] = useState<NfcStep>("idle");
@@ -132,6 +134,7 @@ export default function QRDistributionPage() {
 
     // NFC 근로자 카드 발급
     const handleNfcIssue = async () => {
+        if (!nameReady) return;
         const name = nfcWorkerName.trim();
         if (!name) { setNfcError(nfcT.nameRequired); return; }
         setNfcError("");
@@ -351,15 +354,7 @@ export default function QRDistributionPage() {
 
                             {nfcStep === "idle" && (
                                 <div className="flex flex-col gap-4">
-                                    <div>
-                                        <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{nfcT.name}</label>
-                                        <input
-                                            value={nfcWorkerName}
-                                            onChange={(e) => setNfcWorkerName(e.target.value)}
-                                            placeholder="홍길동"
-                                            className="w-full bg-slate-900/70 border border-white/10 rounded-2xl px-4 py-3.5 text-white font-bold focus:outline-none focus:border-cyan-500/40 placeholder-slate-700"
-                                        />
-                                    </div>
+                                    <EnglishNameField language={lang} value={nfcWorkerName} onChange={setNfcWorkerName} onReadyChange={setNameReady} />
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         <div>
@@ -388,7 +383,7 @@ export default function QRDistributionPage() {
 
                                     <button
                                         onClick={handleNfcIssue}
-                                        disabled={nfcLoading || !nfcWorkerName.trim() || !nfcNameInitials.trim() || nfcPhoneLast4.length !== 4}
+                                        disabled={nfcLoading || !nameReady || !nfcNameInitials.trim() || nfcPhoneLast4.length !== 4}
                                         className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-black rounded-2xl transition-all flex items-center justify-center gap-2"
                                     >
                                         <UserPlus className="w-4 h-4" />

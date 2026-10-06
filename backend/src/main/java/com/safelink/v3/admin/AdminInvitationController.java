@@ -140,7 +140,7 @@ public class AdminInvitationController {
 
         var account = users.createPendingAdminSignupAccount(
             invitation.email().trim().toLowerCase(java.util.Locale.ROOT),
-            request.displayName().trim(),
+            com.safelink.v3.auth.EnglishName.require(request.displayName()),
             request.preferredLanguage() == null || request.preferredLanguage().isBlank() ? "ko" : request.preferredLanguage().trim().toLowerCase(java.util.Locale.ROOT),
             passwordEncoder.encode(request.password())
         );

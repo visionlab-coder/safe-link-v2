@@ -77,6 +77,7 @@ public class SecurityConfig {
             .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/auth/admin-signup").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/auth/temporary-worker").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/v1/auth/romanize-name").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/auth/worker-quick-login").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/auth/password-reset/**").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/admin/invitations/accept").permitAll()

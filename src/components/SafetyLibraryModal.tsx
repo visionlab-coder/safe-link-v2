@@ -2,25 +2,14 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
-
-interface LibraryItem {
-    id: string;
-    category: string;
-    subcategory: string;
-    hazard_description: string;
-    accident_type: string;
-    frequency: number;
-    severity: number;
-    risk_level: number;
-    preventive_measure: string;
-    is_critical: boolean;
-}
+import { filterRiskLibrary, riskLibraryDraft, type RiskLibraryItem, type RiskLibrarySource } from "@/lib/tbm-risk-library";
 
 interface SafetyLibraryModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSelect: (text: string) => void;
     lang?: string;
+    disabled?: boolean;
 }
 
 const UI_TEXT: Record<string, Record<string, string>> = {
@@ -31,7 +20,7 @@ const UI_TEXT: Record<string, Record<string, string>> = {
         allSubs: "전체 세부공종",
         criticalOnly: "중점관리만",
         hazard: "위험요인",
-        measure: "예방대책",
+        measure: "관리계획 (예방대책)",
         risk: "위험등급",
         freq: "빈도",
         sev: "강도",
@@ -92,294 +81,155 @@ const UI_TEXT: Record<string, Record<string, string>> = {
     },
 };
 
-const RISK_COLORS: Record<number, string> = {
-    1: "text-green-400 bg-green-500/10 border-green-500/20",
-    2: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
-    3: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-    4: "text-red-400 bg-red-500/10 border-red-500/20",
-    5: "text-red-500 bg-red-500/20 border-red-500/30",
+const EXTRA: Record<string, string[]> = {
+    ko: ["자료", "검색", "공종·위험요인·관리계획 검색", "목록을 불러오지 못했습니다.", "다시 시도", "첨부 자료 원문(한국어) · 적용할 항목을 검토한 뒤 선택하세요.", "개 항목", "이전", "다음", "행", "세부공종"],
+    en: ["Source", "Search", "Search work, hazards or measures", "Could not load the list.", "Retry", "Original source in Korean. Review items before adding.", "items", "Previous", "Next", "Row", "Subcategory"],
+    zh: ["资料", "搜索", "搜索工种、危险因素或措施", "无法加载列表。", "重试", "韩文原始资料。请审核后选择。", "项", "上一页", "下一页", "行", "细分工种"],
+    vi: ["Nguồn", "Tìm kiếm", "Tìm công việc, nguy cơ hoặc biện pháp", "Không tải được danh sách.", "Thử lại", "Tài liệu gốc tiếng Hàn. Kiểm tra trước khi thêm.", "mục", "Trước", "Sau", "Dòng", "Hạng mục"],
+    ru: ["Источник", "Поиск", "Работы, риски или меры", "Не удалось загрузить список.", "Повторить", "Оригинал на корейском. Проверьте пункты перед добавлением.", "пунктов", "Назад", "Далее", "Строка", "Подкатегория"],
 };
-
-export default function SafetyLibraryModal({ isOpen, onClose, onSelect, lang }: SafetyLibraryModalProps) {
+export default function SafetyLibraryModal({ isOpen, onClose, onSelect, lang, disabled = false }: SafetyLibraryModalProps) {
     const displayLanguage = useDisplayLanguage();
-    const t = UI_TEXT[lang ?? displayLanguage] || UI_TEXT.en;
-
-    const [items, setItems] = useState<LibraryItem[]>([]);
+    const language = lang ?? displayLanguage;
+    const t = UI_TEXT[language] || UI_TEXT.en;
+    const e = EXTRA[language] || EXTRA.en;
+    const [items, setItems] = useState<RiskLibraryItem[]>([]);
+    const [sources, setSources] = useState<RiskLibrarySource[]>([]);
     const [loading, setLoading] = useState(false);
-    const [categories, setCategories] = useState<string[]>([]);
-    const [subcategories, setSubcategories] = useState<string[]>([]);
-    const [selectedCategory, setSelectedCategory] = useState<string>("");
-    const [selectedSubcategory, setSelectedSubcategory] = useState<string>("");
-    const [criticalOnly, setCriticalOnly] = useState(false);
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
-    const fetchData = useCallback(async () => {
-        setLoading(true);
-        try {
-            const params = new URLSearchParams();
-            if (selectedCategory) params.set("category", selectedCategory);
-            if (selectedSubcategory) params.set("subcategory", selectedSubcategory);
-            if (criticalOnly) params.set("critical_only", "true");
-
-            const res = await fetch(`/api/tbm/library?${params.toString()}`);
-            const json = await res.json();
-            const data: LibraryItem[] = json.data || [];
-            setItems(data);
-
-            if (!selectedCategory) {
-                const cats = [...new Set(data.map((d) => d.category))];
-                setCategories(cats);
-            }
-
-            if (selectedCategory) {
-                const subs = [...new Set(
-                    data
-                        .filter((d) => d.category === selectedCategory)
-                        .map((d) => d.subcategory)
-                )];
-                setSubcategories(subs);
-            } else {
-                setSubcategories([]);
-            }
-        } catch (e) {
-            console.error("Library fetch error:", e);
-        } finally {
-            setLoading(false);
-        }
-    }, [selectedCategory, selectedSubcategory, criticalOnly]);
+    const [error, setError] = useState(false);
+    const [retry, setRetry] = useState(0);
+    const [source, setSource] = useState("seowon-initial-20261006");
+    const [category, setCategory] = useState("");
+    const [subcategory, setSubcategory] = useState("");
+    const [critical, setCritical] = useState(false);
+    const [query, setQuery] = useState("");
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    const [selected, setSelected] = useState<Set<string>>(new Set());
 
     useEffect(() => {
-        if (isOpen) {
-            fetchData();
-            setSelectedIds(new Set());
-        }
-    }, [isOpen, fetchData]);
+        if (!isOpen) return;
+        const abort = new AbortController();
+        const timeout = setTimeout(() => abort.abort(), 15000);
+        let active = true;
+        setLoading(true); setError(false); setSelected(new Set());
+        fetch("/api/tbm/library", { signal: abort.signal, cache: "no-store" })
+            .then(async response => {
+                if (!response.ok) throw new Error("library_unavailable");
+                const body = await response.json();
+                if (!Array.isArray(body.data) || !Array.isArray(body.sources)) throw new Error("library_invalid");
+                if (active) { setItems(body.data); setSources(body.sources); }
+            })
+            .catch(() => { if (active) { setError(true); setItems([]); } })
+            .finally(() => { clearTimeout(timeout); if (active) setLoading(false); });
+        return () => { active = false; abort.abort(); clearTimeout(timeout); };
+    }, [isOpen, retry]);
+    useEffect(() => {
+        if (!isOpen) return;
+        const previous = document.activeElement as HTMLElement | null;
+        const overflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        const dialog = document.getElementById("tbm-risk-dialog");
+        const first = dialog?.querySelector<HTMLElement>("button");
+        first?.focus();
+        const key = (event: KeyboardEvent) => {
+            if (event.key === "Escape") onClose();
+            if (event.key !== "Tab" || !dialog) return;
+            const nodes = [...dialog.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), select:not([disabled])")].filter(node => node.getClientRects().length > 0);
+            const start = nodes[0], end = nodes[nodes.length - 1];
+            if (event.shiftKey && document.activeElement === start) { event.preventDefault(); end?.focus(); }
+            else if (!event.shiftKey && document.activeElement === end) { event.preventDefault(); start?.focus(); }
+        };
+        document.addEventListener("keydown", key);
+        return () => { document.body.style.overflow = overflow; document.removeEventListener("keydown", key); previous?.focus(); };
+    }, [isOpen, onClose]);
 
-    const handleCategoryChange = (cat: string) => {
-        setSelectedCategory(cat);
-        setSelectedSubcategory("");
-        setSelectedIds(new Set());
+    const categories = [...new Set(items.filter(i => i.source_id === source).map(i => i.category))];
+    const subs = [...new Set(items.filter(i => i.source_id === source && (!category || i.category === category)).map(i => i.subcategory))];
+    const filtered = filterRiskLibrary(items, {source, category, subcategory, critical, query});
+    const changeCategory = (next: string) => {
+        setCategory(next); setSubcategory(""); setQuery(""); setCritical(false);
+        document.getElementById("tbm-risk-items")?.scrollTo({ top: 0 });
     };
-
-    const toggleItem = (id: string) => {
-        setSelectedIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(id)) {
-                next.delete(id);
-            } else {
-                next.add(id);
-            }
-            return next;
-        });
-    };
-
-    const toggleSelectAll = () => {
-        if (selectedIds.size === filteredItems.length) {
-            setSelectedIds(new Set());
-        } else {
-            setSelectedIds(new Set(filteredItems.map((i) => i.id)));
-        }
-    };
-
-    const filteredItems = items.filter((item) => {
-        if (selectedCategory && item.category !== selectedCategory) return false;
-        if (selectedSubcategory && item.subcategory !== selectedSubcategory) return false;
-        return true;
-    });
-
-    const handleInsert = () => {
-        const selected = filteredItems.filter((i) => selectedIds.has(i.id));
-        if (selected.length === 0) return;
-
-        const lines = selected.map((item) => {
-            const critical = item.is_critical ? ` [${t.critical}]` : "";
-            return `[${item.accident_type}] ${item.hazard_description}\n  -> ${t.measure}: ${item.preventive_measure}${critical}`;
-        });
-
-        onSelect(lines.join("\n\n"));
-        onClose();
-    };
-
+    const allVisibleSelected = filtered.length > 0 && filtered.every(item => selected.has(item.id));
+    const sourceInfo = sources.find(s => s.id === source);
+    const toggle = useCallback((id: string) => setSelected(prev => {
+        const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next;
+    }), []);
     if (!isOpen) return null;
-
-    return (
-        <div className="safe-area-overlay fixed inset-0 z-[100] flex items-end sm:items-center justify-center">
-            {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-
-            {/* Modal */}
-            <div className="relative w-full max-w-2xl max-h-[85vh] bg-[#0a0f1a] border border-white/10 rounded-t-[40px] sm:rounded-[40px] shadow-2xl flex flex-col overflow-hidden animate-float">
-                {/* Header */}
-                <div className="p-6 pb-4 border-b border-white/5">
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <h2 className="text-2xl font-black text-white tracking-tight">{t.title}</h2>
-                            <p className="text-xs text-slate-500 font-bold mt-1 uppercase tracking-widest">{t.subtitle}</p>
-                        </div>
-                        <button onClick={onClose} className="p-2 rounded-full hover:bg-white/5 transition-colors text-slate-500">
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-
-                    {/* Category Tabs */}
-                    <div className="flex gap-2 mt-4 overflow-x-auto pb-1 scrollbar-hide">
-                        <button
-                            onClick={() => handleCategoryChange("")}
-                            className={`px-4 py-2 rounded-full text-xs font-black whitespace-nowrap transition-all ${
-                                !selectedCategory
-                                    ? "bg-blue-500 text-white shadow-lg"
-                                    : "glass border-white/10 text-slate-400 hover:text-white"
-                            }`}
-                        >
-                            {t.allCategories}
-                        </button>
-                        {categories.map((cat) => (
-                            <button
-                                key={cat}
-                                onClick={() => handleCategoryChange(cat)}
-                                className={`px-4 py-2 rounded-full text-xs font-black whitespace-nowrap transition-all ${
-                                    selectedCategory === cat
-                                        ? "bg-blue-500 text-white shadow-lg"
-                                        : "glass border-white/10 text-slate-400 hover:text-white"
-                                }`}
-                            >
-                                {cat}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Subcategory + Filters */}
-                    <div className="flex gap-2 mt-3 items-center flex-wrap">
-                        {selectedCategory && subcategories.length > 0 && (
-                            <select
-                                value={selectedSubcategory}
-                                onChange={(e) => {
-                                    setSelectedSubcategory(e.target.value);
-                                    setSelectedIds(new Set());
-                                }}
-                                className="px-3 py-2 rounded-2xl bg-white/5 border border-white/10 text-xs font-bold text-slate-300 outline-none"
-                            >
-                                <option value="">{t.allSubs}</option>
-                                {subcategories.map((sub) => (
-                                    <option key={sub} value={sub}>{sub}</option>
-                                ))}
-                            </select>
-                        )}
-                        <button
-                            onClick={() => setCriticalOnly(!criticalOnly)}
-                            className={`px-3 py-2 rounded-full text-xs font-black transition-all ${
-                                criticalOnly
-                                    ? "bg-red-500/20 text-red-400 border border-red-500/30"
-                                    : "glass border-white/10 text-slate-500 hover:text-white"
-                            }`}
-                        >
-                            {t.criticalOnly}
-                        </button>
-                        {filteredItems.length > 0 && (
-                            <button
-                                onClick={toggleSelectAll}
-                                className="px-3 py-2 rounded-full text-xs font-black glass border-white/10 text-slate-400 hover:text-white transition-all ml-auto"
-                            >
-                                {selectedIds.size === filteredItems.length ? t.deselectAll : t.selectAll}
-                            </button>
-                        )}
-                    </div>
+    const fieldClass = "w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900";
+    return <div className="safe-area-overlay fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/35 p-2 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
+        <section id="tbm-risk-dialog" role="dialog" aria-modal="true" aria-labelledby="tbm-risk-title"
+            onClick={event => event.stopPropagation()} className="flex max-h-[90dvh] w-full max-w-2xl flex-col overflow-hidden rounded-[32px] border border-slate-200 bg-slate-50 text-slate-900 shadow-2xl sm:rounded-[40px]">
+            <header className="shrink-0 space-y-4 border-b border-slate-200 bg-white p-4 sm:p-6">
+                <div className="flex items-start justify-between gap-3">
+                    <div><h2 id="tbm-risk-title" className="text-2xl font-black text-slate-900">{t.title}</h2><p className="mt-1 text-sm font-medium text-slate-600">{t.subtitle}</p></div>
+                    <button type="button" onClick={onClose} aria-label={t.close} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+                    </button>
                 </div>
-
-                {/* Items List */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                    {loading ? (
-                        <div className="flex items-center justify-center py-20 text-slate-500 font-bold">
-                            <div className="w-6 h-6 border-2 border-slate-500 border-t-transparent rounded-full animate-spin mr-3" />
-                            {t.loading}
-                        </div>
-                    ) : filteredItems.length === 0 ? (
-                        <div className="text-center py-20 text-slate-600 font-bold italic">{t.noData}</div>
-                    ) : (
-                        filteredItems.map((item) => {
-                            const isSelected = selectedIds.has(item.id);
-                            const riskColor = RISK_COLORS[item.risk_level] || RISK_COLORS[1];
-
-                            return (
-                                <button
-                                    key={item.id}
-                                    onClick={() => toggleItem(item.id)}
-                                    className={`w-full text-left p-4 rounded-[24px] transition-all ${
-                                        isSelected
-                                            ? "bg-blue-500/10 border-2 border-blue-500/30 shadow-lg"
-                                            : "glass border border-white/5 hover:border-white/10"
-                                    }`}
-                                >
-                                    <div className="flex items-start gap-3">
-                                        {/* Checkbox */}
-                                        <div className={`w-5 h-5 mt-0.5 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                                            isSelected ? "bg-blue-500 border-blue-500" : "border-slate-600"
-                                        }`}>
-                                            {isSelected && (
-                                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                </svg>
-                                            )}
-                                        </div>
-
-                                        <div className="flex-1 min-w-0">
-                                            {/* Top row: accident type + risk badges */}
-                                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                                <span className="px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-black text-slate-400 uppercase">
-                                                    {item.accident_type}
-                                                </span>
-                                                <span className={`px-2 py-0.5 rounded-lg border text-[10px] font-black ${riskColor}`}>
-                                                    {t.risk} {item.risk_level}
-                                                </span>
-                                                {item.is_critical && (
-                                                    <span className="px-2 py-0.5 rounded-lg bg-red-500/20 border border-red-500/30 text-[10px] font-black text-red-400">
-                                                        {t.critical}
-                                                    </span>
-                                                )}
-                                                {!selectedCategory && (
-                                                    <span className="px-2 py-0.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-[10px] font-black text-purple-400">
-                                                        {item.category}
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            {/* Hazard description */}
-                                            <p className="text-sm text-slate-200 font-bold leading-relaxed">
-                                                {item.hazard_description}
-                                            </p>
-
-                                            {/* Preventive measure */}
-                                            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                                                {t.measure}: {item.preventive_measure}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </button>
-                            );
-                        })
-                    )}
+                <div role="group" aria-label={t.allCategories} className="flex gap-2 overflow-x-auto pb-1">
+                    {["", ...categories].map(cat => <button key={cat} type="button" aria-pressed={category === cat}
+                        onClick={() => changeCategory(cat)}
+                        className={`shrink-0 rounded-full border px-4 py-2.5 text-sm font-bold transition-colors ${category === cat ? "border-blue-600 bg-blue-600 text-white shadow-sm" : "border-slate-300 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50"}`}>
+                        {cat || t.allCategories}
+                    </button>)}
                 </div>
-
-                {/* Footer */}
-                {selectedIds.size > 0 && (
-                    <div className="p-4 border-t border-white/5 flex items-center gap-3">
-                        <span className="text-sm font-black text-blue-400">
-                            {selectedIds.size}{t.selected}
-                        </span>
-                        <button
-                            onClick={handleInsert}
-                            className="flex-1 py-4 bg-gradient-to-br from-blue-400 to-blue-600 rounded-[24px] text-lg font-black text-slate-950 shadow-[0_10px_30px_-10px_rgba(59,130,246,0.4)] tap-effect flex items-center justify-center gap-2"
-                        >
-                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-                            </svg>
-                            {t.insert}
-                        </button>
-                    </div>
-                )}
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <button type="button" aria-pressed={critical} onClick={() => setCritical(value => !value)}
+                        className={`rounded-full border px-4 py-2.5 font-bold transition-colors ${critical ? "border-rose-300 bg-rose-50 text-rose-700" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"}`}>{t.criticalOnly}</button>
+                    <button type="button" disabled={!filtered.length || loading || error} className="rounded-full border border-slate-300 bg-white px-4 py-2.5 font-bold text-slate-600 hover:bg-blue-50 disabled:opacity-40"
+                        onClick={() => setSelected(prev => {const next = new Set(prev); for (const item of filtered) {if (allVisibleSelected) next.delete(item.id); else next.add(item.id);} return next;})}>
+                        {allVisibleSelected ? t.deselectAll : t.selectAll}
+                    </button>
+                </div>
+                <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
+                    <span aria-live="polite">{filtered.length} {e[6]}</span>
+                    <button type="button" aria-expanded={filtersOpen} aria-controls="tbm-risk-filters" onClick={() => setFiltersOpen(open => !open)} className="rounded px-1 py-1 font-semibold text-slate-600 hover:text-blue-700">{e[0]} · {e[1]} <span aria-hidden="true">{filtersOpen ? "▴" : "▾"}</span></button>
+                </div>
+                {filtersOpen && <div id="tbm-risk-filters" className="max-h-[25dvh] space-y-3 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <label className="block text-xs font-bold">{e[0]}
+                        <select value={source} onChange={ev => {setSource(ev.target.value);changeCategory("");}} className={fieldClass}>
+                            {sources.map(s => <option value={s.id} key={s.id}>{s.name}</option>)}
+                        </select>
+                    </label>
+                    {category && <select aria-label={e[10]} value={subcategory} onChange={ev => setSubcategory(ev.target.value)} className={fieldClass}>
+                        <option value="">{t.allSubs}</option>{subs.map(s => <option key={s}>{s}</option>)}
+                    </select>}
+                    <input type="search" aria-label={e[1]} placeholder={e[2]} value={query} onChange={ev => setQuery(ev.target.value)} className={fieldClass} />
+                    <p className="text-xs leading-relaxed text-slate-600">{e[5]}{sourceInfo && <span className="mt-1 block">{sourceInfo.sheet || sourceInfo.name}</span>}</p>
+                </div>}
+            </header>
+            <div id="tbm-risk-items" className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+                {loading ? <p role="status" className="py-10 text-center">{t.loading}</p>
+                    : error ? <div role="alert" className="space-y-3 p-6 text-center text-red-800"><p>{e[3]}</p><button type="button" onClick={() => setRetry(n=>n+1)} className="rounded-xl border px-4 py-2">{e[4]}</button></div>
+                    : filtered.length === 0 ? <p className="py-10 text-center text-slate-600">{t.noData}</p>
+                    : <div className="space-y-2">{filtered.map(item => <label key={item.id} className={`block cursor-pointer rounded-[24px] border p-4 transition-colors sm:p-5 ${selected.has(item.id) ? "border-blue-500 bg-blue-50 ring-1 ring-blue-200" : "border-slate-200 bg-white hover:border-blue-300"}`}>
+                        <div className="flex items-start gap-3">
+                            <span className="relative mt-0.5 h-5 w-5 shrink-0">
+                                <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggle(item.id)} aria-label={item.hazard_description} className="peer m-0 h-5 w-5 cursor-pointer appearance-none rounded-[7px] border-2 border-slate-500 bg-white checked:border-blue-600 checked:bg-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" />
+                                <svg viewBox="0 0 20 20" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="pointer-events-none absolute inset-0 hidden h-5 w-5 peer-checked:block"><path d="m5 10 3 3 7-7" /></svg>
+                            </span>
+                            <div className="min-w-0 space-y-2">
+                                <div className="flex flex-wrap gap-2 text-xs font-bold">
+                                    <span className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-slate-600">{item.accident_type}</span>
+                                    <span title={`${t.freq} ${item.frequency} · ${t.sev} ${item.severity}`} className={`rounded-lg border px-2 py-0.5 ${item.is_critical ? "border-rose-200 bg-rose-50 text-rose-700" : "border-orange-200 bg-orange-50 text-orange-700"}`}>{t.risk} {item.risk_level}</span>
+                                    {item.is_critical && <span className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-0.5 text-rose-700">{t.critical}</span>}
+                                    <span title={item.subcategory} className="rounded-lg border border-purple-200 bg-purple-50 px-2 py-0.5 text-purple-700">{item.category}</span>
+                                </div>
+                                <p className="whitespace-pre-wrap break-words text-base font-bold leading-relaxed">{item.hazard_description}</p>
+                                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-600">{t.measure}: {item.preventive_measure}</p>
+                            </div>
+                        </div>
+                    </label>)}</div>}
             </div>
-        </div>
-    );
+            {selected.size > 0 && <footer className="shrink-0 border-t border-slate-200 bg-white p-4">
+                <div className="flex items-center gap-3">
+                    <button type="button" onClick={()=>setSelected(new Set())} disabled={selected.size === 0} className="text-sm font-bold text-slate-600 disabled:opacity-40">{t.deselectAll} ({selected.size})</button>
+                    <button type="button" disabled={disabled || loading || error || selected.size === 0} onClick={()=>{
+                        const text = riskLibraryDraft(items, selected); if (!text || disabled) return; onSelect(text); onClose();
+                    }} className="ml-auto rounded-xl bg-blue-700 px-5 py-3 text-sm font-bold text-white disabled:bg-slate-200 disabled:text-slate-500">{t.insert}</button>
+                </div>
+            </footer>}
+        </section>
+    </div>;
 }

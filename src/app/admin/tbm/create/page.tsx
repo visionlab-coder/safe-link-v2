@@ -1,5 +1,6 @@
 "use client";
 import { tbmDraftSummaryUI } from "@/lib/tbm-draft-summary-ui";
+import { nationwideTbmUI } from "@/lib/tbm-nationwide-ui";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -34,8 +35,8 @@ const adminUI: Record<string, any> = {
         back: "뒤로",
         previewNorm: "은어 자동 교정 미리보기",
         recTime: "녹음 중",
-        library: "기초교육 라이브러리",
-        libraryDesc: "위험성평가 항목 불러오기",
+        library: "위험성 평가 목록",
+        libraryDesc: "목록 열기",
         deleteHistory: "이력 숨기기", chat: "1:1 대화 바로가기", male: "남성", female: "여성",
     },
     en: {
@@ -201,6 +202,16 @@ function AdminTBMCreateContent() {
 
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
     const [adminSiteId, setAdminSiteId] = useState<string | null>(null);
+    const [canBroadcastNationwide, setCanBroadcastNationwide] = useState(false);
+    const [nationwide, setNationwide] = useState(false);
+    const [nationwideConfirmed, setNationwideConfirmed] = useState(false);
+    const [targetCount, setTargetCount] = useState<number | null>(null);
+    const [targetError, setTargetError] = useState(false);
+    const scopeUserRef = useRef<string | null>(null);
+    const nationwidePublishRef = useRef<{ fingerprint: string; id: string } | null>(null);
+    const nationUI = nationwideTbmUI(displayLang || adminLang);
+    const broadcastTarget = nationwide && canBroadcastNationwide ? "nationwide" : adminSiteId;
+    const nationwideReady = !nationwide || (canBroadcastNationwide && nationwideConfirmed && (targetCount ?? 0) > 0 && !targetError);
 
     const loadProfile = useCallback(async () => {
         const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
@@ -208,21 +219,40 @@ function AdminTBMCreateContent() {
         const data = await res.json() as {
             user?: { id: string };
             profile?: { preferred_lang?: string | null; site_id?: string | null } | null;
+            v3?: { roles?: string[] };
         };
         if (!data.user) return;
         setAdminLang(resolveDisplayLanguage(data.profile?.preferred_lang, urlLang));
         setAdminSiteId(data.profile?.site_id || null);
+        const roles = data.v3?.roles || [];
+        setCanBroadcastNationwide(roles.includes("HQ_ADMIN") || roles.includes("ROOT"));
+        if (scopeUserRef.current !== data.user.id) {
+            scopeUserRef.current = data.user.id;
+            setNationwide(roles.includes("HQ_ADMIN") || (roles.includes("ROOT") && !data.profile?.site_id));
+            setNationwideConfirmed(false);
+        }
         setUserId(data.user.id);
     }, [urlLang]);
 
     const fetchHistory = useCallback(async () => {
         const params = new URLSearchParams({ limit: "10" });
-        if (adminSiteId) params.set("site_id", adminSiteId);
+        if (adminSiteId && !nationwide) params.set("site_id", adminSiteId);
         const res = await fetch(`/api/tbm/notices?${params.toString()}`, { cache: "no-store", credentials: "include" });
         if (!res.ok) return;
         const data = await res.json() as { tbms?: any[] };
         if (data.tbms) setHistory(data.tbms);
-    }, [adminSiteId]);
+    }, [adminSiteId, nationwide]);
+
+    useEffect(() => {
+        if (!canBroadcastNationwide) return;
+        const controller = new AbortController();
+        setTargetError(false);
+        fetch("/api/tbm/nationwide/targets", { cache: "no-store", signal: controller.signal })
+            .then(async res => { if (!res.ok) throw new Error("targets_failed"); return res.json(); })
+            .then(data => { if (!Number.isInteger(data.targetCount) || data.targetCount < 1) throw new Error("no_targets"); setTargetCount(data.targetCount); })
+            .catch(() => { if (!controller.signal.aborted) setTargetError(true); });
+        return () => controller.abort();
+    }, [canBroadcastNationwide]);
 
     useEffect(() => {
         loadProfile();
@@ -311,7 +341,7 @@ function AdminTBMCreateContent() {
 
     const { isRecording, toggle: toggleRecording, stopAndDrain } = useCloudSTT({
         lang: "ko",
-        siteId: adminSiteId,
+        siteId: broadcastTarget,
         live: true,
         // TBM은 문장 전체가 끝날 때까지 기다리지 않고 짧은 발화 조각 단위로 전달한다.
         chunkInterval: 1800,
@@ -324,6 +354,10 @@ function AdminTBMCreateContent() {
 
     const showBroadcastError = (error: unknown) => {
         const code = error instanceof Error ? error.message : "";
+        if (code.startsWith("nationwide_")) {
+            setSttError(code === "nationwide_tbm_live_conflict" ? nationUI.conflict : nationUI.failed);
+            return;
+        }
         console.error(`[TBM live] broadcast action failed: ${code || String(error)} (siteId=${adminSiteId ?? "none"})`);
         if (code.endsWith("_401") || code.endsWith("_403")) {
             setSttError("TBM 방송 권한 또는 현장 연결을 확인하지 못했습니다. 다시 로그인한 뒤 시도해 주세요.");
@@ -346,7 +380,7 @@ function AdminTBMCreateContent() {
             const { normalized, changes } = await normalizeKoAsync(source.trim());
             const response = await fetch("/api/tbm/summary", {
                 method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ siteId: adminSiteId, text: normalized }),
+                body: JSON.stringify({ siteId: nationwide ? null : adminSiteId, nationwide, text: normalized }),
                 signal: AbortSignal.timeout(65000),
             });
             if (!response.ok) throw new Error("summary_failed");
@@ -363,7 +397,7 @@ function AdminTBMCreateContent() {
         } finally {
             if (requestId === summaryRequestRef.current) setSummaryBusy(false);
         }
-    }, [adminSiteId]);
+    }, [adminSiteId, nationwide]);
 
     useEffect(() => {
         if (!liveFinalizing || liveCompleted || isDraining || isSending || summaryBusy || !tbmText.trim()
@@ -392,7 +426,7 @@ function AdminTBMCreateContent() {
                 }
                 await completeLiveTbm();
             } else {
-                if (!adminSiteId) {
+                if (!broadcastTarget || !nationwideReady) {
                     setSttError("방송할 현장 정보를 확인하지 못했습니다. 다시 로그인한 뒤 시도해 주세요.");
                     return;
                 }
@@ -406,7 +440,7 @@ function AdminTBMCreateContent() {
                     setBroadcastActive(false);
                 }
                 try {
-                    await broadcaster.current.start(adminSiteId);
+                    await broadcaster.current.start(broadcastTarget);
                 } catch (error) {
                     showBroadcastError(error);
                     return;
@@ -488,16 +522,24 @@ function AdminTBMCreateContent() {
                 return;
             }
 
-            const res = await fetch("/api/tbm/broadcast", {
+            if (!nationwideReady) {
+                setBroadcastResult({ type: "error", message: nationUI.confirm });
+                return;
+            }
+            const fingerprint = JSON.stringify([normalized, summarySource === tbmText ? summaryText : ""]);
+            if (nationwide && nationwidePublishRef.current?.fingerprint !== fingerprint)
+                nationwidePublishRef.current = { fingerprint, id: `tbm_${Date.now()}_${Math.random().toString(36).slice(2, 10)}` };
+            const res = await fetch(nationwide ? "/api/tbm/nationwide/broadcast" : "/api/tbm/broadcast", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Idempotency-Key": crypto.randomUUID(),
+                    "Idempotency-Key": globalThis.crypto?.randomUUID?.() || `tbm_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
                 },
                 body: JSON.stringify({
                     content_ko: normalized,
                     summary_ko: summarySource === tbmText ? summaryText.trim() || undefined : undefined,
                     site_id: adminSiteId ?? undefined,
+                    ...(nationwide ? { sessionId: nationwidePublishRef.current!.id, confirmed: nationwideConfirmed } : {}),
                 }),
             });
             const result = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
@@ -573,21 +615,33 @@ function AdminTBMCreateContent() {
                   <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
                     <p className="text-[10px] font-black tracking-[.18em] text-blue-200">SQ LINK TBM</p>
                     <h2 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h2>
-                    <p className="mt-2 text-sm font-bold text-slate-100">{t.subtitle}</p>
+                    <p className="mt-2 text-sm font-bold text-slate-100">{nationwide ? nationUI.all : t.subtitle}</p>
                   </div>
                 </div>
 
                 <main className="flex-1 flex flex-col p-4 md:p-8 gap-8 max-w-3xl mx-auto w-full pb-20">
+                    {canBroadcastNationwide && <fieldset disabled={broadcastActive || broadcastBusy || isSending || isDraining || summaryBusy || (liveFinalizing && !liveCompleted)} className="rounded-3xl border border-blue-200 bg-blue-50 p-5 text-slate-900">
+                        <legend className="px-2 text-sm font-bold">{nationUI.target}</legend>
+                        <div className="flex flex-wrap gap-4 text-sm font-bold">
+                            <label className="flex items-center gap-2"><input type="radio" name="tbm-scope" checked={nationwide} onChange={() => { setNationwide(true); setNationwideConfirmed(false); }} />{nationUI.all}</label>
+                            {adminSiteId && <label className="flex items-center gap-2"><input type="radio" name="tbm-scope" checked={!nationwide} onChange={() => { setNationwide(false); setNationwideConfirmed(false); }} />{nationUI.site}</label>}
+                        </div>
+                        {nationwide && <>
+                            <p className="mt-3 text-sm" role="status">{targetError ? nationUI.unavailable : targetCount == null ? nationUI.loading : `${nationUI.count}: ${targetCount}`}</p>
+                            <label className="mt-3 flex items-start gap-2 text-sm font-semibold"><input type="checkbox" className="mt-1" checked={nationwideConfirmed} onChange={e => setNationwideConfirmed(e.target.checked)} />{nationUI.confirm}</label>
+                        </>}
+                    </fieldset>}
                     {/* 기초교육 라이브러리 섹션 */}
                     <section className="glass rounded-[40px] p-8 border-white/10 shadow-2xl relative overflow-hidden group">
                         <div className="absolute top-0 left-0 w-32 h-32 bg-green-500/10 blur-[60px] rounded-full -ml-16 -mt-16 group-hover:bg-green-500/20 transition-all duration-1000" />
-                        <div className="flex justify-between items-center">
+                        <div className="flex flex-wrap justify-between items-center gap-3">
                             <h3 className="text-lg font-black text-white flex items-center gap-3 italic font-mono">
                                 <span className="w-2 h-6 bg-green-500 rounded-full" />
                                 {t.library}
                             </h3>
                             <button
                                 onClick={() => setIsLibraryOpen(true)}
+                                disabled={liveFinalizing}
                                 className="flex items-center gap-2 px-6 py-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl text-xs font-black shadow-lg tap-effect tracking-widest uppercase"
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -602,7 +656,7 @@ function AdminTBMCreateContent() {
                         <div className="glass tbm-compose-panel rounded-[48px] p-8 border-white/10 shadow-3xl flex flex-col gap-6 relative min-h-[400px]">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">{t.koreanDraft}</h3>
-                                <button onClick={handleRecording} disabled={isDraining || isSending || broadcastBusy || summaryBusy || (liveFinalizing && !liveCompleted) || !adminSiteId} className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all tap-effect relative ${isRecording ? "bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)]" : "glass border-white/10 text-slate-400 hover:text-white"}`}>
+                                <button onClick={handleRecording} disabled={isDraining || isSending || broadcastBusy || summaryBusy || (liveFinalizing && !liveCompleted) || !broadcastTarget || (!isRecording && !nationwideReady)} className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all tap-effect relative ${isRecording ? "bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)]" : "glass border-white/10 text-slate-400 hover:text-white"}`}>
                                     {isRecording && (
                                         <span className="absolute inset-0 rounded-full bg-red-500/40 animate-ping" />
                                     )}
@@ -695,7 +749,7 @@ function AdminTBMCreateContent() {
                             )}
 
                             <div className="mt-auto pt-6 border-t border-white/5 flex flex-col gap-3">
-                                <button onClick={handleSendTBM} disabled={liveCompleted || isSending || !tbmText.trim() || isRecording || isDraining || summaryBusy} className="w-full py-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-[32px] text-2xl font-black text-slate-950 shadow-[0_20px_50px_-15px_rgba(59,130,246,0.4)] tap-effect flex items-center justify-center gap-4 disabled:opacity-30 disabled:grayscale transition-all">
+                                <button onClick={handleSendTBM} disabled={liveCompleted || isSending || !tbmText.trim() || isRecording || isDraining || summaryBusy || !nationwideReady} className="w-full py-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-[32px] text-2xl font-black text-slate-950 shadow-[0_20px_50px_-15px_rgba(59,130,246,0.4)] tap-effect flex items-center justify-center gap-4 disabled:opacity-30 disabled:grayscale transition-all">
                                     {isSending ? <div className="w-8 h-8 border-4 border-slate-950 border-t-transparent rounded-full animate-spin" /> : <><svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>{liveCompleted ? t.pushSuccess : t.pushBtn}</>}
                                 </button>
                                 <button
@@ -751,6 +805,7 @@ function AdminTBMCreateContent() {
                     onClose={() => setIsLibraryOpen(false)}
                     onSelect={handleLibrarySelect}
                     lang={adminLang}
+                    disabled={liveFinalizing}
                 />
             </div>
         </RoleGuard>

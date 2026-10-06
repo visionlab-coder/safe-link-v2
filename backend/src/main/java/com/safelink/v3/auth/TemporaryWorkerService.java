@@ -34,13 +34,14 @@ public class TemporaryWorkerService {
 
     public static void validate(String name, String phone, boolean consent, String version) {
         if (!consent || !CONSENT_VERSION.equals(version)) throw new IllegalArgumentException("privacy_consent_required");
-        if (name == null || name.strip().isEmpty() || name.length()>80) throw new IllegalArgumentException("name_required");
+        EnglishName.require(name);
         if (phone == null || !phone.matches("\\+?[0-9]{8,15}")) throw new IllegalArgumentException("phone_invalid");
     }
 
     @Transactional
     public SessionPrincipal register(String name, String phone, String language, boolean consent, String version) {
         validate(name, phone, consent, version);
+        name = EnglishName.require(name);
         if (language == null || !language.matches("[a-z]{2,5}")) throw new IllegalArgumentException("language_invalid");
         Long site = siteId();
         // Never sign in or promote an existing account using an unverified phone number.

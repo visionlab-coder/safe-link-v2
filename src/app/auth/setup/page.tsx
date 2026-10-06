@@ -1,4 +1,6 @@
 "use client";
+import EnglishNameField from "@/components/EnglishNameField";
+import { englishNameUI } from "@/lib/english-name";
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -297,7 +299,8 @@ function SetupContent() {
   const [role, setRole] = useState<RoleKey>(getInitialSetupRole(searchParams.get("role")));
   const [language, setLanguage] = useState(urlLang);
   const [name, setName] = useState("");
-  const [romanizing, setRomanizing] = useState(false);
+  const [nameReady, setNameReady] = useState(false);
+  const [nameError, setNameError] = useState(false);
   const [phone, setPhone] = useState("");
   const [trade, setTrade] = useState("");
   const [title, setTitle] = useState("");
@@ -353,37 +356,8 @@ function SetupContent() {
     loadSites();
   }, []);
 
-  const isNonLatin = useCallback((value: string) =>
-    !/^[a-zA-Z\s\-'.]+$/.test(value.trim()) && !/\(.+\)/.test(value.trim()), []);
-
-  const fetchRomanized = useCallback(async (value: string): Promise<string | null> => {
-    try {
-      const res = await fetch("/api/romanize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: value.trim(), lang: language }),
-      });
-      const data = await res.json() as { romanized: string | null };
-      return data.romanized && data.romanized !== value.trim() ? data.romanized : null;
-    } catch {
-      return null;
-    }
-  }, [language]);
-
-  const handleNameBlur = async () => {
-    const trimmed = name.trim();
-    if (!trimmed || !isNonLatin(trimmed)) return;
-    setRomanizing(true);
-    try {
-      const romanized = await fetchRomanized(trimmed);
-      if (romanized) setName(`${trimmed} (${romanized})`);
-    } finally {
-      setRomanizing(false);
-    }
-  };
-
   const isAdminSiteRole = role === "site_manager" || role === "safety_officer" || role === "gongmu";
-  const canProceedStep1 = () => Boolean(name.trim() && role);
+  const canProceedStep1 = () => Boolean(nameReady && role);
   const canProceedStep2 = () => {
     if (role === "worker" && (!trade || !siteCode)) return false;
     if (isAdminSiteRole) {
@@ -395,21 +369,11 @@ function SetupContent() {
   };
 
   const handleSave = useCallback(async () => {
-    if (!role || !name.trim()) {
-      alert(t.err);
+    if (!role || !nameReady) {
+      setNameError(true); setStep(1);
       return;
     }
-
-    let finalName = name.trim();
-    if (isNonLatin(finalName)) {
-      setRomanizing(true);
-      const romanized = await fetchRomanized(finalName);
-      setRomanizing(false);
-      if (romanized) {
-        finalName = `${finalName} (${romanized})`;
-        setName(finalName);
-      }
-    }
+    const finalName = name.trim();
 
     if ((isMasterEmail || isHQAuthorized) && role === "worker") {
       alert(t.adminAccountWorker);
@@ -463,13 +427,12 @@ function SetupContent() {
     }
   }, [
     adminExists,
-    fetchRomanized,
     initSiteId,
     isAdminSiteRole,
     isEditMode,
     isHQAuthorized,
     isMasterEmail,
-    isNonLatin,
+    nameReady,
     language,
     name,
     phone,
@@ -580,27 +543,8 @@ function SetupContent() {
                     })}
                   </div>
 
-                  <div>
-                    <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest" style={{ color:"#475569" }}>
-                      {t.nameTitle}
-                    </label>
-                    <div style={fieldBox}>
-                      <input
-                        type="text"
-                        placeholder={t.nameTitle}
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        onBlur={handleNameBlur}
-                        className="w-full bg-transparent px-4 py-3.5 text-sm text-slate-800 outline-none placeholder:text-slate-400"
-                      />
-                    </div>
-                    {romanizing && (
-                      <p className="ml-1 mt-1.5 flex animate-pulse items-center gap-1 text-[10px]" style={{ color:"#60A5FA" }}>
-                        <span className="inline-block h-2 w-2 animate-ping rounded-full bg-blue-400" />
-                        {t.romanizing}
-                      </p>
-                    )}
-                  </div>
+                  <EnglishNameField language={language} value={name} onChange={setName} onReadyChange={setNameReady} />
+                  {nameError && !nameReady && <p role="alert" className="text-sm text-red-700">{englishNameUI(language).error}</p>}
 
                   <div>
                     <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest" style={{ color:"#475569" }}>

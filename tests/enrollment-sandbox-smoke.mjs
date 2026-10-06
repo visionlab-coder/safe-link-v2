@@ -1,4 +1,4 @@
-// Deliberately fixed local endpoints. Uses dummy #7; leaves #1-6 for manual testing.
+// Deliberately fixed local endpoints. Uses English dummy #17; leaves #10-16 for manual testing.
 import assert from "node:assert/strict";
 const base = "http://127.0.0.1:3100";
 const cookies = new Map();
@@ -11,7 +11,7 @@ async function call(path, body) {
   let data; try { data = JSON.parse(text); } catch { data = null; }
   return { status: res.status, data };
 }
-const signup = {name:"테스트근로자7",phone:"01000009007",language:"ko",consent:true,consentVersion:"temporary-worker-2026-09-28"};
+const signup = {name:"TEST WORKER H",phone:"01000009017",language:"ko",consent:true,consentVersion:"temporary-worker-2026-09-28"};
 assert.equal((await call("/api/auth/temporary-worker",{...signup,consent:false})).status,400);
 assert.equal((await call("/api/auth/temporary-worker",signup)).status,200);
 const before = await call("/api/auth/me");
@@ -21,7 +21,7 @@ const sites=await call("/api/worker-upgrade?mode=sites");
 assert.equal(sites.status,200);
 const site = sites.data.find(s => s.name === "로컬 가입 테스트 현장");
 assert.ok(site);
-const input={name:signup.name,phone:signup.phone,siteId:site.id,irisId:"99001007",consent:true,consentVersion:"worker-upgrade-2026-09-28"};
+const input={name:signup.name,phone:signup.phone,siteId:site.id,irisId:"99001017",consent:true,consentVersion:"worker-upgrade-2026-09-28"};
 for (const invalid of [{...input,consent:false},{...input,irisId:"1111"},{...input,siteId:999999},{...input,name:"다른사람"},{...input,phone:"01000009001"}]) {
   assert.equal((await call("/api/worker-upgrade",invalid)).status,400);
   assert.equal((await call("/api/auth/me")).data.profile.role,"TEMP_WORKER");

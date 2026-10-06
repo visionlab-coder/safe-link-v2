@@ -7,6 +7,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Component
 public class LiveInterpreterEventBus {
@@ -25,6 +27,14 @@ public class LiveInterpreterEventBus {
             remove(channel, emitter);
         }
         return emitter;
+    }
+
+    public void publishAfterCommit(String channel, String eventName, Object payload) {
+        if (TransactionSynchronizationManager.isActualTransactionActive() && TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCommit() { publish(channel,eventName,payload); }
+            });
+        } else publish(channel,eventName,payload);
     }
 
     public void publish(String channel, String eventName, Object payload) {

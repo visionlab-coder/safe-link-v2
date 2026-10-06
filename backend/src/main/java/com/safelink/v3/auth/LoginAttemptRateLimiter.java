@@ -52,6 +52,18 @@ public class LoginAttemptRateLimiter {
         }
     }
 
+    /** Separate atomic bucket for a CPU-only public helper; names never become keys. */
+    public void consumeNameSuggestion(String ipAddress) {
+        var script = new org.springframework.data.redis.core.script.DefaultRedisScript<Long>(
+            "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],60) end; return n", Long.class);
+        try {
+            Long count = redis.execute(script, java.util.List.of("auth:name-suggestion:" + sha256(ipAddress == null ? "" : ipAddress)));
+            if (count == null) throw new IllegalStateException("missing_limit");
+            if (count > 60) throw new LoginRateLimitExceededException("name_suggestion_rate_limited");
+        } catch (LoginRateLimitExceededException ex) { throw ex; }
+        catch (RuntimeException ex) { throw new ServiceUnavailableException("redis_name_rate_limit_unavailable"); }
+    }
+
     private static String key(String email, String ipAddress) {
         String subject = (email == null ? "" : email.trim().toLowerCase()) + "|" + (ipAddress == null ? "" : ipAddress);
         return "auth:login:fail:" + sha256(subject);

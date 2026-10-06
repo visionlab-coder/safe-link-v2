@@ -157,8 +157,8 @@ public class AiGatewayController {
     // Draft-only: does not publish a notice or alter session-linked summary records.
     @PostMapping("/tbm-summary")
     public VendorResponse summarizeTbm(@AuthenticationPrincipal SessionPrincipal actor, @Valid @RequestBody SummaryRequest request) {
-        siteGuard.requireGlobalOrSiteAdmin(actor, request.siteId(), "ai.tbm_summary", "site", String.valueOf(request.siteId()));
-        requireAiAccess(actor, request.siteId(), "tbm_summary");
+        if (!request.nationwide()) siteGuard.requireGlobalOrSiteAdmin(actor, request.siteId(), "ai.tbm_summary", "site", String.valueOf(request.siteId()));
+        requireTbmAiAccess(actor, request.siteId(), "tbm_summary", request.nationwide());
         requireQuota(actor, request.siteId(), "tbm_summary", request.text().length());
         Instant started = Instant.now();
         var result = vendor.summarizeTbm(request.text());
@@ -169,8 +169,10 @@ public class AiGatewayController {
         return new VendorResponse(result.text(), result.vendor(), result.model());
     }
 
-    public record SummaryRequest(@NotNull @jakarta.validation.constraints.Positive Long siteId,
-        @NotBlank @jakarta.validation.constraints.Size(max=60000) String text) {}
+    public record SummaryRequest(@jakarta.validation.constraints.Positive Long siteId,
+        @NotBlank @jakarta.validation.constraints.Size(max=60000) String text, boolean nationwide) {
+        public SummaryRequest(Long siteId,String text) { this(siteId,text,false); }
+    }
 
     @PostMapping("/vision")
     public VisionResponse vision(@AuthenticationPrincipal SessionPrincipal actor, @Valid @RequestBody VisionRequest request) {
@@ -202,7 +204,7 @@ public class AiGatewayController {
 
     @PostMapping("/stt")
     public SttResponse stt(@AuthenticationPrincipal SessionPrincipal actor, @Valid @RequestBody SttRequest request) {
-        requireAiAccess(actor, request.siteId(), "stt");
+        requireTbmAiAccess(actor, request.siteId(), "stt", request.nationwide());
         if (request.audio().length() > 14_000_000) throw new IllegalArgumentException("stt_audio_too_large");
         var decision = requireQuota(actor, request.siteId(), "stt", request.audio().length());
         Instant started = Instant.now();
@@ -318,6 +320,14 @@ public class AiGatewayController {
         if (!properties.isVendorEnabled()) throw new ServiceUnavailableException("ai_vendor_not_configured");
     }
 
+    private void requireTbmAiAccess(SessionPrincipal actor,Long siteId,String feature,boolean nationwide) {
+        if (!nationwide) { requireAiAccess(actor,siteId,feature); return; }
+        com.safelink.v3.tbm.NationwideTbmAccess.require(actor);
+        if (siteId != null) throw new IllegalArgumentException("nationwide_site_must_be_empty");
+        if (!properties.isVendorEnabled()) throw new ServiceUnavailableException("ai_vendor_not_configured");
+        // Nationwide STT and summary are generated once, with user-level quota and null site audit.
+    }
+
     private AiQuotaService.QuotaDecision requireQuota(SessionPrincipal actor, Long siteId, String feature, long inputSize) {
         var decision = quota.checkAndIncrement(feature, siteId, actor.userId());
         if (!decision.allowed()) {
@@ -408,7 +418,11 @@ public class AiGatewayController {
     public record VendorResponse(String text, String vendor, String model) {}
     public record VisionRequest(@NotNull Long siteId, @NotBlank String image, String mimeType, String targetLanguage, @NotBlank String prompt) {}
     public record VisionResponse(String text, String vendor, String model) {}
-    public record SttRequest(@NotNull Long siteId, @NotBlank String audio, String mimeType, String languageCode, Integer sampleRateHertz, boolean live, List<String> speechHints, String prompt, List<String> targetLanguages) {}
+    public record SttRequest(Long siteId, @NotBlank String audio, String mimeType, String languageCode, Integer sampleRateHertz, boolean live, List<String> speechHints, String prompt, List<String> targetLanguages, boolean nationwide) {
+        public SttRequest(Long siteId,String audio,String mimeType,String languageCode,Integer sampleRateHertz,boolean live,List<String> speechHints,String prompt,List<String> targetLanguages) {
+            this(siteId,audio,mimeType,languageCode,sampleRateHertz,live,speechHints,prompt,targetLanguages,false);
+        }
+    }
     public record SttResponse(String transcript, String vendor, String model, Map<String, String> translations) {}
     public record TtsRequest(@NotNull Long siteId, @NotBlank String text, String voiceLanguageCode, String voiceName, String gender, boolean preferOpenAi, boolean strictProvider, String audioEncoding) {}
     public record TtsResponse(String audioBase64, String contentType, String vendor, String model) {}

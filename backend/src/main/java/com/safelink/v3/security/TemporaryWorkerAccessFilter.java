@@ -26,6 +26,7 @@ public class TemporaryWorkerAccessFilter extends OncePerRequestFilter {
     private static final Set<String> WRITE = Set.of(
         "/api/v1/auth/logout", "/api/v1/live/worker-responses", "/api/v1/live/tbm-participation",
         "/api/v1/worker-upgrade",
+        "/api/v1/auth/romanize-name",
         "/api/v1/ai/translate", "/api/v1/ai/stt", "/api/v1/ai/tts",
         "/api/v1/ai/vendor", "/api/v1/ai/reserve"
     );

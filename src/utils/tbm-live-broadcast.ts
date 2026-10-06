@@ -2,7 +2,11 @@
 export class TbmLiveBroadcast {
   private session: { sessionId: string; siteId: string } | null = null;
   private stoppedSession: { sessionId: string; siteId: string } | null = null;
+  private pendingNationwideSession: { sessionId: string; siteId: string } | null = null;
   private queue: Promise<void> = Promise.resolve();
+  private endpoint(session: { siteId: string }, operation: string) {
+    return session.siteId === "nationwide" ? `/api/tbm/nationwide/${operation}` : `/api/live/${operation}`;
+  }
   constructor(private request: typeof fetch = fetch) {}
 
   private async requestWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs = 10_000) {
@@ -27,26 +31,30 @@ export class TbmLiveBroadcast {
     if (this.session) throw new Error("broadcast_already_started");
     // 일부 Android WebView에서는 crypto.randomUUID()가 없어, API 요청 전에 방송 시작이
     // 중단될 수 있다. 기존 라이브와 동일하게 브라우저 호환 식별자를 사용한다.
-    const session = {
+    const session = (siteId === "nationwide" ? this.pendingNationwideSession : null) || {
       sessionId: `tbm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       siteId,
     };
-    const response = await this.requestWithTimeout("/api/live/sessions", {
+    if (siteId === "nationwide") this.pendingNationwideSession = session;
+    const response = await this.requestWithTimeout(this.endpoint(session,"sessions"), {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(session),
+      body: JSON.stringify({ ...session, ...(siteId === "nationwide" ? { confirmed: true } : {}) }),
     });
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
       console.error("[TBM live] session start rejected", { status: response.status, detail, session });
-      throw new Error(`broadcast_start_failed_${response.status}`);
+      let code = "";
+      try { code = JSON.parse(detail).error || ""; } catch {}
+      throw new Error(code.startsWith("nationwide_") ? code : `broadcast_start_failed_${response.status}`);
     }
     this.session = session;
+    this.pendingNationwideSession = null;
     this.stoppedSession = null;
   }
   async announceSpeaking() {
     const session = this.session;
     if (!session) return;
-    const response = await this.requestWithTimeout("/api/live/sessions/speaking", {
+    const response = await this.requestWithTimeout(this.endpoint(session,session.siteId === "nationwide" ? "speaking" : "sessions/speaking"), {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(session),
     });
     if (!response.ok) {
@@ -57,7 +65,7 @@ export class TbmLiveBroadcast {
     const session = this.session;
     if (!session || !text.trim()) return Promise.resolve();
     const task = this.queue.then(async () => {
-      const response = await this.requestWithTimeout("/api/live/translations", {
+      const response = await this.requestWithTimeout(this.endpoint(session,"translations"), {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...session, text_ko: text.trim(), translations: {} }),
       });
@@ -74,8 +82,10 @@ export class TbmLiveBroadcast {
     await this.queue;
     const session = this.session;
     if (!session) return;
-    const response = await this.requestWithTimeout("/api/live/sessions?" + new URLSearchParams(session), {
-      method: "DELETE", keepalive: true,
+    const national = session.siteId === "nationwide";
+    const response = await this.requestWithTimeout(national ? this.endpoint(session,"stop") : "/api/live/sessions?" + new URLSearchParams(session), {
+      method: national ? "POST" : "DELETE", keepalive: true,
+      ...(national ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(session) } : {}),
     });
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
@@ -90,7 +100,7 @@ export class TbmLiveBroadcast {
     const session = this.session || this.stoppedSession;
     if (!session) return Promise.resolve();
     const task = this.queue.then(async () => {
-      const response = await this.requestWithTimeout("/api/live/tbm-draft", {
+      const response = await this.requestWithTimeout(this.endpoint(session,session.siteId === "nationwide" ? "draft" : "tbm-draft"), {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...session, content }),
       });
@@ -105,7 +115,7 @@ export class TbmLiveBroadcast {
     await this.stop();
     const session = this.stoppedSession;
     if (!session) throw new Error("broadcast_session_required");
-    const response = await this.requestWithTimeout("/api/live/summary", {
+    const response = await this.requestWithTimeout(this.endpoint(session,"summary"), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...session, content_ko: content, summary_ko: summary }),
     }, 65_000);

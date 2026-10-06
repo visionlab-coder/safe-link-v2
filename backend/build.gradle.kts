@@ -15,6 +15,7 @@ java {
 }
 
 dependencies {
+    implementation("com.ibm.icu:icu4j:78.1")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")

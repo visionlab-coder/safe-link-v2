@@ -52,6 +52,11 @@ public class LiveInterpreterController {
         String sessionId = clean(request.sessionId());
         if (sessionId.isBlank()) throw new IllegalArgumentException("session_id_required");
 
+        jdbc.sql("select pg_advisory_xact_lock(737037)").query((rs,n)->true).single();
+        if (jdbc.sql("select exists(select 1 from live_broadcast_sessions s join nationwide_tbm_targets t on t.session_id=s.session_id where s.site_id=:site and s.active=true)")
+                .param("site",siteId).query(Boolean.class).single())
+            throw new IllegalArgumentException("nationwide_tbm_live_conflict");
+
         // 이전 방송은 종료 처리한 뒤 새 방송을 단 하나만 활성화한다.
         jdbc.sql("""
                 update live_broadcast_sessions
@@ -71,7 +76,7 @@ public class LiveInterpreterController {
 
         var event = new BroadcastSessionEvent(sessionId, String.valueOf(siteId), String.valueOf(actor.userId()), true);
         audit.record(actor.userId(), siteId, "live.broadcast.start", "live_broadcast_session", sessionId, "ALLOWED", "server_api", Map.of());
-        eventBus.publish(LiveInterpreterEventBus.translationsChannel(siteId), "broadcast-start", event);
+        eventBus.publishAfterCommit(LiveInterpreterEventBus.translationsChannel(siteId), "broadcast-start", event);
         return event;
     }
 
@@ -86,6 +91,12 @@ public class LiveInterpreterController {
         Long requestedSiteId = siteId == null || siteId.isBlank() ? firstSiteId(actor) : parseLong(siteId, "siteId_invalid");
         if (requestedSiteId == null) throw new IllegalArgumentException("site_id_required");
         siteGuard.requireSiteAccess(actor, requestedSiteId, "live.broadcast.stop", "live_broadcast_session", null);
+        var nationwideOwner = jdbc.sql("select b.created_by from nationwide_tbm_targets t join nationwide_tbm_broadcasts b on b.id=t.broadcast_id where t.session_id=:id and t.site_id=:site")
+            .param("id",clean(sessionId)).param("site",requestedSiteId).query(Long.class).optional();
+        if (nationwideOwner.isPresent()) {
+            com.safelink.v3.tbm.NationwideTbmAccess.require(actor);
+            if (!nationwideOwner.get().equals(actor.userId())) throw new AccessDeniedException("live_session_owner_required");
+        }
         int changed = jdbc.sql("""
                 update live_broadcast_sessions
                 set active = false, ended_at = now()
@@ -96,7 +107,7 @@ public class LiveInterpreterController {
             .update();
         if (changed > 0) {
             audit.record(actor.userId(), requestedSiteId, "live.broadcast.stop", "live_broadcast_session", clean(sessionId), "ALLOWED", "server_api", Map.of());
-            eventBus.publish(
+            eventBus.publishAfterCommit(
                 LiveInterpreterEventBus.translationsChannel(requestedSiteId),
                 "broadcast-stop",
                 new BroadcastSessionEvent(clean(sessionId), String.valueOf(requestedSiteId), String.valueOf(actor.userId()), false)
@@ -127,7 +138,7 @@ public class LiveInterpreterController {
             .query(Boolean.class)
             .single();
         if (!active) return Map.of("announced", false);
-        eventBus.publish(
+        eventBus.publishAfterCommit(
             LiveInterpreterEventBus.translationsChannel(siteId),
             "broadcast-speaking",
             new BroadcastSessionEvent(sessionId, String.valueOf(siteId), String.valueOf(actor.userId()), true)
@@ -197,7 +208,7 @@ public class LiveInterpreterController {
             .query(Long.class)
             .single();
         audit.record(actor.userId(), siteId, "live.translation.create", "live_translation_event", String.valueOf(id), "ALLOWED", "server_api", Map.of("sessionId", sessionId));
-        eventBus.publish(
+        eventBus.publishAfterCommit(
             LiveInterpreterEventBus.translationsChannel(siteId),
             "translation",
             new TranslationEvent(String.valueOf(id), sessionId, String.valueOf(siteId), textKo, translations, String.valueOf(actor.userId()), Instant.now().toString())
@@ -303,8 +314,8 @@ public class LiveInterpreterController {
             speakerName,
             Instant.now().toString()
         );
-        eventBus.publish(LiveInterpreterEventBus.workerResponsesChannel(adminId, siteId), "worker-response", event);
-        eventBus.publish(LiveInterpreterEventBus.workerResponsesChannel(adminId, null), "worker-response", event);
+        eventBus.publishAfterCommit(LiveInterpreterEventBus.workerResponsesChannel(adminId, siteId), "worker-response", event);
+        eventBus.publishAfterCommit(LiveInterpreterEventBus.workerResponsesChannel(adminId, null), "worker-response", event);
         return Map.of("id", String.valueOf(id));
     }
 

@@ -139,12 +139,15 @@ export async function POST(request: Request) {
         ? Number(requestedSiteId)
         : null;
     const isRoot = user.roles?.includes("ROOT") === true;
-    // 현장 계정은 절대 요청값으로 현장을 바꿀 수 없다. ROOT만 라이브 화면에서
-    // 선택한 현장을 사용할 수 있으며, 백엔드 AI 게이트웨이도 해당 권한을 재검증한다.
-    const siteId = isRoot && Number.isInteger(parsedRequestedSiteId)
+    const isGlobal = isRoot || user.roles?.includes("HQ_ADMIN") === true;
+    const nationwide = requestedSiteId === "nationwide";
+    if (nationwide && !isGlobal) return NextResponse.json({ error: "nationwide_tbm_admin_required" }, { status: 403 });
+    // Only global administrators can request another site or explicit nationwide scope.
+    // The backend independently validates the role; ordinary site sessions remain scoped.
+    const siteId = nationwide ? null : isGlobal && Number.isInteger(parsedRequestedSiteId)
       ? parsedRequestedSiteId
       : user.activeSiteId ?? user.siteIds?.[0];
-    if (user.source !== "v3" || typeof siteId !== "number" || !Number.isInteger(siteId) || siteId <= 0) {
+    if (user.source !== "v3" || (!nationwide && (typeof siteId !== "number" || !Number.isInteger(siteId) || siteId <= 0))) {
       return NextResponse.json({ error: "V3_SITE_SESSION_REQUIRED" }, { status: 403 });
     }
     if (!audio) return NextResponse.json({ error: "No audio data" }, { status: 400 });
@@ -156,7 +159,8 @@ export async function POST(request: Request) {
     const shortLang = languageCode.split("-")[0];
     const isChatContext = context === "chat";
     const upstream = await callV3AiStt(request, {
-      siteId,
+      siteId: siteId ?? null,
+      nationwide,
       audio,
       mimeType,
       languageCode,

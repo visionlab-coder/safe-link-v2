@@ -23,7 +23,7 @@ public class WorkerUpgradeService {
     public record Application(String name,String phone,Long siteId,String irisId,boolean consent,String consentVersion) {}
     public static void validate(Application input) {
         if (!input.consent() || !CONSENT_VERSION.equals(input.consentVersion())) throw new IllegalArgumentException("privacy_consent_required");
-        if (input.name()==null || input.name().isBlank() || input.name().length()>80) throw new IllegalArgumentException("name_required");
+        EnglishName.require(input.name());
         if (input.phone()==null || !input.phone().matches("\\+?[0-9]{8,15}")) throw new IllegalArgumentException("phone_invalid");
         if (input.siteId()==null || input.siteId()<1) throw new IllegalArgumentException("site_required");
         if (input.irisId()==null || !input.irisId().matches("[0-9]{1,64}")) throw new IllegalArgumentException("iris_id_invalid");
@@ -62,7 +62,7 @@ public class WorkerUpgradeService {
             phone=excluded.phone,iris_id=excluded.iris_id,consent_version=excluded.consent_version,
             consented_at=now(),requested_at=now(),status='PENDING',decided_by=null,decided_at=null,
             decision_reason=null,verification_method=null,revision=worker_upgrade_requests.revision+1
-            """).param("user",actor.userId()).param("site",input.siteId()).param("name",input.name().strip())
+            """).param("user",actor.userId()).param("site",input.siteId()).param("name",EnglishName.require(input.name()))
             .param("phone",input.phone()).param("iris",input.irisId()).param("version",CONSENT_VERSION).update();
         audit.record(actor.userId(),input.siteId(),"worker.upgrade.request","user",String.valueOf(actor.userId()),"ALLOWED","pending_manual_verification",Map.of("consentVersion",CONSENT_VERSION));
         return Map.of("status","PENDING");
@@ -94,13 +94,14 @@ public class WorkerUpgradeService {
         if (!approve && (reason==null || reason.isBlank() || reason.length()>500)) throw new IllegalArgumentException("rejection_reason_required");
         if (approve) {
             requireActiveSite(site);
+            String approvedName = EnglishName.require((String)request.get("display_name"));
             // Match the existing worker login mechanism without asking the worker to create another account.
             String loginId = "W" + Long.toString(user,36).toUpperCase(java.util.Locale.ROOT);
             if (loginId.length()>6) throw new IllegalArgumentException("worker_login_id_requires_configuration");
             String phone = (String)request.get("phone");
             jdbc.sql("insert into worker_quick_login_credentials(user_id,name_initials,phone_last4,enabled) values(:id,:login,:last4,true) on conflict(user_id) do update set phone_last4=excluded.phone_last4,enabled=true,updated_at=now()")
                 .param("id",user).param("login",loginId).param("last4",phone.substring(phone.length()-4)).update();
-            jdbc.sql("update users set display_name=:name,phone=:phone where id=:id").param("name",request.get("display_name")).param("phone",request.get("phone")).param("id",user).update();
+            jdbc.sql("update users set display_name=:name,phone=:phone where id=:id").param("name",approvedName).param("phone",request.get("phone")).param("id",user).update();
             jdbc.sql("update user_roles set revoked_at=now() where user_id=:id and role='TEMP_WORKER' and revoked_at is null").param("id",user).update();
             jdbc.sql("insert into user_roles(user_id,role,granted_by) values(:id,'WORKER',:actor)").param("id",user).param("actor",actor.userId()).update();
             jdbc.sql("update site_memberships set status='REVOKED' where user_id=:id and role='TEMP_WORKER'").param("id",user).update();

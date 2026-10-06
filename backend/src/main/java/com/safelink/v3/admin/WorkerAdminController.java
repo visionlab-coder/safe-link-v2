@@ -48,7 +48,7 @@ public class WorkerAdminController {
         String initials = cleanInitials(request.nameInitials());
         String phoneLast4 = cleanPhoneLast4(request.phoneLast4(), phone);
         String preferredLanguage = cleanLanguage(request.preferredLanguage());
-        String displayName = request.displayName().trim();
+        String displayName = com.safelink.v3.auth.EnglishName.require(request.displayName());
 
         try {
             Long userId = jdbc.sql("""

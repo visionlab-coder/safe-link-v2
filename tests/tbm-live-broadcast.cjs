@@ -9,6 +9,35 @@ vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.Mo
   exports: exportsObject, crypto: require("node:crypto").webcrypto, AbortSignal, URLSearchParams, fetch,
 });
 const { TbmLiveBroadcast } = exportsObject;
+test("a lost nationwide start response retries the same operation instead of conflicting with itself", async () => {
+  const ids=[];
+  const broadcaster=new TbmLiveBroadcast(async (url,options)=>{
+    ids.push(JSON.parse(options.body).sessionId);
+    if(ids.length===1) throw new Error('network_lost_after_commit');
+    return {ok:true};
+  });
+  await assert.rejects(broadcaster.start('nationwide'));
+  await broadcaster.start('nationwide');
+  assert.equal(ids[0],ids[1]);
+});
+test("nationwide uses one HQ fan-out API with explicit confirmation, including stop, draft and final summary", async () => {
+  const calls=[];
+  const broadcaster=new TbmLiveBroadcast(async (url,options)=>{
+    calls.push({url,...options});
+    return {ok:true,json:async()=>({sessionId:JSON.parse(options.body).sessionId,tbmId:'42',text:'- 전국 요약'})};
+  });
+  await broadcaster.start('nationwide');
+  await broadcaster.announceSpeaking();
+  await broadcaster.publish('전국 발화');
+  await broadcaster.syncDraft('수정된 전국 원문');
+  await broadcaster.stop();
+  await broadcaster.complete('수정된 전국 원문','- 전국 요약');
+  assert.deepEqual(calls.map(c=>c.url),['sessions','speaking','translations','draft','stop','summary'].map(p=>'/api/tbm/nationwide/'+p));
+  assert.equal(JSON.parse(calls[0].body).confirmed,true);
+  assert.equal(calls[4].method,'POST');
+  assert.equal(JSON.parse(calls[5].body).summary_ko,'- 전국 요약');
+  assert.equal(new Set(calls.map(c=>JSON.parse(c.body).sessionId)).size,1);
+});
 test("draft edits preserve request order and final publication waits for the last correction", async () => {
   const calls = [];
   const broadcaster = new TbmLiveBroadcast(async (url, options) => {

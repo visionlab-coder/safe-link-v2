@@ -4,6 +4,18 @@
 
 GitHub Actions의 `Deploy SQ Link V3 production` workflow는 `refactor/v3-commercialization-20260710` 브랜치 push 또는 수동 실행으로 frontend와 backend를 테스트·빌드하고 운영 서버에 불변 release로 배포한다. 이 브랜치에 push하기 전 운영 배포 권한과 백업 상태를 확인한다. 배포 중에는 release 디렉터리를 새로 만들고 `current` 심볼릭 링크만 교체하므로, 실패한 빌드를 현재 운영 파일 위에 덮어쓰지 않는다.
 
+## 2026-10-06 전체 변경 운영 배포
+
+- 사용자 승인: 미커밋 변경 전체 push 및 프론트·백엔드·DB 배포, 테스트 화면 제공.
+- 범위: HQ/ROOT 전국 TBM 라이브·최종 전파/발신자 질문 연결, 영문 이름 입력 제한, TBM 위험성 평가 목록과 밝은 카테고리 UI. 기존 임시→정식 전환 승인 정책을 새로 변경하지 않는다.
+- V037은 전국 TBM 그룹/현장 연결 테이블만 추가한다. 기존 회원·현장 소속·서명·TBM 기록을 일괄 수정하거나 삭제하지 않는다. 배포 실패 시 이전 실행본으로 복귀하되 새 테이블/자료는 보존한다.
+- 사전 확인: 두 운영 서비스 active, readiness UP, Flyway V036 성공, 최근 15분 활동한 활성 방송 0건. 이전 release `e7103d752cc4070311bdc1b5a559ab3fe3ca93e7`.
+- 백업: `/home/ubuntu/safelink-v3/backups/nationwide-20261006-sytIE3/database.dump` 9,957,445 bytes, pg_restore 목록 확인 성공. SHA256 `818ba1bdd0aacf56b8f21d0f7fcda951d2200b6125e1b67be4776fff2dbae2d1`. 같은 권한 제한 디렉터리에 이전 release 경로 보관.
+- 로컬: 타입 검사, 변경 파일 ESLint, 프론트 단위 18개, 백엔드 실행 99개 통과. 기존 Testcontainers 13개는 로컬 Docker 탐지로 skip이며 GitHub Actions에서 다시 실행한다. 전국 DB 테스트 7개는 별도 PostgreSQL로 실제 실행했다.
+- 격리 브라우저: 전국 TBM 실제 BFF/DB/SSE·참여/미참여·질문 연결, 영문 입력/IME/붙여넣기·20개 언어 화면, 위험성 평가 목록 확인. 실제 음성 품질과 서명 스토리지/OS 푸시는 검증 범위에서 제외.
+- 운영 더미 계정 생성/실제 전국 방송 테스트는 하지 않는다. 로컬 전용 HQ/근로자 더미는 3100/18081에서만 제공되고 운영 JAR에는 sandbox 소스셋을 포함하지 않는다. APK 네이티브 변경·재빌드 없음.
+- Actions 성공, 실행 release SHA, V037 성공, readiness 및 운영 페이지 반영을 확인한 뒤 완료 보고한다.
+
 ## 2026-10-02 TBM 참여 구분·초안 정정 배포 준비
 
 - 사용자 승인: 보류하던 프론트·백엔드·DB 변경 전체 운영 배포. 동작 명세는 `TBM_REALTIME_DELIVERY.md`의 최신 절을 따른다. 방송 종료는 요약 생성, 최종 전파는 관리자 브로드캐스트 클릭으로 구분한다.

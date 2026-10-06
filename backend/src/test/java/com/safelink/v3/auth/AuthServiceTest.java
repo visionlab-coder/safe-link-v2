@@ -170,7 +170,7 @@ class AuthServiceTest {
         );
         when(users.findByEmail("admin@seowonenc.co.kr")).thenReturn(Optional.empty());
         when(passwordEncoder.encode("password1234")).thenReturn("$2a$new");
-        when(users.createPendingAdminSignupAccount("admin@seowonenc.co.kr", "Admin", "ko", "$2a$new")).thenReturn(account);
+        when(users.createPendingAdminSignupAccount("admin@seowonenc.co.kr", "ADMIN", "ko", "$2a$new")).thenReturn(account);
 
         AuthService.PendingAdminSignup signup = authService.registerDirectAdminSignup(
             "ADMIN@seowonenc.co.kr",
@@ -245,8 +245,19 @@ class AuthServiceTest {
         assertThat(updated.displayName()).isEqualTo("Site Manager");
         assertThat(updated.roles()).containsExactly(Role.SITE_ADMIN);
         assertThat(updated.siteIds()).isEmpty();
-        verify(users).updateProfile(23L, "Site Manager", "ko");
+        verify(users).updateProfile(23L, "SITE MANAGER", "ko");
         verify(audit).record(eq(23L), eq(null), eq("auth.profile_setup"), eq("user"), eq("23"), eq("ALLOWED"), eq("self_profile_update"), any());
+    }
+
+    @Test
+    void legacyNameDoesNotBlockLanguageOnlyUpdatesButChangedNativeNamesAreRejected() {
+        var principal = new SessionPrincipal(23L, "admin@seowonenc.co.kr", "홍길동", Set.of(Role.SITE_ADMIN), Set.of());
+        var account = new UserAccount(23L, "admin@seowonenc.co.kr", "홍길동", "ACTIVE", "$2a$hash", Set.of(Role.SITE_ADMIN), Set.of());
+        when(users.findById(23L)).thenReturn(Optional.of(account));
+        authService.updateOwnProfile(principal, "홍길동", "en", java.util.Map.of(), "127.0.0.1");
+        verify(users).updateProfile(23L, "홍길동", "en");
+        assertThatThrownBy(() -> authService.updateOwnProfile(principal, "김철수", "en", java.util.Map.of(), "127.0.0.1"))
+            .isInstanceOf(IllegalArgumentException.class).hasMessage("english_name_required");
     }
 
     @Test

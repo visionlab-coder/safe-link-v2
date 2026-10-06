@@ -259,6 +259,7 @@ public class ChatController {
                 throw new IllegalArgumentException("chat_not_allowed");
             }
             siteId = sharedSite(actor.siteIds(), peer.siteIds());
+            if (siteId == null) siteId = chat.nationwideTbmSenderSite(peer.id(), actor.siteIds());
             workerId = actor.userId();
             adminId = peer.id();
         } else if (actorIsAdmin) {
@@ -276,8 +277,9 @@ public class ChatController {
             throw new IllegalArgumentException("site_id_required");
         }
         siteGuard.requireSiteAccess(actor, siteId, "chat.thread.resolve", "chat_thread", null);
-        var thread = chat.findOpenThread(siteId, workerId, adminId)
-            .orElseGet(() -> chat.createThread(siteId, workerId, adminId));
+        Long conversationSiteId = siteId;
+        var thread = chat.findOpenThread(conversationSiteId, workerId, adminId)
+            .orElseGet(() -> chat.createThread(conversationSiteId, workerId, adminId));
         return new Conversation(thread, workerId, adminId);
     }
 

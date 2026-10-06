@@ -6,6 +6,7 @@ const vm = require('node:vm');
 const source = fs.readFileSync('src/app/admin/tbm/create/page.tsx', 'utf8');
 const tree = ts.createSourceFile('page.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 function handler(name, context) {
+  context.nationwide ??= false;
   let initializer;
   function visit(node) {
     if (ts.isVariableDeclaration(node) && node.name.getText(tree) === name) initializer = node.initializer;

@@ -74,7 +74,7 @@ public class AuthService {
             throw new UserAlreadyExistsException("email_already_registered");
         }
 
-        String resolvedDisplayName = resolveDisplayName(displayName, normalizedEmail);
+        String resolvedDisplayName = EnglishName.require(displayName);
         String resolvedLanguage = resolvePreferredLanguage(preferredLanguage);
         String passwordHash = passwordEncoder.encode(rawPassword);
 
@@ -120,7 +120,9 @@ public class AuthService {
         if (principal == null) {
             throw new BadCredentialsException("session_required");
         }
-        String resolvedDisplayName = requireDisplayName(displayName);
+        // Language/site-only updates must continue to work for legacy accounts. Validate actual name changes.
+        String resolvedDisplayName = java.util.Objects.equals(displayName, principal.displayName())
+            ? requireDisplayName(displayName) : EnglishName.require(displayName);
         String resolvedLanguage = resolvePreferredLanguage(preferredLanguage);
         String requestedSite = requestedProfile.getOrDefault("requestedSiteId", "").trim();
         Long activeSiteId = null;
@@ -264,14 +266,6 @@ public class AuthService {
             throw new IllegalArgumentException("email_required");
         }
         return email.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private static String resolveDisplayName(String displayName, String email) {
-        if (displayName != null && !displayName.isBlank()) {
-            return displayName.trim();
-        }
-        int at = email.indexOf('@');
-        return at > 0 ? email.substring(0, at) : "관리자";
     }
 
     private static String requireDisplayName(String displayName) {

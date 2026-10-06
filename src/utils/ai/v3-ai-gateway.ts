@@ -216,7 +216,8 @@ export async function callV3AiVision(
 export async function callV3AiStt(
   request: Request | NextRequest,
   payload: {
-    siteId: number;
+    siteId: number | null;
+    nationwide?: boolean;
     audio: string;
     mimeType?: string;
     languageCode: string;

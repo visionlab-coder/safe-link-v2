@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 import { workerRegistrationUI } from "@/lib/worker-registration-ui";
+import EnglishNameField from "@/components/EnglishNameField";
 
 export default function TemporaryRegistration() {
   const router = useRouter();
@@ -14,10 +15,12 @@ export default function TemporaryRegistration() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [consent, setConsent] = useState(false);
+  const [name, setName] = useState("");
+  const [nameReady, setNameReady] = useState(false);
   return <WorkerRegistrationFrame title={t.temporary} language={language} mode="temporary" backHref="/auth">
     <form noValidate onSubmit={async event => {
       event.preventDefault();
-      if (busy || !consent) return;
+      if (busy || !consent || !nameReady) return;
       const form = new FormData(event.currentTarget);
       if (!String(form.get("name") || "").trim()) { setError(t.workerNameRequired); return; }
       if (!/^\+?[0-9]{8,15}$/.test(String(form.get("phone") || "").replace(/[\s()-]/g, ""))) { setError(t.phoneError); return; }
@@ -50,7 +53,7 @@ export default function TemporaryRegistration() {
       finally { setBusy(false); }
     }}>
       <p>{t.intro}</p>
-      <label className="block">{t.name}<input name="name" required maxLength={80} autoComplete="name" className="mt-2 w-full rounded-xl border border-slate-400 p-3" /></label>
+      <EnglishNameField language={language} value={name} onChange={setName} onReadyChange={setNameReady} />
       <label className="block">{t.phone}<input name="phone" required type="tel" autoComplete="tel" className="mt-2 w-full rounded-xl border border-slate-400 p-3" /></label>
       <section className="rounded-xl border border-slate-300 bg-slate-50 p-4 text-sm">
         <h2 className="font-bold">{t.privacy}</h2>
@@ -59,7 +62,7 @@ export default function TemporaryRegistration() {
         <label className="mt-3 flex items-start gap-3"><input type="checkbox" required checked={consent} onChange={event => setConsent(event.target.checked)} className="mt-1 h-5 w-5" />{t.agree}</label>
       </section>
       {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">{error}</p>}
-      <button disabled={busy || !consent} className="w-full rounded-xl bg-blue-700 p-4 font-bold text-white disabled:bg-slate-300 disabled:text-slate-600">{busy ? t.busy : t.doSignup}</button>
+      <button disabled={busy || !consent || !nameReady} className="w-full rounded-xl bg-blue-700 p-4 font-bold text-white disabled:bg-slate-300 disabled:text-slate-600">{busy ? t.busy : t.doSignup}</button>
     </form>
   </WorkerRegistrationFrame>;
 }

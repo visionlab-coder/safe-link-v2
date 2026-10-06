@@ -1,4 +1,5 @@
 "use client";
+import EnglishNameField from "@/components/EnglishNameField";
 
 import { Suspense, useEffect, useState } from "react";
 import RoleGuard from "@/components/RoleGuard";
@@ -53,6 +54,7 @@ function WorkerEnrollInner() {
 
   const [step, setStep] = useState<Step>("form");
   const [fullName, setFullName] = useState("");
+  const [nameReady, setNameReady] = useState(false);
   const [nameInitials, setNameInitials] = useState("");
   const [phoneLast4, setPhoneLast4] = useState("");
   const [siteId, setSiteId] = useState("");
@@ -98,14 +100,15 @@ function WorkerEnrollInner() {
 
     if (!workerId) {
       // 🟢 V2 NFC 간편 등록: 영문 이니셜 + 전화번호 뒷 4자리.
-      // full_name 은 옵션. 입력 없으면 이니셜 그대로 사용 (서버에서 처리).
+      // Display name is required and independent of the existing login initials.
       const cleanInitials = nameInitials.trim().replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase();
       const cleanLast4 = phoneLast4.trim().replace(/\D/g, "").slice(-4);
       if (!cleanInitials || cleanLast4.length !== 4) {
         setError(t.invalid);
         return;
       }
-      const name = fullName.trim() || cleanInitials;
+      if (!nameReady) return;
+      const name = fullName.trim();
 
       const res = await fetch("/api/nfc/workers", {
         method: "POST",
@@ -398,7 +401,7 @@ function WorkerEnrollInner() {
       <div className="max-w-lg mx-auto">
         <VisualizationScreenLayout
           visual={ONBOARDING_VISUAL[lang] || ONBOARDING_VISUAL.en}
-          action={<button type="submit" form="worker-enroll-form">{existingWorkerId ? t.reissue : t.enroll}</button>}
+          action={<button type="submit" form="worker-enroll-form" disabled={!existingWorkerId && !nameReady}>{existingWorkerId ? t.reissue : t.enroll}</button>}
         >
         <form id="worker-enroll-form" onSubmit={handleSubmit} className="space-y-4">
           {!existingWorkerId && (
@@ -433,16 +436,7 @@ function WorkerEnrollInner() {
                   />
                 </div>
               </div>
-              <div>
-                <label className="text-sm text-gray-400 mb-1 block">{t.name} *</label>
-                <input
-                  required
-                  value={fullName}
-                  onChange={(event) => setFullName(event.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500"
-                  placeholder="카드에 표시할 이름"
-                />
-              </div>
+              <EnglishNameField language={lang} value={fullName} onChange={setFullName} onReadyChange={setNameReady} />
               <div>
                 <label className="text-sm text-gray-400 mb-1 block">{t.site}</label>
                 <input
@@ -477,7 +471,7 @@ function WorkerEnrollInner() {
             <button type="button" onClick={() => router.back()} className="flex-1 bg-gray-700 hover:bg-gray-600 py-3 rounded-xl font-medium transition-colors">
               {t.back}
             </button>
-            <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2">
+            <button type="submit" disabled={!existingWorkerId && !nameReady} className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2">
               {nfcSupport.supported ? <><Nfc className="w-4 h-4" /> {t.issueUrl}</> : t.issueShort}
             </button>
           </div>

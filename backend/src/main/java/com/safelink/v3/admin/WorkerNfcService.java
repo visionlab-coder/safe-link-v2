@@ -156,7 +156,7 @@ public class WorkerNfcService {
 
         String initials = cleanInitials(request.nameInitials());
         String phoneLast4 = cleanPhoneLast4(request.phoneLast4());
-        String displayName = cleanDisplayName(request.fullName(), initials);
+        String displayName = com.safelink.v3.auth.EnglishName.require(request.fullName());
         String phone = cleanOptionalPhone(request.phone());
         String email = phone == null ? internalWorkerEmail(siteId, initials, phoneLast4) : null;
         String nationality = cleanCountry(request.nationality());
@@ -200,7 +200,8 @@ public class WorkerNfcService {
         var current = findWorker(id).orElseThrow(() -> new NotFoundException("worker_not_found"));
         siteGuard.requireGlobalOrSiteAdmin(actor, current.assignedSiteIdLong(), "admin.worker.update", "worker", workerId);
 
-        String displayName = request.fullName() == null ? current.fullName() : cleanDisplayName(request.fullName(), current.fullName());
+        String displayName = request.fullName() == null || request.fullName().equals(current.fullName())
+            ? current.fullName() : com.safelink.v3.auth.EnglishName.require(request.fullName());
         String preferredLanguage = request.preferredLang() == null ? current.preferredLang() : cleanLanguage(request.preferredLang());
         String nationality = request.nationality() == null ? current.nationality() : cleanCountry(request.nationality());
         String trade = request.trade() == null ? current.trade() : cleanTrade(request.trade());
@@ -1513,14 +1514,6 @@ public class WorkerNfcService {
         if (value == null) return "";
         String sanitized = value.trim().replaceAll("[,()*\"\\\\%_]", "").toLowerCase(Locale.ROOT);
         return sanitized.substring(0, Math.min(64, sanitized.length()));
-    }
-
-    private static String cleanDisplayName(String value, String fallback) {
-        String name = value == null || value.isBlank() ? fallback : value.trim();
-        if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("full_name_required");
-        }
-        return name.substring(0, Math.min(80, name.length()));
     }
 
     private static String cleanInitials(String value) {

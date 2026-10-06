@@ -136,7 +136,17 @@ public class ChatRepository {
                   and ur.role <> 'WORKER'
                   and ur.role <> 'ROOT'
                   and u.account_status = 'ACTIVE'
-                order by u.display_name, u.id
+                union
+                select u.id, u.display_name,
+                    case when bool_or(ur.role='ROOT') then 'ROOT' else 'HQ_ADMIN' end as role,
+                    min(nt.site_id) as site_id
+                from users u
+                join user_roles ur on ur.user_id=u.id and ur.revoked_at is null and ur.role in ('HQ_ADMIN','ROOT')
+                join nationwide_tbm_broadcasts nb on nb.created_by=u.id
+                join nationwide_tbm_targets nt on nt.broadcast_id=nb.id
+                where nt.site_id in (:siteIds) and u.account_status='ACTIVE'
+                group by u.id,u.display_name
+                order by display_name, id
             """)
             .param("siteIds", siteIds)
             .query((rs, rowNum) -> new AdminPeerRow(
@@ -146,6 +156,18 @@ public class ChatRepository {
                 rs.getLong("site_id")
             ))
             .list();
+    }
+
+    /** Only a sender who actually addressed this worker's site, not every global admin. */
+    public Long nationwideTbmSenderSite(Long senderId, Set<Long> workerSites) {
+        if (workerSites==null || workerSites.isEmpty()) return null;
+        return jdbc.sql("""
+            select min(nt.site_id) from nationwide_tbm_targets nt
+            join nationwide_tbm_broadcasts nb on nb.id=nt.broadcast_id
+            join users u on u.id=nb.created_by and u.account_status='ACTIVE'
+            where nb.created_by=:sender and nt.site_id in (:sites)
+            and exists(select 1 from user_roles ur where ur.user_id=u.id and ur.revoked_at is null and ur.role in ('HQ_ADMIN','ROOT'))
+            """).param("sender",senderId).param("sites",workerSites).query(Long.class).optional().orElse(null);
     }
 
     public UserAccessRow getUserAccess(Long userId) {
