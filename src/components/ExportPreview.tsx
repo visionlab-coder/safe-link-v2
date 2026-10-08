@@ -19,6 +19,7 @@ export default function ExportPreview({ file, language, onClose }: {
   const [failed, setFailed] = useState(false);
   const headingId = useId();
   const helpId = useId();
+  const isPdf = file.blob.type.split(";")[0].trim().toLowerCase() === "application/pdf";
   const shareFile = useMemo(() => new File([file.blob], file.filename, { type: file.blob.type }), [file]);
   const canShare = useMemo(() => {
     try { return !!navigator.share && !!navigator.canShare?.({ files: [shareFile] }); }
@@ -27,7 +28,12 @@ export default function ExportPreview({ file, language, onClose }: {
   const preview = useMemo(() => file.previewHtml.replace("<head>", '<head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data:; style-src \'unsafe-inline\'; base-uri \'none\'; form-action \'none\'">'), [file]);
 
   useEffect(() => {
-    const objectUrl = URL.createObjectURL(file.blob);
+    // iOS Safari may open application/pdf Blob links in its viewer even with
+    // `download`. Only the download transport uses a non-previewable MIME;
+    // the original PDF bytes, .pdf filename and share File remain unchanged.
+    // https://bugs.webkit.org/show_bug.cgi?id=263608#c7
+    const downloadBlob = isPdf ? new Blob([file.blob], { type: "application/octet-stream" }) : file.blob;
+    const objectUrl = URL.createObjectURL(downloadBlob);
     setUrl(objectUrl);
     const dialog = dialogRef.current;
     dialog?.showModal();
@@ -39,7 +45,7 @@ export default function ExportPreview({ file, language, onClose }: {
       // Keep the source alive while Safari consumes an in-flight download.
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
     };
-  }, [file]);
+  }, [file, isPdf]);
 
   useEffect(() => {
     if (!url || requestedRef.current) return;
@@ -79,8 +85,8 @@ export default function ExportPreview({ file, language, onClose }: {
         </header>
         <div className="shrink-0 border-b border-slate-200 bg-blue-50 p-4">
           <div className="flex flex-wrap gap-2">
-            {/* Keep this preview available if a browser opens, rather than saves, the file. */}
-            <a ref={downloadRef} href={url || undefined} download={file.filename} target="_blank" rel="noopener noreferrer" aria-disabled={!url}
+            {/* PDF is a download, not a request to open Safari's PDF viewer. */}
+            <a ref={downloadRef} href={url || undefined} download={file.filename} target={isPdf ? undefined : "_blank"} rel="noopener noreferrer" aria-disabled={!url}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold !text-white no-underline">
               <Download aria-hidden className="h-4 w-4" />{download}
             </a>

@@ -64,6 +64,15 @@ try {
     await context.addInitScript(() => {
       window.open = () => { throw new Error('Export must not open a popup'); };
       window.print = () => { throw new Error('Export must not use the print dialog'); };
+      // Inspect the generated source without fetch(blob:), which the app's
+      // connect-src CSP intentionally disallows. Do not weaken production CSP.
+      const createObjectURL = URL.createObjectURL.bind(URL);
+      window.__exportBlobs = new Map();
+      URL.createObjectURL = blob => {
+        const url = createObjectURL(blob);
+        window.__exportBlobs.set(url, blob);
+        return url;
+      };
       const nativeClick = HTMLAnchorElement.prototype.click;
       HTMLAnchorElement.prototype.click = function () {
         if (this.download && window.__blockAutomaticDownload) {
@@ -186,6 +195,15 @@ try {
     assert.equal(await page.locator('iframe[title="PDF export"]').count(), 0, 'PDF render frame removed');
     const preview = page.getByRole('dialog', {name: '파일 미리보기', exact: true});
     await preview.waitFor();
+    const pdfLink = preview.getByRole('link', {name: '다운로드', exact: true});
+    assert.equal(await pdfLink.getAttribute('target'), null, 'PDF download must not request a new viewer tab');
+    const pdfTransport = await pdfLink.evaluate(async link => {
+      const blob = window.__exportBlobs.get(link.href);
+      return {type: blob.type, bytes: [...new Uint8Array(await blob.arrayBuffer())]};
+    });
+    assert.equal(pdfTransport.type, 'application/octet-stream', 'Safari download uses binary MIME, not inline PDF MIME');
+    assert.deepEqual(Buffer.from(pdfTransport.bytes), fs.readFileSync(await pdfDownload.path()), 'Download preserves every original PDF byte');
+    assert.equal(context.pages().length, 1, 'PDF download does not open an extra tab');
     assert.ok((await preview.innerText()).includes('자동 다운로드가 뜨지 않으면'));
     assert.equal(await page.frameLocator('iframe[title="파일 미리보기"]').getByText('공사현장', {exact: true}).count(), 1);
     const retryPromise = page.waitForEvent('download');
@@ -213,6 +231,9 @@ try {
     const download = await downloadPromise;
     assert.match(download.suggestedFilename(), /^sqlink_glossary_.*\.xlsx$/);
     const book = xlsx.read(fs.readFileSync(await download.path()), {type: 'buffer'});
+    assert.equal(await preview.getByRole('link', {name: '다운로드', exact: true}).evaluate(link =>
+      window.__exportBlobs.get(link.href).type),
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Other file MIME types stay unchanged');
     const rows = xlsx.utils.sheet_to_json(book.Sheets.data);
     assert.equal(rows.length, 2);
     assert.equal(rows[0]['현장 표현'], '겐바');
@@ -284,6 +305,7 @@ try {
         Object.defineProperty(navigator, 'canShare', {configurable: true, value: data => data.files?.[0]?.type === 'application/pdf'});
         Object.defineProperty(navigator, 'share', {configurable: true, value: async data => {
           window.__sharedFile = {name: data.files[0].name, type: data.files[0].type, size: data.files[0].size, active: navigator.userActivation.isActive};
+          window.__sharedBytes = [...new Uint8Array(await data.files[0].arrayBuffer())];
           if (window.__shareError) throw new DOMException('fixture', window.__shareError);
         }});
       });
@@ -297,11 +319,13 @@ try {
       assert.equal(fs.readFileSync(await manual.path()).subarray(0, 5).toString(), '%PDF-');
       const share = preview.getByRole('button', {name: '공유 · 파일에 저장', exact: true});
       await activate(share);
+      await page.waitForFunction(() => Array.isArray(window.__sharedBytes));
       const shared = await page.evaluate(() => window.__sharedFile);
       assert.equal(shared.active, true, 'Share called inside the fresh user gesture');
       assert.equal(shared.name, manual.suggestedFilename());
       assert.equal(shared.size, fs.statSync(await manual.path()).size);
       assert.equal(shared.type, 'application/pdf');
+      assert.deepEqual(Buffer.from(await page.evaluate(() => window.__sharedBytes)), fs.readFileSync(await manual.path()), 'Shared PDF and binary download contain identical bytes');
       await page.evaluate(() => { window.__shareError = 'AbortError'; });
       await activate(share);
       assert.equal(await preview.getByRole('alert').count(), 0, 'Cancelling Share is not an export error');

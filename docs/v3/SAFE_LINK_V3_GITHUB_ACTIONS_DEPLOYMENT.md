@@ -4,6 +4,15 @@
 
 GitHub Actions의 `Deploy SQ Link V3 production` workflow는 `refactor/v3-commercialization-20260710` 브랜치 push 또는 수동 실행으로 frontend와 backend를 테스트·빌드하고 운영 서버에 불변 release로 배포한다. 이 브랜치에 push하기 전 운영 배포 권한과 백업 상태를 확인한다. 배포 중에는 release 디렉터리를 새로 만들고 `current` 심볼릭 링크만 교체하므로, 실패한 빌드를 현재 운영 파일 위에 덮어쓰지 않는다.
 
+## 2026-10-08 iPhone PDF 다운로드 전용 보완 배포
+
+- 사용자 승인: 운영에서 PDF만 미리보기로 열린다는 제보 후 PDF 수정만 배포. 이전 운영 기준은 `f393d2c0d389e2267cb228eca7c0797da51ba1c1`이며 직전 Actions `37719193260`은 성공했다.
+- 범위: `ExportPreview.tsx`의 PDF 다운로드 Blob만 `application/octet-stream`으로 감싸고 PDF 링크의 새 탭 target을 제거한다. PDF bytes/파일명/확장자/공유용 MIME은 보존한다. 서버 업로드·파일 저장 API·백엔드·DB·APK·관리자/가입/권한 변경은 없다.
+- 검증: 운영 기준에 이번 수정만 복사한 격리 빌드·타입·린트 통과. `tests/glossary-export-browser.mjs`를 Chrome/WebKit 1280/390/320px에서 실행하여 다운로드 MIME, PDF 헤더/파일명, 공유/다운로드 bytes 동일성, 추가 탭 없음, 다른 형식 다운로드 및 실패 복구를 확인했다. 배포 전 소스가 검증한 격리 소스와 동일함을 재확인했다.
+- 물리 iPhone Safari의 시스템 확인창은 별도 단말 검증이 필요하다. 자동화 download 이벤트를 실제 기기의 확인창/저장 완료 증거로 표현하지 않는다.
+- 사전 확인: 운영 API readiness `UP`, 원격/로컬 기준 SHA 및 직전 성공 Actions 일치. 로컬 운영 SSH 인증이 없어 활성 방송·최신 백업을 직접 재확인하지 못했으며 DB 변경은 없다. 기존 workflow는 변경 없는 백엔드도 재빌드·재시작한다.
+- 완료 판단: 이 수정 커밋의 Actions 활성화/스모크 성공과 운영 로그인/인증 이동/API 상태를 확인한다. 장애 시 이전 운영 실행본으로 복귀하며 DB와 미완료 로컬 작업은 보존한다.
+
 ## 2026-10-08 iPhone Safari 내보내기 후속 배포
 
 - 사용자 승인: iPhone Safari 내보내기 후속 수정 배포. 이전 운영 기준은 `19a2a8a0c9788e53999ea663237550d25d3447c9`이다.
