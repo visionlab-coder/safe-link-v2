@@ -579,7 +579,7 @@ function AdminChatContent() {
                 read: message.is_read ? "읽음" : "미확인",
             };
         });
-        await exportData(format, {
+        return exportData(format, {
             title: "1:1 AI 번역 채팅 로그",
             subtitle: `${activeWorker.display_name} / ${new Date().toLocaleString("ko-KR")}`,
             filename: `chat_log_${activeWorker.display_name}_${new Date().toISOString().slice(0, 10)}`,

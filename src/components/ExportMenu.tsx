@@ -2,7 +2,8 @@
 
 import { Download, FileJson, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ElementType } from "react";
-import type { ExportFormat } from "@/utils/export-files";
+import type { ExportFile, ExportFormat } from "@/utils/export-files";
+import ExportPreview from "@/components/ExportPreview";
 import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 const EXPORT_TEXT: Record<string, [string, string, string]> = {
   ko: ["내보내기", "파일 생성 중…", "파일을 만들지 못했습니다. 다시 시도해 주세요."],
@@ -29,7 +30,7 @@ const EXPORT_TEXT: Record<string, [string, string, string]> = {
 
 type ExportMenuProps = {
   disabled?: boolean;
-  onExport: (format: ExportFormat) => void | Promise<void>;
+  onExport: (format: ExportFormat) => Promise<ExportFile | undefined>;
   includeJson?: boolean;
 };
 
@@ -47,6 +48,7 @@ export default function ExportMenu({ disabled, onExport, includeJson = false }: 
   const [isOpen, setIsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [file, setFile] = useState<ExportFile>();
   const exportingRef = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -63,7 +65,7 @@ export default function ExportMenu({ disabled, onExport, includeJson = false }: 
     setBusy(true);
     triggerRef.current?.focus();
     try {
-      await onExport(format);
+      setFile(await onExport(format));
     } catch (error) {
       if (process.env.NODE_ENV === "development") console.warn("Export failed:", error instanceof Error ? error.message : "unknown");
       setFailed(true);
@@ -163,6 +165,10 @@ export default function ExportMenu({ disabled, onExport, includeJson = false }: 
           ))}
         </div>
       )}
+      {file && <ExportPreview file={file} language={language} onClose={() => {
+        setFile(undefined);
+        requestAnimationFrame(() => triggerRef.current?.focus());
+      }} />}
     </div>
   );
 }

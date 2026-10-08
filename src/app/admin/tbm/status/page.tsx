@@ -231,7 +231,7 @@ function TBMStatusPageContent() {
         if (!latestTBM) return;
         const signedWorkers = workers.filter(w => w.signed);
         const unsignedWorkers = workers.filter(w => !w.signed);
-        await exportData(format, {
+        return exportData(format, {
             title: `${t.title} Report`,
             subtitle: `${latestTBM.site_name || t.status} / ${new Date(latestTBM.created_at).toLocaleString(locale)}`,
             filename: `tbm_signature_report_${latestTBM.site_name || "site"}_${new Date().toISOString().slice(0, 10)}`,

@@ -10,6 +10,9 @@ export type ExportColumn<T> = {
 
 export type ExportFormat = "pdf" | "excel" | "word" | "hwp" | "json";
 
+/** Kept in memory until the preview closes; never uploaded or persisted. */
+export type ExportFile = { blob: Blob; filename: string; previewHtml: string };
+
 type ExportPayload<T> = {
   title: string;
   subtitle?: string;
@@ -31,22 +34,6 @@ function escapeHtml(value: unknown) {
 function cellValue<T>(row: T, column: ExportColumn<T>) {
   if (column.value) return column.value(row);
   return (row as Record<string, unknown>)[String(column.key)] as string | number | null | undefined;
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.hidden = true;
-  document.body.appendChild(link);
-  try {
-    link.click();
-  } finally {
-    link.remove();
-    // Mobile browsers may consume the Blob after the click handler returns.
-    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  }
 }
 
 async function cellHtml<T>(row: T, column: ExportColumn<T>, images: Map<string, Promise<string>>) {
@@ -130,13 +117,17 @@ async function buildHtml<T>(payload: ExportPayload<T>) {
 </html>`;
 }
 
-export async function exportData<T>(format: ExportFormat, payload: ExportPayload<T>) {
+// Prepare once. ExportMenu owns the visible preview, automatic download request,
+// and direct user-gesture retry/share. A hidden click alone cannot confirm that
+// Safari saved a file, and regenerating it on retry loses user activation again.
+export async function exportData<T>(format: ExportFormat, payload: ExportPayload<T>): Promise<ExportFile> {
   if (format === "json") {
-    downloadBlob(
-      new Blob([JSON.stringify(payload.raw ?? { summary: payload.summary, rows: payload.rows }, null, 2)], { type: "application/json;charset=utf-8" }),
-      `${payload.filename}.json`,
-    );
-    return;
+    const json = JSON.stringify(payload.raw ?? { summary: payload.summary, rows: payload.rows }, null, 2);
+    return {
+      blob: new Blob([json], { type: "application/json;charset=utf-8" }),
+      filename: `${payload.filename}.json`,
+      previewHtml: `<!doctype html><html><head><meta charset="utf-8"><style>body{color:#111827;background:white}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style></head><body><pre>${escapeHtml(json)}</pre></body></html>`,
+    };
   }
 
   if (format === "excel") {
@@ -152,18 +143,22 @@ export async function exportData<T>(format: ExportFormat, payload: ExportPayload
     const sheet = xlsx.utils.json_to_sheet(rows);
     xlsx.utils.book_append_sheet(workbook, sheet, "data");
     const bytes = xlsx.write(workbook, { type: "array", bookType: "xlsx" });
-    downloadBlob(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `${payload.filename}.xlsx`);
-    return;
+    return {
+      blob: new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+      filename: `${payload.filename}.xlsx`,
+      // Excel contains text values, not signature images. Preview the same
+      // values and avoid unnecessary authenticated signature requests.
+      previewHtml: await buildHtml({ ...payload, columns: payload.columns.map(column => ({ ...column, html: undefined })) }),
+    };
   }
 
   const html = await buildHtml(payload);
   if (format === "pdf") {
     const { renderExportPdf } = await import("./export-pdf");
-    downloadBlob(await renderExportPdf(html, payload.title), `${payload.filename}.pdf`);
-    return;
+    return { blob: await renderExportPdf(html, payload.title), filename: `${payload.filename}.pdf`, previewHtml: html };
   }
 
   const extension = format === "word" ? "doc" : "hwp";
   const mime = format === "word" ? "application/msword;charset=utf-8" : "application/x-hwp;charset=utf-8";
-  downloadBlob(new Blob(["\ufeff", html], { type: mime }), `${payload.filename}.${extension}`);
+  return { blob: new Blob(["\ufeff", html], { type: mime }), filename: `${payload.filename}.${extension}`, previewHtml: html };
 }

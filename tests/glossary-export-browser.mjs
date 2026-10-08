@@ -64,6 +64,14 @@ try {
     await context.addInitScript(() => {
       window.open = () => { throw new Error('Export must not open a popup'); };
       window.print = () => { throw new Error('Export must not use the print dialog'); };
+      const nativeClick = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function () {
+        if (this.download && window.__blockAutomaticDownload) {
+          window.__blockedDownloadCount = (window.__blockedDownloadCount || 0) + 1;
+          return;
+        }
+        return nativeClick.call(this);
+      };
     });
     let empty = false;
     let signatureBytes;
@@ -126,6 +134,8 @@ try {
     const menu = page.getByRole('menu', {name: '내보내기', exact: true});
     const activate = locator => touch ? locator.tap() : locator.click();
     const open = async () => {
+      const preview = page.getByRole('dialog');
+      if (await preview.isVisible()) await preview.getByRole('button', {name: '닫기', exact: true}).click();
       await activate(trigger);
       await menu.waitFor();
       assert.equal(await trigger.getAttribute('aria-expanded'), 'true');
@@ -174,6 +184,27 @@ try {
     await pdfDownload.saveAs(path.join(workspace, `${label}.pdf`));
     assert.equal(fs.readFileSync(await pdfDownload.path()).subarray(0, 5).toString(), '%PDF-');
     assert.equal(await page.locator('iframe[title="PDF export"]').count(), 0, 'PDF render frame removed');
+    const preview = page.getByRole('dialog', {name: '파일 미리보기', exact: true});
+    await preview.waitFor();
+    assert.ok((await preview.innerText()).includes('자동 다운로드가 뜨지 않으면'));
+    assert.equal(await page.frameLocator('iframe[title="파일 미리보기"]').getByText('공사현장', {exact: true}).count(), 1);
+    const retryPromise = page.waitForEvent('download');
+    await activate(preview.getByRole('link', {name: '다운로드', exact: true}));
+    const retry = await retryPromise;
+    assert.deepEqual(fs.readFileSync(await retry.path()), fs.readFileSync(await pdfDownload.path()), 'Manual retry reuses the exact file');
+    await page.screenshot({path: path.join(workspace, `${label}-preview.png`)});
+    if (label === 'mobile') {
+      const source = fs.readFileSync(path.join(root, 'src/lib/export-preview-ui.ts'), 'utf8');
+      const translations = [...source.matchAll(/^\s+(\w+): (\[[^\n]+\]),$/gm)].map(m => [m[1], JSON.parse(m[2])]);
+      assert.equal(translations.length, 20);
+      for (const [language, words] of translations) {
+        await page.evaluate(lang => { localStorage.setItem('safe-link-lang', lang); window.dispatchEvent(new Event('safe-link-language-changed')); }, language);
+        await page.getByRole('dialog', {name: words[0], exact: true}).waitFor();
+        assert.equal(await page.getByRole('dialog').getByRole('link', {name: words[1], exact: true}).count(), 1);
+      }
+      await page.evaluate(() => { localStorage.setItem('safe-link-lang', 'ko'); window.dispatchEvent(new Event('safe-link-language-changed')); });
+      await preview.waitFor();
+    }
     await menu.waitFor({state: 'hidden'});
 
     await open();
@@ -224,6 +255,7 @@ try {
       await activate(menu.getByRole('menuitem', {name: 'JSON', exact: true}));
       const json = await jsonPromise;
       assert.equal(JSON.parse(fs.readFileSync(await json.path(), 'utf8')).rows.length, 86);
+      await page.getByRole('dialog').getByRole('button', {name: '닫기', exact: true}).click();
 
       await page.getByRole('button', {name: 'Simulate error'}).click();
       await open();
@@ -241,7 +273,46 @@ try {
       await busyButton.waitFor();
       assert.equal(await busyButton.isDisabled(), true, 'No duplicate exports while preparing');
       await busyPromise;
+      await page.getByRole('dialog').getByRole('button', {name: '닫기', exact: true}).click();
       await trigger.waitFor();
+
+      // Model a mobile browser suppressing the asynchronous automatic click.
+      // A real tap on the persistent link must still download without rendering.
+      await page.getByRole('button', {name: 'Delay export'}).click();
+      await page.evaluate(() => {
+        window.__blockAutomaticDownload = true;
+        Object.defineProperty(navigator, 'canShare', {configurable: true, value: data => data.files?.[0]?.type === 'application/pdf'});
+        Object.defineProperty(navigator, 'share', {configurable: true, value: async data => {
+          window.__sharedFile = {name: data.files[0].name, type: data.files[0].type, size: data.files[0].size, active: navigator.userActivation.isActive};
+          if (window.__shareError) throw new DOMException('fixture', window.__shareError);
+        }});
+      });
+      await open();
+      await activate(menu.getByRole('menuitem', {name: 'PDF', exact: true}));
+      await preview.waitFor({timeout: 90000});
+      await page.waitForFunction(() => window.__blockedDownloadCount === 1);
+      const manualPromise = page.waitForEvent('download');
+      await activate(preview.getByRole('link', {name: '다운로드', exact: true}));
+      const manual = await manualPromise;
+      assert.equal(fs.readFileSync(await manual.path()).subarray(0, 5).toString(), '%PDF-');
+      const share = preview.getByRole('button', {name: '공유 · 파일에 저장', exact: true});
+      await activate(share);
+      const shared = await page.evaluate(() => window.__sharedFile);
+      assert.equal(shared.active, true, 'Share called inside the fresh user gesture');
+      assert.equal(shared.name, manual.suggestedFilename());
+      assert.equal(shared.size, fs.statSync(await manual.path()).size);
+      assert.equal(shared.type, 'application/pdf');
+      await page.evaluate(() => { window.__shareError = 'AbortError'; });
+      await activate(share);
+      assert.equal(await preview.getByRole('alert').count(), 0, 'Cancelling Share is not an export error');
+      await page.evaluate(() => { window.__shareError = 'NotAllowedError'; });
+      await activate(share);
+      await preview.getByRole('alert').waitFor();
+      assert.equal(await preview.getByRole('link', {name: '다운로드', exact: true}).isVisible(), true);
+      await page.keyboard.press('Escape');
+      await preview.waitFor({state: 'hidden'});
+      assert.equal(await page.evaluate(() => document.body.style.overflow), '', 'Closing restores page scrolling');
+      console.log('PASS mobile recovery: blocked automatic download, direct tap, same-file sharing, cancellation, share failure, close');
     }
     await context.close();
     console.log(`PASS ${label}: menu layering, touch/keyboard, PDF download (no print/popup), Excel data, Word/HWP downloads, empty state`);

@@ -295,7 +295,7 @@ function AdminLiveContent() {
     };
 
     const handleExport = async (format: ExportFormat) => {
-        await exportData(format, {
+        return exportData(format, {
             title: t.live,
             subtitle: `${sessionId || t.notStarted} / ${t.site} ${siteId || "-"} / ${new Date().toLocaleString(locale)}`,
             filename: `live_interpreter_${sessionId || "draft"}_${new Date().toISOString().slice(0, 10)}`,

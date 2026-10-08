@@ -200,6 +200,7 @@ try {
               if (name === 'tbm-status') assert.ok(bytes.toString().includes('data:image/png;base64,'));
             } else assert.equal(JSON.parse(bytes.toString()).siteId, '2');
             result.files.push({format, filename: download.suggestedFilename(), bytes: bytes.length});
+            await page.getByRole('dialog', {name: '파일 미리보기', exact: true}).getByRole('button', {name: '닫기', exact: true}).click();
             await trigger.waitFor();
           }
         }

@@ -149,7 +149,7 @@ export default function AdminIncentivePage() {
       granted: alreadyGranted(response.worker_id) ? t.issued : t.notGranted,
     }));
 
-    await exportData(format, {
+    return exportData(format, {
       title: t.report,
       subtitle: `${selectedSession?.id ?? t.all} / ${t.site} ${adminSiteId || "-"}`,
       filename: `safety_incentive_${selectedSession?.id ?? "all"}_${new Date().toISOString().slice(0, 10)}`,

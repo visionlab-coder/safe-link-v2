@@ -19,7 +19,7 @@ export default function ExportDownloadFixture() {
       const pen = canvas.getContext("2d")!;
       pen.strokeStyle = "#172554"; pen.lineWidth = 3;
       pen.beginPath(); pen.moveTo(5, 35); pen.lineTo(40, 10); pen.lineTo(28, 38); pen.lineTo(85, 15); pen.lineTo(140, 35); pen.stroke();
-      await exportData(format, {
+      return exportData(format, {
         title: "모바일 다운로드 검증 · TBM 서명",
         subtitle: "Korean · Tiếng Việt · 中文 · English / LOCAL FIXTURES ONLY",
         filename: "sq_export_fixture",

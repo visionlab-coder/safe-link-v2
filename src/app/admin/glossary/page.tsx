@@ -498,7 +498,7 @@ export default function GlossaryPage() {
         str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 
     const handleFileExport = async (format: ExportFormat) => {
-        await exportData(format, {
+        return exportData(format, {
             title: "현장 용어집 리포트",
             subtitle: `총 ${terms.length}개 / ${new Date().toLocaleString("ko-KR")}`,
             filename: `sqlink_glossary_${new Date().toISOString().slice(0, 10)}`,

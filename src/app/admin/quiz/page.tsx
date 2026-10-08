@@ -186,7 +186,7 @@ function AdminQuizContent() {
           submitted_at: question.question_ko,
         }));
 
-    await exportData(format, {
+    return exportData(format, {
       title: t.report,
       subtitle: `${selectedSession?.title ?? selectedSession?.id ?? t.selected} / ${new Date().toLocaleString(locale)}`,
       filename: `safety_quiz_${quizSessionId || selectedSession?.id || "draft"}_${new Date().toISOString().slice(0, 10)}`,

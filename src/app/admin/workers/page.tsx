@@ -90,7 +90,7 @@ export default function AdminWorkersPage() {
   };
 
   const handleExport = async (format: ExportFormat) => {
-    await exportData(format, {
+    return exportData(format, {
       title: t.report,
       subtitle: `${t.site} ${adminSiteId || "-"} / ${new Date().toLocaleString(locale)}`,
       filename: `nfc_workers_${adminSiteId || "site"}_${new Date().toISOString().slice(0, 10)}`,

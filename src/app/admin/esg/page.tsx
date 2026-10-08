@@ -247,7 +247,7 @@ export default function AdminEsgPage() {
 
   const handleExport = async (format: ExportFormat) => {
     if (!report) return;
-    await exportData(format, {
+    return exportData(format, {
       title: t.title,
       subtitle: `${report.period.from} ~ ${report.period.to}`,
       filename: `esg_safety_report_${report.siteId}_${report.period.from}_${report.period.to}`,

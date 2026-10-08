@@ -102,7 +102,7 @@ export default function AdminNfcDailyLogsPage() {
   const signedCount = logs.filter((log) => log.attendance_summary?.has_tbm_signature).length;
 
   const handleExport = async (format: ExportFormat) => {
-    await exportData(format, {
+    return exportData(format, {
       title: t.report,
       subtitle: `${workDate} / ${t.site} ${adminSiteId || "-"}`,
       filename: `nfc_daily_logs_${adminSiteId || "site"}_${workDate}`,
