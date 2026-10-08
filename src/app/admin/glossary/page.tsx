@@ -600,7 +600,8 @@ export default function GlossaryPage() {
     return (
         <RoleGuard allowedRole="admin">
             <div className="visualization-light min-h-screen p-4 md:p-8 flex flex-col gap-8 pb-12 font-sans selection:bg-blue-500/30">
-                <header className="concept-page-header flex-wrap animate-float">
+                {/* Keep the export menu's header stacking context above the hero. */}
+                <header className="concept-page-header relative z-20 flex-wrap animate-float">
                     <div className="flex items-center gap-4">
                         <button onClick={() => router.push('/admin')} className="w-12 h-12 glass rounded-2xl flex items-center justify-center text-slate-400 hover:text-white transition-all hover:-translate-x-1">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

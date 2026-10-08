@@ -4,7 +4,7 @@ export type ExportColumn<T> = {
   key: keyof T | string;
   label: string;
   value?: (row: T) => string | number | null | undefined;
-  /** PDF/Word 등 HTML 출력에서 raw HTML(예: 서명 <img>)을 렌더. 지정 시 escape 안 함. excel/json은 value 사용. */
+  /** PDF/Word 등에서 검증된 서명 이미지를 포함. 그 외 HTML은 허용하지 않으며 excel/json은 value 사용. */
   html?: (row: T) => string;
 };
 
@@ -38,11 +38,56 @@ function downloadBlob(blob: Blob, filename: string) {
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
+  link.hidden = true;
+  document.body.appendChild(link);
+  try {
+    link.click();
+  } finally {
+    link.remove();
+    // Mobile browsers may consume the Blob after the click handler returns.
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
 }
 
-function buildHtml<T>(payload: ExportPayload<T>) {
+async function cellHtml<T>(row: T, column: ExportColumn<T>, images: Map<string, Promise<string>>) {
+  if (!column.html) return escapeHtml(cellValue(row, column));
+  // The only rich export content is a signature image. Never execute HTML
+  // returned by a row callback in the document used to render the PDF.
+  const parsed = new DOMParser().parseFromString(column.html(row), "text/html");
+  const image = parsed.querySelector("img");
+  const source = image?.getAttribute("src") ?? "";
+  if (/^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=\s]+$/i.test(source)) {
+    return `<img src="${escapeHtml(source)}" style="height:34px;max-width:130px;object-fit:contain" />`;
+  }
+  // V3 signatures are authenticated same-origin URLs, not inline data. Embed
+  // their bytes so downloaded reports remain readable outside the session.
+  const url = new URL(source || "/", window.location.origin);
+  if (url.origin === window.location.origin && /^\/api\/tbm\/signature\/\d+$/.test(url.pathname)) {
+    if (!images.has(url.href)) images.set(url.href, (async () => {
+      const response = await fetch(url.href, { credentials: "same-origin", cache: "no-store" });
+      if (!response.ok) throw new Error("EXPORT_SIGNATURE_UNAVAILABLE");
+      const blob = await response.blob();
+      if (!/^image\/(png|jpeg|webp)$/.test(blob.type) || blob.size > 5 * 1024 * 1024) throw new Error("EXPORT_SIGNATURE_INVALID");
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error("EXPORT_SIGNATURE_READ_FAILED"));
+        reader.readAsDataURL(blob);
+      });
+    })());
+    return `<img src="${escapeHtml(await images.get(url.href))}" style="height:34px;max-width:130px;object-fit:contain" />`;
+  }
+  return escapeHtml(cellValue(row, column));
+}
+
+async function buildHtml<T>(payload: ExportPayload<T>) {
+  const images = new Map<string, Promise<string>>();
+  // Sequential rows bound authenticated image requests on large worker lists.
+  const rows: string[] = [];
+  for (const row of payload.rows) {
+    const cells = await Promise.all(payload.columns.map(async column => `<td>${await cellHtml(row, column, images)}</td>`));
+    rows.push(`<tr>${cells.join("")}</tr>`);
+  }
   const summary = payload.summary?.length
     ? `<section class="summary">${payload.summary.map((item) => `
         <div><b>${escapeHtml(item.value)}</b><span>${escapeHtml(item.label)}</span></div>
@@ -56,16 +101,18 @@ function buildHtml<T>(payload: ExportPayload<T>) {
   <title>${escapeHtml(payload.title)}</title>
   <style>
     @page { size: A4; margin: 14mm; }
-    body { font-family: "Malgun Gothic", Arial, sans-serif; color: #111827; line-height: 1.5; }
+    body { font-family: "Malgun Gothic", Arial, sans-serif; color: #111827; line-height: 1.5; background: white; }
     h1 { font-size: 24px; margin: 0 0 6px; }
     .subtitle { color: #4b5563; font-size: 12px; margin-bottom: 18px; }
     .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0 18px; }
     .summary div { border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; background: #f9fafb; }
     .summary b { display: block; font-size: 20px; }
     .summary span { color: #6b7280; font-size: 11px; font-weight: 700; }
-    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; line-height: 18px; }
     th { background: #111827; color: white; text-align: left; padding: 8px; }
-    td { border: 1px solid #d1d5db; padding: 7px; vertical-align: top; }
+    td { border: 1px solid #d1d5db; padding: 7px; vertical-align: top; white-space: pre-wrap; overflow-wrap: anywhere; }
+    th { overflow-wrap: anywhere; }
+    img { max-width: 100%; }
     tr:nth-child(even) td { background: #f9fafb; }
   </style>
 </head>
@@ -76,7 +123,7 @@ function buildHtml<T>(payload: ExportPayload<T>) {
   <table>
     <thead><tr>${payload.columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}</tr></thead>
     <tbody>
-      ${payload.rows.map((row) => `<tr>${payload.columns.map((column) => `<td>${column.html ? column.html(row) : escapeHtml(cellValue(row, column))}</td>`).join("")}</tr>`).join("")}
+      ${rows.join("")}
     </tbody>
   </table>
 </body>
@@ -104,18 +151,15 @@ export async function exportData<T>(format: ExportFormat, payload: ExportPayload
     }
     const sheet = xlsx.utils.json_to_sheet(rows);
     xlsx.utils.book_append_sheet(workbook, sheet, "data");
-    xlsx.writeFile(workbook, `${payload.filename}.xlsx`);
+    const bytes = xlsx.write(workbook, { type: "array", bookType: "xlsx" });
+    downloadBlob(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `${payload.filename}.xlsx`);
     return;
   }
 
-  const html = buildHtml(payload);
+  const html = await buildHtml(payload);
   if (format === "pdf") {
-    const printWindow = window.open("", "_blank", "width=1100,height=800");
-    if (!printWindow) return;
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => printWindow.print(), 300);
+    const { renderExportPdf } = await import("./export-pdf");
+    downloadBlob(await renderExportPdf(html, payload.title), `${payload.filename}.pdf`);
     return;
   }
 
