@@ -154,6 +154,27 @@ public class AiGatewayController {
         return new VendorResponse(result.text(), result.vendor(), result.model());
     }
 
+    // Keep the existing Korean TBM storage/summary contract. Never mislabel foreign STT as Korean.
+    @PostMapping("/tbm-speech-draft")
+    public VendorResponse tbmSpeechDraft(@AuthenticationPrincipal SessionPrincipal actor, @Valid @RequestBody SpeechDraftRequest request) {
+        requireTbmAiAccess(actor, request.siteId(), "tbm_speech_draft", request.nationwide());
+        if (!request.nationwide()) siteGuard.requireGlobalOrSiteAdmin(actor, request.siteId(), "ai.tbm_speech_draft", "site", String.valueOf(request.siteId()));
+        requireQuota(actor, request.siteId(), "translate", request.text().length());
+        Instant started = Instant.now();
+        var result = vendor.translateTbmSpeech(request.text(), request.sourceLanguage());
+        if (result.text().isBlank() || result.text().length() > 12000) throw new ServiceUnavailableException("tbm_speech_draft_invalid");
+        usage.log(actor.userId(), request.siteId(), "translate", result.vendor(), result.model(), request.text().length(), result.text().length(),
+            Duration.between(started, Instant.now()).toMillis(), AiCostEstimator.estimate("translate", result.vendor(), request.text().length(), result.text().length()));
+        audit.record(actor.userId(), request.siteId(), "ai.tbm_speech_draft", "ai_vendor", result.vendor(), "ALLOWED", "draft_only",
+            Map.of("sourceLanguage", request.sourceLanguage(), "model", result.model()));
+        return new VendorResponse(result.text(), result.vendor(), result.model());
+    }
+
+    public record SpeechDraftRequest(@jakarta.validation.constraints.Positive Long siteId,
+        @NotBlank @jakarta.validation.constraints.Size(max=12000) String text,
+        @NotBlank @jakarta.validation.constraints.Pattern(regexp="ko|en|zh|vi|th|uz|id|ja|ph|km|mn|my|ne|bn|kk|ru|fr|es|ar|hi") String sourceLanguage,
+        boolean nationwide) {}
+
     // Draft-only: does not publish a notice or alter session-linked summary records.
     @PostMapping("/tbm-summary")
     public VendorResponse summarizeTbm(@AuthenticationPrincipal SessionPrincipal actor, @Valid @RequestBody SummaryRequest request) {

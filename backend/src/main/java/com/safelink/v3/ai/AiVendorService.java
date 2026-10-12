@@ -45,6 +45,14 @@ public class AiVendorService {
         };
     }
 
+    public VendorResult translateTbmSpeech(String text, String sourceLanguage) {
+        if ("ko".equals(sourceLanguage)) return new VendorResult(text, "identity", "ko");
+        String source = "zh".equals(sourceLanguage) ? "zh-CN" : "ph".equals(sourceLanguage) ? "tl" : sourceLanguage;
+        // Flitto RTT is an audio adapter, not a text translation endpoint.
+        return "flitto".equals(selectedTranslationProvider())
+            ? translateDefault(text, source, "ko") : translateAuto(text, source, "ko");
+    }
+
     private VendorResult translateDefault(String text, String sourceLanguage, String targetLanguage) {
         if (canUsePapago(sourceLanguage, targetLanguage)) {
             VendorResult papago = tryVendor(() -> translatePapago(text, sourceLanguage, targetLanguage));

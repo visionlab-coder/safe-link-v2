@@ -12,6 +12,7 @@ import { normalizeKo, normalizeKoAsync } from "@/utils/normalize";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
 import { TbmLiveBroadcast } from "@/utils/tbm-live-broadcast";
 import { appendTbmTranscript, cleanTbmTranscriptFragment } from "@/utils/tbm-transcript";
+import { prepareTbmSpeechDraft } from "@/utils/tbm-speech-draft";
 import SafetyLibraryModal from "@/components/SafetyLibraryModal";
 import { resolveDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
@@ -140,7 +141,8 @@ function getBroadcastErrorMessage(lang: string, error?: string, detail?: string)
 function AdminTBMCreateContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const displayLang = useDisplayLanguage();
+    const [adminLang, setAdminLang] = useState("ko");
+    const displayLang = useDisplayLanguage(adminLang);
     const [tbmText, setTbmText] = useState("");
     const [draftTextarea, setDraftTextarea] = useState<HTMLTextAreaElement | null>(null);
     const resizeDraft = useCallback(() => {
@@ -189,7 +191,11 @@ function AdminTBMCreateContent() {
     const [hiddenNoticeIds, setHiddenNoticeIds] = useState<string[]>([]);
     const [normalizeResult, setNormalizeResult] = useState<{ normalized: string; changes: { from: string; to: string }[] } | null>(null);
     const [broadcastResult, setBroadcastResult] = useState<BroadcastResult | null>(null);
-    const [adminLang, setAdminLang] = useState("ko");
+    const [speechSource, setSpeechSource] = useState("");
+    const pendingSpeechRef = useRef<Array<{ text: string; language: string; target: string | null }>>([]);
+    const speechFlushRef = useRef<Promise<void> | null>(null);
+    const [pendingSpeechCount, setPendingSpeechCount] = useState(0);
+    const [speechRetrying, setSpeechRetrying] = useState(false);
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const voiceGenderRef = useRef<'male' | 'female'>('female');
 
@@ -319,20 +325,45 @@ function AdminTBMCreateContent() {
         return () => { void current.stop().catch(() => {}); };
     }, []);
 
-    const handleTranscript = useCallback(async (text: string) => {
-        const liveText = cleanTbmTranscriptFragment(text);
-        if (!liveText) return;
-        setSttError(null);
-        draftRef.current = appendTbmTranscript(draftRef.current, liveText);
-        setTbmText(draftRef.current);
-        // 라이브 STT는 1초 안팎의 조각마다 임의의 마침표를 붙일 수 있다.
-        // 그 값을 그대로 전송하면 수신 화면에서 단어마다 문장이 끊긴 것처럼 보인다.
-        try {
-            await broadcaster.current.publish(liveText);
-        } catch {
-            setSttError("일부 음성을 실시간 전송하지 못했습니다. 초안은 보존되며 종료 후 최종 전파할 수 있습니다.");
-        }
+    const flushSpeech = useCallback((): Promise<void> => {
+        if (speechFlushRef.current) return speechFlushRef.current;
+        const task = (async () => {
+            while (pendingSpeechRef.current.length) {
+                const item = pendingSpeechRef.current[0];
+                const korean = await prepareTbmSpeechDraft(item.text, item.language, item.target);
+                const liveText = cleanTbmTranscriptFragment(korean);
+                if (!liveText) throw new Error("tbm_speech_draft_empty");
+                draftRef.current = appendTbmTranscript(draftRef.current, liveText);
+                setTbmText(draftRef.current);
+                pendingSpeechRef.current.shift();
+                setPendingSpeechCount(pendingSpeechRef.current.length);
+                await broadcaster.current.publish(liveText).catch(() => {
+                    setSttError("일부 음성을 실시간 전송하지 못했습니다. 초안은 보존되며 종료 후 최종 전파할 수 있습니다.");
+                });
+            }
+        })();
+        speechFlushRef.current = task.finally(() => { speechFlushRef.current = null; });
+        return speechFlushRef.current;
     }, []);
+
+    const retrySpeech = useCallback(async () => {
+        setSpeechRetrying(true);
+        setSttError(null);
+        try { await flushSpeech(); }
+        catch { setSttError((displayLang || adminLang) === "ko"
+            ? "음성 원문은 보존되어 있습니다. 한국어 초안 변환을 다시 시도해 주세요."
+            : "Speech is preserved. Please retry the Korean draft translation."); }
+        finally { setSpeechRetrying(false); }
+    }, [flushSpeech, displayLang, adminLang]);
+
+    const handleTranscript = useCallback(async (text: string, _translations?: Record<string, string>, sourceLanguage?: string) => {
+        if (!text.trim()) return;
+        const language = sourceLanguage || displayLang || adminLang;
+        setSpeechSource(previous => [previous, `[${language}] ${text.trim()}`].filter(Boolean).join("\n"));
+        pendingSpeechRef.current.push({ text: text.trim(), language, target: broadcastTarget });
+        setPendingSpeechCount(pendingSpeechRef.current.length);
+        await retrySpeech();
+    }, [displayLang, adminLang, broadcastTarget, retrySpeech]);
 
     const handleSTTError = useCallback((_type: string, message: string) => {
         setSttError(message);
@@ -340,7 +371,7 @@ function AdminTBMCreateContent() {
     }, []);
 
     const { isRecording, toggle: toggleRecording, stopAndDrain } = useCloudSTT({
-        lang: "ko",
+        lang: displayLang || adminLang,
         siteId: broadcastTarget,
         live: true,
         // TBM은 문장 전체가 끝날 때까지 기다리지 않고 짧은 발화 조각 단위로 전달한다.
@@ -371,6 +402,7 @@ function AdminTBMCreateContent() {
     };
 
     const completeLiveTbm = useCallback(async () => {
+        if (pendingSpeechRef.current.length) return null;
         const requestId = ++summaryRequestRef.current;
         setSummaryBusy(true);
         setSummaryError(false);
@@ -449,6 +481,7 @@ function AdminTBMCreateContent() {
                 if (liveCompleted) {
                     draftRef.current = "";
                     setTbmText("");
+                    setSpeechSource("");
                 }
                 setLiveFinalizing(false);
                 setLiveCompleted(false);
@@ -499,7 +532,7 @@ function AdminTBMCreateContent() {
     };
 
     const handleSendTBM = async () => {
-        if (isSending || liveCompleted || isRecording || isDraining || summaryBusy) return;
+        if (isSending || liveCompleted || isRecording || isDraining || summaryBusy || pendingSpeechRef.current.length) return;
         if (!tbmText.trim()) return;
         setIsSending(true);
         setBroadcastResult(null);
@@ -675,6 +708,13 @@ function AdminTBMCreateContent() {
                                     {sttError}
                                 </div>
                             )}
+                            {speechSource && <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-slate-700">
+                                <p className="text-xs font-bold mb-2">STT · {t.voiceInput}</p>
+                                <p className="whitespace-pre-wrap break-words text-base">{speechSource}</p>
+                                {pendingSpeechCount > 0 && !isRecording && <button type="button" disabled={speechRetrying}
+                                    onClick={() => void retrySpeech()} aria-label="Retry speech translation"
+                                    className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-white disabled:opacity-50">↻ {speechRetrying ? t.processing : t.voiceInput}</button>}
+                            </div>}
                             <textarea
                                 ref={setDraftTextarea}
                                 rows={5}
@@ -749,7 +789,7 @@ function AdminTBMCreateContent() {
                             )}
 
                             <div className="mt-auto pt-6 border-t border-white/5 flex flex-col gap-3">
-                                <button onClick={handleSendTBM} disabled={liveCompleted || isSending || !tbmText.trim() || isRecording || isDraining || summaryBusy || !nationwideReady} className="w-full py-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-[32px] text-2xl font-black text-slate-950 shadow-[0_20px_50px_-15px_rgba(59,130,246,0.4)] tap-effect flex items-center justify-center gap-4 disabled:opacity-30 disabled:grayscale transition-all">
+                                <button onClick={handleSendTBM} disabled={liveCompleted || isSending || !tbmText.trim() || isRecording || isDraining || summaryBusy || pendingSpeechCount > 0 || !nationwideReady} className="w-full py-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-[32px] text-2xl font-black text-slate-950 shadow-[0_20px_50px_-15px_rgba(59,130,246,0.4)] tap-effect flex items-center justify-center gap-4 disabled:opacity-30 disabled:grayscale transition-all">
                                     {isSending ? <div className="w-8 h-8 border-4 border-slate-950 border-t-transparent rounded-full animate-spin" /> : <><svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>{liveCompleted ? t.pushSuccess : t.pushBtn}</>}
                                 </button>
                                 <button

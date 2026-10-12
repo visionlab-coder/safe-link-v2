@@ -66,7 +66,7 @@ interface UseCloudSTTOptions {
     lang: string;
     /** ROOT 관리자가 라이브 화면에서 선택한 방송 현장 */
     siteId?: string | number | null;
-    onTranscript: (text: string, translations?: Record<string, string>) => void | Promise<void>;
+    onTranscript: (text: string, translations?: Record<string, string>, sourceLanguage?: string) => void | Promise<void>;
     onError?: (type: STTErrorType, message: string) => void;
     /** VAD가 음성 시작을 감지하는 즉시 호출 — STT 완료 전 파트너에게 조기 신호 전달용 */
     onSpeechStart?: () => void;
@@ -246,6 +246,8 @@ export function useCloudSTT({
 
         const generation = generationRef.current;
         const onTranscriptForChunk = onTranscriptRef.current;
+        // Keep the language attached to this clip across asynchronous encoding/STT.
+        const languageForChunk = langRef.current;
         // Upload clips concurrently, but publish recognition results in capture order.
         const previousDelivery = deliveryTailRef.current;
         let releaseDelivery!: () => void;
@@ -253,7 +255,7 @@ export function useCloudSTT({
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 20_000);
         try {
-            const sourceLang = langRef.current.toLowerCase().split("-")[0];
+            const sourceLang = languageForChunk.toLowerCase().split("-")[0];
             // Khmer 등 RTT 미지원 언어는 PCM으로 바꾸지 않고 기존 Google STT로 유지한다.
             const useFlitto = process.env.NEXT_PUBLIC_REALTIME_STT_ENGINE === "flitto" && FLITTO_RTT_LANGS.has(sourceLang);
             const base64 = useFlitto ? await blobToPcm16Base64(blob) : await blobToBase64(blob);
@@ -265,7 +267,7 @@ export function useCloudSTT({
                 signal: controller.signal,
                 body: JSON.stringify({
                     audio: base64,
-                    lang: getSTTLang(langRef.current),
+                    lang: getSTTLang(languageForChunk),
                     mimeType: useFlitto ? "audio/pcm;rate=16000" : blob.type,
                     ...(useFlitto ? { sampleRateHertz: 16000 } : typeof sampleRateHertz === "number" && Number.isFinite(sampleRateHertz)
                         ? { sampleRateHertz: Math.round(sampleRateHertz) }
@@ -304,7 +306,7 @@ export function useCloudSTT({
                 emptyStreakRef.current = 0;
                 // muted 상태(TTS 재생 중 / 파트너 발화 중)면 결과 버림
                 if (!mutedRef.current) {
-                    await onTranscriptForChunk(data.transcript.trim(), data.translations);
+                    await onTranscriptForChunk(data.transcript.trim(), data.translations, languageForChunk);
                 }
             } else {
                 emptyStreakRef.current += 1;
