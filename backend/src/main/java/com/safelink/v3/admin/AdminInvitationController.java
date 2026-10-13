@@ -218,7 +218,7 @@ public class AdminInvitationController {
     public record InvitationResponse(Long id, String status, String oneTimeToken) {}
     public record AcceptInvitationRequest(@NotBlank String token, @NotBlank String password, @NotBlank String displayName, String preferredLanguage) {
         public AcceptInvitationRequest {
-            if (password != null && password.length() < 12) {
+            if (password != null && password.length() < 10) {
                 throw new IllegalArgumentException("password_min_length");
             }
         }

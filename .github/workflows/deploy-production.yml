@@ -48,6 +48,10 @@ jobs:
           node tests/korean-glossary-api.cjs
           node tests/live-glossary-policy.cjs
           node tests/deepl-routing.cjs
+          node tests/admin-signup-guidance.cjs
+          node tests/glossary-search.cjs
+          node tests/glossary-additions-20261013.cjs
+          node tests/tbm-admin-publication.cjs
           npm run build
 
       - uses: actions/setup-java@v4

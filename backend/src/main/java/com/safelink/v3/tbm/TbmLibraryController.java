@@ -39,7 +39,7 @@ public class TbmLibraryController {
     @GetMapping
     public ResponseEntity<LibraryResponse> list(@AuthenticationPrincipal SessionPrincipal actor) {
         if (actor == null || !(actor.hasRole(Role.ROOT) || actor.hasRole(Role.HQ_ADMIN)
-            || actor.hasRole(Role.SITE_ADMIN) || actor.hasRole(Role.SAFETY_MANAGER))) {
+            || actor.hasRole(Role.SITE_ADMIN) || actor.hasRole(Role.SAFETY_MANAGER) || actor.hasRole(Role.WORKER))) {
             throw new AccessDeniedException("tbm_admin_required");
         }
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(library);

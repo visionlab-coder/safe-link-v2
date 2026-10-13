@@ -34,7 +34,7 @@ const noiseLabels: Record<string, string> = {
  * 🟢 Tier 3: 현장 환경 제어 에이전트 (Ambient Device Agent)
  * 스마트폰의 마이크와 환경광 상태를 스니핑하여 프론트엔드 환경을 자율적으로 조절합니다.
  */
-export default function SwarmAgentHUD({ lang, placement = "default" }: { lang?: string; placement?: "default" | "worker-home" }) {
+export default function SwarmAgentHUD({ lang, placement = "default" }: { lang?: string; placement?: "default" | "worker-home" | "chat" }) {
     const displayLanguage = useDisplayLanguage();
     const activeLanguage = lang ?? displayLanguage;
     const [isActive, setIsActive] = useState(false);
@@ -43,6 +43,15 @@ export default function SwarmAgentHUD({ lang, placement = "default" }: { lang?: 
     const [agentStatus, setAgentStatus] = useState<AgentStatus>("waiting");
     const [isMinimized, setIsMinimized] = useState(true);
     const noiseLabel = noiseLabels[activeLanguage] || noiseLabels.en;
+    // In chat, the composer owns the floating position so keyboard/composer
+    // height changes cannot move the monitor over the input or Send button.
+    const positionClass = placement === "chat" ? "relative pointer-events-auto" : "fixed";
+    const positionStyle = placement === "chat" ? undefined : {
+        insetInlineEnd: "calc(env(safe-area-inset-right, 0px) + 1rem)",
+        bottom: placement === "worker-home"
+            ? "calc(env(safe-area-inset-bottom, 0px) + 7rem)"
+            : "calc(env(safe-area-inset-bottom, 0px) + 4.25rem)",
+    };
     const agentMessage = agentStatus === "permission"
         ? "MIC · PERMISSION"
         : `${noiseLabel} · ${agentStatus === "warning" ? "HIGH" : agentStatus === "normal" ? "OK" : agentStatus === "monitoring" ? "ON" : agentStatus === "stopped" ? "OFF" : "READY"}`;
@@ -150,16 +159,11 @@ export default function SwarmAgentHUD({ lang, placement = "default" }: { lang?: 
             {!isMinimized ? (
                 <motion.div
                     key="full-hud"
-                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                    initial={{ opacity: 0, scale: 0.9, y: placement === "chat" ? 0 : 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                    style={{
-                        insetInlineEnd: "calc(env(safe-area-inset-right, 0px) + 1rem)",
-                        bottom: placement === "worker-home"
-                            ? "calc(env(safe-area-inset-bottom, 0px) + 7rem)"
-                            : "calc(env(safe-area-inset-bottom, 0px) + 4.25rem)",
-                    }}
-                    className={`fixed z-[100] w-56 rounded-2xl p-3 shadow-2xl border-2 backdrop-blur-xl transition-colors duration-500
+                    exit={{ opacity: 0, scale: 0.9, y: placement === "chat" ? 0 : 20 }}
+                    style={positionStyle}
+                    className={`${positionClass} z-[100] w-56 rounded-2xl p-3 shadow-2xl border-2 backdrop-blur-xl transition-colors duration-500
                         ${isNoisy ? 'bg-red-900/90 border-red-500 text-white' : 'bg-slate-900/80 border-slate-700 text-slate-100'}
                     `}
                 >
@@ -228,13 +232,8 @@ export default function SwarmAgentHUD({ lang, placement = "default" }: { lang?: 
                     onClick={() => setIsMinimized(false)}
                     type="button"
                     aria-label={`${noiseLabel} ${isActive ? "ON" : "open"}`}
-                    style={{
-                        insetInlineEnd: "calc(env(safe-area-inset-right, 0px) + 1rem)",
-                        bottom: placement === "worker-home"
-                            ? "calc(env(safe-area-inset-bottom, 0px) + 7rem)"
-                            : "calc(env(safe-area-inset-bottom, 0px) + 4.25rem)",
-                    }}
-                    className={`fixed z-[100] h-10 max-w-[11rem] whitespace-nowrap rounded-full border px-3 leading-none shadow-xl backdrop-blur-md transition-colors
+                    style={positionStyle}
+                    className={`${positionClass} z-[100] h-10 max-w-[11rem] whitespace-nowrap rounded-full border px-3 leading-none shadow-xl backdrop-blur-md transition-colors
                         ${isActive ? 'bg-emerald-900/90 border-emerald-500/50 text-emerald-400' : 'bg-slate-900/90 border-slate-700 text-slate-400 hover:text-white'}`}
                 >
                     <span className="flex h-full w-full items-center justify-center gap-2 leading-none">

@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ExportMenu from "@/components/ExportMenu";
 import { exportData, type ExportFormat } from "@/utils/export-files";
 import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { filterGlossaryTerms, glossarySearchUI } from "@/lib/glossary-search";
 
 const GLOSSARY_UI: Record<string, Record<string, string>> = {
     ko: { title:"용어집", desc:"현장 용어 및 표준어 관리", add:"새 용어 추가", slang:"은어 (현장 용어)", standard:"표준어", category:"카테고리", save:"추가/수정하기", saving:"저장 중...", bulk:"일괄 가져오기", drop:"여기에 놓으세요!", attach:"📎 엑셀 파일 첨부", drag:"클릭하거나 파일을 끌어다 놓으세요", columns:"A열: 은어 | B열: 표준어 | C열: 카테고리(선택) · 헤더 행 자동 건너뜀", other:"다른 방법으로 가져오기 (웹 URL · 텍스트 붙여넣기)", fetching:"가져오는 중", fetch:"웹 가져오기", preview:"붙여넣은 내용 미리보기", cancel:"취소", test:"표준어 변환 테스트", testDesc:"새로 추가한 단어가 잘 변환되는지 테스트해 보세요.", testBtn:"변환 테스트", registered:"등록된 용어 목록", refresh:"새로고침", loading:"데이터를 불러오는 중입니다...", added:"신규 추가", duplicate:"중복", missing:"누락", error:"오류", noSlang:"은어 없음", count:"개", row:"행", skipped:"자동 제외됨", skippedMissing:"건너뜀", new:"신규", excluding:"제외", edit:"수정", deactivate:"비활성화", activate:"활성화", delete:"완전 삭제", none:"등록된 용어가 없습니다.", slangExample:"예: 공구리", standardExample:"예: 콘크리트", pasteExample:"현장용어, 표준어, 분류\n오함마, 대형 망치, 도구" },
@@ -111,6 +112,9 @@ export default function GlossaryPage() {
     const lang = useDisplayLanguage();
     const t = { ...GLOSSARY_UI.en, ...(GLOSSARY_UI[lang] || {}) };
     const [terms, setTerms] = useState<GlossaryTerm[]>([]);
+    const [searchQuery, setSearchQuery] = useState("");
+    const searchUI = glossarySearchUI(lang);
+    const visibleTerms = filterGlossaryTerms(terms, searchQuery);
     const [loading, setLoading] = useState(true);
 
     // Add new term form state
@@ -925,14 +929,24 @@ export default function GlossaryPage() {
                             </button>
                         </div>
 
-                        <div className="overflow-y-auto pr-2 custom-scrollbar flex-1 flex flex-col gap-2">
+                        <div className="flex shrink-0 flex-col gap-2">
+                            <div className="relative">
+                                <input type="search" value={searchQuery} onChange={event => setSearchQuery(event.target.value)}
+                                    aria-label={searchUI.placeholder} placeholder={searchUI.placeholder}
+                                    className="w-full min-w-0 rounded-xl border border-slate-300 bg-white py-3 pl-4 pr-20 text-base text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 [&::-webkit-search-cancel-button]:appearance-none" />
+                                {searchQuery && <button type="button" onClick={() => setSearchQuery("")} aria-label={searchUI.clear}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100">✕</button>}
+                            </div>
+                            <p role="status" aria-live="polite" className="px-1 text-sm text-slate-600">{visibleTerms.length} / {terms.length} {t.count}</p>
+                        </div>
+                        <div data-testid="glossary-term-list" className="overflow-y-auto pr-2 custom-scrollbar flex-1 flex flex-col gap-2">
                             {loading && terms.length === 0 ? (
                                 <div className="text-center py-10 text-slate-500 font-bold animate-pulse uppercase tracking-widest">
                                     {t.loading}
                                 </div>
                             ) : (
                                 <AnimatePresence>
-                                    {terms.map(term => (
+                                    {visibleTerms.map(term => (
                                         <motion.div
                                             key={term.id}
                                             initial={{ opacity: 0, scale: 0.95 }}
@@ -986,9 +1000,9 @@ export default function GlossaryPage() {
                                     ))}
                                 </AnimatePresence>
                             )}
-                            {terms.length === 0 && !loading && (
+                            {visibleTerms.length === 0 && !loading && (
                                 <div className="text-center py-10 text-slate-500 font-bold uppercase tracking-widest">
-                                    {t.none}
+                                    {terms.length === 0 ? t.none : searchUI.empty}
                                 </div>
                             )}
                         </div>

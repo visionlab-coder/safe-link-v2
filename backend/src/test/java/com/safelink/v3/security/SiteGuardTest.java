@@ -77,4 +77,21 @@ class SiteGuardTest {
     private static SessionPrincipal principal(Long userId, Role role, Set<Long> siteIds) {
         return new SessionPrincipal(userId, "user%d@example.com".formatted(userId), "User " + userId, Set.of(role), siteIds);
     }
+
+    @Test void safetyStaffCanPublishOnlyInsideTheirSiteWithoutUserManagement() {
+        var safety = principal(4L, Role.SAFETY_MANAGER, Set.of(10L));
+        assertThatCode(() -> siteGuard.requireTbmPublisher(safety,10L,"tbm.create","tbm",null)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> siteGuard.requireTbmPublisher(safety,11L,"tbm.create","tbm",null)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> siteGuard.requireGlobalOrSiteAdmin(safety,10L,"user.manage","user",null)).isInstanceOf(AccessDeniedException.class);
+        for (Role role : Set.of(Role.TEMP_WORKER, Role.VIEWER))
+            assertThatThrownBy(() -> siteGuard.requireTbmPublisher(principal(5L,role,Set.of(10L)),10L,"tbm.create","tbm",null)).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void workerCanPublishOnlyInsideAssignedSiteWithoutAdminAccess() {
+        var worker = principal(5L,Role.WORKER,Set.of(10L));
+        assertThatCode(() -> siteGuard.requireTbmPublisher(worker,10L,"tbm.create","tbm",null)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> siteGuard.requireTbmPublisher(worker,11L,"tbm.create","tbm",null)).hasMessage("cross_site_denied");
+        assertThatThrownBy(() -> siteGuard.requireTbmPublisher(worker,null,"tbm.create","tbm",null)).hasMessage("site_id_required");
+        assertThatThrownBy(() -> siteGuard.requireGlobalOrSiteAdmin(worker,10L,"user.manage","user",null)).hasMessage("role_denied");
+    }
 }

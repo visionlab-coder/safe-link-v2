@@ -159,7 +159,7 @@ public class AiGatewayController {
     @PostMapping("/tbm-speech-draft")
     public VendorResponse tbmSpeechDraft(@AuthenticationPrincipal SessionPrincipal actor, @Valid @RequestBody SpeechDraftRequest request) {
         requireTbmAiAccess(actor, request.siteId(), "tbm_speech_draft", request.nationwide());
-        if (!request.nationwide()) siteGuard.requireGlobalOrSiteAdmin(actor, request.siteId(), "ai.tbm_speech_draft", "site", String.valueOf(request.siteId()));
+        if (!request.nationwide()) siteGuard.requireTbmPublisher(actor, request.siteId(), "ai.tbm_speech_draft", "site", String.valueOf(request.siteId()));
         requireQuota(actor, request.siteId(), "translate", request.text().length());
         Instant started = Instant.now();
         var result = vendor.translateTbmSpeech(request.text(), request.sourceLanguage());
@@ -179,7 +179,7 @@ public class AiGatewayController {
     // Draft-only: does not publish a notice or alter session-linked summary records.
     @PostMapping("/tbm-summary")
     public VendorResponse summarizeTbm(@AuthenticationPrincipal SessionPrincipal actor, @Valid @RequestBody SummaryRequest request) {
-        if (!request.nationwide()) siteGuard.requireGlobalOrSiteAdmin(actor, request.siteId(), "ai.tbm_summary", "site", String.valueOf(request.siteId()));
+        if (!request.nationwide()) siteGuard.requireTbmPublisher(actor, request.siteId(), "ai.tbm_summary", "site", String.valueOf(request.siteId()));
         requireTbmAiAccess(actor, request.siteId(), "tbm_summary", request.nationwide());
         requireQuota(actor, request.siteId(), "tbm_summary", request.text().length());
         Instant started = Instant.now();

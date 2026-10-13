@@ -32,9 +32,9 @@ class TbmLibraryControllerTest {
         assertThat(json.at("/data/0/hazard_description").asText()).contains("지게차");
         assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
     }
-    @Test void allowsOnlyTbmAdministrators() {
-        for (Role role : new Role[]{Role.ROOT,Role.HQ_ADMIN,Role.SITE_ADMIN,Role.SAFETY_MANAGER}) assertThat(controller.list(actor(role)).getStatusCode().value()).isEqualTo(200);
-        for (Role role : new Role[]{Role.WORKER,Role.TEMP_WORKER,Role.VIEWER}) assertThatThrownBy(()->controller.list(actor(role))).isInstanceOf(AccessDeniedException.class);
+    @Test void allowsTbmPublishers() {
+        for (Role role : new Role[]{Role.ROOT,Role.HQ_ADMIN,Role.SITE_ADMIN,Role.SAFETY_MANAGER,Role.WORKER}) assertThat(controller.list(actor(role)).getStatusCode().value()).isEqualTo(200);
+        for (Role role : new Role[]{Role.TEMP_WORKER,Role.VIEWER}) assertThatThrownBy(()->controller.list(actor(role))).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(()->controller.list(null)).isInstanceOf(AccessDeniedException.class);
     }
 }

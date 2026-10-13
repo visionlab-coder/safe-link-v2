@@ -12,6 +12,7 @@ import { logoutV3 } from "@/lib/v3-auth";
 import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
 import { persistDisplayLanguage, resolveDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 import { getT as getAuthT } from "@/app/auth/translations";
+import { tbmPublishLabel } from "@/lib/tbm-publish-ui";
 
 const WORKER_COMMON: Record<string, Record<string, string>> = {
     ko: { profile:"프로필", connecting:"연결 중...", safetyHome:"근로자 안전 홈", todayTitle:"오늘 할 일", todayDesc:"교육을 확인하고 서명하면 완료됩니다.", step1:"교육 확인", step2:"서명", step3:"완료", helperTitle:"필요한 기능", logoutFailed:"로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.", pledgeTitle:"TBM 안전 서약", pledgeDesc:"서명으로 안전 서약 확인" },
@@ -841,6 +842,10 @@ function WorkerHomeContent() {
                 </div>
 
                 {temporary && <aside className="rounded-3xl border border-blue-200 bg-blue-50 p-5 text-slate-800"><h2 className="text-lg font-black">임시 근로자</h2><p className="mt-2 text-sm leading-relaxed">실시간 통역만 이용할 수 있습니다. 잠긴 기능은 정식 근로자 전환 후 이용 가능합니다.</p><Link href="/worker/upgrade" className="mt-4 inline-flex rounded-xl border border-blue-300 bg-white px-4 py-3 text-sm font-bold text-blue-800">정식 근로자 전환 신청 · 승인 상태 확인 →</Link></aside>}
+                {!temporary && <Link href="/worker/tbm/create" className="flex min-h-14 items-center justify-center gap-3 rounded-2xl bg-blue-600 px-5 py-4 text-base font-black text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600">
+                    <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
+                    {tbmPublishLabel(lang)}
+                </Link>}
                 <section inert={temporary || undefined} data-worker-locked={temporary || undefined} className="relative">
                     <button
                         onClick={() => setShowStopWorkModal(true)}

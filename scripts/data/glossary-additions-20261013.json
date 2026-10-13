@@ -1,0 +1,2200 @@
+{
+  "source": "건설 및 일상 용어의 순화 대조표.xlsx",
+  "sha256": "997363a99366b40e92d9560a92d811af2457f386f411a32bb85945c1d4b2736d",
+  "source_rows": 360,
+  "existing_preserved": 208,
+  "excluded": [
+    {
+      "slang": "전",
+      "row": 95,
+      "reason": "V029에서 제거한 일반어 오치환 항목 재등록 금지"
+    },
+    {
+      "slang": "~부",
+      "row": 247,
+      "reason": "단어가 아닌 단위 표기 패턴. 단독 치환 금지"
+    }
+  ],
+  "entries": [
+    {
+      "slang": "가타",
+      "standard": "형틀, 거푸집 틀",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 3,
+      "source_standard": "형틀, 거푸집 틀 (콘크리트 타설용 또는 구조물 틀)",
+      "source_term": "가다 / 가타 / 와쿠 (型 / ガーダー / 枠): 틀, 거더(girder), 거푸집 등을 가리키는 일본식 현장 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A3:C3"
+    },
+    {
+      "slang": "와쿠",
+      "standard": "형틀, 거푸집 틀",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 3,
+      "source_standard": "형틀, 거푸집 틀 (콘크리트 타설용 또는 구조물 틀)",
+      "source_term": "가다 / 가타 / 와쿠 (型 / ガーダー / 枠): 틀, 거더(girder), 거푸집 등을 가리키는 일본식 현장 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A3:C3"
+    },
+    {
+      "slang": "노가대",
+      "standard": "토공, 공사판 노동자, 현장근로자",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 8,
+      "source_standard": "토공, 공사판 노동자, 현장근로자 (건설 현장에서 육체노동을 제공하는 작업자)",
+      "source_term": "노가다 / 노가대 / 도가다 (土方, Dokata): 토공 및 건설 현장 노동자를 지칭하는 일본식 잔재 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A8:C8"
+    },
+    {
+      "slang": "도가다",
+      "standard": "토공, 공사판 노동자, 현장근로자",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 8,
+      "source_standard": "토공, 공사판 노동자, 현장근로자 (건설 현장에서 육체노동을 제공하는 작업자)",
+      "source_term": "노가다 / 노가대 / 도가다 (土方, Dokata): 토공 및 건설 현장 노동자를 지칭하는 일본식 잔재 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A8:C8"
+    },
+    {
+      "slang": "뒷모도",
+      "standard": "조력공, 조공, 보조공, 뒷모도, 곁꾼",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 9,
+      "source_standard": "조력공, 조공, 보조공, 뒷모도, 곁꾼 (주 작업자를 보조하여 자재 전달 등을 돕는 보조 인력)",
+      "source_term": "데모도 / 뒷모도 (手元, Temoto): 보조공 및 조수를 뜻하는 일본식 현장 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A9:C9"
+    },
+    {
+      "slang": "갓따",
+      "standard": "절단기, 커터칼",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 17,
+      "source_standard": "절단기, 커터칼",
+      "source_term": "갓따 (カッター): 영어 Cutter의 일본식 발음 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A17:C17"
+    },
+    {
+      "slang": "겐사끼",
+      "standard": "래칫 렌치, 견삭기, 깔깔이, 복스렌치",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 19,
+      "source_standard": "래칫 렌치, 견삭기, 깔깔이, 복스렌치",
+      "source_term": "겐사끼 (剣先): 래칫 렌치나 견삭기를 가리키는 현장 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A19:C19"
+    },
+    {
+      "slang": "구찌",
+      "standard": "노즐, 연결구, 주입구",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 22,
+      "source_standard": "노즐, 연결구, 주입구 (배관 연결부나 개구부)",
+      "source_term": "구찌 (口): 노즐이나 배관 연결부를 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A22:C22"
+    },
+    {
+      "slang": "기리바",
+      "standard": "자투리, 지스러기, 톱밥, 칩",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 24,
+      "source_standard": "자투리, 지스러기, 톱밥, 칩",
+      "source_term": "기리빠시 / 기리바 (切れっ端し): 자투리 조각을 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A24:C24"
+    },
+    {
+      "slang": "낫또",
+      "standard": "너트",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 26,
+      "source_standard": "너트 (암나사)",
+      "source_term": "낫또 / 낫토 (ナット): Nut의 일본식 발음 표현",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A26:C26"
+    },
+    {
+      "slang": "낫토",
+      "standard": "너트",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 26,
+      "source_standard": "너트 (암나사)",
+      "source_term": "낫또 / 낫토 (ナット): Nut의 일본식 발음 표현",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A26:C26"
+    },
+    {
+      "slang": "데나우시",
+      "standard": "재손질, 재시공",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 30,
+      "source_standard": "재손질, 재시공 (잘못된 부분을 다시 고쳐 시공함)",
+      "source_term": "데나오시 / 데나우시 (手直し): 재시공 및 재손질을 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A30:C30"
+    },
+    {
+      "slang": "데우",
+      "standard": "차동 기어",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 31,
+      "source_standard": "차동 기어",
+      "source_term": "데우 / 데후 (デフ): Differential의 일본식 축약 표현",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A31:C31 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "데후",
+      "standard": "차동 기어",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 31,
+      "source_standard": "차동 기어",
+      "source_term": "데우 / 데후 (デフ): Differential의 일본식 축약 표현",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A31:C31"
+    },
+    {
+      "slang": "도라무",
+      "standard": "드럼통",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 32,
+      "source_standard": "드럼통",
+      "source_term": "도라무 (ドラム): Drum의 일본식 발음 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A32:C32"
+    },
+    {
+      "slang": "도라꾸",
+      "standard": "트럭",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 33,
+      "source_standard": "트럭",
+      "source_term": "도라꾸 (トラック): Truck의 일본식 발음 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A33:C33"
+    },
+    {
+      "slang": "도란스",
+      "standard": "변압기",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 34,
+      "source_standard": "변압기",
+      "source_term": "도란스 (トランス): Transformer의 일본식 축약 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A34:C34"
+    },
+    {
+      "slang": "도탄",
+      "standard": "함석판",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 35,
+      "source_standard": "함석판 (아연도금 철판)",
+      "source_term": "도탄 (トタン): 포르투갈어 유래의 함석판 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A35:C35"
+    },
+    {
+      "slang": "돗바",
+      "standard": "장옷, 덮개, 패딩",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 36,
+      "source_standard": "장옷, 덮개, 패딩",
+      "source_term": "돗바 / 돕빠 (トッパ): Topper의 일본식 발음 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A36:C36"
+    },
+    {
+      "slang": "돕빠",
+      "standard": "장옷, 덮개, 패딩",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 36,
+      "source_standard": "장옷, 덮개, 패딩",
+      "source_term": "돗바 / 돕빠 (トッパ): Topper의 일본식 발음 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A36:C36"
+    },
+    {
+      "slang": "라다",
+      "standard": "사다리, 방향타",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 37,
+      "source_standard": "사다리, 방향타",
+      "source_term": "라다 (ラダ): Ladder/Rudder의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A37:C37"
+    },
+    {
+      "slang": "라바콘",
+      "standard": "트래픽콘, 삼각대",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 38,
+      "source_standard": "트래픽콘, 삼각대 (도로 통제용 안전 깔대기)",
+      "source_term": "라바콘 (ラバーコーン): Traffic cone의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A38:C38"
+    },
+    {
+      "slang": "락카펀치",
+      "standard": "유압 천공기, 녹아웃 펀치",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 39,
+      "source_standard": "유압 천공기, 녹아웃 펀치",
+      "source_term": "락카펀치 (ラッカーパンチ): Knockout punch를 뜻하는 현장 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A39:C39"
+    },
+    {
+      "slang": "레듀샤",
+      "standard": "리듀서",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 41,
+      "source_standard": "리듀서 (관경 변환 배관 부속)",
+      "source_term": "레듀샤 (レジューサー): Reducer의 일본식 발음 표현",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A41:C41"
+    },
+    {
+      "slang": "리데나",
+      "standard": "오일씰, 리테이너",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 42,
+      "source_standard": "오일씰, 리테이너 (누유 및 먼지 유입 방지 부품)",
+      "source_term": "리데나 (リテーナ): Retainer의 일본식 표현",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A42:C42"
+    },
+    {
+      "slang": "리후다",
+      "standard": "밸브 리프터",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 43,
+      "source_standard": "밸브 리프터",
+      "source_term": "리후다 / 니후다 (リフター): Valve Lifter의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A43:C43"
+    },
+    {
+      "slang": "니후다",
+      "standard": "밸브 리프터",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 43,
+      "source_standard": "밸브 리프터",
+      "source_term": "리후다 / 니후다 (リフター): Valve Lifter의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A43:C43"
+    },
+    {
+      "slang": "마키선",
+      "standard": "전기 릴선",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 44,
+      "source_standard": "전기 릴선 (감아서 쓰는 전선)",
+      "source_term": "마키선 (巻き線): 전선 릴을 가리키는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A44:C44"
+    },
+    {
+      "slang": "몽키",
+      "standard": "몽키 스패너",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 47,
+      "source_standard": "몽키 스패너 (조절식 공구)",
+      "source_term": "몽키 (モンキー): Monkey Spanner의 축약 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A47:C47"
+    },
+    {
+      "slang": "미미",
+      "standard": "엔진마운트",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 48,
+      "source_standard": "엔진마운트",
+      "source_term": "미미 (耳): 엔진마운트를 가리키는 현장 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A48:C48 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "바란스",
+      "standard": "균형",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 49,
+      "source_standard": "균형",
+      "source_term": "바란스 (バランス): Balance의 일본식 발음 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A49:C49"
+    },
+    {
+      "slang": "바이브",
+      "standard": "바이브레이터(진동기)",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 50,
+      "source_standard": "진동장치, 바이브레이터 (콘크리트 다짐용 기구)",
+      "source_term": "바이브 (バイブレーター): Vibrator의 축약 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A50:C50 / 기존 코드 용어 뜻 유지"
+    },
+    {
+      "slang": "반도",
+      "standard": "고정용 밴드",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 52,
+      "source_standard": "고정용 밴드",
+      "source_term": "반도 (バンド): Band의 일본식 발음 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A52:C52 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "벤치레다",
+      "standard": "환풍기, 흡출기",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 54,
+      "source_standard": "환풍기, 흡출기",
+      "source_term": "벤치레다 / 벤츄레타 (ベンチレーター): Ventilator의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A54:C54"
+    },
+    {
+      "slang": "벤츄레타",
+      "standard": "환풍기, 흡출기",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 54,
+      "source_standard": "환풍기, 흡출기",
+      "source_term": "벤치레다 / 벤츄레타 (ベンチレーター): Ventilator의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A54:C54"
+    },
+    {
+      "slang": "부란자",
+      "standard": "인젝션 펌프, 플런저",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 55,
+      "source_standard": "인젝션 펌프, 플런저 (디젤엔진 연료분사펌프)",
+      "source_term": "부란자 (プランジャー): Plunger의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A55:C55"
+    },
+    {
+      "slang": "부록꾸",
+      "standard": "블록",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 56,
+      "source_standard": "블록 (콘크리트 블록 등)",
+      "source_term": "부록꾸 / 보루꼬 (ブロック): Block의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A56:C56"
+    },
+    {
+      "slang": "보루꼬",
+      "standard": "블록",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 56,
+      "source_standard": "블록 (콘크리트 블록 등)",
+      "source_term": "부록꾸 / 보루꼬 (ブロック): Block의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A56:C56"
+    },
+    {
+      "slang": "뷰다",
+      "standard": "배전기",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 57,
+      "source_standard": "배전기",
+      "source_term": "뷰다 (ビューター): Distributor의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A57:C57"
+    },
+    {
+      "slang": "브레까",
+      "standard": "브레이커, 차단기, 해머드릴",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 58,
+      "source_standard": "브레이커, 차단기, 해머드릴 (콘크리트 파쇄 기계 또는 회로 차단기)",
+      "source_term": "브레까 / 뿌레카 (ブレーカー): Breaker의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A58:C58"
+    },
+    {
+      "slang": "뿌레카",
+      "standard": "브레이커, 차단기, 해머드릴",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 58,
+      "source_standard": "브레이커, 차단기, 해머드릴 (콘크리트 파쇄 기계 또는 회로 차단기)",
+      "source_term": "브레까 / 뿌레카 (ブレーカー): Breaker의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A58:C58"
+    },
+    {
+      "slang": "빠레트",
+      "standard": "파렛트, 적재용 깔판",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 61,
+      "source_standard": "파렛트, 적재용 깔판",
+      "source_term": "빠레트 / 파렛트 (パレット): Pallet의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A61:C61"
+    },
+    {
+      "slang": "파렛트",
+      "standard": "파렛트, 적재용 깔판",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 61,
+      "source_standard": "파렛트, 적재용 깔판",
+      "source_term": "빠레트 / 파렛트 (パレット): Pallet의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A61:C61"
+    },
+    {
+      "slang": "빠우",
+      "standard": "금속 표면 연마",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 62,
+      "source_standard": "금속 표면 연마",
+      "source_term": "빠우 (バフ): Buffing의 일본식 표현",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A62:C62"
+    },
+    {
+      "slang": "뺑끼",
+      "standard": "페인트",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 64,
+      "source_standard": "페인트 (칠용 도료)",
+      "source_term": "뺑끼 (ペンキ): 페인트를 뜻하는 현장 외래어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A64:C64"
+    },
+    {
+      "slang": "뿌리",
+      "standard": "도르래",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 65,
+      "source_standard": "도르래",
+      "source_term": "뿌리 (プーリー): Pulley의 일본식 발음 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A65:C65 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "사부로꾸",
+      "standard": "3'×6' 합판 규격",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 66,
+      "source_standard": "3'×6' 합판 규격",
+      "source_term": "사부로꾸 (3×6): 3x6 규격을 뜻하는 일본식 표현",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A66:C66"
+    },
+    {
+      "slang": "사뽀도",
+      "standard": "서포트, 지주",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 67,
+      "source_standard": "서포트, 지주 (처짐 방지 지지대)",
+      "source_term": "사뽀도 / 삽뽀드 (サポート): Support의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A67:C67"
+    },
+    {
+      "slang": "삽뽀드",
+      "standard": "서포트, 지주",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 67,
+      "source_standard": "서포트, 지주 (처짐 방지 지지대)",
+      "source_term": "사뽀도 / 삽뽀드 (サポート): Support의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A67:C67"
+    },
+    {
+      "slang": "사쿠",
+      "standard": "자루, 집",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 68,
+      "source_standard": "자루, 집 (보호용 자루)",
+      "source_term": "사쿠 (サック): Sack의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A68:C68"
+    },
+    {
+      "slang": "서스",
+      "standard": "스테인리스 스틸, 스테인리스 강",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 69,
+      "source_standard": "스테인리스 스틸, 스테인리스 강",
+      "source_term": "서스 / 스텐 / 스덴 / 스뎅 (サス / ステンレス): SUS 및 Stainless의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A69:C69"
+    },
+    {
+      "slang": "스텐",
+      "standard": "스테인리스 스틸, 스테인리스 강",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 69,
+      "source_standard": "스테인리스 스틸, 스테인리스 강",
+      "source_term": "서스 / 스텐 / 스덴 / 스뎅 (サス / ステンレス): SUS 및 Stainless의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A69:C69"
+    },
+    {
+      "slang": "스뎅",
+      "standard": "스테인리스 스틸, 스테인리스 강",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 69,
+      "source_standard": "스테인리스 스틸, 스테인리스 강",
+      "source_term": "서스 / 스텐 / 스덴 / 스뎅 (サス / ステンレス): SUS 및 Stainless의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A69:C69"
+    },
+    {
+      "slang": "세리",
+      "standard": "아치",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 70,
+      "source_standard": "아치",
+      "source_term": "세리 (迫り): 아치를 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A70:C70 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "세멘",
+      "standard": "시멘트",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 71,
+      "source_standard": "시멘트",
+      "source_term": "세멘 / 세면 (セメント): Cement의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A71:C71"
+    },
+    {
+      "slang": "세면",
+      "standard": "시멘트",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 71,
+      "source_standard": "시멘트",
+      "source_term": "세멘 / 세면 (セメント): Cement의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A71:C71 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "스데",
+      "standard": "버림 콘크리트, 버리는 콘크리트",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 72,
+      "source_standard": "버림 콘크리트, 버리는 콘크리트",
+      "source_term": "스데 / 스데 콘쿠리 (捨て Conc.): 버림 콘크리트를 가리키는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A72:C72"
+    },
+    {
+      "slang": "스데 콘쿠리",
+      "standard": "버림 콘크리트, 버리는 콘크리트",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 72,
+      "source_standard": "버림 콘크리트, 버리는 콘크리트",
+      "source_term": "스데 / 스데 콘쿠리 (捨て Conc.): 버림 콘크리트를 가리키는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A72:C72"
+    },
+    {
+      "slang": "스페샤",
+      "standard": "스페이서",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 74,
+      "source_standard": "스페이서 (철근 간격재 또는 이격 도구)",
+      "source_term": "스페샤 (スペーサー): Spacer의 일본식 표현",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A74:C74"
+    },
+    {
+      "slang": "스페아",
+      "standard": "여분, 예비품",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 75,
+      "source_standard": "여분, 예비품",
+      "source_term": "스페아 (スペア): Spare의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A75:C75"
+    },
+    {
+      "slang": "시메라",
+      "standard": "장선기, 전선바이스",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 77,
+      "source_standard": "장선기, 전선바이스 (전선 늘어짐 조정 공구)",
+      "source_term": "시메라 (しめら): 장선기를 뜻하는 현장 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A77:C77"
+    },
+    {
+      "slang": "시하찌",
+      "standard": "4'×8' 합판 규격",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 78,
+      "source_standard": "4'×8' 합판 규격",
+      "source_term": "시하찌 (4×8): 4x8 규격을 뜻하는 일본식 표현",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A78:C78"
+    },
+    {
+      "slang": "신나",
+      "standard": "희석제, 시너",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 79,
+      "source_standard": "희석제, 시너",
+      "source_term": "신나 (シンナー): Thinner의 일본식 발음 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A79:C79 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "쓰라",
+      "standard": "면, 여유치",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 81,
+      "source_standard": "면, 여유치",
+      "source_term": "쓰라 / 스라 (面): 면이나 간격을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A81:C81"
+    },
+    {
+      "slang": "스라",
+      "standard": "면, 여유치",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 81,
+      "source_standard": "면, 여유치",
+      "source_term": "쓰라 / 스라 (面): 면이나 간격을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A81:C81"
+    },
+    {
+      "slang": "암롤 박스",
+      "standard": "대형 박스, 쓰레기 적재용 박스",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 83,
+      "source_standard": "대형 박스, 쓰레기 적재용 박스",
+      "source_term": "암롤 박스: 현장에서 사용되는 대형 적재 박스 명칭",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A83:C83"
+    },
+    {
+      "slang": "앙카",
+      "standard": "앵커(고정 장치)",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 84,
+      "source_standard": "앵커, 앵커볼트",
+      "source_term": "앙카 (アンカー): Anchor의 일본식 발음 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A84:C84 / 기존 코드 용어 뜻 유지"
+    },
+    {
+      "slang": "오라이",
+      "standard": "좋다, 양호, 오케이",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 86,
+      "source_standard": "좋다, 양호, 오케이",
+      "source_term": "오라이 (オーライ): All right의 일본식 발음 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A86:C86"
+    },
+    {
+      "slang": "오무기어",
+      "standard": "웜기어",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 87,
+      "source_standard": "웜기어",
+      "source_term": "오무기어 / 오모기어 (ウォームギアー): Worm gear의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A87:C87"
+    },
+    {
+      "slang": "오모기어",
+      "standard": "웜기어",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 87,
+      "source_standard": "웜기어",
+      "source_term": "오무기어 / 오모기어 (ウォームギアー): Worm gear의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A87:C87"
+    },
+    {
+      "slang": "우끼",
+      "standard": "뜨개밸브, 부레, 플로트 스위치",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 89,
+      "source_standard": "뜨개밸브, 부레, 플로트 스위치",
+      "source_term": "우끼 (浮き): 부레나 플로트 스위치를 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A89:C89"
+    },
+    {
+      "slang": "위샤캡",
+      "standard": "엔트런스 캡, 서비스 캡, 배수구 트랩",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 90,
+      "source_standard": "엔트런스 캡, 서비스 캡, 배수구 트랩",
+      "source_term": "위샤캡 / 웨샤캡 / 유가 / 육가 (ウェザー Cap / 流下): Weather Cap 및 배수 트랩 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A90:C90"
+    },
+    {
+      "slang": "웨샤캡",
+      "standard": "엔트런스 캡, 서비스 캡, 배수구 트랩",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 90,
+      "source_standard": "엔트런스 캡, 서비스 캡, 배수구 트랩",
+      "source_term": "위샤캡 / 웨샤캡 / 유가 / 육가 (ウェザー Cap / 流下): Weather Cap 및 배수 트랩 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A90:C90"
+    },
+    {
+      "slang": "유가",
+      "standard": "엔트런스 캡, 서비스 캡, 배수구 트랩",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 90,
+      "source_standard": "엔트런스 캡, 서비스 캡, 배수구 트랩",
+      "source_term": "위샤캡 / 웨샤캡 / 유가 / 육가 (ウェザー Cap / 流下): Weather Cap 및 배수 트랩 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A90:C90 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "육가",
+      "standard": "엔트런스 캡, 서비스 캡, 배수구 트랩",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 90,
+      "source_standard": "엔트런스 캡, 서비스 캡, 배수구 트랩",
+      "source_term": "위샤캡 / 웨샤캡 / 유가 / 육가 (ウェザー Cap / 流下): Weather Cap 및 배수 트랩 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A90:C90"
+    },
+    {
+      "slang": "이바리",
+      "standard": "거스러미",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 92,
+      "source_standard": "거스러미 (가공 후 남은 잔여 찌꺼기)",
+      "source_term": "이바리 (鋳張り): 거스러미를 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A92:C92"
+    },
+    {
+      "slang": "쟈바라",
+      "standard": "주름진 물건",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 93,
+      "source_standard": "주름진 물건 (플렉서블관, 접문 등)",
+      "source_term": "자바라 / 쟈바라 (蛇腹): 주름관 형태 부재를 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A93:C93"
+    },
+    {
+      "slang": "짬뿌",
+      "standard": "점프",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 94,
+      "source_standard": "점프 (전선 우회 연결)",
+      "source_term": "짬뿌 (ジャンプ): Jump의 일본식 발음 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A94:C94"
+    },
+    {
+      "slang": "치구",
+      "standard": "고정 도구, DRF렌치",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 96,
+      "source_standard": "고정 도구, DRF렌치",
+      "source_term": "치구 (治具): 고정 공구를 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A96:C96"
+    },
+    {
+      "slang": "카본",
+      "standard": "탄소강",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 97,
+      "source_standard": "탄소강",
+      "source_term": "카본 (carbon): Carbon의 현장 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A97:C97"
+    },
+    {
+      "slang": "칼브럭",
+      "standard": "스크루앵커",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 98,
+      "source_standard": "스크루앵커",
+      "source_term": "칼브럭 / 칼블럭 (カールプラグ): Carl Plug의 변형 명칭",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A98:C98"
+    },
+    {
+      "slang": "칼블럭",
+      "standard": "스크루앵커",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 98,
+      "source_standard": "스크루앵커",
+      "source_term": "칼브럭 / 칼블럭 (カールプラグ): Carl Plug의 변형 명칭",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A98:C98"
+    },
+    {
+      "slang": "쿠사비",
+      "standard": "쐐기",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 99,
+      "source_standard": "쐐기",
+      "source_term": "쿠사비 / 웨지 (楔 / ウエッジ): 쐐기를 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A99:C99"
+    },
+    {
+      "slang": "웨지",
+      "standard": "쐐기",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 99,
+      "source_standard": "쐐기",
+      "source_term": "쿠사비 / 웨지 (楔 / ウエッジ): 쐐기를 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A99:C99"
+    },
+    {
+      "slang": "클립",
+      "standard": "비계 파이프 고정 연결구, 클립",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 100,
+      "source_standard": "비계 파이프 고정 연결구, 클립",
+      "source_term": "클립 (クリップ): Clip의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A100:C100"
+    },
+    {
+      "slang": "타이",
+      "standard": "거푸집 고정용 금속핀",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 101,
+      "source_standard": "거푸집 고정용 금속핀",
+      "source_term": "타이 (タイ): Tie의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A101:C101 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "타이루",
+      "standard": "타일",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 102,
+      "source_standard": "타일",
+      "source_term": "타이루 (タイル): Tile의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A102:C102"
+    },
+    {
+      "slang": "타카",
+      "standard": "태커, 스테이플러",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 103,
+      "source_standard": "태커, 스테이플러",
+      "source_term": "타카 (タッカ): Tacker의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A103:C103"
+    },
+    {
+      "slang": "탭",
+      "standard": "암나사 내기",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 104,
+      "source_standard": "암나사 가공, 탭",
+      "source_term": "탭 (タップ): Tap의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A104:C104 / 기존 코드 용어 뜻 유지"
+    },
+    {
+      "slang": "투바이",
+      "standard": "각재 규격",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 105,
+      "source_standard": "각재 규격 (50x100mm, 1.5치x3치)",
+      "source_term": "투바이 (2×4): 2x4 규격을 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A105:C105"
+    },
+    {
+      "slang": "판넬",
+      "standard": "패널, 배전반, 판자",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 106,
+      "source_standard": "패널, 배전반, 판자",
+      "source_term": "판넬 / 판네루 (パネル): Panel의 일본식 발음 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A106:C106"
+    },
+    {
+      "slang": "판네루",
+      "standard": "패널, 배전반, 판자",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 106,
+      "source_standard": "패널, 배전반, 판자",
+      "source_term": "판넬 / 판네루 (パネル): Panel의 일본식 발음 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A106:C106"
+    },
+    {
+      "slang": "펜치",
+      "standard": "플라이어, 펜치",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 107,
+      "source_standard": "플라이어, 펜치",
+      "source_term": "펜치 (ペンチ): Pliers의 일본식 표현",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A107:C107"
+    },
+    {
+      "slang": "프리치",
+      "standard": "브리지, 연결 배선",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 108,
+      "source_standard": "브리지, 연결 배선",
+      "source_term": "프리치 (ブリッジ): Bridge의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A108:C108"
+    },
+    {
+      "slang": "프로파일",
+      "standard": "형강",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 109,
+      "source_standard": "형강",
+      "source_term": "프로파일: 형강 구조재",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A109:C109"
+    },
+    {
+      "slang": "피스",
+      "standard": "나사못",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 110,
+      "source_standard": "나사못",
+      "source_term": "피스 / 비스 (ビス): 프랑스어 vis에서 유래된 나사못 표현",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A110:C110"
+    },
+    {
+      "slang": "비스",
+      "standard": "나사못",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 110,
+      "source_standard": "나사못",
+      "source_term": "피스 / 비스 (ビス): 프랑스어 vis에서 유래된 나사못 표현",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A110:C110"
+    },
+    {
+      "slang": "항공 마대",
+      "standard": "항공 마대, 톤백",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 111,
+      "source_standard": "항공 마대, 톤백",
+      "source_term": "항공 마대: 톤백을 가리키는 현장 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A111:C111"
+    },
+    {
+      "slang": "후렌찌",
+      "standard": "플랜지",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 112,
+      "source_standard": "플랜지",
+      "source_term": "후렌지 / 후렌찌 (フランジ): Flange의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A112:C112"
+    },
+    {
+      "slang": "후앙",
+      "standard": "팬, 환풍기",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 113,
+      "source_standard": "팬, 환풍기",
+      "source_term": "후앙 (ファン): Fan의 일본식 발음 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A113:C113"
+    },
+    {
+      "slang": "후쿠",
+      "standard": "갈고리, 후크",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 114,
+      "source_standard": "갈고리, 후크 (철근 결속선용 갈고리)",
+      "source_term": "후쿠 (フック): Hook의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A114:C114"
+    },
+    {
+      "slang": "후쿠메타",
+      "standard": "클램프 미터, 전류계",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 115,
+      "source_standard": "클램프 미터, 전류계",
+      "source_term": "후쿠메타 (デジタルマルチメータ): 측정기 현장 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A115:C115"
+    },
+    {
+      "slang": "ky",
+      "standard": "위험예지",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 117,
+      "source_standard": "위험예지 (당일 작업의 예상 위험사항을 주지시키는 안전 미팅)",
+      "source_term": "KY (危險予知): 위험예지 미팅",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A117:C117"
+    },
+    {
+      "slang": "tbm",
+      "standard": "작업 전 미팅",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 118,
+      "source_standard": "작업 전 미팅 (아침체조, 스트레칭 및 당일 지시사항 전달 미팅)",
+      "source_term": "TBM (ツールボックス・ミーティング): Tool Box Meeting의 일본식 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A118:C118"
+    },
+    {
+      "slang": "가쿠목",
+      "standard": "각목",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 126,
+      "source_standard": "각목 (각진 목재)",
+      "source_term": "가꾸목 / 가쿠목 (角木): 각목을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A126:C126"
+    },
+    {
+      "slang": "가리고야",
+      "standard": "가설건물",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 134,
+      "source_standard": "가설건물 (임시 건물)",
+      "source_term": "가리고야 (仮小屋): 가설건물을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A134:C134"
+    },
+    {
+      "slang": "가오다시",
+      "standard": "체면, 폼잡기",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 136,
+      "source_standard": "체면, 폼잡기",
+      "source_term": "가오다시 (顔出し): 체면 차리기를 뜻하는 현장 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A136:C136"
+    },
+    {
+      "slang": "가타키리",
+      "standard": "외쪽깎이, 한쪽깎이",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 138,
+      "source_standard": "외쪽깎이, 한쪽깎이 (한쪽 면 절토 작업)",
+      "source_term": "가타키리 (片切り): 한쪽깎기를 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A138:C138"
+    },
+    {
+      "slang": "간나",
+      "standard": "대패",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 139,
+      "source_standard": "대패",
+      "source_term": "간나 (鉋): 대패를 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A139:C139"
+    },
+    {
+      "slang": "겜바",
+      "standard": "현장",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 142,
+      "source_standard": "현장 (공사 작업 장소)",
+      "source_term": "겐바 / 겜바 (現場): 공사현장을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A142:C142"
+    },
+    {
+      "slang": "겐세이",
+      "standard": "견제",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 143,
+      "source_standard": "견제 (시간을 끌며 일을 방해함)",
+      "source_term": "겐세이 (牽制): 견제를 뜻하는 현장 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A143:C143"
+    },
+    {
+      "slang": "겐칸",
+      "standard": "현관",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 144,
+      "source_standard": "현관",
+      "source_term": "겐칸 (玄関): 현관을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A144:C144"
+    },
+    {
+      "slang": "고도리",
+      "standard": "철탑/전봇대 시공 시 자재 가조립 인력",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 148,
+      "source_standard": "철탑/전봇대 시공 시 자재 가조립 인력",
+      "source_term": "고도리 (五鳥 / 小鳥): 철탑 가조립 인력을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A148:C148"
+    },
+    {
+      "slang": "고시",
+      "standard": "격자",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 152,
+      "source_standard": "격자",
+      "source_term": "고시 (格子): 격자를 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A152:C152 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "곤조",
+      "standard": "근성, 고집",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 153,
+      "source_standard": "근성, 고집",
+      "source_term": "곤조 (根性): 근성을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A153:C153"
+    },
+    {
+      "slang": "고운반",
+      "standard": "소운반",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 154,
+      "source_standard": "소운반 (현장 내 단거리 자재 운반)",
+      "source_term": "곰방 / 고운반 (小運搬): 소운반을 뜻하는 현장 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A154:C154"
+    },
+    {
+      "slang": "관심근로자",
+      "standard": "관심근로자",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 155,
+      "source_standard": "관심근로자",
+      "source_term": "관심근로자: 현장에서 관심이 필요한 근로자",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A155:C155"
+    },
+    {
+      "slang": "구기",
+      "standard": "못",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 156,
+      "source_standard": "못",
+      "source_term": "구기 (釘): 못을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A156:C156"
+    },
+    {
+      "slang": "구리이시",
+      "standard": "호박돌, 잡석, 조약돌",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 158,
+      "source_standard": "호박돌, 잡석, 조약돌",
+      "source_term": "구리스 / 구리이시 (栗石): 잡석/호박돌을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A158:C158"
+    },
+    {
+      "slang": "키리카에",
+      "standard": "바꾸기, 교체",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 161,
+      "source_standard": "바꾸기, 교체",
+      "source_term": "기리까에 / 키리카에 (切り替え): 교체 작업을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A161:C161"
+    },
+    {
+      "slang": "기성",
+      "standard": "기성, 기성과금",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 164,
+      "source_standard": "기성, 기성과금 (완성도 청구액)",
+      "source_term": "기성 (既成): 공사 기성금 청구를 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A164:C164"
+    },
+    {
+      "slang": "기즈리",
+      "standard": "졸대",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 167,
+      "source_standard": "졸대",
+      "source_term": "기즈리 (木摺り): 졸대를 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A167:C167"
+    },
+    {
+      "slang": "나까미",
+      "standard": "분전반 속판",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 170,
+      "source_standard": "분전반 속판 (내부 알맹이)",
+      "source_term": "나까미 (中身): 속판/내용물을 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A170:C170"
+    },
+    {
+      "slang": "냉가망치",
+      "standard": "벽돌용 각망치",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 174,
+      "source_standard": "벽돌용 각망치",
+      "source_term": "냉가망치 (煉瓦 + 망치): 벽돌용 망치를 가리키는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A174:C174"
+    },
+    {
+      "slang": "네지리",
+      "standard": "뒤틀림",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 177,
+      "source_standard": "뒤틀림",
+      "source_term": "네지리 (捩り): 뒤틀림을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A177:C177"
+    },
+    {
+      "slang": "넨도",
+      "standard": "점토",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 178,
+      "source_standard": "점토",
+      "source_term": "넨도 (粘土): 점토를 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A178:C178"
+    },
+    {
+      "slang": "노로비끼",
+      "standard": "시멘트 풀칠",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 181,
+      "source_standard": "시멘트 풀칠",
+      "source_term": "노리비끼 / 노로비끼 (野呂引き): 시멘트 풀칠 작업을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A181:C181"
+    },
+    {
+      "slang": "누노기소",
+      "standard": "줄기초",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 185,
+      "source_standard": "줄기초",
+      "source_term": "누노기소 (布基礎): 줄기초를 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A185:C185"
+    },
+    {
+      "slang": "다께와리",
+      "standard": "대쪽",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 188,
+      "source_standard": "대쪽 (반으로 쪼갠 타일)",
+      "source_term": "다께와리 (竹割り): 대쪽 타일을 가리키는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A188:C188"
+    },
+    {
+      "slang": "다떼",
+      "standard": "세로",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 189,
+      "source_standard": "세로",
+      "source_term": "다데 / 다떼 (縦): 세로 방향을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A189:C189"
+    },
+    {
+      "slang": "당까",
+      "standard": "들것",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 202,
+      "source_standard": "들것",
+      "source_term": "당까 / 단가 / 담가 (担架): 들것을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A202:C202"
+    },
+    {
+      "slang": "단가",
+      "standard": "들것",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 202,
+      "source_standard": "들것",
+      "source_term": "당까 / 단가 / 담가 (担架): 들것을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A202:C202 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "담가",
+      "standard": "들것",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 202,
+      "source_standard": "들것",
+      "source_term": "당까 / 단가 / 담가 (担架): 들것을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A202:C202 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "데코",
+      "standard": "지레, 쇠지렛대",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 208,
+      "source_standard": "지레, 쇠지렛대",
+      "source_term": "데코 (梃子): 지렛대를 가리키는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A208:C208"
+    },
+    {
+      "slang": "데코보코",
+      "standard": "요철, 울퉁불퉁함",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 209,
+      "source_standard": "요철, 울퉁불퉁함",
+      "source_term": "데코보코 / 데꾸보꾸 (凸凹): 표면 요철을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A209:C209"
+    },
+    {
+      "slang": "데꾸보꾸",
+      "standard": "요철, 울퉁불퉁함",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 209,
+      "source_standard": "요철, 울퉁불퉁함",
+      "source_term": "데코보코 / 데꾸보꾸 (凸凹): 표면 요철을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A209:C209"
+    },
+    {
+      "slang": "뎃킨",
+      "standard": "철근",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 212,
+      "source_standard": "철근",
+      "source_term": "뎃킨 (鉄筋): 철근을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A212:C212"
+    },
+    {
+      "slang": "도기다시",
+      "standard": "갈아내기",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 213,
+      "source_standard": "갈아내기 (인조석 다듬기)",
+      "source_term": "도끼다시 / 도기다시 (硏ぎ出し): 인조석 갈아내기 공법",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A213:C213"
+    },
+    {
+      "slang": "도지나",
+      "standard": "주상 안전 벨트",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 218,
+      "source_standard": "주상 안전 벨트",
+      "source_term": "도지나 (胴綱): 주상 안전 벨트를 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A218:C218"
+    },
+    {
+      "slang": "똥띠기",
+      "standard": "인건비 착복",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 219,
+      "source_standard": "인건비 착복",
+      "source_term": "똥띠기: 인건비 중간 착복 행위 현장어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A219:C219"
+    },
+    {
+      "slang": "란마",
+      "standard": "고창, 환기창",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 220,
+      "source_standard": "고창, 환기창",
+      "source_term": "란마 / 람마 (欄間): 문 상부 환기창을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A220:C220"
+    },
+    {
+      "slang": "류베",
+      "standard": "입방미터",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 221,
+      "source_standard": "입방미터 ( $m^3$ )",
+      "source_term": "루베 / 류베 (立米): 입방미터를 뜻하는 일본식 단위",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A221:C221"
+    },
+    {
+      "slang": "마루보",
+      "standard": "전산볼트",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 225,
+      "source_standard": "전산볼트",
+      "source_term": "마루보 (丸棒): 전산볼트를 가리키는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A225:C225"
+    },
+    {
+      "slang": "마루타",
+      "standard": "통나무",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 226,
+      "source_standard": "통나무",
+      "source_term": "마루다 / 마루타 (丸太): 통나무를 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A226:C226"
+    },
+    {
+      "slang": "마찌꼬바",
+      "standard": "소규모 공장",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 229,
+      "source_standard": "소규모 공장",
+      "source_term": "마찌꼬바 / 마찌꼬방 (町工場): 소형 공장을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A229:C229"
+    },
+    {
+      "slang": "마찌꼬방",
+      "standard": "소규모 공장",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 229,
+      "source_standard": "소규모 공장",
+      "source_term": "마찌꼬바 / 마찌꼬방 (町工場): 소형 공장을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A229:C229"
+    },
+    {
+      "slang": "맥기",
+      "standard": "도금",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 230,
+      "source_standard": "도금",
+      "source_term": "매끼 / 맥기 / 멕기 / 멧키 (鍍金): 도금을 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A230:C230"
+    },
+    {
+      "slang": "멕기",
+      "standard": "도금",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 230,
+      "source_standard": "도금",
+      "source_term": "매끼 / 맥기 / 멕기 / 멧키 (鍍金): 도금을 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A230:C230"
+    },
+    {
+      "slang": "멧키",
+      "standard": "도금",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 230,
+      "source_standard": "도금",
+      "source_term": "매끼 / 맥기 / 멕기 / 멧키 (鍍金): 도금을 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A230:C230"
+    },
+    {
+      "slang": "메꾸라시",
+      "standard": "막음",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 231,
+      "source_standard": "막음 (배관 막음)",
+      "source_term": "메꾸라 / 메꾸라시 (盲): 배관 단말 막음을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A231:C231"
+    },
+    {
+      "slang": "메모도",
+      "standard": "수평조절목",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 232,
+      "source_standard": "수평조절목",
+      "source_term": "메모도 (目もと): 바닥 기준점 목재를 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A232:C232"
+    },
+    {
+      "slang": "메지보",
+      "standard": "줄눈대",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 234,
+      "source_standard": "줄눈대",
+      "source_term": "메지보 (目地棒): 줄눈대를 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A234:C234"
+    },
+    {
+      "slang": "무시로",
+      "standard": "거적",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 240,
+      "source_standard": "거적",
+      "source_term": "무시로 (筵): 거적을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A240:C240"
+    },
+    {
+      "slang": "미스모리",
+      "standard": "물수평, 수준기",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 242,
+      "source_standard": "물수평, 수준기",
+      "source_term": "미스모리 / 미즈모리 (水盛り): 물수평 측정을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A242:C242"
+    },
+    {
+      "slang": "미즈모리",
+      "standard": "물수평, 수준기",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 242,
+      "source_standard": "물수평, 수준기",
+      "source_term": "미스모리 / 미즈모리 (水盛り): 물수평 측정을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A242:C242"
+    },
+    {
+      "slang": "미쓰모리",
+      "standard": "견적",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 243,
+      "source_standard": "견적",
+      "source_term": "미쓰모리 (見積もり): 견적을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A243:C243"
+    },
+    {
+      "slang": "미즈끼리",
+      "standard": "물끊기",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 244,
+      "source_standard": "물끊기",
+      "source_term": "미즈끼리 (水切り): 물끊기 홈을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A244:C244"
+    },
+    {
+      "slang": "보로",
+      "standard": "넝마, 누더기, 걸레",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 246,
+      "source_standard": "넝마, 누더기, 걸레",
+      "source_term": "보로 / 보루 (襤褸): 걸레나 헝겊을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A246:C246"
+    },
+    {
+      "slang": "보루",
+      "standard": "넝마, 누더기, 걸레",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 246,
+      "source_standard": "넝마, 누더기, 걸레",
+      "source_term": "보로 / 보루 (襤褸): 걸레나 헝겊을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A246:C246"
+    },
+    {
+      "slang": "부비끼",
+      "standard": "톱밥칫수 빼기",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 248,
+      "source_standard": "톱밥칫수 빼기",
+      "source_term": "부비끼 (分引き): 제재목 치수 차감을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A248:C248"
+    },
+    {
+      "slang": "뽕끼",
+      "standard": "배관 분기",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 250,
+      "source_standard": "배관 분기",
+      "source_term": "뽕끼 (分岐): 배관 분기 작업을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A250:C250"
+    },
+    {
+      "slang": "사게후리",
+      "standard": "다림추",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 251,
+      "source_standard": "다림추",
+      "source_term": "사게부리 / 사게후리 (下げ振り): 다림추를 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A251:C251"
+    },
+    {
+      "slang": "세와야꾸",
+      "standard": "부책임자",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 260,
+      "source_standard": "부책임자",
+      "source_term": "세와 / 세와야꾸 (世話役): 부작업반장을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A260:C260"
+    },
+    {
+      "slang": "소꼬",
+      "standard": "보밑판",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 261,
+      "source_standard": "보밑판",
+      "source_term": "소꼬 / 하리소꼬 (梁底): 보 거푸집 밑바닥 판",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A261:C261"
+    },
+    {
+      "slang": "하리소꼬",
+      "standard": "보밑판",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 261,
+      "source_standard": "보밑판",
+      "source_term": "소꼬 / 하리소꼬 (梁底): 보 거푸집 밑바닥 판",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A261:C261"
+    },
+    {
+      "slang": "소지",
+      "standard": "청소",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 262,
+      "source_standard": "청소",
+      "source_term": "소지 (掃除): 청소를 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A262:C262 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "스기",
+      "standard": "삼나무",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 265,
+      "source_standard": "삼나무",
+      "source_term": "스기 (杉): 삼나무를 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A265:C265"
+    },
+    {
+      "slang": "스나",
+      "standard": "모래",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 266,
+      "source_standard": "모래",
+      "source_term": "스나 (砂): 모래를 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A266:C266"
+    },
+    {
+      "slang": "승고다루끼",
+      "standard": "한치반 각재",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 271,
+      "source_standard": "한치반 각재",
+      "source_term": "승고다루끼 (寸五棰木): 한치반 각재 표현",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A271:C271"
+    },
+    {
+      "slang": "시끼이",
+      "standard": "밑홈대, 문지방",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 272,
+      "source_standard": "밑홈대, 문지방",
+      "source_term": "시끼 / 시끼이 (敷き居): 문지방을 가리킴",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A272:C272"
+    },
+    {
+      "slang": "시누",
+      "standard": "긴결 철물 갈고리",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 273,
+      "source_standard": "긴결 철물 갈고리",
+      "source_term": "시노 / 시누 (篠): 결속선 조임 도구",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A273:C273"
+    },
+    {
+      "slang": "시다바리",
+      "standard": "보조원",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 274,
+      "source_standard": "보조원",
+      "source_term": "시다 / 시다바리 (下張り): 하부 보조원 표현",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A274:C274"
+    },
+    {
+      "slang": "시로토",
+      "standard": "초보자",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 277,
+      "source_standard": "초보자",
+      "source_term": "시로토 (素人): 비숙련 초보자를 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A277:C277"
+    },
+    {
+      "slang": "신주",
+      "standard": "황동, 놋쇠",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 280,
+      "source_standard": "황동, 놋쇠",
+      "source_term": "신주 / 신쭈 (真鍮): 황동을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A280:C280"
+    },
+    {
+      "slang": "신쭈",
+      "standard": "황동, 놋쇠",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 280,
+      "source_standard": "황동, 놋쇠",
+      "source_term": "신주 / 신쭈 (真鍮): 황동을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A280:C280"
+    },
+    {
+      "slang": "쓰루하시",
+      "standard": "곡괭이",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 281,
+      "source_standard": "곡괭이",
+      "source_term": "쓰루하시 (つるはし): 곡괭이를 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A281:C281"
+    },
+    {
+      "slang": "쓰미",
+      "standard": "조적, 벽돌 쌓기",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 282,
+      "source_standard": "조적, 벽돌 쌓기",
+      "source_term": "쓰미 (積み): 벽돌 쌓기를 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A282:C282"
+    },
+    {
+      "slang": "쓰봉",
+      "standard": "바지, 하의",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 283,
+      "source_standard": "바지, 하의",
+      "source_term": "쓰봉 (ズボン): 작업용 바지를 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A283:C283"
+    },
+    {
+      "slang": "아다라시",
+      "standard": "신품",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 285,
+      "source_standard": "신품",
+      "source_term": "아다라시 (新しい): 새 제품을 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A285:C285"
+    },
+    {
+      "slang": "아다리",
+      "standard": "맞물림, 각막 화상",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 286,
+      "source_standard": "맞물림, 각막 화상",
+      "source_term": "아다리 (当たり): 용접 화상 또는 맞물림",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A286:C286"
+    },
+    {
+      "slang": "어지기",
+      "standard": "입선 구령 소리",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 295,
+      "source_standard": "입선 구령 소리",
+      "source_term": "어지기 (お辞儀): 전선 당김 구령",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A295:C295"
+    },
+    {
+      "slang": "열반",
+      "standard": "판넬 맞춤 작업",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 297,
+      "source_standard": "판넬 맞춤 작업",
+      "source_term": "열반: 판넬을 열 맞춰 맞추는 현장어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A297:C297 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "오도시",
+      "standard": "오르내리 꽂이쇠",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 300,
+      "source_standard": "오르내리 꽂이쇠",
+      "source_term": "오도시 / 마루오도시 (丸落とし): 꽂이쇠 부품",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A300:C300"
+    },
+    {
+      "slang": "마루오도시",
+      "standard": "오르내리 꽂이쇠",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 300,
+      "source_standard": "오르내리 꽂이쇠",
+      "source_term": "오도시 / 마루오도시 (丸落とし): 꽂이쇠 부품",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A300:C300"
+    },
+    {
+      "slang": "오사에",
+      "standard": "누름",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 303,
+      "source_standard": "누름 (몰탈, 퍼티)",
+      "source_term": "오사이 / 오사에 (押さえ): 누름 작업을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A303:C303"
+    },
+    {
+      "slang": "오삽",
+      "standard": "큰 각삽",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 304,
+      "source_standard": "큰 각삽",
+      "source_term": "오삽: 대형 삽을 뜻하는 혼용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A304:C304"
+    },
+    {
+      "slang": "오시이레",
+      "standard": "반침, 벽장",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 305,
+      "source_standard": "반침, 벽장",
+      "source_term": "오시이레 (押し入れ): 벽장을 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A305:C305"
+    },
+    {
+      "slang": "오야가다",
+      "standard": "책임자, 반장",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 306,
+      "source_standard": "책임자, 반장",
+      "source_term": "오야 / 오야지 / 오야가다 (親方): 작업 반장",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A306:C306"
+    },
+    {
+      "slang": "요비선",
+      "standard": "호출선",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 308,
+      "source_standard": "호출선",
+      "source_term": "요비선 (呼び出し線): 전선 입선용 호출선",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A308:C308"
+    },
+    {
+      "slang": "우라이시",
+      "standard": "뒷채움 자갈",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 311,
+      "source_standard": "뒷채움 자갈",
+      "source_term": "우라이시 (裏石): 뒷채움 자갈을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A311:C311"
+    },
+    {
+      "slang": "이도",
+      "standard": "우물",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 317,
+      "source_standard": "우물",
+      "source_term": "이도 (井戸): 우물을 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A317:C317 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "이모메지",
+      "standard": "통줄눈",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 318,
+      "source_standard": "통줄눈",
+      "source_term": "이모메지 (芋目地): 일자 통줄눈을 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A318:C318"
+    },
+    {
+      "slang": "이타",
+      "standard": "판자",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 319,
+      "source_standard": "판자",
+      "source_term": "이타 (板): 판자를 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A319:C319 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "입뽄모노",
+      "standard": "하나로 된 물건",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 321,
+      "source_standard": "하나로 된 물건",
+      "source_term": "입뽄모노 (一本物): 통으로 된 물품",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A321:C321"
+    },
+    {
+      "slang": "조세",
+      "standard": "상태, 조절",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 324,
+      "source_standard": "상태, 조절",
+      "source_term": "조시 / 조세 (調子 / 調節): 상태 및 조율",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A324:C324"
+    },
+    {
+      "slang": "지리",
+      "standard": "벽쌤",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 325,
+      "source_standard": "벽쌤",
+      "source_term": "지리 (散り): 미장면 차이를 뜻하는 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A325:C325 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "찜빠",
+      "standard": "짝짝이, 엔진 부조",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 326,
+      "source_standard": "짝짝이, 엔진 부조",
+      "source_term": "찐빠 / 찜빠 (跛): 불균형/부조 현상",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A326:C326"
+    },
+    {
+      "slang": "천정",
+      "standard": "천장",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 327,
+      "source_standard": "천장",
+      "source_term": "천정 (天井): 천장의 관행적 한자 표기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A327:C327"
+    },
+    {
+      "slang": "쿠사리",
+      "standard": "쇠사슬, 구박",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 328,
+      "source_standard": "쇠사슬, 구박",
+      "source_term": "쿠사리 (鎖 / 腐り): 쇠사슬 또는 질책",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A328:C328"
+    },
+    {
+      "slang": "하리가네",
+      "standard": "철사",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 332,
+      "source_standard": "철사",
+      "source_term": "하리가네 (針金): 철사를 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A332:C332"
+    },
+    {
+      "slang": "하리가와",
+      "standard": "보옆판",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 333,
+      "source_standard": "보옆판",
+      "source_term": "하리가와 (梁側): 보 거푸집 측면 판",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A333:C333"
+    },
+    {
+      "slang": "한빠",
+      "standard": "어중간한 사람",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 337,
+      "source_standard": "어중간한 사람",
+      "source_term": "한빠 / 함빠 (半端): 비숙련자를 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A337:C337"
+    },
+    {
+      "slang": "함빠",
+      "standard": "어중간한 사람",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 337,
+      "source_standard": "어중간한 사람",
+      "source_term": "한빠 / 함빠 (半端): 비숙련자를 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A337:C337"
+    },
+    {
+      "slang": "함바집",
+      "standard": "현장 식당",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 338,
+      "source_standard": "현장 식당",
+      "source_term": "함바 / 함바집 (飯場): 현장 식당 표현",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A338:C338"
+    },
+    {
+      "slang": "호루",
+      "standard": "적재함 덮개",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 342,
+      "source_standard": "적재함 덮개",
+      "source_term": "호로 / 호루 (幌): 방수 천막 덮개",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A342:C342"
+    },
+    {
+      "slang": "후까시",
+      "standard": "부풀리기, 공회전",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 344,
+      "source_standard": "부풀리기, 공회전",
+      "source_term": "후까시 (蒸かし): 공회전 및 부풀리기",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A344:C344"
+    },
+    {
+      "slang": "후다",
+      "standard": "뚜껑, 덮개",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 346,
+      "source_standard": "뚜껑, 덮개",
+      "source_term": "후다 (蓋): 덮개를 뜻하는 일본식 용어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A346:C346"
+    },
+    {
+      "slang": "호네구미",
+      "standard": "뼈대",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 350,
+      "source_standard": "뼈대",
+      "source_term": "호네구미 (骨組み): 골조 구조를 뜻함",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A350:C350"
+    },
+    {
+      "slang": "로드킬",
+      "standard": "동물 찻길 사고",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 351,
+      "source_standard": "동물 찻길 사고",
+      "source_term": "로드킬: 주행 중 야생동물 충돌 사고",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A351:C351"
+    },
+    {
+      "slang": "톨비",
+      "standard": "통행료",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 352,
+      "source_standard": "통행료",
+      "source_term": "톨비: 도로 통행료 속어",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A352:C352"
+    },
+    {
+      "slang": "싱크홀",
+      "standard": "땅꺼짐",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 353,
+      "source_standard": "땅꺼짐",
+      "source_term": "싱크홀 (sink hole): 지반 꺼짐 현상",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A353:C353"
+    },
+    {
+      "slang": "블랙 아이스",
+      "standard": "도로 살얼음",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 354,
+      "source_standard": "도로 살얼음",
+      "source_term": "블랙 아이스 (Black Ice): 도로 얼음 층",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A354:C354"
+    },
+    {
+      "slang": "포트 홀",
+      "standard": "도로 파임",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 355,
+      "source_standard": "도로 파임",
+      "source_term": "포트 홀 (pot hole): 도로 구멍 손상",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A355:C355"
+    },
+    {
+      "slang": "렉카",
+      "standard": "견인차",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 356,
+      "source_standard": "견인차",
+      "source_term": "렉카 / 렉카차: 견인 차량",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A356:C356"
+    },
+    {
+      "slang": "렉카차",
+      "standard": "견인차",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 356,
+      "source_standard": "견인차",
+      "source_term": "렉카 / 렉카차: 견인 차량",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A356:C356"
+    },
+    {
+      "slang": "럼블 스트립",
+      "standard": "졸음방지 홈",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 357,
+      "source_standard": "졸음방지 홈",
+      "source_term": "럼블 스트립 (rumble strip): 진동 홈",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A357:C357"
+    },
+    {
+      "slang": "램프",
+      "standard": "연결로",
+      "category": "기타",
+      "is_active": false,
+      "source_row": 358,
+      "source_standard": "연결로",
+      "source_term": "램프 (ramp): 도로 연결 경사로",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A358:C358 / 일반어와 의미 충돌: 자동 치환 보류"
+    },
+    {
+      "slang": "보루바코",
+      "standard": "골판지 상자",
+      "category": "기타",
+      "is_active": true,
+      "source_row": 361,
+      "source_standard": "골판지 상자",
+      "source_term": "보루바코 (ボルばこ): 골판지 상자",
+      "note": "건설 및 일상 용어의 순화 대조표.xlsx / Table 1!A361:C361"
+    }
+  ]
+}

@@ -202,10 +202,10 @@ class AuthServiceTest {
     }
 
     @Test
-    void directAdminSignupRequiresAtLeastTwelveCharacterPassword() {
+    void directAdminSignupRejectsNineCharacterPassword() {
         assertThatThrownBy(() -> authService.registerDirectAdminSignup(
             "admin@seowonenc.co.kr",
-            "password123",
+            "pass12345",
             "Admin",
             "ko",
             "127.0.0.1"

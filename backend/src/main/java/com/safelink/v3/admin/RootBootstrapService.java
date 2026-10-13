@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RootBootstrapService {
-    private static final int ROOT_PASSWORD_MIN_LENGTH = 12;
+    private static final int ROOT_PASSWORD_MIN_LENGTH = 10;
 
     private final UserAccountRepository users;
     private final PasswordEncoder passwordEncoder;

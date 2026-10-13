@@ -53,7 +53,7 @@ public class LiveTbmSummaryController {
     @PostMapping
     @Transactional(timeout = 60)
     public Summary finish(@AuthenticationPrincipal SessionPrincipal actor, @Valid @RequestBody Request request) {
-        guard.requireGlobalOrSiteAdmin(actor, request.siteId(), "live.summary.create", "live_broadcast_session", request.sessionId());
+        guard.requireTbmPublisher(actor, request.siteId(), "live.summary.create", "live_broadcast_session", request.sessionId());
         // Serialize concurrent/retried completion requests using only this session row.
         var session = jdbc.sql("select started_by,active from live_broadcast_sessions where session_id=:id and site_id=:site for update")
             .param("id",request.sessionId()).param("site",request.siteId())

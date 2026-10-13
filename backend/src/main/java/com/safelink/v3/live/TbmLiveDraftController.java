@@ -35,7 +35,7 @@ public class TbmLiveDraftController {
     @PostMapping
     @Transactional
     public Draft save(@AuthenticationPrincipal SessionPrincipal actor, @Valid @RequestBody Request request) {
-        guard.requireGlobalOrSiteAdmin(actor,request.siteId(),"tbm.live.draft.update","live_broadcast_session",request.sessionId());
+        guard.requireTbmPublisher(actor,request.siteId(),"tbm.live.draft.update","live_broadcast_session",request.sessionId());
         Long owner = jdbc.sql("select started_by from live_broadcast_sessions where session_id=:id and site_id=:site for update")
             .param("id",request.sessionId()).param("site",request.siteId()).query(Long.class)
             .optional().orElseThrow(() -> new IllegalArgumentException("live_session_not_found"));

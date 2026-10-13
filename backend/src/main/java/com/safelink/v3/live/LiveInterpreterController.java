@@ -45,7 +45,7 @@ public class LiveInterpreterController {
     @PostMapping("/sessions")
     @Transactional
     public BroadcastSessionEvent startSession(@AuthenticationPrincipal SessionPrincipal actor, @RequestBody BroadcastSessionRequest request) {
-        requireAdmin(actor);
+        requireBroadcastPublisher(actor, request.sessionId());
         Long siteId = request.siteId() == null || request.siteId().isBlank() ? firstSiteId(actor) : parseLong(request.siteId(), "siteId_invalid");
         if (siteId == null) throw new IllegalArgumentException("site_id_required");
         siteGuard.requireSiteAccess(actor, siteId, "live.broadcast.start", "live_broadcast_session", null);
@@ -53,6 +53,10 @@ public class LiveInterpreterController {
         if (sessionId.isBlank()) throw new IllegalArgumentException("session_id_required");
 
         jdbc.sql("select pg_advisory_xact_lock(737037)").query((rs,n)->true).single();
+        // Worker publishing must not terminate another person's ongoing broadcast.
+        if (isWorkerPublisher(actor) && jdbc.sql("select exists(select 1 from live_broadcast_sessions where site_id=:site and active=true and started_by<>:owner)")
+                .param("site",siteId).param("owner",actor.userId()).query(Boolean.class).single())
+            throw new AccessDeniedException("live_broadcast_already_active");
         if (jdbc.sql("select exists(select 1 from live_broadcast_sessions s join nationwide_tbm_targets t on t.session_id=s.session_id where s.site_id=:site and s.active=true)")
                 .param("site",siteId).query(Boolean.class).single())
             throw new IllegalArgumentException("nationwide_tbm_live_conflict");
@@ -87,10 +91,16 @@ public class LiveInterpreterController {
         @RequestParam String sessionId,
         @RequestParam(required = false) String siteId
     ) {
-        requireAdmin(actor);
+        requireBroadcastPublisher(actor, sessionId);
         Long requestedSiteId = siteId == null || siteId.isBlank() ? firstSiteId(actor) : parseLong(siteId, "siteId_invalid");
         if (requestedSiteId == null) throw new IllegalArgumentException("site_id_required");
         siteGuard.requireSiteAccess(actor, requestedSiteId, "live.broadcast.stop", "live_broadcast_session", null);
+        if (isWorkerPublisher(actor)) {
+            var owner = jdbc.sql("select started_by from live_broadcast_sessions where session_id=:id and site_id=:site")
+                .param("id",clean(sessionId)).param("site",requestedSiteId).query(Long.class).optional();
+            if (owner.isEmpty() || !owner.get().equals(actor.userId()))
+                throw new AccessDeniedException("live_session_owner_required");
+        }
         var nationwideOwner = jdbc.sql("select b.created_by from nationwide_tbm_targets t join nationwide_tbm_broadcasts b on b.id=t.broadcast_id where t.session_id=:id and t.site_id=:site")
             .param("id",clean(sessionId)).param("site",requestedSiteId).query(Long.class).optional();
         if (nationwideOwner.isPresent()) {
@@ -121,7 +131,7 @@ public class LiveInterpreterController {
         @AuthenticationPrincipal SessionPrincipal actor,
         @RequestBody BroadcastSessionRequest request
     ) {
-        requireAdmin(actor);
+        requireBroadcastPublisher(actor, request.sessionId());
         Long siteId = request.siteId() == null || request.siteId().isBlank() ? firstSiteId(actor) : parseLong(request.siteId(), "siteId_invalid");
         if (siteId == null) throw new IllegalArgumentException("site_id_required");
         siteGuard.requireSiteAccess(actor, siteId, "live.broadcast.speaking", "live_broadcast_session", null);
@@ -178,7 +188,7 @@ public class LiveInterpreterController {
     @PostMapping("/translations")
     @Transactional
     public Map<String, String> createTranslation(@AuthenticationPrincipal SessionPrincipal actor, @RequestBody TranslationRequest request) {
-        requireAdmin(actor);
+        requireBroadcastPublisher(actor, request.sessionId());
         Long siteId = request.siteId() == null || request.siteId().isBlank() ? firstSiteId(actor) : parseLong(request.siteId(), "siteId_invalid");
         if (siteId == null) {
             throw new IllegalArgumentException("site_id_required");
@@ -386,6 +396,16 @@ public class LiveInterpreterController {
             ))
             .list();
         return Map.of("responses", rows);
+    }
+
+    static void requireBroadcastPublisher(SessionPrincipal actor, String sessionId) {
+        if (actor != null && actor.hasRole(Role.WORKER) && clean(sessionId).startsWith("tbm_")) return;
+        requireAdmin(actor);
+    }
+
+    private static boolean isWorkerPublisher(SessionPrincipal actor) {
+        return actor.hasRole(Role.WORKER) && actor.roles().stream().noneMatch(role ->
+            role.hasGlobalSiteScope() || role == Role.SITE_ADMIN || role == Role.SAFETY_MANAGER);
     }
 
     private static void requireAdmin(SessionPrincipal actor) {

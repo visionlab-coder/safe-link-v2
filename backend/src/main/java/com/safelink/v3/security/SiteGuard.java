@@ -38,6 +38,16 @@ public class SiteGuard {
         requireSiteAccess(actor, siteId, action, resourceType, resourceId);
     }
 
+    /** TBM publishing does not grant permission to administer users. */
+    public void requireTbmPublisher(SessionPrincipal actor, Long siteId, String action, String resourceType, String resourceId) {
+        if (actor == null || actor.roles().stream().noneMatch(role -> role.hasGlobalSiteScope()
+            || role == com.safelink.v3.domain.Role.SITE_ADMIN || role == com.safelink.v3.domain.Role.SAFETY_MANAGER
+            || role == com.safelink.v3.domain.Role.WORKER)) {
+            deny(actor, siteId, action, resourceType, resourceId, "role_denied");
+        }
+        requireSiteAccess(actor, siteId, action, resourceType, resourceId);
+    }
+
     private void deny(SessionPrincipal actor, Long siteId, String action, String resourceType, String resourceId, String reason) {
         audit.record(
             actor == null ? null : actor.userId(),

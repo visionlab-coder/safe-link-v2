@@ -32,14 +32,14 @@ class LiveTbmSummaryTest {
             .hasMessage("live_session_not_stopped");
         assertThatCode(() -> LiveTbmSummaryController.validateSession(1L,1L,false)).doesNotThrowAnyException();
     }
-    @Test void wrongSiteOrWorkerCannotCallVendor() {
+    @Test void wrongSiteOrTemporaryWorkerCannotCallVendor() {
         var jdbc=mock(JdbcClient.class);
         var vendor=mock(AiVendorService.class);
         var audit=mock(AuditService.class);
         var controller=new LiveTbmSummaryController(jdbc,new SiteGuard(audit),mock(TbmRepository.class),vendor,
             mock(AiProperties.class),mock(AiQuotaService.class),mock(AiUsageRepository.class),audit,mock(LiveInterpreterEventBus.class));
         var admin=new SessionPrincipal(1L,"test","test",Set.of(Role.SITE_ADMIN),Set.of(10L));
-        var worker=new SessionPrincipal(2L,"test","test",Set.of(Role.WORKER),Set.of(20L));
+        var worker=new SessionPrincipal(2L,"test","test",Set.of(Role.TEMP_WORKER),Set.of(20L));
         assertThatThrownBy(() -> controller.finish(admin,new LiveTbmSummaryController.Request("s",20L)))
             .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> controller.finish(worker,new LiveTbmSummaryController.Request("s",20L)))

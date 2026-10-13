@@ -779,12 +779,15 @@ function WorkerChatContent() {
                                     </AnimatePresence>
                                     <div aria-hidden="true" className="h-px shrink-0" />
                                 </div>
-                                <div className="sticky bottom-0 z-40 shrink-0 bg-white border-t border-slate-200 px-2 pt-2 md:p-6 shadow-[0_-10px_30px_rgba(0,0,0,0.02)] flex gap-2 items-center" style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 0.25rem)" }}>
-                                    {sttError && (
-                                        <p role="status" aria-live="polite" className="absolute -top-10 left-3 right-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 shadow-sm">
-                                            {sttError}
-                                        </p>
-                                    )}
+                                <div data-testid="worker-chat-composer" className="sticky bottom-0 z-40 shrink-0 bg-white border-t border-slate-200 px-2 pt-2 md:p-6 shadow-[0_-10px_30px_rgba(0,0,0,0.02)] flex gap-2 items-center" style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 0.25rem)" }}>
+                                    <div className="pointer-events-none absolute inset-x-0 bottom-full flex flex-col items-end gap-2 px-3 pb-2">
+                                        <SwarmAgentHUD lang={lang} placement="chat" />
+                                        {sttError && (
+                                            <p role="status" aria-live="polite" className="w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 shadow-sm">
+                                                {sttError}
+                                            </p>
+                                        )}
+                                    </div>
                                     <button onClick={toggleRecording} className={`flex h-12 w-12 md:h-16 md:w-16 shrink-0 items-center justify-center rounded-full shadow-md transition-all border-2 ${isRecording ? 'bg-red-500 border-red-500 text-white animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-400'}`}><svg className="w-6 h-6 md:w-7 md:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg></button>
                                     <div className="relative flex min-w-0 flex-1 items-center bg-slate-50 border-2 border-slate-200 rounded-[28px] md:rounded-[36px] overflow-hidden focus-within:border-blue-500 transition-all shadow-inner">
                                         <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={isRecording ? t.listening : t.chatPlaceholder} className="w-full min-w-0 overflow-hidden whitespace-pre-wrap bg-transparent px-3 py-3 md:p-5 md:pl-8 text-slate-800 text-base md:text-lg font-black outline-none resize-none min-h-[52px] md:min-h-[64px] leading-snug placeholder:whitespace-nowrap placeholder:text-sm placeholder:font-bold placeholder:tracking-tight placeholder:text-slate-400" rows={1} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} />
@@ -805,9 +808,6 @@ function WorkerChatContent() {
                 </main>
             </div>
             <style jsx global>{`::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }`}</style>
-
-            {/* 🤖 Tier 3 Ambient Edge Agent */}
-            <SwarmAgentHUD lang={lang} />
         </RoleGuard>
     );
 }

@@ -5,7 +5,7 @@ import { nationwideTbmUI } from "@/lib/tbm-nationwide-ui";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
 import { Suspense } from "react";
 import { normalizeKo, normalizeKoAsync } from "@/utils/normalize";
@@ -140,6 +140,7 @@ function getBroadcastErrorMessage(lang: string, error?: string, detail?: string)
 
 function AdminTBMCreateContent() {
     const router = useRouter();
+    const workerMode = usePathname().startsWith("/worker/");
     const searchParams = useSearchParams();
     const [adminLang, setAdminLang] = useState("ko");
     const displayLang = useDisplayLanguage(adminLang);
@@ -243,11 +244,11 @@ function AdminTBMCreateContent() {
     const fetchHistory = useCallback(async () => {
         const params = new URLSearchParams({ limit: "10" });
         if (adminSiteId && !nationwide) params.set("site_id", adminSiteId);
-        const res = await fetch(`/api/tbm/notices?${params.toString()}`, { cache: "no-store", credentials: "include" });
+        const res = await fetch(workerMode ? "/api/tbm/today?limit=10" : `/api/tbm/notices?${params.toString()}`, { cache: "no-store", credentials: "include" });
         if (!res.ok) return;
         const data = await res.json() as { tbms?: any[] };
-        if (data.tbms) setHistory(data.tbms);
-    }, [adminSiteId, nationwide]);
+        if (data.tbms) setHistory(workerMode ? data.tbms.filter(tbm => String(tbm.created_by) === String(userId)) : data.tbms);
+    }, [adminSiteId, nationwide, workerMode, userId]);
 
     useEffect(() => {
         if (!canBroadcastNationwide) return;
@@ -605,7 +606,7 @@ function AdminTBMCreateContent() {
     const locale = ({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[displayLang || adminLang] || "en-US";
 
     return (
-        <RoleGuard allowedRole="admin">
+        <RoleGuard allowedRole={workerMode ? "worker" : "admin"}>
             <div className="visualization-light min-h-screen font-sans flex flex-col selection:bg-blue-500/30">
                 <header className="concept-page-header safe-area-sticky-top sticky z-50">
                     <div className="flex items-center gap-4">
@@ -617,7 +618,7 @@ function AdminTBMCreateContent() {
                         <div className="flex flex-col">
                             <div className="flex items-center gap-2">
                                 <span className="text-xl font-black tracking-tight text-white uppercase italic">SQ Link</span>
-                                <span className="px-2 py-0.5 bg-blue-500 text-[10px] font-black rounded text-white tracking-widest uppercase">Admin</span>
+                                <span className="px-2 py-0.5 bg-blue-500 text-[10px] font-black rounded text-white tracking-widest uppercase">{workerMode ? "Worker" : "Admin"}</span>
                             </div>
                         </div>
                     </div>
@@ -793,7 +794,7 @@ function AdminTBMCreateContent() {
                                     {isSending ? <div className="w-8 h-8 border-4 border-slate-950 border-t-transparent rounded-full animate-spin" /> : <><svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>{liveCompleted ? t.pushSuccess : t.pushBtn}</>}
                                 </button>
                                 <button
-                                    onClick={() => router.push("/admin/chat")}
+                                    onClick={() => router.push(workerMode ? "/worker/chat" : "/admin/chat")}
                                     className="w-full py-5 glass rounded-[28px] border-white/10 text-slate-300 hover:text-white hover:border-green-500/30 hover:bg-green-500/5 transition-all tap-effect flex items-center justify-center gap-3 group"
                                 >
                                     <svg className="w-6 h-6 text-green-400 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">

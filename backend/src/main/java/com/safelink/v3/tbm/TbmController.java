@@ -137,7 +137,7 @@ public class TbmController {
         @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
         @RequestBody BroadcastRequest request
     ) {
-        requireTbmAdmin(actor);
+        if (actor == null) throw new AccessDeniedException("authentication_required");
         String content = cleanRequired(request.contentKo(), "content_required");
         Long siteId = resolveWritableSite(actor, request.siteId());
         String title = request.title() == null || request.title().isBlank()
@@ -309,7 +309,7 @@ public class TbmController {
         if (siteId == null) {
             throw new IllegalArgumentException("site_id_required");
         }
-        siteGuard.requireGlobalOrSiteAdmin(actor, siteId, "tbm.notice.create", "tbm_notice", null);
+        siteGuard.requireTbmPublisher(actor, siteId, "tbm.notice.create", "tbm_notice", null);
         return siteId;
     }
 

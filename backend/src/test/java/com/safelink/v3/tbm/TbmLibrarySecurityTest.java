@@ -24,9 +24,9 @@ class TbmLibrarySecurityTest {
     @Autowired MockMvc mvc;
     @MockitoBean AuditService audit;
     @MockitoBean UserAccountRepository users;
-    @Test void sessionRequiredAndOnlyTbmAdministratorsCanReadReference() throws Exception {
+    @Test void sessionRequiredAndOnlyTbmPublishersCanReadReference() throws Exception {
         mvc.perform(get("/api/v1/tbm/library")).andExpect(status().isForbidden());
-        var allowed = Set.of(Role.ROOT, Role.HQ_ADMIN, Role.SITE_ADMIN, Role.SAFETY_MANAGER);
+        var allowed = Set.of(Role.ROOT, Role.HQ_ADMIN, Role.SITE_ADMIN, Role.SAFETY_MANAGER, Role.WORKER);
         for (Role role : Role.values()) {
             var account = new UserAccount(2L,"local@example.invalid","LOCAL","ACTIVE",null,Set.of(role),Set.of(1L));
             when(users.findById(2L)).thenReturn(Optional.of(account));

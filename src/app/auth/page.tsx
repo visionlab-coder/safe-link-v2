@@ -1,6 +1,7 @@
 "use client";
 import EnglishNameField from "@/components/EnglishNameField";
 import { englishNameUI } from "@/lib/english-name";
+import { ADMIN_PASSWORD_MIN_LENGTH, adminPasswordHint, adminSignupIssues } from "@/lib/admin-signup-validation";
 
 import { useEffect, useState, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -45,13 +46,13 @@ const ADMIN_SIGNUP_ERROR_NOTICES: Record<string, Record<"domain" | "duplicate" |
   ko: {
     domain: "관리자 가입은 @seowonenc.co.kr 이메일로만 가능합니다.",
     duplicate: "이미 가입 신청되었거나 등록된 이메일입니다. 기존 계정으로 로그인하거나 승인 상태를 확인해주세요.",
-    password: "비밀번호는 12자 이상으로 입력해주세요.",
+    password: "비밀번호는 10자 이상으로 입력해주세요.",
     rate: "가입 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
   },
   en: {
     domain: "Administrator sign-up is available only with an @seowonenc.co.kr email address.",
     duplicate: "This email is already registered or has a pending sign-up request. Sign in with the existing account or check its approval status.",
-    password: "Enter a password with at least 12 characters.",
+    password: "Enter a password with at least 10 characters.",
     rate: "Too many sign-up requests. Please try again shortly.",
   },
 };
@@ -81,6 +82,7 @@ const ADMIN_LOGIN_INVALID_CREDENTIALS: Record<string, string> = {
 };
 
 function adminSignupErrorNotice(language: string, key: "domain" | "duplicate" | "password" | "rate"): string {
+  if (key === "password") return adminPasswordHint(language);
   return (ADMIN_SIGNUP_ERROR_NOTICES[language] ?? ADMIN_SIGNUP_ERROR_NOTICES.en)[key];
 }
 
@@ -249,6 +251,11 @@ function AuthContent() {
   const [adminEmail, setAdminEmail] = useState("");
   const [adminName, setAdminName] = useState("");
   const [adminNameReady, setAdminNameReady] = useState(false);
+  const signupIssues = adminSignupIssues({
+    language: lang || "en", email: adminEmail, nameReady: adminNameReady, password,
+    confirmation: passConfirm, emailLabel, confirmationLabel: t.passConfirm, mismatchLabel: t.noMatch,
+  });
+  const signupPasswordValid = password.length >= ADMIN_PASSWORD_MIN_LENGTH;
 
   const [initials, setInitials] = useState("");
   const [phoneLast4, setPhoneLast4] = useState("");
@@ -420,9 +427,8 @@ function AuthContent() {
   };
 
   const handleAdminSignup = async () => {
-    if (!adminEmail || !password || !passConfirm || !adminNameReady) return;
-    if (password !== passConfirm) {
-      setAuthFlash({ tone: "error", message: t.noMatch });
+    if (signupIssues.length > 0) {
+      setAuthFlash({ tone: "error", message: signupIssues[0] });
       return;
     }
 
@@ -791,11 +797,20 @@ function AuthContent() {
 
                 {/* Password */}
                 {adminSignupMode && <EnglishNameField language={lang || "ko"} value={adminName} onChange={setAdminName} onReadyChange={setAdminNameReady} />}
+                <div className="space-y-2">
                 <div style={fieldBox}>
                   <input type="password" aria-label={t.pass} placeholder={t.pass} value={password}
+                    minLength={adminSignupMode ? ADMIN_PASSWORD_MIN_LENGTH : undefined}
+                    autoComplete={adminSignupMode ? "new-password" : "current-password"}
+                    aria-describedby={adminSignupMode ? "admin-password-hint" : undefined}
+                    aria-invalid={adminSignupMode && password.length > 0 && !signupPasswordValid}
                     onChange={e => setPassword(e.target.value)}
                     onKeyDown={e => !adminSignupMode && e.key === "Enter" && handleAdminLogin()}
                     className="block w-full box-border border-0 bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5" />
+                </div>
+                {adminSignupMode && <p id="admin-password-hint" className={`px-1 text-xs leading-relaxed ${password && !signupPasswordValid ? "text-red-600" : "text-slate-600"}`}>
+                  {adminPasswordHint(lang || "en")}
+                </p>}
                 </div>
 
                 {!adminSignupMode && (
@@ -814,14 +829,17 @@ function AuthContent() {
                       ...fieldBox,
                       border: `1px solid ${passConfirm && passConfirm !== password
                         ? "#fca5a5"
-                        : passConfirm && passConfirm === password
+                        : passConfirm && passConfirm === password && signupPasswordValid
                           ? "#86efac"
                           : "#b9cbe4"}`,
                     }}>
                       <input type="password" aria-label={t.passConfirm} placeholder={t.passConfirm} value={passConfirm}
+                        autoComplete="new-password"
+                        aria-describedby={signupIssues.length ? "admin-signup-requirements" : undefined}
+                        aria-invalid={Boolean(passConfirm && passConfirm !== password)}
                         onChange={e => setPassConfirm(e.target.value)}
                         className="block w-full box-border border-0 bg-transparent text-white text-sm placeholder-slate-700 outline-none px-4 py-3.5 pr-11" />
-                      {passConfirm && (
+                      {passConfirm && (passConfirm !== password || signupPasswordValid) && (
                         <span className="absolute right-3.5 top-1/2 -translate-y-1/2">
                           {passConfirm === password
                             ? <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -839,8 +857,17 @@ function AuthContent() {
                 )}
 
                 {/* CTA */}
+                {adminSignupMode && signupIssues.length > 0 && (
+                  <div id="admin-signup-requirements" role="status" aria-live="polite" aria-atomic="true"
+                    className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+                    <ul className="list-disc space-y-1 pl-4">
+                      {signupIssues.map(issue => <li key={issue}>{issue}</li>)}
+                    </ul>
+                  </div>
+                )}
                 <button onClick={adminSignupMode ? handleAdminSignup : handleAdminLogin}
-                  disabled={loading || !adminEmail || !password || (adminSignupMode && (!passConfirm || !adminNameReady))}
+                  aria-describedby={adminSignupMode && signupIssues.length ? "admin-signup-requirements" : undefined}
+                  disabled={loading || (adminSignupMode ? signupIssues.length > 0 : !adminEmail || !password)}
                   className="w-full py-3.5 font-black text-sm text-white rounded-xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: "linear-gradient(135deg,#2563EB 0%,#3B82F6 100%)", boxShadow: "0 4px 24px rgba(59,130,246,0.28)" }}>
                   {loading ? <Spinner /> : adminSignupMode ? t.doSignup : t.doLogin}

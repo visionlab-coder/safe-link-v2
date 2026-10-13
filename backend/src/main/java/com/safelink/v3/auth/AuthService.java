@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuthService {
     private static final String ADMIN_SIGNUP_DOMAIN = "seowonenc.co.kr";
-    private static final int ADMIN_SIGNUP_PASSWORD_MIN_LENGTH = 12;
+    private static final int ADMIN_SIGNUP_PASSWORD_MIN_LENGTH = 10;
 
     private final UserAccountRepository users;
     private final PasswordEncoder passwordEncoder;

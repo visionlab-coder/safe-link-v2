@@ -30,7 +30,7 @@ class TbmSpeechDraftTest {
         var result=controller.tbmSpeechDraft(siteAdmin,new AiGatewayController.SpeechDraftRequest(160L,"Hello","en",false));
         assertEquals("안녕하세요",result.text());
         verify(guard).requireSiteAccess(eq(siteAdmin),eq(160L),anyString(),anyString(),anyString());
-        verify(guard).requireGlobalOrSiteAdmin(eq(siteAdmin),eq(160L),anyString(),anyString(),anyString());
+        verify(guard).requireTbmPublisher(eq(siteAdmin),eq(160L),anyString(),anyString(),anyString());
         verify(vendor).translateTbmSpeech("Hello","en");
     }
     @Test void hqNationwideUsesUserQuotaWithoutInventingSite() {
@@ -58,10 +58,10 @@ class TbmSpeechDraftTest {
         when(vendor.translateTbmSpeech("Hello","en")).thenReturn(new AiVendorService.VendorResult("","fixture","fixture"));
         assertThrows(com.safelink.v3.support.ServiceUnavailableException.class,()->controller.tbmSpeechDraft(siteAdmin,new AiGatewayController.SpeechDraftRequest(160L,"Hello","en",false)));
     }
-    @Test void workerCannotTranslatePublisherDraft() {
+    @Test void workerCanTranslatePublisherDraftAtOwnSite() {
         var worker=new SessionPrincipal(3L,"worker@example.invalid","Worker",Set.of(Role.WORKER),Set.of(160L));
-        doThrow(new AccessDeniedException("admin_required")).when(guard).requireGlobalOrSiteAdmin(eq(worker),eq(160L),anyString(),anyString(),anyString());
-        assertThrows(AccessDeniedException.class,()->controller.tbmSpeechDraft(worker,new AiGatewayController.SpeechDraftRequest(160L,"Hello","en",false)));
-        verifyNoInteractions(vendor);
+        assertEquals("안녕하세요",controller.tbmSpeechDraft(worker,new AiGatewayController.SpeechDraftRequest(160L,"Hello","en",false)).text());
+        verify(guard).requireTbmPublisher(eq(worker),eq(160L),anyString(),anyString(),anyString());
+        verify(vendor).translateTbmSpeech("Hello","en");
     }
 }

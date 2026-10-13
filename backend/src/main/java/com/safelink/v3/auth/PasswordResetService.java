@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PasswordResetService {
     private static final Duration TOKEN_TTL = Duration.ofMinutes(30);
-    private static final int PASSWORD_MIN_LENGTH = 12;
+    private static final int PASSWORD_MIN_LENGTH = 10;
     private final JdbcClient jdbc;
     private final UserAccountRepository users;
     private final PasswordEncoder passwordEncoder;
