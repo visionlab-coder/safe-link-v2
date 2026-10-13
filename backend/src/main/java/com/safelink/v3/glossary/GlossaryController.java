@@ -64,7 +64,7 @@ public class GlossaryController {
     @GetMapping("/translations")
     public GlossaryTranslationListResponse translations() {
         var rows = jdbc.sql("""
-                select t.glossary_id, g.standard, t.pivot_en, t.lang_code, t.local_slang
+                select t.glossary_id, g.slang, g.standard, t.pivot_en, t.lang_code, t.local_slang
                 from site_term_translations t
                 join construction_glossary g on g.id = t.glossary_id
                 where g.is_active = true
@@ -75,7 +75,7 @@ public class GlossaryController {
                 return new GlossaryTranslation(
                     rs.getLong("glossary_id"),
                     standard,
-                    standardCore(standard),
+                    GlossaryDeliveryPolicy.deliveryTerm(rs.getString("slang"), standard),
                     rs.getString("pivot_en"),
                     rs.getString("local_slang"),
                     normalizeLanguage(rs.getString("lang_code"))
@@ -268,12 +268,6 @@ public class GlossaryController {
         return category.substring(0, Math.min(category.length(), 40));
     }
 
-    private static String standardCore(String standard) {
-        if (standard == null) return "";
-        String[] parts = standard.split("[,(]", 2);
-        return parts[0].trim();
-    }
-
     private static String normalizeLanguage(String language) {
         String value = language == null ? "" : language.trim().toLowerCase(Locale.ROOT);
         return switch (value) {
@@ -292,7 +286,13 @@ public class GlossaryController {
     public record GlossaryTranslationListResponse(List<GlossaryTranslation> terms) {}
     public record ImportResponse(int ok, int dup, int invalid, List<ImportRowResult> rows, String message) {}
     public record ImportRowResult(int row, String slang, String standard, String status, String reason) {}
-    public record GlossaryTerm(Long id, String slang, String standard, String category, @JsonProperty("is_active") boolean isActive) {}
+    public record GlossaryTerm(Long id, String slang, String standard, String category, @JsonProperty("is_active") boolean isActive) {
+        @JsonProperty("delivery_term")
+        public String deliveryTerm() { return GlossaryDeliveryPolicy.deliveryTerm(slang, standard); }
+
+        @JsonProperty("delivery_policy_version")
+        public String deliveryPolicyVersion() { return GlossaryDeliveryPolicy.version(); }
+    }
     public record GlossaryTranslation(Long glossaryId, String standard, String standardCore, String pivotEnglish, String localTerm, String language) {}
     public record GlossaryUpsertRequest(String slang, String standard, String category, @JsonProperty("is_active") Boolean isActive) {}
     public record GlossaryPatchRequest(String standard, String category, @JsonProperty("is_active") Boolean isActive) {}

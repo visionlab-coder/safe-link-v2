@@ -23,6 +23,7 @@ type Masked = {
 
 const ENGINES = [
     { v: "", label: "auto" },
+    { v: "deepl", label: "DeepL" },
     { v: "m2m100", label: "local" },
     { v: "papago", label: "Papago (네이버)" },
     { v: "google", label: "Google Translate" },
@@ -102,7 +103,7 @@ export default function LabPage() {
                 <label style={{ fontSize: 14, fontWeight: 600 }}>{t.engine}</label>
                 <select value={engine} onChange={e => setEngine(e.target.value)}
                     style={{ display: "block", marginTop: 6, padding: 8, width: "100%" }}>
-                    {ENGINES.map(e => <option key={e.v} value={e.v}>{t[e.label]}</option>)}
+                    {ENGINES.map(e => <option key={e.v} value={e.v}>{t[e.label] ?? e.label}</option>)}
                 </select>
             </section>
 

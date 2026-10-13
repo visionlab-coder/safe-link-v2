@@ -11,8 +11,6 @@ const STT_LANG_MAP: Record<string, string> = {
     fr: "fr-FR", es: "es-ES", ar: "ar-SA", hi: "hi-IN",
 };
 
-const FLITTO_RTT_LANGS = new Set(["ko", "en", "zh", "ja", "jp", "ru", "vi", "fr", "it", "ar", "es"]);
-
 function getSTTLang(code: string): string {
     return STT_LANG_MAP[code] || code;
 }
@@ -26,19 +24,7 @@ function getMediaMimeType(): string {
     return "";
 }
 
-async function blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            const result = reader.result as string;
-            resolve(result.split(",")[1] || "");
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-}
-
-// Flitto RTT requires signed 16-bit little-endian PCM, 16kHz, mono.
+// One input format for DeepL Voice and the Google capability fallback, including iOS AAC recordings.
 async function blobToPcm16Base64(blob: Blob): Promise<string> {
     const AudioCtxCtor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioCtxCtor) throw new Error("audio_context_unavailable");
@@ -233,12 +219,6 @@ export function useCloudSTT({
         if (blob.size < MIN_CHUNK_SIZE) return;
         if (mutedRef.current) return;
 
-        const trackSampleRate = streamRef.current
-            ?.getAudioTracks()[0]
-            ?.getSettings()
-            .sampleRate;
-        const sampleRateHertz = trackSampleRate ?? audioCtxRef.current?.sampleRate;
-
         if (!liveRef.current && emptyStreakRef.current >= MAX_EMPTY_STREAK) {
             emptyStreakRef.current = 0;
             return;
@@ -253,12 +233,10 @@ export function useCloudSTT({
         let releaseDelivery!: () => void;
         deliveryTailRef.current = new Promise<void>(resolve => { releaseDelivery = resolve; });
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 20_000);
+        const timeout = setTimeout(() => controller.abort(), 45_000);
         try {
-            const sourceLang = languageForChunk.toLowerCase().split("-")[0];
-            // Khmer 등 RTT 미지원 언어는 PCM으로 바꾸지 않고 기존 Google STT로 유지한다.
-            const useFlitto = process.env.NEXT_PUBLIC_REALTIME_STT_ENGINE === "flitto" && FLITTO_RTT_LANGS.has(sourceLang);
-            const base64 = useFlitto ? await blobToPcm16Base64(blob) : await blobToBase64(blob);
+            // The backend selects the provider. Do not couple the wire format to a stale build-time flag.
+            const base64 = await blobToPcm16Base64(blob);
             if (!base64) return;
 
             const res = await fetch("/api/stt", {
@@ -268,10 +246,8 @@ export function useCloudSTT({
                 body: JSON.stringify({
                     audio: base64,
                     lang: getSTTLang(languageForChunk),
-                    mimeType: useFlitto ? "audio/pcm;rate=16000" : blob.type,
-                    ...(useFlitto ? { sampleRateHertz: 16000 } : typeof sampleRateHertz === "number" && Number.isFinite(sampleRateHertz)
-                        ? { sampleRateHertz: Math.round(sampleRateHertz) }
-                        : {}),
+                    mimeType: "audio/pcm;encoding=s16le;rate=16000",
+                    sampleRateHertz: 16000,
                     ...(liveRef.current && { live: true }),
                     ...(siteIdRef.current != null ? { siteId: siteIdRef.current } : {}),
                     context: contextRef.current,
@@ -287,7 +263,7 @@ export function useCloudSTT({
                 const error = String(data.error || `stt_http_${res.status}`);
                 // RTT currently collapses upstream errors/timeouts into this code.
                 // Suppress isolated failures, but report sustained recognition loss once.
-                const transient = ["flitto_rtt_failed", "google_stt_failed", "openai_stt_failed"].includes(error)
+                const transient = ["deepl_stt_failed", "google_stt_failed", "openai_stt_failed"].includes(error)
                     || [502, 503, 504].includes(res.status);
                 if (transient) {
                     transientFailuresRef.current += 1;

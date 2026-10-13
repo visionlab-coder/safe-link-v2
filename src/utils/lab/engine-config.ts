@@ -11,7 +11,7 @@ import { encrypt, decrypt } from "@/utils/crypto";
  *  - 저장소: Upstash Redis(배포), 미설정 시 in-memory(로컬 dev 단일 인스턴스).
  */
 
-export type TranslateEngine = "m2m100" | "papago" | "google";
+export type TranslateEngine = "m2m100" | "papago" | "google" | "deepl";
 
 export interface LabEngineConfig {
     translateEngine?: TranslateEngine;   // 강제 엔진(미지정 시 기존 우선순위)

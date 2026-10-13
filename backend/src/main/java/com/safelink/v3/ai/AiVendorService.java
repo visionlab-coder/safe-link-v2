@@ -25,10 +25,12 @@ public class AiVendorService {
     private final AiProperties properties;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
+    private final DeepLClient deepl;
 
-    public AiVendorService(AiProperties properties, ObjectMapper objectMapper) {
+    public AiVendorService(AiProperties properties, ObjectMapper objectMapper, DeepLClient deepl) {
         this.properties = properties;
         this.objectMapper = objectMapper;
+        this.deepl = deepl;
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     }
 
@@ -38,9 +40,7 @@ public class AiVendorService {
             case "papago" -> translatePapago(text, sourceLanguage, targetLanguage);
             case "google" -> translateGoogle(text, sourceLanguage, targetLanguage);
             case "openai" -> generateOpenAi(translationPrompt(text, sourceLanguage, targetLanguage), 1024, 0.2);
-            // 실제 API 규격·권한이 도착하기 전에는 기존 엔진으로 조용히 폴백하지 않습니다.
-            // 그래야 플리토/DeepL 비교 기간에 다른 공급자를 쓴 결과가 섞이지 않습니다.
-            case "flitto", "deepl" -> throw new ServiceUnavailableException(selectedTranslationProvider() + "_translation_adapter_not_configured");
+            case "deepl" -> translateDeepL(text, sourceLanguage, targetLanguage);
             default -> throw new IllegalArgumentException("unsupported_translation_provider");
         };
     }
@@ -48,9 +48,7 @@ public class AiVendorService {
     public VendorResult translateTbmSpeech(String text, String sourceLanguage) {
         if ("ko".equals(sourceLanguage)) return new VendorResult(text, "identity", "ko");
         String source = "zh".equals(sourceLanguage) ? "zh-CN" : "ph".equals(sourceLanguage) ? "tl" : sourceLanguage;
-        // Flitto RTT is an audio adapter, not a text translation endpoint.
-        return "flitto".equals(selectedTranslationProvider())
-            ? translateDefault(text, source, "ko") : translateAuto(text, source, "ko");
+        return translateAuto(text, source, "ko");
     }
 
     private VendorResult translateDefault(String text, String sourceLanguage, String targetLanguage) {
@@ -67,9 +65,19 @@ public class AiVendorService {
         return value == null || value.isBlank() ? "auto" : value.trim().toLowerCase();
     }
 
+    private VendorResult translateDeepL(String text, String sourceLanguage, String targetLanguage) {
+        // Explicit capability fallback, not a hidden fallback on DeepL failures.
+        if ("km".equals(DeepLClient.language(sourceLanguage)) || "km".equals(DeepLClient.language(targetLanguage))) {
+            return translateGoogle(text, sourceLanguage, targetLanguage);
+        }
+        return deepl.translate(text, sourceLanguage, targetLanguage);
+    }
+
     public VendorResult call(String provider, String text, String sourceLanguage, String targetLanguage, String prompt, Integer maxOutputTokens, Double temperature) {
         String normalized = provider == null ? "" : provider.trim().toLowerCase();
         return switch (normalized) {
+            case "auto" -> translateAuto(text, sourceLanguage, targetLanguage);
+            case "deepl" -> translateDeepL(text, sourceLanguage, targetLanguage);
             case "papago" -> translatePapago(text, sourceLanguage, targetLanguage);
             case "google" -> translateGoogle(text, sourceLanguage, targetLanguage);
             case "openai", "openai-prompt" -> generateOpenAi(prompt == null || prompt.isBlank()
@@ -363,6 +371,7 @@ public class AiVendorService {
             You are a construction-site safety interpreter.
             Translate from %s to %s.
             Preserve numbers, names, equipment names, floor names, measurements, and safety warnings.
+            Preserve negations, prohibitions, conditions and questions. Never add unspoken instructions or glossary explanations.
             Return only the translated text.
 
             Text: %s

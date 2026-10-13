@@ -23,7 +23,8 @@ type Masked = {
 type Audit = { at: string; by: string; engine?: string; fields: string[] };
 
 const ENGINES = [
-    { v: "", label: "자동(기존 우선순위)" },
+    { v: "", label: "서버 설정 사용 (기본 DeepL)" },
+    { v: "deepl", label: "DeepL" },
     { v: "m2m100", label: "M2M100 (오픈소스·로컬)" },
     { v: "papago", label: "Papago (네이버)" },
     { v: "google", label: "Google Translate" },

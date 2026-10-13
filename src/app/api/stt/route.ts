@@ -6,32 +6,9 @@ import { SAFE_LINK_V3_API_BASE_URL } from "@/utils/auth/v3-proxy";
 import { CONSTRUCTION_SPEECH_HINTS, WHISPER_CONTEXT_PROMPT } from "@/constants/construction-terms";
 import { CONSTRUCTION_GLOSSARY } from "@/constants/glossary";
 import { canReuseLiveTranslation } from "@/utils/live-glossary-policy";
+import { normalizeKoreanGlossary, GLOSSARY_POLICY_VERSION } from "@/utils/korean-glossary";
 
 export const runtime = "nodejs";
-
-/**
- * 한국어 STT가 현장 소음에서 자주 만드는 명백한 오인식만 보정한다.
- *
- * `안전`을 말했는데 "안 센티미터" 또는 "안 미터"로 나오는 사례가 있어
- * 번역 전에 바로잡는다. 숫자와 함께 쓰인 실제 길이(예: "10센티미터")는
- * 대상이 아니므로 보존된다.
- */
-function normalizeKoreanSttMisrecognitions(text: string): { normalized: string; changes: { from: string; to: string }[] } {
-  const changes: { from: string; to: string }[] = [];
-  const corrections: Array<{ pattern: RegExp; replacement: string }> = [
-    { pattern: /안\s*센티(?:미터)?/g, replacement: "안전" },
-    { pattern: /안\s*미터/g, replacement: "안전" },
-  ];
-
-  let normalized = text;
-  for (const { pattern, replacement } of corrections) {
-    normalized = normalized.replace(pattern, (matched) => {
-      changes.push({ from: matched, to: replacement });
-      return replacement;
-    });
-  }
-  return { normalized, changes };
-}
 
 const GLOSSARY_CACHE_TTL_MS = 60_000;
 let activeGlossaryCache: Record<string, string> | null = null;
@@ -64,31 +41,9 @@ async function fetchActiveGlossary(): Promise<Record<string, string>> {
   return activeGlossaryCache;
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 async function normalizeServerSide(text: string): Promise<{ normalized: string; changes: { from: string; to: string }[] }> {
-  const sttCorrection = normalizeKoreanSttMisrecognitions(text);
-  const changes: { from: string; to: string }[] = [...sttCorrection.changes];
   const glossary = await fetchActiveGlossary();
-  const sorted = Object.entries(glossary)
-    .filter(([, standard]) => !standard.includes("("))
-    .sort((a, b) => b[0].length - a[0].length);
-  let result = sttCorrection.normalized;
-  for (const [slang, standard] of sorted) {
-    const escapedSlang = escapeRegExp(slang);
-    // 한 글자 용어는 독립된 단어일 때만 치환한다. "전"이 "안전" 내부까지
-    // 바뀌는 식의 오인식 보정 오류를 막는다.
-    const pattern = Array.from(slang).length === 1
-      ? new RegExp(`(?<![\\p{L}\\p{N}])${escapedSlang}(?![\\p{L}\\p{N}])`, "gu")
-      : new RegExp(escapedSlang, "gu");
-    result = result.replace(pattern, (matched) => {
-      changes.push({ from: matched, to: standard });
-      return standard;
-    });
-  }
-  return { normalized: result, changes };
+  return normalizeKoreanGlossary(text, glossary);
 }
 
 const WAKE_WORD_RE = /^(ok\s*google|okay\s*google|hey\s*google|ok\s*구글|오케이\s*구글|hey\s*siri|하이\s*빅스비|hi\s*bixby|ok\s*bixby|알렉사|alexa)\.?$/i;
@@ -185,14 +140,17 @@ export async function POST(request: Request) {
     if (!transcript || WAKE_WORD_RE.test(transcript) || isCrossTalkContamination(transcript, shortLang) || isTbmPromptEcho(transcript)) {
       return NextResponse.json({ transcript: "" });
     }
-    const engine = data.vendor === "openai" ? "whisper" : data.vendor === "flitto" ? "flitto" : "google";
+    const engine = data.vendor === "openai" ? "whisper" : data.vendor || "unknown";
     const translations = data.translations && Object.keys(data.translations).length > 0 ? data.translations : undefined;
-    if (shortLang !== "ko") return NextResponse.json({ transcript, engine, ...(translations && { translations }) });
+    if (shortLang !== "ko") return NextResponse.json({ transcript, originalTranscript: transcript, normalizedTranscript: transcript, engine, ...(translations && { translations }) });
     const { normalized, changes } = await normalizeServerSide(transcript);
     // RTT output predates local normalization. Affected live speech must use the glossary translation path.
     const reuseTranslations = !live || canReuseLiveTranslation(transcript, normalized, await fetchActiveGlossary());
     return NextResponse.json({
       transcript: normalized,
+      originalTranscript: transcript,
+      normalizedTranscript: normalized,
+      glossaryPolicyVersion: GLOSSARY_POLICY_VERSION,
       ...(changes.length > 0 && { normalized: true, changes }),
       engine,
       ...(reuseTranslations && translations && { translations }),

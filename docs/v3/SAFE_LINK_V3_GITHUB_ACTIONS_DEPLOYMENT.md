@@ -4,7 +4,22 @@
 
 GitHub Actions의 `Deploy SQ Link V3 production` workflow는 `refactor/v3-commercialization-20260710` 브랜치 push 또는 수동 실행으로 frontend와 backend를 테스트·빌드하고 운영 서버에 불변 release로 배포한다. 이 브랜치에 push하기 전 운영 배포 권한과 백업 상태를 확인한다. 배포 중에는 release 디렉터리를 새로 만들고 `current` 심볼릭 링크만 교체하므로, 실패한 빌드를 현재 운영 파일 위에 덮어쓰지 않는다.
 
+## 2026-10-13 DeepL 전환 배포
+
+- 사용자 승인: Flitto 제거 후 DeepL 음성인식·텍스트 번역 교체 및 운영 배포. 기존 TTS/요약 공급자는 유지하며 미지원 언어는 `AI_PROVIDER_COMPARISON_TEST.md`의 Google 경로를 사용한다.
+- 현재 운영 서버는 `43.202.226.137`이다. `app.safe-link.co.kr`/`api.safe-link.co.kr` DNS, 운영 `current` SHA, 서비스 active를 함께 확인했다. 과거 문서의 `43.200.49.69`는 이전 테스트 서버이므로 운영 변경 대상으로 사용하지 않는다.
+- 사용자가 제공한 키 디렉터리의 회사 서버 키로 정상 관리자 접속 확인. Actions 전용 키를 추출하거나 권한 제한을 우회하지 않는다. 개인키·DB 비밀번호·API 키 값은 문서/로그에 기록하지 않는다.
+- 포함: DeepL Voice/Text 프론트·백엔드 연동, 공급자별 캐시, 언어별 Google 예외, 일반 문장 보존/복합용어 우선/전달용 단일 표제어를 적용하는 기존 용어집 수정 및 회귀 시험. 관리자·직원/가입/권한 개편, V038/V039, 소음감지 UI, APK는 제외한다.
+- 기준 release: `0086c90d3c50aedaefbb078eb652d9bac38e1be9`. DB Flyway V037 성공. 최근 15분 시작 또는 번역 이벤트가 있는 활성 방송 0건 확인.
+- 사전 백업: `/home/ubuntu/safelink-v3/backups/deepl-20261013-d0gl2yca` (root 전용)에 DB dump, 이전 release, 환경파일 보관. dump 10,141,878 bytes, SHA256 `4eb80e6e9c293c50dc9b02b7f769a93269b5b4958808aed4bf337e7d23ada00d`, pg_restore 목록 확인 성공.
+- 운영 연결 시험: 서버에서 새 키의 DeepL 번역 응답 성공. 키는 root 전용 대기 환경파일에만 준비했으며 릴리스 전환 때 공급자 둘을 `deepl`로 설정한다. 실패 시 이전 release와 환경파일을 함께 복원한다.
+- 검증: 운영 HEAD에 위 변경만 복사한 격리 소스의 Next production build(타입/린트 포함), AI/용어집 JUnit 및 bootJar, glossary 32쌍/940 부분문자열 방지, API 계약, 라이브 용어집, DeepL 라우팅 시험 통과. 외부 폰트 다운로드 오류는 임시 빌드 캐시를 분리해 재시도 후 성공했다. 전체 DB 시험은 Actions에서 재검증한다.
+- DBeaver는 SSH tunnel을 사용한다. SSH host `43.202.226.137:22`, user `ubuntu`; DB host `localhost`, port `15432`, database/user `safelink`. 비밀번호는 운영 환경파일의 `DB_PASSWORD`를 안전하게 확인하며 공개 포트/방화벽/DB 계정을 추가하지 않는다.
+- 완료 여부는 해당 SHA의 Actions 결과, 운영 release/서비스/readiness, 실제 서버 번역 공급자 응답을 확인한 뒤 갱신한다. 실제 현장 마이크·언어별 정확도 시험은 별도다.
+
 ## 2026-10-12 TBM 선택 언어 음성인식 배포
+
+- 완료: `0086c90d3c50aedaefbb078eb652d9bac38e1be9`, Actions https://github.com/visionlab-coder/safe-link-v2/actions/runs/38228422594 성공. 사용자가 승인한 `seann3113` 계정으로 push했다. 2026-10-12 18:17 KST 운영 readiness `UP`, `/auth` 200, 비로그인 `/admin`→`/auth` 307 확인. 실제 휴대폰 마이크·인식 정확도는 별도 시험이 남아 있다. 로컬 빌드의 chunk hash는 CI와 달라 그 URL로 운영 JS 동일성은 검증하지 못했으며 배포 성공 근거는 해당 SHA의 릴리스 활성화/스모크 성공이다.
 
 - 사용자 승인: 선택한 언어가 TBM STT에 전달되지 않는 문제의 수정분을 프론트/백엔드 함께 배포한다. 이전 성공 운영 SHA는 `f8d342ec8f2fdd193c7ef715df6e2035ffec2482`(Actions `37720521996`)이다.
 - 포함: 선택 언어 STT 및 비동기 청크 언어 유지, 인식 원문 화면 표시, 권한/쿼터 검증된 한국어 초안 번역 API, 변환 실패 원문 보존·재시도·불완전 전파 차단. 기존 한국어 TBM 저장/요약/수신 계약을 유지한다.

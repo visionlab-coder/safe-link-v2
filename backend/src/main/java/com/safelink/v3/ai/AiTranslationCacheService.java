@@ -17,18 +17,18 @@ public class AiTranslationCacheService {
         this.redis = redis;
     }
 
-    public Optional<String> get(Long siteId, String sourceLanguage, String targetLanguage, String text) {
+    public Optional<String> get(String provider, Long siteId, String sourceLanguage, String targetLanguage, String text) {
         try {
-            return Optional.ofNullable(redis.opsForValue().get(key(siteId, sourceLanguage, targetLanguage, text)));
+            return Optional.ofNullable(redis.opsForValue().get(key(provider, siteId, sourceLanguage, targetLanguage, text)));
         } catch (RuntimeException ignored) {
             return Optional.empty();
         }
     }
 
-    public void put(Long siteId, String sourceLanguage, String targetLanguage, String text, String translatedText) {
+    public void put(String provider, Long siteId, String sourceLanguage, String targetLanguage, String text, String translatedText) {
         try {
             redis.opsForValue().set(
-                key(siteId, sourceLanguage, targetLanguage, text),
+                key(provider, siteId, sourceLanguage, targetLanguage, text),
                 translatedText,
                 TTL
             );
@@ -37,13 +37,13 @@ public class AiTranslationCacheService {
         }
     }
 
-    private static String key(Long siteId, String sourceLanguage, String targetLanguage, String text) {
-        String input = "%s|%s|%s|%s".formatted(siteId, sourceLanguage, targetLanguage, text);
+    private static String key(String provider, Long siteId, String sourceLanguage, String targetLanguage, String text) {
+        String input = "%s|%s|%s|%s|%s".formatted(provider, siteId, sourceLanguage, targetLanguage, text);
         try {
             String digest = HexFormat.of().formatHex(
                 MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8))
             );
-            return "ai:translation:v1:" + digest;
+            return "ai:translation:v2:" + digest;
         } catch (Exception ex) {
             throw new IllegalStateException("translation_cache_key_failed", ex);
         }

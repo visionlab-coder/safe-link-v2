@@ -11,9 +11,9 @@ import { hangulize } from '@/utils/hangulize';
 import { stripEmoji } from '@/utils/strip-emoji';
 import pinyin from 'tiny-pinyin';
 import { preProcessWithGlossary } from '@/utils/construction-glossary';
-import { formalizeKo } from '@/utils/politeness';
 import { callInternalAiTranslate, callV3AiVendor } from '@/utils/ai/v3-ai-gateway';
 import { SAFE_LINK_V3_API_BASE_URL } from '@/utils/auth/v3-proxy';
+import { normalizeKoreanGlossary, containsKoreanGlossaryTerm, hasKoreanTermAt, GLOSSARY_POLICY_VERSION } from '@/utils/korean-glossary';
 
 interface CloudTranslateResponse {
     data?: { translations?: Array<{ translatedText?: string }> };
@@ -79,7 +79,7 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
     }
 
-    // 🧪 Lab 런타임 오버라이드: 운영(APP_MODE!=lab)에선 항상 null → 아래 모든 분기는 기존 env 그대로.
+    // Developer override is explicit; otherwise the backend owns provider selection.
     const lab = await getLabOverride();
     const internalGatewayConfigured = Boolean(process.env.TRAVEL_API_SECRET?.trim());
 
@@ -94,27 +94,20 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
             return NextResponse.json({ error: "Text too long (max 5000 characters)" }, { status: 400 });
         }
 
-        // 건설 현장 용어집 전처리 — useGlossary=true 로 명시한 호출(TBM/안전지시)에만 적용
-        // 일반 채팅(밥 먹으러 가자 등)에는 건설 용어집 불필요 — 오역 방지
+        // All Korean paths share the same whole-term policy; never rewrite sentence fragments.
         let processedText = text;
+        let glossaryChanges: { from: string; to: string }[] = [];
         if (sl === 'ko') {
             const glossary = await fetchGlossaryServer();
-            // BUG-1 fix: 괄호 설명형 치환어는 번역 텍스트를 오염시킴 → skip
-            // BUG-2 fix: 긴 슬랭 먼저 매칭해야 짧은 슬랭이 긴 슬랭 일부를 먼저 치환하는 문제 방지
-            const sortedEntries = Object.entries(glossary)
-                .filter(([, std]) => !(std as string).includes('('))
-                .sort((a, b) => b[0].length - a[0].length);
-            for (const [slang, std] of sortedEntries) {
-                const escapedSlang = slang.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const pattern = Array.from(slang).length === 1
-                    ? `(?<![\\p{L}\\p{N}])${escapedSlang}(?![\\p{L}\\p{N}])`
-                    : escapedSlang;
-                processedText = processedText.replace(new RegExp(pattern, 'gu'), std as string);
-            }
+            const result = normalizeKoreanGlossary(text, glossary);
+            processedText = result.normalized;
+            glossaryChanges = result.changes;
         } else if (tl === 'ko') {
             // 외국어→한국어: 건설 전문 용어를 한국어로 치환 후 번역 (품질 향상)
             processedText = preProcessWithGlossary(text, sl);
         }
+        // Additive response fields for verification; no raw audio/text is written to server logs.
+        const stageDetails = { originalText: text, normalizedText: processedText, glossaryChanges, glossaryPolicyVersion: GLOSSARY_POLICY_VERSION };
 
         // 언어 코드 매핑 (앱 내부 코드 → Google API 코드)
         const langMap: Record<string, string> = {
@@ -126,26 +119,22 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
         const sourceLang = langMap[sl] || sl;
         const targetLang = langMap[tl] || tl;
         const forced = lab?.translateEngine;
+        const useConfiguredProvider = !forced || forced === "deepl";
         // 크메르어는 OpenAI 문맥 번역의 문장 선택이 Google 번역과 달라
         // 화면의 기준 번역문과 TTS 발음 확인이 혼동될 수 있다. Google 결과를
         // 기준 번역문으로 고정하고, TTS는 그 결과만 읽도록 한다.
         const preferGoogleTranslation = tl === 'km';
 
-        // m2m100(로컬 오픈소스)은 서비스 URL이 설정됐거나 루트관리자가 명시 선택한 경우에만 시도.
-        // (운영엔 127.0.0.1:8100 서비스가 없어 매 번역마다 실패·낭비되던 문제 수정)
-        const m2m100Enabled = forced === "m2m100"
-            || (!forced && !!process.env.M2M100_TRANSLATE_URL?.trim());
+        // 로컬 M2M100은 명시 선택한 경우에만 사용한다. 서버 기본 공급자를 우회하지 않는다.
+        const m2m100Enabled = forced === "m2m100";
         if (m2m100Enabled) {
             const localTranslation = await tryM2M100Translate(processedText, sl, tl, !fast);
             if (localTranslation) {
                 return NextResponse.json({
-                    translated: stripEmoji(tl === "ko"
-                        ? formalizeKo(localTranslation.translated)
-                        : localTranslation.translated),
+                    ...stageDetails,
+                    translated: stripEmoji(localTranslation.translated),
                     pronunciation: getLocalPronunciation(localTranslation.translated, tl),
-                    reverse_translated: stripEmoji(sl === "ko"
-                        ? formalizeKo(localTranslation.reverseTranslated)
-                        : localTranslation.reverseTranslated),
+                    reverse_translated: stripEmoji(localTranslation.reverseTranslated),
                     engine: "m2m100-local",
                     processing_ms: localTranslation.processingMs,
                 });
@@ -168,10 +157,23 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
         let translatedText = "";
         let engine = "google";
 
+        // Normal production requests follow the backend provider (DeepL by default).
+        // Do not mix an OpenAI rewrite or a silent Google retry into a DeepL comparison.
+        if (useConfiguredProvider) {
+            const provider = forced === "deepl" ? "deepl" : "auto";
+            const payload = { provider, sourceLanguage: sourceLang, targetLanguage: targetLang, text: processedText } as const;
+            const result = v3AiVendorContext
+                ? await callV3AiVendor(v3AiVendorContext.request, { ...payload, siteId: v3AiVendorContext.siteId, feature: "translate" })
+                : await callInternalAiTranslate(payload);
+            if (!result?.text) return NextResponse.json({ error: "translation_provider_unavailable" }, { status: 503 });
+            translatedText = result.text;
+            engine = result.vendor;
+        }
+
         // 일반 1:1 대화는 문맥과 현장 용어의 의미 보존을 우선한다.
         // fast는 발음·역번역만 생략할 뿐, quality=high 본문 번역의 정확도를 낮추지 않는다.
         const useHighQualityContext = quality === "high" && forced !== "papago" && forced !== "google" && !preferGoogleTranslation;
-        if (useHighQualityContext && v3AiVendorContext) {
+        if (!translatedText && useHighQualityContext && v3AiVendorContext) {
             try {
                 const contextualTranslation = await contextualConstructionTranslate(processedText, sl, tl, v3AiVendorContext);
                 if (contextualTranslation) {
@@ -214,7 +216,7 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
         // Papago가 중국어 요청형 문장에서 "~해주세요, 식사하세요"처럼
         // 미완성 조사/접두어를 그대로 반환하는 경우가 있다. 한국어 결과에
         // 이 형태가 섞이면 Google 번역으로 다시 시도해 정상 문장만 반환한다.
-        if (tl === "ko" && /(?:^|\s)~\s*해s*주(?:세|세)요/.test(translatedText)) {
+        if (!useConfiguredProvider && tl === "ko" && /(?:^|\s)~\s*해s*주(?:세|세)요/.test(translatedText)) {
             translatedText = "";
             engine = "google";
         }
@@ -260,7 +262,9 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
         }
 
         if (!translatedText) {
-            return await aiFullFallback(processedText, sl, tl, v3AiVendorContext);
+            const fallback = await aiFullFallback(processedText, sl, tl, v3AiVendorContext);
+            if (!fallback.ok) return fallback;
+            return NextResponse.json({ ...await fallback.json(), ...stageDetails });
         }
 
         // 채팅 전송은 상대방에게 번역문을 먼저 전달하는 것이 우선이다.
@@ -268,20 +272,22 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
         // 만들지 않는다. 이전에는 fast=true여도 역번역을 기다려 전송이 늦었다.
         if (fast) {
             return NextResponse.json({
-                translated: stripEmoji(tl === "ko" ? formalizeKo(translatedText) : translatedText),
+                ...stageDetails,
+                translated: stripEmoji(translatedText),
                 pronunciation: "",
                 reverse_translated: "",
                 engine,
             });
         }
 
-        // === 3. 역번역 및 발음 처리 (Google로 통일하여 속도 확보) ===
+        // 역번역도 선택한 공급자를 사용한다. 발음 표기용 모델은 기존 방식 유지.
         const cloudTranslateFast = async (q: string, source: string, target: string) => {
+            const provider = useConfiguredProvider ? (forced === "deepl" ? "deepl" : "auto") : "google";
             if (v3AiVendorContext) {
                 const translated = await callV3AiVendor(v3AiVendorContext.request, {
                     siteId: v3AiVendorContext.siteId,
                     feature: "translate",
-                    provider: "google",
+                    provider,
                     sourceLanguage: source,
                     targetLanguage: target,
                     text: q,
@@ -289,7 +295,7 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
                 return { data: { translations: [{ translatedText: translated?.text || "" }] } } as CloudTranslateResponse;
             }
             const translated = await callInternalAiTranslate({
-                provider: "google",
+                provider,
                 sourceLanguage: source,
                 targetLanguage: target,
                 text: q,
@@ -360,12 +366,12 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
             pronunciation = englishText ? hangulize(englishText, 'en') : "";
         }
 
-        // 한국어 결과는 존대말(경어)로 변환
-        const finalTranslated = stripEmoji(tl === 'ko' ? formalizeKo(translatedText) : translatedText);
-        // 역번역은 원래 언어로 돌아가므로, 한국어로 돌아오는 경우 존대말 적용
-        const finalReverse = stripEmoji(sl === 'ko' ? formalizeKo(reverseTranslated) : reverseTranslated);
+        // Do not turn a statement/question into an instruction through honorific rewriting.
+        const finalTranslated = stripEmoji(translatedText);
+        const finalReverse = stripEmoji(reverseTranslated);
 
         return NextResponse.json({
+            ...stageDetails,
             translated: finalTranslated,
             pronunciation,
             reverse_translated: finalReverse,
@@ -503,8 +509,9 @@ async function prepareM2M100Terminology(
 
     if (source === "ko") {
         for (const term of targetTerms.sort((a, b) => b.standardCore.length - a.standardCore.length)) {
-            if (!prepared.includes(term.standardCore)) continue;
-            prepared = prepared.replaceAll(term.standardCore, term.pivotEnglish);
+            if (!containsKoreanGlossaryTerm(prepared, term.standardCore)) continue;
+            prepared = prepared.replace(new RegExp(escapeRegExp(term.standardCore), "gu"), (matched, index: number) =>
+                hasKoreanTermAt(prepared, index, term.standardCore) ? term.pivotEnglish : matched);
             applied.push(term);
         }
     } else {
@@ -541,9 +548,7 @@ function enforceM2M100Terminology(
                 new RegExp(`\\b(?:${pivotWords.slice(0, -1).map(escapeRegExp).join("\\s+")}\\s+)?${escapeRegExp(distinctiveWord)}\\b`, "iu"),
                 required,
             );
-        } else {
-            result = `${required}: ${result}`;
-        }
+        } // Never prepend an unspoken glossary explanation when alignment is uncertain.
     }
     return result;
 }
@@ -817,6 +822,7 @@ async function contextualConstructionTranslate(text: string, sl: string, tl: str
 3. 안전 지시는 단순·명확하게 (문법보다 이해 우선)
 4. 명령/지시는 근로자에게 정중하게, 하지만 오해 없이 직접적으로
 5. 번역문만 반환 (원문·설명·따옴표 절대 불포함)
+6. 원문의 금지·부정·조건·질문·수량을 그대로 보존. 발언하지 않은 안전 지시나 사전 설명을 추가하지 말 것.
 
 원문 (${sourceName}): ${text}
 
@@ -839,6 +845,7 @@ async function contextualConstructionTranslate(text: string, sl: string, tl: str
 async function aiFullFallback(text: string, sl: string, tl: string, v3Context: V3AiVendorContext | null = null) {
     try {
         const prompt = `Translate accurately. Source: ${sl}, Target: ${tl}.
+Preserve negation, prohibitions, conditions, questions and quantities. Do not add unspoken instructions or glossary explanations.
 Return ONLY JSON: {"translated":"...","pronunciation":"Korean Hangul pronunciation","reverse_translated":"..."}
 Text: ${JSON.stringify(text)}`;
 

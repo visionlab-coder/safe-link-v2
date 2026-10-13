@@ -10,6 +10,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
@@ -31,15 +33,15 @@ public class AiMediaService {
     private final AiProperties properties;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
-    private final FlittoRttClient flitto;
+    private final DeepLClient deepl;
     // OpenAI TTS는 같은 입력도 매 호출마다 음색·억양이 조금 달라질 수 있다.
     // 재생·새로고침 후에는 같은 현장/문장/음성 조합의 MP3를 재사용한다.
     private final Map<String, TtsCacheEntry> ttsCache = new ConcurrentHashMap<>();
 
-    public AiMediaService(AiProperties properties, ObjectMapper objectMapper, FlittoRttClient flitto) {
+    public AiMediaService(AiProperties properties, ObjectMapper objectMapper, DeepLClient deepl) {
         this.properties = properties;
         this.objectMapper = objectMapper;
-        this.flitto = flitto;
+        this.deepl = deepl;
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     }
 
@@ -57,19 +59,11 @@ public class AiMediaService {
             case "auto" -> transcribeDefault(audio, mimeType, languageCode, sampleRateHertz, live, speechHints, prompt);
             case "google" -> transcribeGoogle(audio, mimeType, languageCode, sampleRateHertz, live, speechHints);
             case "openai" -> transcribeOpenAi(audio, mimeType, languageCode, prompt);
-            case "flitto" -> transcribeFlitto(audio, mimeType, languageCode, targetLanguages);
-            case "deepl" -> throw new ServiceUnavailableException("deepl_stt_adapter_not_configured");
+            case "deepl" -> DeepLClient.supportsVoice(languageCode)
+                ? new SttResult(deepl.transcribe(audio, mimeType, languageCode, sampleRateHertz), "deepl", "voice-v3", Map.of())
+                : transcribeGoogle(audio, mimeType, languageCode, sampleRateHertz, live, speechHints);
             default -> throw new IllegalArgumentException("unsupported_stt_provider");
         };
-    }
-
-    private SttResult transcribeFlitto(String audio, String mimeType, String languageCode, List<String> targetLanguages) {
-        if (mimeType == null || !mimeType.toLowerCase().contains("audio/pcm") || !FlittoRttClient.supports(languageCode)) {
-            // RTT 미지원 언어(예: 크메르어)와 기존 WebM 입력은 현행 Google STT로 유지한다.
-            return transcribeGoogle(audio, mimeType, languageCode, 48000, true, List.of());
-        }
-        FlittoRttClient.Result result = flitto.transcribe(audio, languageCode, targetLanguages == null ? List.of() : targetLanguages);
-        return new SttResult(result.transcript(), "flitto", "rtt-v2", result.translations());
     }
 
     private SttResult transcribeDefault(
@@ -191,7 +185,8 @@ public class AiMediaService {
 
     private SttResult transcribeGoogle(String audio, String mimeType, String languageCode, int sampleRateHertz, boolean live, List<String> speechHints) {
         requireConfigured(properties.getGoogleCloudApiKey(), "google_stt_not_configured");
-        String encoding = mimeType != null && mimeType.contains("ogg") ? "OGG_OPUS" : "WEBM_OPUS";
+        String encoding = mimeType != null && mimeType.contains("audio/pcm") ? "LINEAR16"
+            : mimeType != null && mimeType.contains("ogg") ? "OGG_OPUS" : "WEBM_OPUS";
         JsonNode enhanced = callGoogleSpeech(audio, encoding, languageCode, sampleRateHertz, true, speechHints);
         String transcript = readGoogleTranscript(enhanced, live ? 0.65 : 0.6);
         if (enhanced.has("error") || transcript.isBlank()) {
@@ -330,6 +325,10 @@ public class AiMediaService {
 
     private static byte[] multipart(String boundary, byte[] audio, String mimeType, String languageCode, String prompt) {
         try {
+            if (mimeType != null && mimeType.startsWith("audio/pcm")) {
+                audio = pcm16ToWav(audio);
+                mimeType = "audio/wav";
+            }
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             writeField(output, boundary, "model", "gpt-4o-mini-transcribe");
             writeField(output, boundary, "language", languageCode == null ? "ko" : languageCode.split("-")[0]);
@@ -337,7 +336,8 @@ public class AiMediaService {
             writeField(output, boundary, "temperature", "0");
             writeField(output, boundary, "response_format", "json");
             output.write(("--" + boundary + "\r\n").getBytes(StandardCharsets.UTF_8));
-            output.write("Content-Disposition: form-data; name=\"file\"; filename=\"audio.webm\"\r\n".getBytes(StandardCharsets.UTF_8));
+            String filename = "audio/wav".equals(mimeType) ? "audio.wav" : "audio.webm";
+            output.write(("Content-Disposition: form-data; name=\"file\"; filename=\"" + filename + "\"\r\n").getBytes(StandardCharsets.UTF_8));
             output.write(("Content-Type: " + (mimeType == null ? "audio/webm" : mimeType) + "\r\n\r\n").getBytes(StandardCharsets.UTF_8));
             output.write(audio);
             output.write(("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
@@ -345,6 +345,14 @@ public class AiMediaService {
         } catch (Exception ex) {
             throw new IllegalArgumentException("multipart_build_failed");
         }
+    }
+
+    static byte[] pcm16ToWav(byte[] pcm) {
+        return ByteBuffer.allocate(44 + pcm.length).order(ByteOrder.LITTLE_ENDIAN)
+            .put("RIFF".getBytes(StandardCharsets.US_ASCII)).putInt(36 + pcm.length)
+            .put("WAVEfmt ".getBytes(StandardCharsets.US_ASCII)).putInt(16).putShort((short) 1).putShort((short) 1)
+            .putInt(16000).putInt(32000).putShort((short) 2).putShort((short) 16)
+            .put("data".getBytes(StandardCharsets.US_ASCII)).putInt(pcm.length).put(pcm).array();
     }
 
     private static void writeField(ByteArrayOutputStream output, String boundary, String name, String value) throws Exception {

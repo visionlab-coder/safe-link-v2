@@ -42,6 +42,11 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+// One versioned delivery policy for the browser/Next API and the Spring glossary API.
+tasks.processResources {
+    from("../src/constants") { include("glossary-delivery-policy.json") }
+}
+
 // Local-only test harness: excluded from main and every bootJar.
 val enrollmentSandbox by sourceSets.creating {
     compileClasspath += sourceSets.main.get().output + sourceSets.main.get().compileClasspath

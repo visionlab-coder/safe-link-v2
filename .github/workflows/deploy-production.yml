@@ -20,8 +20,7 @@ jobs:
     environment: production
     timeout-minutes: 30
     env:
-      # NEXT_PUBLIC 값은 프런트 빌드 시 고정되므로 운영 백엔드 STT와 동일하게 유지한다.
-      NEXT_PUBLIC_REALTIME_STT_ENGINE: flitto
+      # STT 공급자는 백엔드에서 선택하며 프런트는 공통 PCM16/16kHz 입력을 사용한다.
       NEXT_PUBLIC_SAFE_LINK_API_BASE_URL: https://api.safe-link.co.kr
       SAFE_LINK_PUBLIC_APP_URL: https://app.safe-link.co.kr
       DEPLOY_HOST: ${{ secrets.SAFE_LINK_DEPLOY_HOST }}
@@ -45,6 +44,10 @@ jobs:
       - name: Install and build frontend
         run: |
           npm ci
+          node tests/korean-glossary.cjs
+          node tests/korean-glossary-api.cjs
+          node tests/live-glossary-policy.cjs
+          node tests/deepl-routing.cjs
           npm run build
 
       - uses: actions/setup-java@v4

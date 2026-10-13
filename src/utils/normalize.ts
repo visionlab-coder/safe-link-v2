@@ -1,4 +1,5 @@
 import { CONSTRUCTION_GLOSSARY } from "@/constants/glossary";
+import { normalizeKoreanGlossary } from "./korean-glossary";
 
 export interface NormalizeResult {
     original: string;
@@ -6,33 +7,11 @@ export interface NormalizeResult {
     changes: { from: string; to: string }[];
 }
 
-function escapeRegExp(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/**
- * 한 글자 용어는 다른 단어 안에 포함돼 있을 때 치환하면 안 된다.
- * 예: 용어집의 `전 → 센티미터`가 `안전`의 `전`까지 바꾸면 안 된다.
- */
-function replaceGlossaryTerm(text: string, slang: string, replacement: string): { text: string; matched: boolean } {
-    if (Array.from(slang).length !== 1) {
-        if (!text.includes(slang)) return { text, matched: false };
-        return { text: text.split(slang).join(replacement), matched: true };
-    }
-
-    const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(slang)}(?![\\p{L}\\p{N}])`, "gu");
-    let matched = false;
-    const normalized = text.replace(pattern, () => {
-        matched = true;
-        return replacement;
-    });
-    return { text: normalized, matched };
-}
-
 // ─────────────────────────────────────────────
 // 인메모리 캐시: DB에서 한 번 가져오면 재사용
 // ─────────────────────────────────────────────
 let _dbGlossaryCache: Record<string, string> | null = null;
+let _dbGlossaryCacheAt = 0;
 
 /**
  * fetchGlossaryFromDB
@@ -40,7 +19,7 @@ let _dbGlossaryCache: Record<string, string> | null = null;
  * 실패 시 로컬 상수(CONSTRUCTION_GLOSSARY)를 fallback으로 사용합니다.
  */
 export async function fetchGlossaryFromDB(): Promise<Record<string, string>> {
-    if (_dbGlossaryCache) return _dbGlossaryCache;
+    if (_dbGlossaryCache && Date.now() - _dbGlossaryCacheAt < 60_000) return _dbGlossaryCache;
 
     try {
         const response = await fetch("/api/glossary?active=true", { cache: "no-store" });
@@ -65,6 +44,7 @@ export async function fetchGlossaryFromDB(): Promise<Record<string, string>> {
         _dbGlossaryCache = CONSTRUCTION_GLOSSARY;
     }
 
+    _dbGlossaryCacheAt = Date.now();
     return _dbGlossaryCache;
 }
 
@@ -82,52 +62,20 @@ export function clearGlossaryCache() {
  * 로컬 상수 사전 기반 은어 → 표준어 변환 (최장 일치 우선)
  */
 export function normalizeKo(text: string, dict: Record<string, string> = CONSTRUCTION_GLOSSARY): NormalizeResult {
-    const changes: { from: string; to: string }[] = [];
-
-    // 긴 표현(구절)부터 먼저 치환 (최장 일치)
-    const sorted = Object.entries(dict)
-        .sort((a, b) => b[0].length - a[0].length);
-
-    // 플레이스홀더 기반 치환: 치환된 영역이 재치환되지 않도록 보호
-    const placeholders: string[] = [];
-    let result = text;
-
-    for (const [slang, standard] of sorted) {
-        const ph = `\x00${placeholders.length}\x00`;
-        const replaced = replaceGlossaryTerm(result, slang, ph);
-        if (replaced.matched) {
-            changes.push({ from: slang, to: standard });
-            placeholders.push(standard);
-            result = replaced.text;
-        }
-    }
-
-    // 플레이스홀더를 실제 표준어로 복원
-    for (let i = 0; i < placeholders.length; i++) {
-        result = result.split(`\x00${i}\x00`).join(placeholders[i]);
-    }
-
-    return { original: text, normalized: result, changes };
+    return normalizeKoreanGlossary(text, dict);
 }
 
 // ─────────────────────────────────────────────
 // 비동기 버전: DB 사전 우선, 실패 시 로컬 fallback
 // ─────────────────────────────────────────────
 
-import { formalizeKo } from "./politeness";
-
 /**
  * normalizeKoAsync (비동기, 권장)
- * DB 전역 사전을 우선 사용하고, 문장을 존댓말로 변환합니다.
+ * DB 전역 사전을 우선 사용합니다. 발언의 어미/금지/부정/조건은 다시 쓰지 않습니다.
  */
 export async function normalizeKoAsync(text: string): Promise<NormalizeResult> {
     const dict = await fetchGlossaryFromDB();
-    const normalizedData = normalizeKo(text, dict);
-    // 문장을 존댓말 지침에 맞게 변환 (불변성 유지)
-    return {
-        ...normalizedData,
-        normalized: formalizeKo(normalizedData.normalized),
-    };
+    return normalizeKo(text, dict);
 }
 
 /**

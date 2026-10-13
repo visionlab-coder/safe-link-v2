@@ -93,7 +93,7 @@ export async function callV3AiVendor(
   payload: {
     siteId: number;
     feature?: AiGatewayFeature;
-    provider: "papago" | "google" | "openai" | "openai-prompt";
+    provider: "auto" | "deepl" | "papago" | "google" | "openai" | "openai-prompt";
     sourceLanguage: string;
     targetLanguage: string;
     text: string;
@@ -145,7 +145,7 @@ export async function callV3AiVendor(
 }
 
 export async function callInternalAiTranslate(payload: {
-  provider?: "auto" | "papago" | "google" | "openai";
+  provider?: "auto" | "deepl" | "papago" | "google" | "openai";
   sourceLanguage: string;
   targetLanguage: string;
   text: string;

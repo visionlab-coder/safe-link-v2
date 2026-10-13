@@ -72,6 +72,7 @@ public class AiGatewayController {
         }
 
         var cached = translationCache.get(
+            properties.getTranslationProvider(),
             request.siteId(),
             request.sourceLanguage(),
             request.targetLanguage(),
@@ -101,7 +102,7 @@ public class AiGatewayController {
         Instant started = Instant.now();
         var result = vendor.translateAuto(request.text(), request.sourceLanguage(), request.targetLanguage());
         long durationMs = Duration.between(started, Instant.now()).toMillis();
-        translationCache.put(request.siteId(), request.sourceLanguage(), request.targetLanguage(), request.text(), result.text());
+        translationCache.put(properties.getTranslationProvider(), request.siteId(), request.sourceLanguage(), request.targetLanguage(), request.text(), result.text());
         usage.log(actor.userId(), request.siteId(), "translate", result.vendor(), result.model(), request.text().length(), result.text().length(), durationMs, AiCostEstimator.estimate("translate", result.vendor(), request.text().length(), result.text().length()));
         audit.record(actor.userId(), request.siteId(), "ai.translate", "ai_vendor", result.vendor(), "ALLOWED", "translated", Map.of("sourceLanguage", request.sourceLanguage(), "targetLanguage", request.targetLanguage()));
         return ResponseEntity.ok(new TranslateResponse(result.text(), result.vendor(), result.model()));
@@ -116,7 +117,7 @@ public class AiGatewayController {
         if (!properties.isVendorEnabled()) throw new ServiceUnavailableException("ai_vendor_not_configured");
         var result = switch (cleanOptional(request.provider(), "auto").toLowerCase()) {
             case "auto" -> vendor.translateAuto(request.text(), request.sourceLanguage(), request.targetLanguage());
-            case "papago", "google", "openai" -> vendor.call(request.provider(), request.text(), request.sourceLanguage(), request.targetLanguage(), null, null, null);
+            case "papago", "google", "openai", "deepl" -> vendor.call(request.provider(), request.text(), request.sourceLanguage(), request.targetLanguage(), null, null, null);
             default -> throw new IllegalArgumentException("unsupported_ai_vendor");
         };
         return new TranslateResponse(result.text(), result.vendor(), result.model());
@@ -305,7 +306,9 @@ public class AiGatewayController {
             properties.isFailOpenLocal(),
             properties.getDefaultWindowSeconds(),
             properties.getDefaultLimitCount(),
-            List.copyOf(SUPPORTED_FEATURES)
+            List.copyOf(SUPPORTED_FEATURES),
+            properties.getTranslationProvider(), properties.getSttProvider(),
+            properties.getDeeplApiKey() != null && !properties.getDeeplApiKey().isBlank()
         );
     }
 
@@ -449,5 +452,5 @@ public class AiGatewayController {
     public record TtsResponse(String audioBase64, String contentType, String vendor, String model) {}
     public record ReserveRequest(@NotBlank String feature, Long siteId, Long inputSize, Long outputSize, String vendor, String model) {}
     public record ReserveResponse(boolean ok, String feature, Long siteId, long used, long limit, String mode) {}
-    public record AiStatusResponse(String status, boolean vendorEnabled, boolean failOpenLocal, long defaultWindowSeconds, long defaultLimitCount, List<String> supportedFeatures) {}
+    public record AiStatusResponse(String status, boolean vendorEnabled, boolean failOpenLocal, long defaultWindowSeconds, long defaultLimitCount, List<String> supportedFeatures, String translationProvider, String sttProvider, boolean deeplConfigured) {}
 }

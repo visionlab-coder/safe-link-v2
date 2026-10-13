@@ -8,14 +8,12 @@ public class AiProperties {
     private long defaultLimitCount = 60;
     private boolean failOpenLocal;
     private boolean vendorEnabled;
-    private String translationProvider = "auto";
-    private String sttProvider = "auto";
+    private String translationProvider = "deepl";
+    private String sttProvider = "deepl";
     private String googleCloudApiKey = "";
     private String naverClientId = "";
     private String naverClientSecret = "";
     private String openAiApiKey = "";
-    private String flittoApiKey = "";
-    private String flittoApiBaseUrl = "";
     private String deeplApiKey = "";
     private String deeplApiBaseUrl = "https://api.deepl.com";
     private String openAiTextModel = "gpt-4o-mini";
@@ -47,10 +45,6 @@ public class AiProperties {
     public void setNaverClientSecret(String naverClientSecret) { this.naverClientSecret = naverClientSecret; }
     public String getOpenAiApiKey() { return openAiApiKey; }
     public void setOpenAiApiKey(String openAiApiKey) { this.openAiApiKey = openAiApiKey; }
-    public String getFlittoApiKey() { return flittoApiKey; }
-    public void setFlittoApiKey(String flittoApiKey) { this.flittoApiKey = flittoApiKey; }
-    public String getFlittoApiBaseUrl() { return flittoApiBaseUrl; }
-    public void setFlittoApiBaseUrl(String flittoApiBaseUrl) { this.flittoApiBaseUrl = flittoApiBaseUrl; }
     public String getDeeplApiKey() { return deeplApiKey; }
     public void setDeeplApiKey(String deeplApiKey) { this.deeplApiKey = deeplApiKey; }
     public String getDeeplApiBaseUrl() { return deeplApiBaseUrl; }

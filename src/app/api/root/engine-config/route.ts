@@ -14,7 +14,7 @@ import {
 
 // 🔐 개발자(루트, "나만") 전용 — API 키 런타임 교체. DEVELOPER_EMAILS 게이트(마스터와 별개).
 //    프로덕션 상시 동작(APP_MODE 무관). 저장은 AES-256-GCM 암호화, 응답은 마스킹(쓰기전용).
-const VALID_ENGINES: TranslateEngine[] = ["m2m100", "papago", "google"];
+const VALID_ENGINES: TranslateEngine[] = ["m2m100", "papago", "google", "deepl"];
 const SECRET_FIELDS = ["papagoId", "papagoSecret", "googleKey"] as const;
 
 export async function GET() {

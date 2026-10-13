@@ -12,7 +12,7 @@ import {
 
 // 🔐 AI 엔진/API키 설정 — SQ Link 루트 관리자(MASTER_EMAILS)만 접근.
 // ⚠️ 완전한 "나만" 보장은 JWT 서명검증 수정이 선결(현재는 MASTER 이메일 게이트 = 방어심층).
-const VALID_ENGINES: TranslateEngine[] = ["m2m100", "papago", "google"];
+const VALID_ENGINES: TranslateEngine[] = ["m2m100", "papago", "google", "deepl"];
 
 export async function GET() {
     const root = await requireRootAdmin();

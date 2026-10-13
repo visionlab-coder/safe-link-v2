@@ -99,7 +99,7 @@ function AdminLiveContent() {
         loadLangs();
     }, [siteId]);
 
-    const handleTranscript = useCallback(async (text: string, flittoTranslations?: Record<string, string>) => {
+    const handleTranscript = useCallback(async (text: string, providerTranslations?: Record<string, string>) => {
         const cleanText = text.trim().replace(/\s+/g, " ");
         if (!sessionId || !cleanText) return;
         setSttError("");
@@ -117,7 +117,7 @@ function AdminLiveContent() {
         // 현장 근로자 언어로 병렬 사전 번역 — 언어당 1번만 호출 (중복 근로자 기기 절약)
         try {
             const langs = siteWorkerLangsRef.current;
-        const translations: Record<string, string> = { ...(flittoTranslations ?? {}) };
+        const translations: Record<string, string> = { ...(providerTranslations ?? {}) };
 
             if (langs.length > 0) {
                 await Promise.all(
