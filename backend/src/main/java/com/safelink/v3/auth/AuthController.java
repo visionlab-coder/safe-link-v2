@@ -105,13 +105,15 @@ public class AuthController {
         HttpServletRequest servletRequest,
         HttpServletResponse servletResponse
     ) {
-        var result = authService.authenticateWorkerQuickLogin(
-            cleanInitials(request.nameInitials()),
-            cleanPhoneLast4(request.phoneLast4()),
-            parseSiteId(request.siteId()),
-            cleanLanguage(request.preferredLang()),
-            clientIp(servletRequest)
-        );
+        boolean birthLogin = request.birthDate() != null;
+        String identity = birthLogin ? WorkerBirthDate.require(request.birthDate()).toString() : cleanInitials(request.nameInitials());
+        String ip = clientIp(servletRequest);
+        loginAttemptRateLimiter.consumeWorkerLogin((birthLogin ? "birth:" : "legacy:") + identity, ip);
+        var result = birthLogin
+            ? authService.authenticateWorkerBirthLogin(request.birthDate(), cleanPhoneLast4(request.phoneLast4()),
+                parseSiteId(request.siteId()), cleanLanguage(request.preferredLang()), ip)
+            : authService.authenticateWorkerQuickLogin(identity, cleanPhoneLast4(request.phoneLast4()),
+                parseSiteId(request.siteId()), cleanLanguage(request.preferredLang()), ip);
 
         if (result instanceof AuthService.WorkerQuickLoginMultipleSites multipleSites) {
             return ResponseEntity.status(409).body(new MultipleSitesResponse(
@@ -260,8 +262,13 @@ public class AuthController {
         @JsonProperty("name_initials") String nameInitials,
         @JsonProperty("phone_last4") String phoneLast4,
         @JsonProperty("preferred_lang") String preferredLang,
-        @JsonProperty("site_id") String siteId
-    ) {}
+        @JsonProperty("site_id") String siteId,
+        @JsonProperty("birth_date") String birthDate
+    ) {
+        public WorkerQuickLoginRequest(String nameInitials,String phoneLast4,String preferredLang,String siteId) {
+            this(nameInitials,phoneLast4,preferredLang,siteId,null);
+        }
+    }
     public record MultipleSitesResponse(List<SiteOptionResponse> sites) {}
     public record SiteOptionResponse(String site_id, String name, String site_code) {}
     public record CsrfResponse(String headerName, String parameterName, String token) {}

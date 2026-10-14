@@ -188,6 +188,23 @@ public class AuthService {
             .filter(account -> !account.siteIds().isEmpty())
             .toList();
 
+        return finishWorkerLogin(candidates, requestedSiteId, preferredLanguage, ipAddress);
+    }
+
+    public WorkerQuickLoginResult authenticateWorkerBirthLogin(String birthDate, String phoneLast4,
+        Long requestedSiteId, String preferredLanguage, String ipAddress) {
+        var candidates = users.findWorkerBirthLoginCandidates(WorkerBirthDate.require(birthDate), phoneLast4).stream()
+            .filter(UserAccount::isActive)
+            // Never allow this weak worker credential to authenticate an administrative account.
+            .filter(account -> account.roles().equals(Set.of(Role.WORKER)) || account.roles().equals(Set.of(Role.TEMP_WORKER)))
+            .filter(account -> !account.siteIds().isEmpty()).toList();
+        if (candidates.size() > 1) throw new WorkerQuickLoginConflictException("ambiguous_worker_match");
+        return finishWorkerLogin(candidates, requestedSiteId, preferredLanguage, ipAddress);
+    }
+
+    private WorkerQuickLoginResult finishWorkerLogin(List<UserAccount> candidates, Long requestedSiteId,
+        String preferredLanguage, String ipAddress) {
+
         if (requestedSiteId != null) {
             candidates = candidates.stream()
                 .filter(account -> account.siteIds().contains(requestedSiteId))

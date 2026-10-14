@@ -21,7 +21,7 @@ public class TemporaryWorkerController {
         String bucket="temporary-worker-registration";
         limiter.checkAllowed(bucket,request.getRemoteAddr());
         limiter.recordFailure(bucket,request.getRemoteAddr()); // Count successes too; public enrollment abuse limit.
-        var actor=service.register(body.name(),body.phone(),body.language(),body.consent(),body.consentVersion());
+        var actor=service.register(body.name(),body.phone(),body.language(),body.consent(),body.consentVersion(),body.birthDate());
         var context=SecurityContextHolder.createEmptyContext();
         context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(actor,null,actor.getAuthorities()));
         SecurityContextHolder.setContext(context);
@@ -30,5 +30,11 @@ public class TemporaryWorkerController {
         new HttpSessionSecurityContextRepository().saveContext(context,request,response);
         return Map.of("ok",true,"siteId",actor.siteIds().iterator().next(),"role","TEMP_WORKER");
     }
-    public record Registration(String name,String phone,String language,boolean consent,String consentVersion) {}
+    public record Registration(String name,String phone,String language,boolean consent,String consentVersion,String birthDate) {}
+
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    @ResponseStatus(org.springframework.http.HttpStatus.CONFLICT)
+    public Map<String,String> identityConflict() {
+        return Map.of("error","temporary_registration_unavailable");
+    }
 }

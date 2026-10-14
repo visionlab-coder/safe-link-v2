@@ -1,6 +1,7 @@
 "use client";
 import EnglishNameField from "@/components/EnglishNameField";
 import { englishNameUI } from "@/lib/english-name";
+import { isWorkerBirthDate, workerLoginUI } from "@/lib/worker-login";
 import { ADMIN_PASSWORD_MIN_LENGTH, adminPasswordHint, adminSignupIssues } from "@/lib/admin-signup-validation";
 
 import { useEffect, useState, Suspense, useCallback } from "react";
@@ -235,6 +236,7 @@ function AuthContent() {
   const urlLang = searchParams.get("lang");
   const [lang, setLang] = useState<string>(urlLang || "");
   const t = getT(lang || "en");
+  const workerLogin = workerLoginUI(lang);
   const emailLabel = EMAIL_LABELS[lang || "en"] || EMAIL_LABELS.en;
 
   const [mode, setMode] = useState<Mode>(urlLang ? "role" : "lang");
@@ -258,6 +260,9 @@ function AuthContent() {
   const signupPasswordValid = password.length >= ADMIN_PASSWORD_MIN_LENGTH;
 
   const [initials, setInitials] = useState("");
+  // One input supports existing alphanumeric IDs and new six-digit birth-date IDs.
+  const birthDate = initials;
+  const legacyWorkerLogin = !/^[0-9]{6}$/.test(initials);
   const [phoneLast4, setPhoneLast4] = useState("");
   const [multipleSites, setMultipleSites] = useState<Array<{ site_id: string; name: string; site_code: string | null }>>([]);
   const [workerLoginError, setWorkerLoginError] = useState("");
@@ -316,15 +321,14 @@ function AuthContent() {
 
   // No auto-login — worker enters fresh every time
 
-  // 🔐 2026-06-08: 이니셜 + 휴대전화 뒷 4자리 빠른 로그인.
-  // phone+name 흐름 폐기 — 단일 로그인 흐름으로 통합 (NFC 사전 등록 전제).
+  // Same form: existing alphanumeric ID or new YYMMDD, with the same last-four password.
   const submitQuickLogin = async (siteId?: string) => {
     setLoading(true);
     const activeLang = lang || "ko";
     const notices = AUTH_NOTICES[activeLang] ?? AUTH_NOTICES.en;
 
-    if (!initials.trim()) {
-      setWorkerLoginError(t.workerNameRequired);
+    if (legacyWorkerLogin ? !initials.trim() : !isWorkerBirthDate(birthDate)) {
+      setWorkerLoginError(legacyWorkerLogin ? t.workerNameRequired : workerLogin.invalid);
       setLoading(false);
       return;
     }
@@ -338,7 +342,7 @@ function AuthContent() {
 
     try {
       const result = await quickLoginWorkerV3({
-        nameInitials: initials.trim(),
+        ...(legacyWorkerLogin ? { nameInitials: initials.trim() } : { birthDate }),
         phoneLast4,
         preferredLang: activeLang,
         siteId,
@@ -361,7 +365,7 @@ function AuthContent() {
       }
 
       if (!result.ok && result.status === 404) {
-        setWorkerLoginError(notices.workerNotFound);
+        setWorkerLoginError(legacyWorkerLogin ? notices.workerNotFound : workerLogin.loginFailure);
         setLoading(false);
         return;
       }
@@ -379,7 +383,7 @@ function AuthContent() {
         if (!localStorage.getItem("safe-link-remember")) {
           localStorage.setItem("safe-link-remember", "false");
         }
-        router.push(`/worker?lang=${activeLang}`);
+        router.push(`${result.user.roles.includes("TEMP_WORKER") ? "/worker/temporary" : "/worker"}?lang=${activeLang}`);
       } else {
         // 로그인 오류는 선택한 표시 언어로만 안내한다. 기술적인 세션 문구를
         // 영어로 노출하지 않고, 언어별 기존 오류 사전을 재사용한다.
@@ -683,19 +687,25 @@ function AuthContent() {
                   </div>
                   <div>
                     <h2 className="text-base font-black" style={{ color: "#6EE7B7" }}>{t.workerTitle}</h2>
-                    <p className="text-xs text-slate-500 mt-0.5 leading-snug">{englishNameUI(lang).loginId} · {t.phone} (1234)</p>
+                    <p className="text-xs text-slate-500 mt-0.5 leading-snug">{englishNameUI(lang).loginId} / {workerLogin.birth} · {workerLogin.password}</p>
                   </div>
                 </div>
 
-                {/* 이니셜 (4~6자) */}
+                {/* 기존 영문/숫자 ID 또는 신규 생년월일 YYMMDD */}
                 <div style={fieldBox}>
                   <input
                     type="text"
-                    aria-label={englishNameUI(lang).loginId}
-                    placeholder={`${englishNameUI(lang).loginId} (BK, NGUYEN)`}
+                    aria-label={`${englishNameUI(lang).loginId} / ${workerLogin.birth}`}
+                    placeholder="BK / NGUYEN / 900521"
+                    inputMode="text"
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    autoComplete="username"
                     value={initials}
                     onChange={e => {
                       setInitials(e.target.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toUpperCase());
+                      setMultipleSites([]);
                       setWorkerLoginError("");
                     }}
                     maxLength={6}
@@ -706,10 +716,11 @@ function AuthContent() {
                 {/* 휴대전화 뒷 4자리 */}
                 <div style={fieldBox}>
                   <input
-                    type="tel"
-                    aria-label={t.phone}
+                    type="password"
+                    autoComplete="current-password"
+                    aria-label={workerLogin.password}
                     inputMode="numeric"
-                    placeholder={`${t.phone} (1234)`}
+                    placeholder={workerLogin.password}
                     value={phoneLast4}
                     onChange={e => {
                       setPhoneLast4(e.target.value.replace(/\D/g, "").slice(0, 4));
@@ -748,7 +759,7 @@ function AuthContent() {
                 {/* Hint */}
                 <div className="flex items-start gap-2">
                   <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-slate-600" />
-                  <p className="text-[11px] text-slate-600 leading-snug">{(AUTH_NOTICES[lang || "en"] ?? AUTH_NOTICES.en).nfcHint}</p>
+                  <p className="text-[11px] text-slate-600 leading-snug">{englishNameUI(lang).loginId} (BK, NGUYEN) / {workerLogin.birth} (900521)<br />{workerLogin.password}</p>
                 </div>
 
                 {/* CTA */}

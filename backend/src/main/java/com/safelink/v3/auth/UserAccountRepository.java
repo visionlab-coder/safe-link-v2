@@ -98,6 +98,7 @@ public class UserAccountRepository {
                 join users u on u.id = q.user_id
                 join user_roles ur on ur.user_id = u.id
                 where q.enabled = true
+                  and q.birth_date is null
                   and q.name_initials = :initials
                   and q.phone_last4 = :phoneLast4
                   and ur.role = 'WORKER'
@@ -117,6 +118,20 @@ public class UserAccountRepository {
                 sitesFor(rs.getLong("id"))
             ))
             .list();
+    }
+
+    public List<UserAccount> findWorkerBirthLoginCandidates(String birthDate, String phoneLast4) {
+        return jdbc.sql("""
+            select distinct u.id,u.email,u.display_name,u.preferred_language,u.account_status
+            from worker_quick_login_credentials q join users u on u.id=q.user_id
+            join user_roles ur on ur.user_id=u.id
+            where q.enabled=true and q.birth_date=:birth and q.phone_last4=:last4
+              and ur.role in ('WORKER','TEMP_WORKER') and ur.revoked_at is null
+            order by u.id
+            """).param("birth",birthDate).param("last4",phoneLast4)
+            .query((rs,rowNum) -> new UserAccount(rs.getLong("id"),rs.getString("email"),
+                rs.getString("display_name"),rs.getString("preferred_language"),rs.getString("account_status"),
+                null,rolesFor(rs.getLong("id")),sitesFor(rs.getLong("id")))).list();
     }
 
     public List<SiteOption> siteOptionsFor(Set<Long> siteIds) {

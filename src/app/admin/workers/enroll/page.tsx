@@ -1,5 +1,7 @@
 "use client";
 import EnglishNameField from "@/components/EnglishNameField";
+import { isWorkerBirthDate, workerLoginUI } from "@/lib/worker-login";
+import { workerRegistrationUI } from "@/lib/worker-registration-ui";
 
 import { Suspense, useEffect, useState } from "react";
 import RoleGuard from "@/components/RoleGuard";
@@ -48,6 +50,8 @@ function WorkerEnrollInner() {
   const searchParams = useSearchParams();
   const lang = useDisplayLanguage();
   const t = ENROLL_UI[lang] || ENROLL_UI.en;
+  const login = workerLoginUI(lang);
+  const registration = workerRegistrationUI(lang);
   const guidance = ENROLL_GUIDANCE[lang] || ENROLL_GUIDANCE.en;
   const existingWorkerId = searchParams.get("worker_id");
   const nfcSupport = detectNfcSupport();
@@ -101,10 +105,12 @@ function WorkerEnrollInner() {
     if (!workerId) {
       // 🟢 V2 NFC 간편 등록: 영문 이니셜 + 전화번호 뒷 4자리.
       // Display name is required and independent of the existing login initials.
-      const cleanInitials = nameInitials.trim().replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase();
-      const cleanLast4 = phoneLast4.trim().replace(/\D/g, "").slice(-4);
-      if (!cleanInitials || cleanLast4.length !== 4) {
-        setError(t.invalid);
+      if (!isWorkerBirthDate(nameInitials)) {
+        setError(login.invalid);
+        return;
+      }
+      if (!/^\+?[0-9]{8,15}$/.test(phoneLast4)) {
+        setError(registration.phoneError);
         return;
       }
       if (!nameReady) return;
@@ -115,8 +121,8 @@ function WorkerEnrollInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           full_name: name,
-          name_initials: cleanInitials,
-          phone_last4: cleanLast4,
+          birth_date: nameInitials,
+          phone: phoneLast4,
           assigned_site_id: siteId || undefined,
           consent_signed_at: new Date().toISOString(),
           ...DEFAULT_WORKER_PROFILE,
@@ -408,31 +414,32 @@ function WorkerEnrollInner() {
             <>
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
                 <p className="text-sm text-gray-300">
-                  {guidance.minimum}
+                  {login.hint}
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm text-gray-400 mb-1 block">{t.initials} *</label>
+                  <label className="text-sm text-gray-400 mb-1 block">{login.birth} *</label>
                   <input
                     required
                     value={nameInitials}
-                    onChange={(event) => setNameInitials(event.target.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase())}
+                    onChange={(event) => setNameInitials(event.target.value.replace(/\D/g, "").slice(0, 6))}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 uppercase"
-                    placeholder="KDH"
-                    maxLength={4}
+                    placeholder="900521"
+                    inputMode="numeric"
+                    maxLength={6}
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-400 mb-1 block">{t.phone} *</label>
+                  <label className="text-sm text-gray-400 mb-1 block">{registration.phone} *</label>
                   <input
                     required
                     value={phoneLast4}
-                    onChange={(event) => setPhoneLast4(event.target.value.replace(/\D/g, "").slice(-4))}
+                    onChange={(event) => setPhoneLast4(event.target.value.replace(/\D/g, "").slice(0, 15))}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500"
-                    placeholder="1234"
+                    placeholder="01012345678"
                     inputMode="numeric"
-                    maxLength={4}
+                    maxLength={15}
                   />
                 </div>
               </div>

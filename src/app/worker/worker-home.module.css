@@ -1,0 +1,57 @@
+.publishAction {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-height: 88px;
+  padding: 1.125rem 1.25rem;
+  border: 1px solid #c9d9ec;
+  border-radius: 24px;
+  background: #fff;
+  color: #172033;
+  text-decoration: none;
+  box-shadow: 0 6px 18px -8px rgb(30 64 105 / 18%);
+  transition: border-color 160ms, background-color 160ms, box-shadow 160ms;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.publishAction:hover {
+  border-color: #93b9ed;
+  background: #f7fbff;
+  box-shadow: 0 8px 22px -8px rgb(30 64 105 / 24%);
+}
+
+.publishAction:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 4px;
+}
+
+.publishAction:active { background: #eff6ff; }
+
+.publishIcon {
+  display: flex;
+  flex: 0 0 48px;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  border: 1px solid #d7e6fc;
+  border-radius: 16px;
+  background: #edf5ff;
+  color: #2563eb;
+}
+
+.publishLabel {
+  flex: 1;
+  min-width: 0;
+  color: #173b69;
+  font-size: 1.125rem;
+  font-weight: 800;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.publishArrow { flex-shrink: 0; color: #6683a5; }
+:global([dir="rtl"]) .publishArrow { transform: rotate(180deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .publishAction { transition: none; }
+}

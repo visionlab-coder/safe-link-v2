@@ -12,6 +12,8 @@ export async function POST(req: NextRequest) {
   let sameOrigin = false;
   try { sameOrigin = new URL(req.headers.get("origin") || "").host === req.headers.get("host"); } catch { /* deny */ }
   if (!sameOrigin) return NextResponse.json({ error: "origin_denied" }, { status: 403 });
+  if (req.nextUrl.searchParams.get("mode") === "sites")
+    return proxyV3Api(req, "/api/v1/worker-upgrade/sites/localize", { method: "POST", body: await req.text() });
   const id = req.nextUrl.searchParams.get("decision");
   if (id !== null && !/^[1-9][0-9]*$/.test(id)) return NextResponse.json({ error: "invalid_id" }, { status: 400 });
   return proxyV3Api(req, id ? `/api/v1/admin/worker-upgrades/${id}/decision` : "/api/v1/worker-upgrade", { method: "POST", body: await req.text() });

@@ -30,7 +30,7 @@ class TemporaryWorkerTest {
         assertDoesNotThrow(() -> TemporaryWorkerService.validate("Kim","01012345678",true,TemporaryWorkerService.CONSENT_VERSION));
     }
     @Test void rejectsInvalidIdentity() {
-        assertThrows(IllegalArgumentException.class, () -> TemporaryWorkerService.validate(" ","01012345678",true,TemporaryWorkerService.CONSENT_VERSION));
+        assertDoesNotThrow(() -> TemporaryWorkerService.validate(null,"01012345678",true,TemporaryWorkerService.CONSENT_VERSION));
         assertThrows(IllegalArgumentException.class, () -> TemporaryWorkerService.validate("Kim","1234",true,TemporaryWorkerService.CONSENT_VERSION));
     }
     @Test void onlyLiveAndSessionEndpointsAllowed() {

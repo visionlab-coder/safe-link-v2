@@ -14,7 +14,7 @@ class EnglishNameTest {
         assertThrows(IllegalArgumentException.class, () -> EnglishName.require(null));
     }
     @Test void workerRegistrationPathsRejectNativeNames() {
-        assertThrows(IllegalArgumentException.class, () -> TemporaryWorkerService.validate("홍길동", "01012345678", true, TemporaryWorkerService.CONSENT_VERSION));
+        assertDoesNotThrow(() -> TemporaryWorkerService.validate(null, "01012345678", true, TemporaryWorkerService.CONSENT_VERSION));
         assertThrows(IllegalArgumentException.class, () -> WorkerUpgradeService.validate(new WorkerUpgradeService.Application("홍길동", "01012345678", 2L, "123", true, WorkerUpgradeService.CONSENT_VERSION)));
         assertDoesNotThrow(() -> WorkerUpgradeService.validate(new WorkerUpgradeService.Application("HONG GILDONG", "01012345678", 2L, "123", true, WorkerUpgradeService.CONSENT_VERSION)));
     }

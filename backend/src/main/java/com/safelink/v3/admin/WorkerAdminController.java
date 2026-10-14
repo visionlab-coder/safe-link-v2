@@ -36,6 +36,7 @@ public class WorkerAdminController {
     }
 
     @PostMapping
+    @org.springframework.transaction.annotation.Transactional
     @ResponseStatus(HttpStatus.CREATED)
     public WorkerResponse createWorker(
         @AuthenticationPrincipal SessionPrincipal actor,
@@ -45,8 +46,9 @@ public class WorkerAdminController {
         siteGuard.requireGlobalOrSiteAdmin(actor, siteId, "admin.worker.create", "worker", null);
 
         String phone = cleanPhone(request.phone());
-        String initials = cleanInitials(request.nameInitials());
-        String phoneLast4 = cleanPhoneLast4(request.phoneLast4(), phone);
+        var birthDate = com.safelink.v3.auth.WorkerBirthDate.require(request.birthDate());
+        String initials = "WORKER";
+        String phoneLast4 = phone.substring(phone.length()-4);
         String preferredLanguage = cleanLanguage(request.preferredLanguage());
         String displayName = com.safelink.v3.auth.EnglishName.require(request.displayName());
 
@@ -79,16 +81,17 @@ public class WorkerAdminController {
                 .update();
 
             jdbc.sql("""
-                    insert into worker_quick_login_credentials(user_id, name_initials, phone_last4, enabled)
-                    values (:userId, :initials, :phoneLast4, true)
+                    insert into worker_quick_login_credentials(user_id, name_initials, phone_last4, enabled,birth_date)
+                    values (:userId, :initials, :phoneLast4, true,:birth)
                 """)
                 .param("userId", userId)
                 .param("initials", initials)
                 .param("phoneLast4", phoneLast4)
+                .param("birth",birthDate)
                 .update();
 
             audit.record(actor.userId(), siteId, "admin.worker.create", "worker", String.valueOf(userId), "ALLOWED", "created", Map.of("role", "WORKER"));
-            return new WorkerResponse(userId, displayName, phone, siteId, "WORKER", initials);
+            return new WorkerResponse(userId, displayName, phone, siteId, "WORKER", birthDate);
         } catch (DataIntegrityViolationException e) {
             audit.record(actor.userId(), siteId, "admin.worker.create", "worker", null, "DENIED", "duplicate_worker", Map.of());
             throw new IllegalArgumentException("duplicate_worker");
@@ -129,9 +132,10 @@ public class WorkerAdminController {
     public record CreateWorkerRequest(
         @NotBlank String displayName,
         @NotBlank String phone,
-        @NotBlank String nameInitials,
+        String nameInitials,
         String phoneLast4,
-        String preferredLanguage
+        String preferredLanguage,
+        String birthDate
     ) {}
 
     public record WorkerResponse(Long id, String displayName, String phone, Long siteId, String role, String nameInitials) {}

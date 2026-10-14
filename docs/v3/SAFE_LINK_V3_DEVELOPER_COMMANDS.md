@@ -14,6 +14,14 @@
 
 ## 기본 원칙
 
+### 2026-10-14 간편가입 및 즉시 전환 (아래 과거 승인 정책보다 우선)
+
+- 생년월일이 등록된 신규 계정만 이번 명시 승인된 즉시 전환을 사용한다. 생년월일 미등록 기존 계정의 로그인·전환 정책은 유지한다. 그룹웨어 검증 우회 플래그가 아니라 신규 가입 정책의 변경이다.
+- 테스트용 별도 worktree의 `scripts/worker-login-local.compose.yml`을 `docker compose -p sq-worker-login -f scripts/worker-login-local.compose.yml up -d`로 실행한다. `./gradlew bootJar` 후 `node scripts/worker-login-local.mjs backend` / `frontend`를 사용한다. DB는 55441, Redis 56391, API 18084, 웹 3000의 루프백 전용이다.
+- `scripts/worker-login-local-seed.sql`은 DB 이름이 `worker_login_test`일 때만 실행 가능하다. 운영 데이터/비밀값을 복사하지 않으며 별도 승인 우회 컨트롤러도 사용하지 않는다. 다국어 현장명 일부는 명시적 로컬 fixture이고 외부 번역 공급자 실증과 구분한다.
+- 브라우저 회귀: `node scripts/test-worker-login-browser.mjs`. 매번 로컬 테스트 사용자 1명과 동의/전환 이력을 추가한다. 테스트 산출물: `outputs/worker-login-qa/`.
+- 운영 배포 시 프론트/백엔드/V040을 함께 적용한다. 보류된 직원 역할 V038/V039는 번들링하지 않는다. 이후 해당 기능 배포 시 미배포 migration 버전을 V040보다 높게 다시 배정해야 한다. 운영 V040 적용 전에는 이 작업본 프론트를 운영 API에 연결하지 않는다.
+
 ### 2026-10-01 임시→정식 전환 격리 테스트
 
 - 더미 즉시 전환은 `backend/src/enrollmentSandbox`의 별도 Gradle 소스셋에서만 실행한다. 운영 승인 절차를 끄는 플래그나 공개 우회 API를 추가하지 않는다.

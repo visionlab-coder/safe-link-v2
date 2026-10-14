@@ -22,9 +22,12 @@ public class WorkerUpgradeService {
     }
     public record Application(String name,String phone,Long siteId,String irisId,boolean consent,String consentVersion) {}
     public static void validate(Application input) {
-        if (!input.consent() || !CONSENT_VERSION.equals(input.consentVersion())) throw new IllegalArgumentException("privacy_consent_required");
+        validateCommon(input);
         EnglishName.require(input.name());
         if (input.phone()==null || !input.phone().matches("\\+?[0-9]{8,15}")) throw new IllegalArgumentException("phone_invalid");
+    }
+    private static void validateCommon(Application input) {
+        if (!input.consent() || !CONSENT_VERSION.equals(input.consentVersion())) throw new IllegalArgumentException("privacy_consent_required");
         if (input.siteId()==null || input.siteId()<1) throw new IllegalArgumentException("site_required");
         if (input.irisId()==null || !input.irisId().matches("[0-9]{1,64}")) throw new IllegalArgumentException("iris_id_invalid");
     }
@@ -39,7 +42,14 @@ public class WorkerUpgradeService {
         if (actor==null) throw new AccessDeniedException("authentication_required");
         var rows=jdbc.sql("select r.id,r.site_id,r.display_name,r.phone,r.iris_id,r.status,r.decision_reason,c.name_initials as login_id from worker_upgrade_requests r left join worker_quick_login_credentials c on c.user_id=r.user_id where r.user_id=:user")
             .param("user",actor.userId()).query().listOfRows();
-        return rows.isEmpty()?Map.of("status","NONE"):rows.getFirst();
+        var identity = jdbc.sql("select u.display_name,u.phone,c.birth_date from users u left join worker_quick_login_credentials c on c.user_id=u.id where u.id=:user")
+            .param("user",actor.userId()).query().singleRow();
+        var result = new java.util.HashMap<String,Object>();
+        result.put("status","NONE");
+        if (!rows.isEmpty()) result.putAll(rows.getFirst());
+        if (identity.get("birth_date") != null || rows.isEmpty()) result.putAll(identity);
+        if (identity.get("birth_date") != null) result.put("login_id",identity.get("birth_date"));
+        return result;
     }
     private void lockTemporary(Long userId) {
         String state=jdbc.sql("select account_status from users where id=:id for update").param("id",userId).query(String.class).single();
@@ -52,7 +62,14 @@ public class WorkerUpgradeService {
     }
     @Transactional
     public Map<String,Object> submit(SessionPrincipal actor,Application input) {
-        requireTemporary(actor); validate(input); lockTemporary(actor.userId()); requireActiveSite(input.siteId());
+        requireTemporary(actor); validateCommon(input); lockTemporary(actor.userId()); requireActiveSite(input.siteId());
+        var identity = jdbc.sql("select u.display_name,u.phone,c.birth_date from users u left join worker_quick_login_credentials c on c.user_id=u.id where u.id=:user")
+            .param("user",actor.userId()).query().singleRow();
+        boolean immediate = identity.get("birth_date") != null;
+        if (!immediate) validate(input);
+        // New enrolments retain the server-owned nickname/phone; client identity fields cannot overwrite them.
+        String name = immediate ? (String) identity.get("display_name") : EnglishName.require(input.name());
+        String phone = immediate ? (String) identity.get("phone") : input.phone();
         var current=jdbc.sql("select status from worker_upgrade_requests where user_id=:id").param("id",actor.userId()).query(String.class).optional();
         if (current.isPresent() && !"REJECTED".equals(current.get())) throw new IllegalArgumentException("upgrade_already_submitted");
         jdbc.sql("""
@@ -62,8 +79,22 @@ public class WorkerUpgradeService {
             phone=excluded.phone,iris_id=excluded.iris_id,consent_version=excluded.consent_version,
             consented_at=now(),requested_at=now(),status='PENDING',decided_by=null,decided_at=null,
             decision_reason=null,verification_method=null,revision=worker_upgrade_requests.revision+1
-            """).param("user",actor.userId()).param("site",input.siteId()).param("name",EnglishName.require(input.name()))
-            .param("phone",input.phone()).param("iris",input.irisId()).param("version",CONSENT_VERSION).update();
+            """).param("user",actor.userId()).param("site",input.siteId()).param("name",name)
+            .param("phone",phone).param("iris",input.irisId()).param("version",CONSENT_VERSION).update();
+        if (immediate) {
+            // Explicit customer policy: manager supplies the iris ID; ERP verification is not yet available.
+            // Unique approved iris index makes duplicate submissions fail and rolls back the entire transaction.
+            jdbc.sql("update worker_upgrade_requests set status='APPROVED',decided_by=:user,decided_at=now(),verification_method='SELF_REPORTED_IRIS' where user_id=:user")
+                .param("user",actor.userId()).update();
+            jdbc.sql("update user_roles set revoked_at=now() where user_id=:user and role='TEMP_WORKER' and revoked_at is null")
+                .param("user",actor.userId()).update();
+            jdbc.sql("insert into user_roles(user_id,role,granted_by) values(:user,'WORKER',:user)").param("user",actor.userId()).update();
+            jdbc.sql("update site_memberships set status='REVOKED' where user_id=:user and role='TEMP_WORKER'").param("user",actor.userId()).update();
+            jdbc.sql("insert into site_memberships(user_id,site_id,role,status) values(:user,:site,'WORKER','ACTIVE') on conflict(user_id,site_id,role) do update set status='ACTIVE'")
+                .param("user",actor.userId()).param("site",input.siteId()).update();
+            audit.record(actor.userId(),input.siteId(),"worker.upgrade.self_convert","user",String.valueOf(actor.userId()),"ALLOWED","self_reported_iris_not_erp_verified",Map.of("consentVersion",CONSENT_VERSION));
+            return Map.of("status","APPROVED");
+        }
         audit.record(actor.userId(),input.siteId(),"worker.upgrade.request","user",String.valueOf(actor.userId()),"ALLOWED","pending_manual_verification",Map.of("consentVersion",CONSENT_VERSION));
         return Map.of("status","PENDING");
     }

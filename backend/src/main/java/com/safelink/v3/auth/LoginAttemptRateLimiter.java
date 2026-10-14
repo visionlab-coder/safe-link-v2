@@ -53,6 +53,20 @@ public class LoginAttemptRateLimiter {
     }
 
     /** Separate atomic bucket for a CPU-only public helper; names never become keys. */
+    public void consumeWorkerLogin(String subject, String ipAddress) {
+        var script = new org.springframework.data.redis.core.script.DefaultRedisScript<Long>(
+            "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],900) end; return n", Long.class);
+        try {
+            // Count attempts atomically (including concurrent requests). Changing the last4 cannot bypass this.
+            Long perIp = redis.execute(script, java.util.List.of("auth:worker:ip:" + sha256(String.valueOf(ipAddress))));
+            Long perSubject = redis.execute(script, java.util.List.of("auth:worker:subject:" + sha256(subject + "|" + ipAddress)));
+            if (perIp == null || perSubject == null) throw new IllegalStateException("missing_limit");
+            if (perIp > 60 || perSubject > 5) throw new LoginRateLimitExceededException("login_rate_limited");
+        } catch (LoginRateLimitExceededException ex) { throw ex; }
+        catch (RuntimeException ex) { throw new ServiceUnavailableException("redis_login_rate_limit_unavailable"); }
+    }
+
+    /** Separate atomic bucket for a CPU-only public helper; names never become keys. */
     public void consumeNameSuggestion(String ipAddress) {
         var script = new org.springframework.data.redis.core.script.DefaultRedisScript<Long>(
             "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],60) end; return n", Long.class);

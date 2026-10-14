@@ -127,7 +127,8 @@ export async function setupProfileV3(input: V3ProfileSetupInput): Promise<V3Curr
 }
 
 export async function quickLoginWorkerV3(input: {
-  nameInitials: string;
+  nameInitials?: string;
+  birthDate?: string;
   phoneLast4: string;
   preferredLang: string;
   siteId?: string;
@@ -138,6 +139,7 @@ export async function quickLoginWorkerV3(input: {
     credentials: "include",
     body: JSON.stringify({
       name_initials: input.nameInitials,
+      birth_date: input.birthDate,
       phone_last4: input.phoneLast4,
       preferred_lang: input.preferredLang,
       ...(input.siteId ? { site_id: input.siteId } : {}),

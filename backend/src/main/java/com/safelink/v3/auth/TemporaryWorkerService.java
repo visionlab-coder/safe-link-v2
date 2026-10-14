@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class TemporaryWorkerService {
-    public static final String CONSENT_VERSION = "temporary-worker-2026-09-28";
+    public static final String CONSENT_VERSION = "temporary-worker-2026-10-14";
     private final JdbcClient jdbc;
     private final AuditService audit;
     private final String sponsorEmail;
@@ -34,14 +34,14 @@ public class TemporaryWorkerService {
 
     public static void validate(String name, String phone, boolean consent, String version) {
         if (!consent || !CONSENT_VERSION.equals(version)) throw new IllegalArgumentException("privacy_consent_required");
-        EnglishName.require(name);
         if (phone == null || !phone.matches("\\+?[0-9]{8,15}")) throw new IllegalArgumentException("phone_invalid");
     }
 
     @Transactional
-    public SessionPrincipal register(String name, String phone, String language, boolean consent, String version) {
+    public SessionPrincipal register(String name, String phone, String language, boolean consent, String version, String birthDate) {
         validate(name, phone, consent, version);
-        name = EnglishName.require(name);
+        var birth = WorkerBirthDate.require(birthDate);
+        name = phone.substring(phone.length()-4);
         if (language == null || !language.matches("[a-z]{2,5}")) throw new IllegalArgumentException("language_invalid");
         Long site = siteId();
         // Never sign in or promote an existing account using an unverified phone number.
@@ -51,6 +51,9 @@ public class TemporaryWorkerService {
             """).param("phone",phone).param("name",name.strip()).param("lang",language)
             .query(Long.class).optional().orElseThrow(() -> new IllegalArgumentException("temporary_registration_unavailable"));
         jdbc.sql("insert into user_roles(user_id,role) values(:id,'TEMP_WORKER')").param("id",id).update();
+        // The legacy column is retained for migration compatibility, not exposed as a new login ID.
+        jdbc.sql("insert into worker_quick_login_credentials(user_id,name_initials,phone_last4,birth_date) values(:id,'TEMP',:last4,:birth)")
+            .param("id",id).param("last4",phone.substring(phone.length()-4)).param("birth",birth).update();
         jdbc.sql("insert into site_memberships(user_id,site_id,role) values(:id,:site,'TEMP_WORKER')")
             .param("id",id).param("site",site).update();
         jdbc.sql("insert into temporary_worker_consents(user_id,site_id,consent_version) values(:id,:site,:version)")

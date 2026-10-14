@@ -154,10 +154,12 @@ public class WorkerNfcService {
         Long siteId = parseRequiredLong(request.assignedSiteId(), "assigned_site_id_required");
         siteGuard.requireGlobalOrSiteAdmin(actor, siteId, "admin.worker.create", "worker", null);
 
-        String initials = cleanInitials(request.nameInitials());
-        String phoneLast4 = cleanPhoneLast4(request.phoneLast4());
+        var birthDate = com.safelink.v3.auth.WorkerBirthDate.require(request.birthDate());
+        String initials = "WORKER";
         String displayName = com.safelink.v3.auth.EnglishName.require(request.fullName());
         String phone = cleanOptionalPhone(request.phone());
+        if (phone == null || !phone.matches("\\+?[0-9]{8,15}")) throw new IllegalArgumentException("phone_invalid");
+        String phoneLast4 = phone.substring(phone.length()-4);
         String email = phone == null ? internalWorkerEmail(siteId, initials, phoneLast4) : null;
         String nationality = cleanCountry(request.nationality());
         String preferredLanguage = cleanLanguage(request.preferredLang());
@@ -178,6 +180,8 @@ public class WorkerNfcService {
                 .single();
 
             ensureWorkerContracts(workerId, siteId, actor.userId(), initials, phoneLast4);
+            jdbc.sql("update worker_quick_login_credentials set birth_date=:birth where user_id=:id")
+                .param("birth",birthDate).param("id",workerId).update();
             upsertWorkerProfile(workerId, siteId, displayName, nationality, phone, trade, consentSignedAt, request.consentDocUrl(), actor.userId());
             audit.record(actor.userId(), siteId, "admin.worker.create", "worker", String.valueOf(workerId), "ALLOWED", "created", Map.of("role", "WORKER"));
             return read(actor, String.valueOf(workerId));
@@ -1280,7 +1284,7 @@ public class WorkerNfcService {
                        coalesce(wp.is_active, u.account_status = 'ACTIVE') as is_active,
                        wp.consent_signed_at,
                        u.created_at,
-                       q.name_initials,
+                       coalesce(q.birth_date,q.name_initials) as name_initials,
                        q.phone_last4,
                        wp.nationality_confirmed_at
                 from users u
@@ -1692,7 +1696,8 @@ public class WorkerNfcService {
         @JsonProperty("consent_signed_at") String consentSignedAt,
         @JsonProperty("consent_doc_url") String consentDocUrl,
         @JsonProperty("name_initials") String nameInitials,
-        @JsonProperty("phone_last4") String phoneLast4
+        @JsonProperty("phone_last4") String phoneLast4,
+        @JsonProperty("birth_date") String birthDate
     ) {}
 
     public record UpdateWorkerRequest(

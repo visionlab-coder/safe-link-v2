@@ -35,7 +35,8 @@ class WorkerUpgradeDatabaseTest {
             new ClassPathResource("db/migration/V001__create_identity_and_site_core.sql"),
             new ClassPathResource("db/migration/V007__create_worker_quick_login_credentials.sql"),
             new ClassPathResource("db/migration/V033__temporary_worker.sql"),
-            new ClassPathResource("db/migration/V034__worker_upgrade_requests.sql")
+            new ClassPathResource("db/migration/V034__worker_upgrade_requests.sql"),
+            new ClassPathResource("db/migration/V040__worker_birth_date_login.sql")
         ).execute(ds);
         jdbc.sql("insert into organizations(id,name) values(1,'Test')").update();
         jdbc.sql("insert into sites(id,organization_id,name) values(2,1,'Training'),(3,1,'Contract site')").update();
@@ -46,9 +47,68 @@ class WorkerUpgradeDatabaseTest {
         service=new WorkerUpgradeService(jdbc,new SiteGuard(audit),audit);
         tx=new TransactionTemplate(new DataSourceTransactionManager(ds));
     }
+    @Test void sixDigitBirthLoginPreservesZeroesAndRejectsDuplicates() {
+        jdbc.sql("insert into worker_quick_login_credentials(user_id,name_initials,phone_last4,birth_date) values(11,'TEMP','5678','010203')").update();
+        assertEquals("010203", service.mine(temp).get("birth_date"));
+        assertEquals("010203", service.mine(temp).get("login_id"));
+        assertThrows(RuntimeException.class, () -> jdbc.sql("insert into worker_quick_login_credentials(user_id,name_initials,phone_last4,birth_date) values(20,'TEMP','5678','010203')").update());
+        for (String value : new String[]{"19900521", "90052", "010229", "900431", "000000"})
+            assertThrows(RuntimeException.class, () -> jdbc.sql("update worker_quick_login_credentials set birth_date=:birth where user_id=11").param("birth", value).update(), value);
+        assertEquals("010203", service.mine(temp).get("birth_date"));
+    }
+
     long submit() {
         tx.execute(status->service.submit(temp,new WorkerUpgradeService.Application("Kim","01012345678",3L,"00123",true,WorkerUpgradeService.CONSENT_VERSION)));
         return jdbc.sql("select id from worker_upgrade_requests").query(Long.class).single();
+    }
+    @Test void simpleSignupReloginAndImmediateConversionKeepCredentials() {
+        var audit=mock(AuditService.class);
+        jdbc.sql("update users set email='sponsor@example.invalid' where id=20").update();
+        var registration=new TemporaryWorkerService(jdbc,audit,"sponsor@example.invalid");
+        var actor=tx.execute(status->registration.register(null,"01099991234","en",true,TemporaryWorkerService.CONSENT_VERSION,"010203"));
+        assertEquals("1234",actor.displayName()); assertEquals(Set.of(Role.TEMP_WORKER),actor.roles());
+        var repository=new UserAccountRepository(jdbc);
+        var auth=new AuthService(repository,mock(org.springframework.security.crypto.password.PasswordEncoder.class),audit);
+        var before=auth.authenticateWorkerBirthLogin("010203","1234",null,null,"test");
+        assertInstanceOf(AuthService.WorkerQuickLoginSuccess.class,before);
+        assertThrows(AuthService.WorkerQuickLoginNotFoundException.class,()->auth.authenticateWorkerBirthLogin("010203","9999",null,null,"test"));
+        assertEquals("APPROVED",tx.execute(status->service.submit(actor,new WorkerUpgradeService.Application(null,null,2L,"009876",true,WorkerUpgradeService.CONSENT_VERSION))).get("status"));
+        var after=auth.authenticateWorkerBirthLogin("010203","1234",null,null,"test");
+        assertInstanceOf(AuthService.WorkerQuickLoginSuccess.class,after);
+        var account=repository.findWorkerBirthLoginCandidates("010203","1234").getFirst();
+        assertEquals(actor.userId(),account.id()); assertEquals(Set.of(Role.WORKER),account.roles()); assertEquals(Set.of(2L),account.siteIds());
+        assertEquals("1234",account.displayName());
+        assertTrue(repository.findWorkerQuickLoginCandidates("TEMP","1234").isEmpty());
+        assertThrows(RuntimeException.class,()->tx.execute(status->registration.register(null,"01088881234","en",true,TemporaryWorkerService.CONSENT_VERSION,"010203")));
+        assertEquals(0L,jdbc.sql("select count(*) from users where phone='01088881234'").query(Long.class).single());
+    }
+    @Test void immediateConversionRejectsDuplicateIrisAndUntrustedSiteAndRequiresConsent() {
+        jdbc.sql("insert into worker_quick_login_credentials(user_id,name_initials,phone_last4,birth_date) values(11,'TEMP','5678','900521')").update();
+        assertThrows(RuntimeException.class,()->tx.execute(status->service.submit(temp,new WorkerUpgradeService.Application(null,null,999L,"00123",true,WorkerUpgradeService.CONSENT_VERSION))));
+        assertThrows(RuntimeException.class,()->tx.execute(status->service.submit(temp,new WorkerUpgradeService.Application(null,null,3L,"00123",false,WorkerUpgradeService.CONSENT_VERSION))));
+        jdbc.sql("insert into worker_upgrade_requests(user_id,site_id,display_name,phone,iris_id,consent_version,status,decided_by,verification_method) values(20,3,'Manager','01087654321','00123','test','APPROVED',20,'SELF_REPORTED_IRIS')").update();
+        assertThrows(RuntimeException.class,()->tx.execute(status->service.submit(temp,new WorkerUpgradeService.Application(null,null,3L,"00123",true,WorkerUpgradeService.CONSENT_VERSION))));
+        assertEquals("TEMP_WORKER",role());
+        assertEquals(0L,jdbc.sql("select count(*) from worker_upgrade_requests where user_id=11").query(Long.class).single());
+    }
+    @Test void siteLabelsAreLocalizedCachedAndInvalidatedWithoutChangingSiteIdentity() {
+        var gateway=mock(com.safelink.v3.ai.AiGatewayController.class);
+        var labels=new WorkerSiteLocalizationService(jdbc,gateway);
+        for(String lang:new String[]{"en","vi","zh","th","uz","ph","km","id","mn","my","ne","bn","kk","ru","jp","fr","es","ar","hi"}) {
+            org.mockito.Mockito.when(gateway.translate(org.mockito.Mockito.eq(temp),org.mockito.Mockito.any()))
+                .thenReturn(org.springframework.http.ResponseEntity.ok(new com.safelink.v3.ai.AiGatewayController.TranslateResponse("[3] Translated B\n[2] Translated A","test","fixture")));
+            var result=labels.sites(temp,lang);
+            assertTrue(result.stream().allMatch(r->Boolean.TRUE.equals(r.get("translation_available"))));
+            assertEquals("Translated A",result.stream().filter(r->r.get("id").equals(2L)).findFirst().orElseThrow().get("name"));
+        }
+        org.mockito.Mockito.clearInvocations(gateway);
+        labels.sites(temp,"en"); labels.sites(temp,"ko"); org.mockito.Mockito.verifyNoInteractions(gateway);
+        jdbc.sql("update sites set name='Changed' where id=2").update();
+        org.mockito.Mockito.when(gateway.translate(org.mockito.Mockito.eq(temp),org.mockito.Mockito.any())).thenThrow(new IllegalStateException("provider_unavailable"));
+        var fallback=labels.sites(temp,"en").stream().filter(r->r.get("id").equals(2L)).findFirst().orElseThrow();
+        assertEquals("Changed",fallback.get("name")); assertEquals(false,fallback.get("translation_available"));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,()->labels.sites(manager,"en"));
+        assertThrows(IllegalArgumentException.class,()->labels.sites(temp,"xx"));
     }
     String role() {return jdbc.sql("select role from user_roles where user_id=11 and revoked_at is null").query(String.class).single();}
     @Test void pendingDoesNotGrantAndApprovalTransitionsSameUserExactlyOnce() {
