@@ -7,7 +7,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class GlossaryDeliveryPolicyTest {
     @Test void reviewedTermsHaveOneDeliveryName() {
         assertEquals("거푸집", GlossaryDeliveryPolicy.deliveryTerm("가타와꾸", "거푸집"));
-        assertEquals("동바리", GlossaryDeliveryPolicy.deliveryTerm("사포도", "서포트, 동바리"));
+        assertEquals("서포트", GlossaryDeliveryPolicy.deliveryTerm("사포도", "서포트, 동바리"));
+        assertEquals("평탄화", GlossaryDeliveryPolicy.deliveryTerm("나라시", "평탄화"));
         assertEquals("망치", GlossaryDeliveryPolicy.deliveryTerm("함마", "해머(망치)"));
         assertEquals("해체", GlossaryDeliveryPolicy.deliveryTerm("바라시", "해체, 뜯기"));
         assertEquals("보조공", GlossaryDeliveryPolicy.deliveryTerm("데모도", "보조공, 조수"));
@@ -27,6 +28,6 @@ class GlossaryDeliveryPolicyTest {
         var json = new ObjectMapper().readTree(new ObjectMapper().writeValueAsString(term));
         assertEquals("보조공, 조수", json.path("standard").asText());
         assertEquals("보조공", json.path("delivery_term").asText());
-        assertEquals("ko-glossary-2026-10-08.1", json.path("delivery_policy_version").asText());
+        assertEquals("ko-glossary-2026-10-15.1", json.path("delivery_policy_version").asText());
     }
 }

@@ -6,7 +6,7 @@ const cases = [
     ['들어가도 됩니까?', '들어가도 됩니까?'],
     ['작업 시작합시다', '작업 시작합시다'],
     ['가타와꾸를 확인하세요.', '거푸집을 확인하세요.'],
-    ['사포도가 없으면 들어가지 마세요.', '동바리가 없으면 들어가지 마세요.'],
+    ['사포도가 없으면 들어가지 마세요.', '서포트가 없으면 들어가지 마세요.'],
     ['함마를 가져오세요.', '망치를 가져오세요.'],
     ['바라시하지 마세요.', '해체하지 마세요.'],
     ['데모도와 함께 확인하세요.', '보조공과 함께 확인하세요.'],
@@ -45,7 +45,7 @@ const request = (url,body)=>new NextRequest('http://localhost'+url,{method:'POST
         assert.equal(s.originalTranscript,source);
         assert.equal(s.normalizedTranscript,expected);
         assert.equal(s.transcript,expected);
-        assert.equal(s.glossaryPolicyVersion,'ko-glossary-2026-10-08.1');
+        assert.equal(s.glossaryPolicyVersion,'ko-glossary-2026-10-15.1');
         if (live && source!==expected) assert.equal(s.translations,undefined,'Never reuse pre-normalization RTT output');
         for (const fast of [false,true]) {
             const response=await translate.POST(request('/api/translate',{text:s.transcript,sl:'ko',tl:'en',fast,pronunciation:false}));
