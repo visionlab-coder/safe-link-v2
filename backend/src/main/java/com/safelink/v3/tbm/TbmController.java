@@ -94,11 +94,19 @@ public class TbmController {
         } else {
             requireSiteScoped(actor);
         }
-        LocalDate targetDate = date == null || date.isBlank() ? LocalDate.now(KST) : LocalDate.parse(date);
-        Instant start = targetDate.atStartOfDay(KST).toInstant();
-        Instant end = targetDate.plusDays(1).atStartOfDay(KST).toInstant();
         int safeLimit = Math.max(1, Math.min(limit, 100));
-        var rows = tbm.listForDate(actor.hasAnyGlobalRole(), actor.siteIds(), requestedSiteId, start, end, safeLimit).stream()
+        List<TbmRepository.NoticeRow> notices;
+        if (date == null || date.isBlank()) {
+            // The composer asks for the latest ten across all dates, not today's ten.
+            notices = tbm.listRecent(actor.hasAnyGlobalRole(), actor.siteIds(), requestedSiteId, safeLimit);
+        } else {
+            // The status screen explicitly supplies a date; preserve its KST day filter.
+            LocalDate targetDate = LocalDate.parse(date);
+            Instant start = targetDate.atStartOfDay(KST).toInstant();
+            Instant end = targetDate.plusDays(1).atStartOfDay(KST).toInstant();
+            notices = tbm.listForDate(actor.hasAnyGlobalRole(), actor.siteIds(), requestedSiteId, start, end, safeLimit);
+        }
+        var rows = notices.stream()
             .map(this::toCompatNotice)
             .toList();
         return new TbmListResponse(rows);

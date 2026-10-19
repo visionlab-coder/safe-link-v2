@@ -52,6 +52,10 @@ class NationwideTbmDatabaseTest {
             "V035__tbm_live_participation.sql","V036__tbm_live_drafts.sql","V037__nationwide_tbm.sql"})
             scripts.addScript(new ClassPathResource("db/migration/"+file));
         scripts.execute(ds);
+        var idleMigration=new ResourceDatabasePopulator(new ClassPathResource("db/migration/V041__tbm_idle_timeout.sql"));
+        // PostgreSQL function bodies contain semicolons; do not split them with Spring's generic parser.
+        idleMigration.setSeparator(org.springframework.jdbc.datasource.init.ScriptUtils.EOF_STATEMENT_SEPARATOR);
+        idleMigration.execute(ds);
         jdbc.sql("insert into organizations(id,name) values(1,'Local test')").update();
         jdbc.sql("insert into sites(id,organization_id,name,status) values(2,1,'A','ACTIVE'),(3,1,'B','ACTIVE'),(4,1,'Archived','ARCHIVED')").update();
         jdbc.sql("insert into users(id,email,display_name,account_status) values(10,'hq@example.invalid','HQ','ACTIVE'),(11,'worker@example.invalid','Worker','ACTIVE'),(12,'other@example.invalid','Other','ACTIVE')").update();
@@ -64,6 +68,92 @@ class NationwideTbmDatabaseTest {
     NationwideTbmController.Request req(String id) { return new NationwideTbmController.Request(id,true,"발화","수정한 원문","수정한 원문","- 보호구 확인"); }
     void start() { tx.executeWithoutResult(s->national.start(hq,req("tbm_nation"))); }
     long count(String table) { return jdbc.sql("select count(*) from "+table).query(Long.class).single(); }
+
+    void expireIdle() {
+        var service=new TbmIdleTimeoutService(jdbc,events,mock(AuditService.class));
+        tx.executeWithoutResult(s->service.expireIdleBroadcasts());
+    }
+    void ageSessions() { jdbc.sql("update live_broadcast_sessions set last_activity_at=now()-interval '6 minutes'").update(); }
+
+    @Test void idleNationwideStopsAllSitesOnceAndCanStillPublish() {
+        start();
+        tx.executeWithoutResult(s->national.translate(hq,req("tbm_nation")));
+        ageSessions(); clearInvocations(events);
+        expireIdle(); expireIdle();
+        assertEquals(false,live.sessionStatus(hq,"tbm_nation").get("active"));
+        assertEquals(0L,jdbc.sql("select count(*) from live_broadcast_sessions where active or ended_at is null").query(Long.class).single());
+        assertEquals(2L,count("live_translation_events"));
+        verify(events,times(1)).publishAfterCommit(eq("translations:2"),eq("broadcast-stop"),any());
+        verify(events,times(1)).publishAfterCommit(eq("translations:3"),eq("broadcast-stop"),any());
+        tx.executeWithoutResult(s->national.draft(hq,req("tbm_nation")));
+        var published=tx.execute(s->national.finish(hq,req("tbm_nation")));
+        assertEquals(2,published.targetCount());
+        tx.executeWithoutResult(s->national.start(hq,req("tbm_new")));
+        assertEquals(true,live.sessionStatus(hq,"tbm_new").get("active"));
+    }
+
+    @Test void activityOnAnyNationwideChildKeepsWholeBroadcastAliveAndStatusReadsDoNotRefresh() {
+        start(); ageSessions();
+        assertEquals(true,live.sessionStatus(hq,"tbm_nation").get("active"));
+        assertThrows(AccessDeniedException.class,()->live.sessionStatus(otherHq,"tbm_nation"));
+        live.announceSpeech(hq,new LiveInterpreterController.BroadcastSessionRequest("tbm_nation_s2","2"));
+        expireIdle();
+        assertEquals(2L,jdbc.sql("select count(*) from live_broadcast_sessions where active").query(Long.class).single());
+        ageSessions();
+        live.sessionStatus(hq,"tbm_nation");
+        expireIdle();
+        assertEquals(false,live.sessionStatus(hq,"tbm_nation").get("active"));
+    }
+
+    @Test void singleSiteIdleExpiryLeavesRecentAndNonTbmSessionsAlone() {
+        tx.executeWithoutResult(s->live.startSession(hq,new LiveInterpreterController.BroadcastSessionRequest("tbm_local","2")));
+        tx.executeWithoutResult(s->live.startSession(hq,new LiveInterpreterController.BroadcastSessionRequest("ordinary_live","3")));
+        jdbc.sql("update live_broadcast_sessions set last_activity_at=now()-interval '299 seconds'").update();
+        expireIdle(); assertEquals(true,live.sessionStatus(hq,"tbm_local").get("active"));
+        ageSessions(); expireIdle();
+        assertEquals(false,live.sessionStatus(hq,"tbm_local").get("active"));
+        assertEquals(true,live.sessionStatus(hq,"ordinary_live").get("active"));
+        assertThrows(AccessDeniedException.class,()->live.sessionStatus(worker,"tbm_local"));
+        assertThrows(AccessDeniedException.class,()->live.sessionStatus(new SessionPrincipal(11L,null,"Temp",Set.of(Role.TEMP_WORKER),Set.of(2L)),"tbm_local"));
+        assertEquals(false,live.announceSpeech(hq,new LiveInterpreterController.BroadcastSessionRequest("tbm_local","2")).get("announced"));
+    }
+
+    @Test void translationsAndChangedDraftRenewDeadlineButRepeatedDraftDoesNot() {
+        start(); ageSessions();
+        tx.executeWithoutResult(s->national.translate(hq,req("tbm_nation")));
+        expireIdle(); assertEquals(true,live.sessionStatus(hq,"tbm_nation").get("active"));
+        ageSessions();
+        tx.executeWithoutResult(s->national.draft(hq,req("tbm_nation")));
+        expireIdle(); assertEquals(true,live.sessionStatus(hq,"tbm_nation").get("active"));
+        ageSessions();
+        tx.executeWithoutResult(s->national.draft(hq,req("tbm_nation")));
+        expireIdle(); assertEquals(false,live.sessionStatus(hq,"tbm_nation").get("active"));
+        assertEquals(2L,count("tbm_live_drafts"));
+    }
+
+    @Test void recentHistorySpansDatesKeepsLatestTenAndSiteIsolation() {
+        for (long id = 1; id <= 12; id++) {
+            var created = java.time.Instant.parse(id > 10 ? "2026-10-15T01:00:00Z" : "2020-01-01T00:00:00Z");
+            jdbc.sql("""
+                insert into tbm_notices(id,site_id,created_by,title,source_text,normalized_text,status,created_at,published_at)
+                values(:id,2,10,'TEST','TEST','TEST','PUBLISHED',:created,:created)
+                """).param("id", id).param("created", java.sql.Timestamp.from(created)).update();
+        }
+        jdbc.sql("""
+            insert into tbm_notices(id,site_id,created_by,title,source_text,normalized_text,status,created_at,published_at)
+            values(13,3,10,'OTHER','OTHER','OTHER','PUBLISHED','2026-10-15T02:00:00Z','2026-10-15T02:00:00Z')
+            """).update();
+        var recent = tbm.listRecent(false, Set.of(2L), null, 10);
+        assertEquals(java.util.List.of(12L,11L,10L,9L,8L,7L,6L,5L,4L,3L), recent.stream().map(TbmRepository.NoticeRow::id).toList());
+        assertEquals(recent, tbm.listRecent(true, Set.of(), 2L, 10));
+        assertEquals(13L, tbm.listRecent(true, Set.of(), null, 10).getFirst().id());
+        assertEquals(1, tbm.listRecent(true, Set.of(), 3L, 10).size());
+        assertTrue(tbm.listRecent(false, Set.of(2L), 3L, 10).isEmpty());
+        assertTrue(tbm.listRecent(false, Set.of(), null, 10).isEmpty());
+        assertEquals(2, tbm.listForDate(false, Set.of(2L), 2L,
+            java.time.Instant.parse("2026-10-14T15:00:00Z"), java.time.Instant.parse("2026-10-15T15:00:00Z"), 10).size());
+        assertEquals(13L, count("tbm_notices")); // Listing never deletes older records.
+    }
 
     @Test void questionsOnlyReachNationwideSenderForWorkersOwnTargetSite() {
         var chat=new com.safelink.v3.chat.ChatRepository(jdbc);

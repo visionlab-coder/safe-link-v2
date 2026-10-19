@@ -242,6 +242,7 @@ function AdminTBMCreateContent() {
     }, [urlLang]);
 
     const fetchHistory = useCallback(async () => {
+        // Omit date intentionally: recent history spans all dates (legacy latest-ten behavior).
         const params = new URLSearchParams({ limit: "10" });
         if (adminSiteId && !nationwide) params.set("site_id", adminSiteId);
         const res = await fetch(workerMode ? "/api/tbm/today?limit=10" : `/api/tbm/notices?${params.toString()}`, { cache: "no-store", credentials: "include" });
@@ -509,6 +510,38 @@ function AdminTBMCreateContent() {
             recordingActionRef.current = false;
         }
     };
+
+    // The server owns the timeout even if this tab is backgrounded or closed.
+    // Polling also recovers missed SSE; never treat a network failure as a stop.
+    useEffect(() => {
+        if (!broadcastActive) return;
+        let disposed = false;
+        let checking = false;
+        const check = async () => {
+            if (checking || recordingActionRef.current || disposed) return;
+            checking = true;
+            let handlingStop = false;
+            try {
+                if (!await broadcaster.current.reconcileStopped(() => !disposed && !recordingActionRef.current)) return;
+                handlingStop = true;
+                recordingActionRef.current = true;
+                setBroadcastActive(false);
+                setIsDraining(true);
+                await stopAndDrain();
+                finalDraftRef.current = draftRef.current;
+                setLiveFinalizing(Boolean(draftRef.current.trim()));
+                setSttError((displayLang || adminLang) === "ko"
+                    ? "방송이 종료되었습니다. 5분간 발화·내용 전송이 없으면 자동 종료됩니다. 작성한 초안은 유지됩니다."
+                    : "Broadcast ended. Broadcasts stop automatically after 5 minutes without speech or content activity. Your draft is preserved.");
+            } catch { /* Retry on the next check; a failed request must not end a broadcast. */ }
+            finally {
+                checking = false;
+                if (handlingStop) { setIsDraining(false); recordingActionRef.current = false; }
+            }
+        };
+        const timer = setInterval(() => { void check(); }, 5000);
+        return () => { disposed = true; clearInterval(timer); };
+    }, [broadcastActive, stopAndDrain, displayLang, adminLang]);
 
     // ── 녹음 경과 시간 (isRecording 선언 후) ──
     const [recSeconds, setRecSeconds] = useState(0);

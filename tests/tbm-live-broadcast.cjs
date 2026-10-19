@@ -9,6 +9,32 @@ vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.Mo
   exports: exportsObject, crypto: require("node:crypto").webcrypto, AbortSignal, URLSearchParams, fetch,
 });
 const { TbmLiveBroadcast } = exportsObject;
+test("server-confirmed stop preserves the session for final publication without a second stop", async () => {
+  const calls=[];
+  const broadcaster=new TbmLiveBroadcast(async (url,options)=>{
+    calls.push({url,...options});
+    if(url.includes('/status?')) return {ok:true,json:async()=>({active:false})};
+    return {ok:true,json:async()=>({sessionId:JSON.parse(options.body).sessionId,tbmId:'42',text:'- summary'})};
+  });
+  await broadcaster.start('nationwide');
+  assert.equal(await broadcaster.reconcileStopped(),true);
+  await broadcaster.publish('late');
+  await broadcaster.syncDraft('preserved draft');
+  await broadcaster.complete('preserved draft','- summary');
+  assert.equal(calls.some(c=>c.url.endsWith('/stop')),false);
+  assert.equal(calls.some(c=>c.url.endsWith('/translations')),false);
+  assert.equal(calls.at(-1).url,'/api/tbm/nationwide/summary');
+});
+test("failed status reads and active status do not stop a session", async () => {
+  let status='failure';
+  const broadcaster=new TbmLiveBroadcast(async (url)=>url.includes('/status?')
+    ? {ok:status!=='failure',json:async()=>({active:status==='active'})} : {ok:true});
+  await broadcaster.start('2');
+  assert.equal(await broadcaster.reconcileStopped(),false);
+  status='active'; assert.equal(await broadcaster.reconcileStopped(),false);
+  status='stopped'; assert.equal(await broadcaster.reconcileStopped(()=>false),false);
+  assert.equal(await broadcaster.reconcileStopped(),true);
+});
 test("a lost nationwide start response retries the same operation instead of conflicting with itself", async () => {
   const ids=[];
   const broadcaster=new TbmLiveBroadcast(async (url,options)=>{

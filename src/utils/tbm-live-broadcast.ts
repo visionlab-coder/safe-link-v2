@@ -61,6 +61,19 @@ export class TbmLiveBroadcast {
       console.error(`[TBM live] speech-start rejected: ${response.status}`);
     }
   }
+  async reconcileStopped(shouldApply: () => boolean = () => true) {
+    const session = this.session;
+    if (!session) return false;
+    const response = await this.requestWithTimeout("/api/live/sessions/status?" + new URLSearchParams({ sessionId: session.sessionId }), {
+      method: "GET", cache: "no-store",
+    });
+    if (!response.ok) return false; // Network/auth errors are not confirmation of a stopped broadcast.
+    const status = await response.json();
+    if (status.active !== false || this.session !== session || !shouldApply()) return false;
+    this.stoppedSession = session; // Keep the original session for draft edits and final publication.
+    this.session = null;
+    return true;
+  }
   publish(text: string) {
     const session = this.session;
     if (!session || !text.trim()) return Promise.resolve();

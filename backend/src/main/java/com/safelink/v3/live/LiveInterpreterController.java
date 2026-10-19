@@ -137,16 +137,13 @@ public class LiveInterpreterController {
         siteGuard.requireSiteAccess(actor, siteId, "live.broadcast.speaking", "live_broadcast_session", null);
         String sessionId = clean(request.sessionId());
         boolean active = jdbc.sql("""
-                select exists(
-                    select 1 from live_broadcast_sessions
+                    update live_broadcast_sessions set last_activity_at=clock_timestamp()
                     where session_id = :sessionId and site_id = :siteId and started_by = :startedBy and active = true
-                )
             """)
             .param("sessionId", sessionId)
             .param("siteId", siteId)
             .param("startedBy", actor.userId())
-            .query(Boolean.class)
-            .single();
+            .update() > 0;
         if (!active) return Map.of("announced", false);
         eventBus.publishAfterCommit(
             LiveInterpreterEventBus.translationsChannel(siteId),
@@ -183,6 +180,24 @@ public class LiveInterpreterController {
         if (active.isEmpty()) return Map.of("active", false);
         var session = active.get();
         return Map.of("active", true, "session", session);
+    }
+
+    /** Exact owned session status; polling never renews the idle deadline. */
+    @GetMapping("/sessions/status")
+    public Map<String,Boolean> sessionStatus(@AuthenticationPrincipal SessionPrincipal actor, @RequestParam String sessionId) {
+        requireBroadcastPublisher(actor,sessionId);
+        var national=jdbc.sql("select created_by,state from nationwide_tbm_broadcasts where id=:id and mode='LIVE'")
+            .param("id",sessionId).query((rs,n)->Map.entry(rs.getLong(1),rs.getString(2))).optional();
+        if (national.isPresent()) {
+            if (!national.get().getKey().equals(actor.userId())) throw new AccessDeniedException("live_session_owner_required");
+            return Map.of("active",national.get().getValue().equals("ACTIVE"));
+        }
+        var session=jdbc.sql("select site_id,started_by,active from live_broadcast_sessions where session_id=:id")
+            .param("id",sessionId).query((rs,n)->new Object[]{rs.getLong(1),rs.getLong(2),rs.getBoolean(3)})
+            .optional().orElseThrow(()->new IllegalArgumentException("live_session_not_found"));
+        siteGuard.requireSiteAccess(actor,(Long)session[0],"live.broadcast.status","live_broadcast_session",sessionId);
+        if (!session[1].equals(actor.userId())) throw new AccessDeniedException("live_session_owner_required");
+        return Map.of("active",(Boolean)session[2]);
     }
 
     @PostMapping("/translations")

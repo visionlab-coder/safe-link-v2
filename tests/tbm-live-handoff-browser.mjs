@@ -111,7 +111,9 @@ try {
   emit('tbm-draft', {sessionId: 'tbm_other', content: '다른 방송', revision: 999});
   emit('tbm-draft', {sessionId, content: '오래된 수정', revision: 0});
   assert.equal(await page.getByText('다른 방송', {exact: true}).count(), 0);
-  active = false; emit('broadcast-stop', {session_id: sessionId});
+  // A server idle timeout can be missed during mobile backgrounding or on another API instance.
+  // Deliberately omit broadcast-stop SSE: polling must end LIVE without erasing the transcript.
+  active = false;
   await page.getByTestId('tbm-live-state').filter({hasText: '等待最终 TBM'}).waitFor();
   await page.getByText('修改后的内容 1', {exact: true}).waitFor();
   await page.getByText('수정 테스트 1', {exact: true}).waitFor();

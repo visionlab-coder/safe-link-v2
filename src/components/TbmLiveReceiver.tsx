@@ -193,8 +193,27 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
       finally { clearTimeout(timer); checkingSummary = false; }
     };
     events.addEventListener("tbm-summary", () => { void checkSummary(); });
+    let checkingSession = false;
+    const checkStopped = async () => {
+      const expected = session;
+      if (!expected || checkingSession) return;
+      checkingSession = true;
+      try {
+        const response = await fetch("/api/live/sessions?" + new URLSearchParams({ siteId }), { cache: "no-store", signal: abort.signal });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (disposed || session !== expected) return;
+        if (data.active === false || (data.active === true && data.session?.session_id !== expected)) {
+          finalizeCurrentSentence();
+          session = null; setActive(false); setSpeaking(false);
+          // Preserve the transcript and participation, just like a broadcast-stop event.
+        }
+      } catch { /* Backgrounding/network failure is not evidence that a session ended. */ }
+      finally { checkingSession = false; }
+    };
     const summaryPoll = setInterval(() => {
       if (session) void register(session);
+      void checkStopped();
       void checkDraft();
       void checkSummary();
     }, 3000);

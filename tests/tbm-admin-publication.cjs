@@ -22,6 +22,23 @@ function handler(name, context) {
   vm.runInNewContext(js, context);
   return context.handler;
 }
+test('recent admin history requests ten across all dates while keeping site scope', async () => {
+  for (const nationwide of [false, true]) {
+    let requested, received;
+    const rows = [{id: 'old-notice', created_at: '2020-01-01T00:00:00Z'}];
+    await handler('fetchHistory', {
+      useCallback: fn => fn, URLSearchParams, adminSiteId: '2', nationwide, workerMode: false, userId: '10',
+      fetch: async url => { requested = new URL(url, 'http://fixture.invalid'); return {ok: true, json: async () => ({tbms: rows})}; },
+      setHistory: value => { received = value; },
+    })();
+    assert.equal(requested.pathname, '/api/tbm/notices');
+    assert.equal(requested.searchParams.get('limit'), '10');
+    assert.equal(requested.searchParams.has('date'), false);
+    assert.equal(requested.searchParams.get('site_id'), nationwide ? null : '2');
+    assert.equal(received, rows);
+  }
+});
+
 test('recording stop drains and prepares the draft summary without publishing', async () => {
   const calls = [];
   const context = {

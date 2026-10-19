@@ -4,6 +4,15 @@
 
 GitHub Actions의 `Deploy SQ Link V3 production` workflow는 `refactor/v3-commercialization-20260710` 브랜치 push 또는 수동 실행으로 frontend와 backend를 테스트·빌드하고 운영 서버에 불변 release로 배포한다. 이 브랜치에 push하기 전 운영 배포 권한과 백업 상태를 확인한다. 배포 중에는 release 디렉터리를 새로 만들고 `current` 심볼릭 링크만 교체하므로, 실패한 빌드를 현재 운영 파일 위에 덮어쓰지 않는다.
 
+## 2026-10-19 TBM 무활동 자동 종료 / 최근 이력 복원
+
+- 사용자 요청: 10/14 sk.park 전국 방송 종료, 이후 TBM 5분 무활동 자동 종료. 앞서 요청한 날짜 제한 없는 최근 10건 복원도 포함한다. 보류된 관리자 권한/직원 분류는 제외한다.
+- 운영 수동 정리: 정확한 전국 방송 ID `tbm_1791942812180_59ssck` 및 소유자 1463, 최근 5분 활동 없음, 자식 38개를 트랜잭션 내 확인하고 STOPPED 처리했다. 감사 기록을 남겼으며 원문·요약·서명 삭제는 없다. 이후 활성 방송 0건 확인.
+- V041은 활동 시각 컬럼과 번역/초안 변경 트리거를 추가한다. 스케줄러는 TBM만 15초 주기로 확인하며 5분 유휴 전국 부모/현장 자식을 함께 종료한다. 이전 실행본으로 롤백 시 이 추가 스키마는 유지한다.
+- 백업: `/home/ubuntu/safelink-v3/backups/tbm-idle-20261019-EA9s3V/database.dump` (10,234,300 bytes), `pg_restore --list` 성공, SHA256 `1272681947683d08abe51fbaf5437e7d591b649cc78132b13d3322d3e9f512ae`. 직전 운영 SHA `f0d43a2abf66f90f6fc9ed82757de8a921d9e2e6`.
+- 검증: 백엔드 171개 중 169개 성공/2개 skip/실패 0, 프론트 단위 15개 성공, 타입·변경 파일 ESLint 성공. `scripts/test-tbm-idle-local.mjs`로 로컬 실제 DB/API/스케줄러와 무음 가상 마이크의 시작→종료→재시작 가능 상태 확인. `tests/tbm-live-handoff-browser.mjs`로 종료 SSE 누락·원문 보존·요약 검토·서명/미참여자 청취 조건 확인. 운영에 시험 방송/더미 계정은 생성하지 않는다.
+- 완료는 해당 커밋의 Actions 성공, 실제 release SHA·V041·readiness·스케줄러 오류 없음 확인 후 판단한다.
+
 ## 2026-10-13 DeepL 전환 배포
 
 - 사용자 승인: Flitto 제거 후 DeepL 음성인식·텍스트 번역 교체 및 운영 배포. 기존 TTS/요약 공급자는 유지하며 미지원 언어는 `AI_PROVIDER_COMPARISON_TEST.md`의 Google 경로를 사용한다.

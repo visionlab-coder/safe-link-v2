@@ -45,6 +45,29 @@ public class TbmRepository {
         return statement.query(this::mapNotice).list();
     }
 
+    /** Recent send history, matching the legacy created-at ordering without a date cutoff. */
+    public List<NoticeRow> listRecent(boolean global, Set<Long> siteIds, Long requestedSiteId, int limit) {
+        if (!global && (siteIds == null || siteIds.isEmpty()
+            || (requestedSiteId != null && !siteIds.contains(requestedSiteId)))) {
+            return List.of();
+        }
+        String siteClause = requestedSiteId != null ? "and t.site_id = :requestedSiteId"
+            : global ? "" : "and t.site_id in (:siteIds)";
+        var statement = noticeStatement("""
+                where 1 = 1
+                  %s
+                order by t.created_at desc, t.id desc
+                limit :limit
+            """.formatted(siteClause))
+            .param("limit", limit);
+        if (requestedSiteId != null) {
+            statement = statement.param("requestedSiteId", requestedSiteId);
+        } else if (!global) {
+            statement = statement.param("siteIds", siteIds);
+        }
+        return statement.query(this::mapNotice).list();
+    }
+
     public List<NoticeRow> listForDate(boolean global, Set<Long> siteIds, Long requestedSiteId, Instant start, Instant end, int limit) {
         return listForDatePage(global, siteIds, requestedSiteId, start, end, null, limit);
     }
