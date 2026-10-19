@@ -50,6 +50,8 @@ export type STTErrorType = "mic_denied" | "network" | "api_error" | "stream_lost
 
 interface UseCloudSTTOptions {
     lang: string;
+    /** A separately scoped guest endpoint. Existing authenticated screens keep /api/stt. */
+    endpoint?: string;
     /** ROOT 관리자가 라이브 화면에서 선택한 방송 현장 */
     siteId?: string | number | null;
     onTranscript: (text: string, translations?: Record<string, string>, sourceLanguage?: string) => void | Promise<void>;
@@ -87,6 +89,7 @@ const SILENCE_RMS_THRESHOLD = 0.015;
 
 export function useCloudSTT({
     lang,
+    endpoint = "/api/stt",
     siteId,
     onTranscript,
     onError,
@@ -106,6 +109,8 @@ export function useCloudSTT({
     const cyclingRef = useRef(false);
     const mutedRef = useRef(false); // muted: 녹음은 유지하되 결과 버림 (TTS/파트너 발화 중)
     const langRef = useRef(lang);
+    const endpointRef = useRef(endpoint);
+    useEffect(() => { endpointRef.current = endpoint; }, [endpoint]);
     const siteIdRef = useRef<string | number | null | undefined>(siteId);
     const onTranscriptRef = useRef(onTranscript);
     const onErrorRef = useRef(onError);
@@ -239,7 +244,7 @@ export function useCloudSTT({
             const base64 = await blobToPcm16Base64(blob);
             if (!base64) return;
 
-            const res = await fetch("/api/stt", {
+            const res = await fetch(endpointRef.current, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 signal: controller.signal,

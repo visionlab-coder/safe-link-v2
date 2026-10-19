@@ -287,6 +287,17 @@ WebSocket 사용:
 
 ## 첫 구현 권장사항
 
+### 2026-10-19 Free Talk 통합 경계
+
+- 고객 제공 `SQ-LINK_FREE_TALK_20261014 3`의 `/travel`은 V3에 이미 이식된 같은 계열 UI였다. 한 폰 대화·QR 두 폰 대화·동시 통역·음성 성별·학습 표시 흐름을 재사용하고 `/free-talk`와 랜딩 버튼으로 연결한다. 제공 폴더/V2 원본은 수정하지 않는다.
+- 기존 travel HMAC 토큰과 Supabase 공유 채널을 새 공개 기능의 인증으로 사용하지 않는다. Spring의 `FreeTalkAccess`가 Redis에 2시간 한정 capability를 발급하고 BFF가 HttpOnly/Secure(production)/SameSite=Strict 쿠키로 보관한다. 브라우저에 handle을 JSON으로 노출하지 않는다.
+- BFF는 Origin을 확인하며 전용 cookie만 내부 헤더로 전달한다. 기존 SQ-LINK 계정 cookie·권한·현장 정보를 전달하지 않는다. 내부 secret은 전송 경계 확인용이며, 유효한 guest capability와 서버 방 참여 검사를 추가로 통과해야 한다. 따라서 공개 통역이 기존 TBM·근로자·현장 API 권한을 부여하지 않는다.
+- 서버 생성 8자리 방 코드, 호스트 1명/상대 1명, 원자적 Redis join, 만료, 타 방 signal/SSE 차단. SSE는 120초마다 재연결 시 capability를 재검사하고 guest당 기존 연결을 교체한다. 현재 실시간 event bus는 단일 백엔드 프로세스용이다. 다중 인스턴스 운영 전 Redis Pub/Sub 등으로 전달 계층을 확장해야 한다.
+- 무료 공개 호출의 비용 방어: guest 생성 IP당 10회/시간, API guest당 600회/분, 유료 호출 guest당 240회/분·3,600회/시간, IP당 7,200회/시간, 서비스 전체 기본 10,000회/24시간. 한 발화가 STT·번역·TTS 여러 호출을 사용함을 고려한다. Redis 오류는 fail-closed. `safe-link.free-talk.daily-call-limit`로 전체 상한 조정 가능. 역번역도 호출 한도를 소비한다. IP는 신뢰하는 역방향 프록시가 덮어쓰는 헤더를 기준으로 하며 전체 상한은 IP와 별개로 적용한다.
+- `AiVendorService`/`AiMediaService`의 기존 운영 제공자 설정을 그대로 사용한다. 제공 앱을 Papago로 부르더라도 신규 코드가 Papago를 강제하지 않는다. 유료 요청은 `ai_usage_logs`에 크기·제공자·추정 비용만 기록한다. guest 대화/음성 원본은 DB에 저장하지 않으며 TTS도 POST로 전송해 문장을 URL에 싣지 않는다.
+- 번역 직전 활성 DB 용어집 + 기존 `korean-glossary` 경계 규칙 적용. 한국어 STT 원문, 용어 변환문, 최종 번역문을 분리하며 외국어→한국어 경로에도 기존 용어 전처리 적용. 일반 문장 조각 치환, 임의 설명 추가, 불명확한 복수 표준어 추측은 하지 않는다. 용어집 조회 실패 시 성공으로 위장하지 않는다.
+- 검증: `npm run build`, TypeScript/대상 ESLint, 백엔드 전체 176건 중 174 통과·2 제외, `tests/free-talk.cjs`, `tests/free-talk-audio.cjs`, 기존 한국어 용어집 API 회귀 검사 통과. `tests/free-talk-browser.mjs`는 production build와 로컬 Spring/Redis를 연결해 랜딩 버튼·QR 입장·독립 브라우저 간 SSE 전달·제3자 접근 차단·방 정원·기존 STT 인증 보존·5개 UI 언어·390px 모바일 화면을 검증했다. AI 제공자 응답은 모의 처리했으며 실기기 마이크 인식률·외국어 번역 품질·Safari 자동재생은 별도 실제 기기 시험 대상으로 남긴다. 운영 DB 변경 및 운영 배포는 이 작업에서 하지 않았다.
+
 현재 Next.js route handler를 계속 확장하기보다 깨끗한 Spring Boot module 또는 app boundary에서 시작한다. 최소로 유용한 backend foundation은 다음과 같다.
 
 1. Spring Boot project scaffold.

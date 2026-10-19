@@ -12,9 +12,25 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class TravelRealtimeEventBus {
     private static final long EMITTER_TIMEOUT_MS = 60 * 60 * 1000L;
     private final Map<String, CopyOnWriteArrayList<SseEmitter>> rooms = new ConcurrentHashMap<>();
+    private final Map<String, SseEmitter> guestConnections = new ConcurrentHashMap<>();
+
+    public SseEmitter subscribe(String room, String guest, long timeout) {
+        // One active stream per guest across Free Talk rooms; reconnect replaces the old stream.
+        SseEmitter emitter = subscribeWithTimeout(room, timeout);
+        SseEmitter old = guestConnections.put(guest, emitter);
+        if (old != null) old.complete();
+        emitter.onCompletion(() -> guestConnections.remove(guest, emitter));
+        emitter.onTimeout(() -> { guestConnections.remove(guest, emitter); emitter.complete(); });
+        emitter.onError(error -> guestConnections.remove(guest, emitter));
+        return emitter;
+    }
 
     public SseEmitter subscribe(String room) {
-        var emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
+        return subscribeWithTimeout(room, EMITTER_TIMEOUT_MS);
+    }
+
+    private SseEmitter subscribeWithTimeout(String room, long timeout) {
+        var emitter = new SseEmitter(timeout);
         rooms.computeIfAbsent(room, ignored -> new CopyOnWriteArrayList<>()).add(emitter);
         emitter.onCompletion(() -> remove(room, emitter));
         emitter.onTimeout(() -> remove(room, emitter));

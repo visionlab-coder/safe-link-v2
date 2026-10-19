@@ -46,6 +46,8 @@ jobs:
           npm ci
           node tests/korean-glossary.cjs
           node tests/korean-glossary-api.cjs
+          node tests/free-talk.cjs
+          node tests/free-talk-audio.cjs
           node tests/live-glossary-policy.cjs
           node tests/deepl-routing.cjs
           node tests/admin-signup-guidance.cjs

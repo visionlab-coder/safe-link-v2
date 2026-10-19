@@ -60,6 +60,8 @@ public class SecurityConfig {
                 new AntPathRequestMatcher("/api/v1/chat/compat/presence", "POST"),
                 new AntPathRequestMatcher("/api/v1/ai/internal/translate", "POST"),
                 new AntPathRequestMatcher("/api/v1/travel/internal/signal", "POST"),
+                // Dedicated guest cookie + internal secret; BFF enforces same-origin requests.
+                new AntPathRequestMatcher("/api/v1/free-talk/internal/**", "POST"),
                 new AntPathRequestMatcher("/api/v1/reports/internal/verification-code", "POST"),
                 new AntPathRequestMatcher("/actuator/**")
             )
@@ -87,6 +89,7 @@ public class SecurityConfig {
             .requestMatchers(HttpMethod.POST, "/api/v1/nfc/worker-preference").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/ai/internal/translate").permitAll()
             .requestMatchers("/api/v1/travel/internal/**").permitAll()
+            .requestMatchers("/api/v1/free-talk/internal/**").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/reports/public/**").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/reports/internal/verification-code").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/glossary/**").permitAll()

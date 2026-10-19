@@ -21,10 +21,11 @@ if(process.argv[2]==='backend') {
     '--safe-link.temporary-worker.sponsor-email=worker-login-sponsor@example.invalid',
     '--safe-link.cors.allowed-origins=http://localhost:3000,http://127.0.0.1:3000',
     '--safe-link.ai.vendor-enabled=false','--safe-link.storage.enabled=false','--safe-link.root-bootstrap.enabled=false',
+    '--safe-link.ai.internal-gateway-secret=local-free-talk-fixture-only',
   ],{cwd:root,env,stdio:'inherit'});
-} else if(process.argv[2]==='frontend') {
-  Object.assign(env,{SAFE_LINK_INTERNAL_API_BASE_URL:'http://127.0.0.1:18084',NEXT_PUBLIC_SAFE_LINK_API_BASE_URL:'http://127.0.0.1:18084',SAFE_LINK_PUBLIC_APP_URL:'http://localhost:3000',NEXT_PUBLIC_SAFE_LINK_APP_URL:'http://localhost:3000'});
-  child=spawn(process.execPath,['node_modules/next/dist/bin/next','dev','--hostname','127.0.0.1','--port','3000'],{cwd:root,env,stdio:'inherit'});
-} else throw new Error('Use backend or frontend');
+} else if(['frontend','frontend-prod'].includes(process.argv[2])) {
+  Object.assign(env,{SAFE_LINK_INTERNAL_API_BASE_URL:'http://127.0.0.1:18084',NEXT_PUBLIC_SAFE_LINK_API_BASE_URL:'http://127.0.0.1:18084',SAFE_LINK_PUBLIC_APP_URL:'http://localhost:3000',NEXT_PUBLIC_SAFE_LINK_APP_URL:'http://localhost:3000',TRAVEL_API_SECRET:'local-free-talk-fixture-only'});
+  child=spawn(process.execPath,['node_modules/next/dist/bin/next',process.argv[2]==='frontend-prod'?'start':'dev','--hostname','127.0.0.1','--port','3000'],{cwd:root,env,stdio:'inherit'});
+} else throw new Error('Use backend, frontend or frontend-prod');
 for(const signal of ['SIGINT','SIGTERM']) process.on(signal,()=>child.kill(signal));
 child.on('exit',code=>process.exit(code??1));

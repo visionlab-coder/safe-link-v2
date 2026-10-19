@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { playPremiumAudio, VoiceGender } from '@/utils/tts';
+import Link from 'next/link';
+import { VoiceGender } from '@/utils/tts';
+import { FreeTalkAudio } from '@/utils/free-talk-audio';
+import { ensureFreeTalkSession, freeTalkRequest } from '@/utils/free-talk-client';
 import { useCloudSTT } from '@/hooks/useCloudSTT';
 import { useDisplayLanguage } from '@/hooks/useDisplayLanguage';
 
@@ -15,6 +18,7 @@ const LANGS: Record<string, { label: string; flag: string; stt: string }> = {
 };
 
 const TRAVEL_UI = {
+  ja: { bridge: '言葉の壁を越えて', myLanguage: '自分の言語', start: '新しい会話', solo: '1台のスマホで会話', enter: '参加', noInstall: 'アプリ不要、ブラウザーで接続', partnerLanguage: '相手の言語を選択', selectLanguage: '言語を選択してください', back: '← 戻る', tapFlag: '国旗をタップして接続', showQr: '相手にこの画面を見せてください', codeEntry: 'またはコードを入力', waiting: '相手の参加を待っています', male: '♂ 男性', female: '♀ 女性', simultaneous: '同時通訳', conversation: '会話', learning: '学習', quick: 'クイック', interpreting: '同時通訳中', microphoneStarting: 'マイクを起動中…', partnerSpeaking: '相手が話しています', startConversation: 'ボタンを押して会話を開始', autoTranslate: '話すと自動翻訳されます', learningHint: '韓国語の発音表記と逆翻訳を表示', learningSub: '相手の言語を読み上げてみましょう', translating: '翻訳中', textInput: 'メッセージ入力', listening: '◉ 聞き取り中', meSpeak: '自分 · 話す', partner: '相手', tapToSpeak: 'タップして話す', pauseMic: 'マイク停止', restartMic: 'マイク再開', replay: '再生', pronunciation: '発音', reverseTranslation: '逆翻訳' },
   ko: { bridge: '언어의 벽을 넘어서', myLanguage: '내 언어', start: '새 대화 시작', solo: '폰 하나로 대화', enter: '입장', noInstall: '앱 설치 없이 브라우저만으로 바로 연결', partnerLanguage: '상대방 언어를 선택하세요', selectLanguage: '언어를 선택해주세요', back: '← 돌아가기', tapFlag: '국기를 누르면 바로 연결됩니다', showQr: '이 화면을 상대방에게 보여주세요', codeEntry: '또는 코드로 직접 입력', waiting: '상대방 스캔 대기 중', male: '♂ 남성', female: '♀ 여성', simultaneous: '동시 통역', conversation: '대화', learning: '학습', quick: '빠른', interpreting: '동시 통역 중', microphoneStarting: '마이크를 시작하는 중…', partnerSpeaking: '상대방이 말하는 중', startConversation: '버튼을 눌러 대화를 시작하세요', autoTranslate: '말하면 자동으로 번역됩니다', learningHint: '한글 발음과 역번역을 표시합니다', learningSub: '상대방 언어를 따라 읽을 수 있습니다', translating: '번역 중', textInput: '직접 입력', listening: '◉ 듣는 중', meSpeak: '나 · 말하기', partner: '상대', tapToSpeak: '탭해서 말하기', pauseMic: '마이크 일시 중지', restartMic: '마이크 재시작', replay: '다시 듣기', pronunciation: '발음', reverseTranslation: '역번역' },
   en: { bridge: 'Beyond language barriers', myLanguage: 'My language', start: 'Start a conversation', solo: 'One-phone conversation', enter: 'Join', noInstall: 'Connect instantly in your browser — no app required', partnerLanguage: "Select your partner's language", selectLanguage: 'Select your language', back: '← Back', tapFlag: 'Tap a flag to connect immediately', showQr: 'Show this screen to your partner', codeEntry: 'Or enter the code directly', waiting: 'Waiting for your partner to scan', male: '♂ Male', female: '♀ Female', simultaneous: 'Simultaneous', conversation: 'Conversation', learning: 'Learning', quick: 'Quick', interpreting: 'Simultaneous interpreting', microphoneStarting: 'Starting microphone…', partnerSpeaking: 'Partner is speaking', startConversation: 'Tap the button to start a conversation', autoTranslate: 'Speak to translate automatically', learningHint: 'Korean pronunciation and back-translation are shown', learningSub: "You can read along in your partner's language", translating: 'Translating', textInput: 'Type a message', listening: '◉ Listening', meSpeak: 'Me · Speak', partner: 'Partner', tapToSpeak: 'Tap to speak', pauseMic: 'Pause microphone', restartMic: 'Restart microphone', replay: 'Play again', pronunciation: 'Pronunciation', reverseTranslation: 'Back translation' },
   zh: { bridge: '跨越语言障碍', myLanguage: '我的语言', start: '开始对话', solo: '单手机对话', enter: '进入', noInstall: '无需安装应用，直接在浏览器连接', partnerLanguage: '请选择对方语言', selectLanguage: '请选择您的语言', back: '← 返回', tapFlag: '点击国旗即可连接', showQr: '请向对方展示此页面', codeEntry: '或直接输入代码', waiting: '等待对方扫描', male: '♂ 男', female: '♀ 女', simultaneous: '同声传译', conversation: '对话', learning: '学习', quick: '快速', interpreting: '同声传译中', microphoneStarting: '正在启动麦克风…', partnerSpeaking: '对方正在说话', startConversation: '点击按钮开始对话', autoTranslate: '说话即可自动翻译', learningHint: '显示韩语发音和回译', learningSub: '可跟读对方语言', translating: '正在翻译', textInput: '直接输入', listening: '◉ 聆听中', meSpeak: '我 · 说话', partner: '对方', tapToSpeak: '点击说话', pauseMic: '暂停麦克风', restartMic: '重新启动麦克风', replay: '再次播放', pronunciation: '发音', reverseTranslation: '回译' },
@@ -24,9 +28,18 @@ const TRAVEL_UI = {
 
 type TravelUi = (typeof TRAVEL_UI)[keyof typeof TRAVEL_UI];
 
+const ERROR_UI: Record<string, { retry: string; limit: string; room: string; mic: string }> = {
+  ko: { retry:'연결을 확인하고 다시 시도해 주세요. 이용 시간이 만료됐다면 새로고침해 주세요.', limit:'잠시 사용량 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.', room:'대화방이 만료되었거나 이미 다른 상대방이 참여 중입니다. 코드를 확인해 주세요.', mic:'마이크 사용 권한을 허용해 주세요.' },
+  en: { retry:'Check your connection and retry. Refresh if your session has expired.', limit:'Usage limit reached. Please try again later.', room:'This room has expired or already has a partner. Check the code.', mic:'Please allow microphone access.' },
+  ja: { retry:'接続を確認して再試行してください。期限切れの場合はページを更新してください。', limit:'利用上限に達しました。しばらくしてから再試行してください。', room:'ルームの期限切れ、または相手が参加済みです。コードを確認してください。', mic:'マイクの使用を許可してください。' },
+  zh: { retry:'请检查连接后重试。会话过期时请刷新页面。', limit:'已达到使用上限，请稍后重试。', room:'房间已过期或已有其他参与者，请检查代码。', mic:'请允许使用麦克风。' },
+  vi: { retry:'Kiểm tra kết nối và thử lại. Tải lại trang nếu phiên đã hết hạn.', limit:'Đã đạt giới hạn sử dụng. Vui lòng thử lại sau.', room:'Phòng đã hết hạn hoặc đã có người tham gia. Hãy kiểm tra mã.', mic:'Vui lòng cho phép sử dụng micrô.' },
+};
+
 interface Message {
   id: number;
   original: string;
+  rawOriginal?: string;
   translated: string;
   pronunciation: string;
   reverse_translated: string;
@@ -46,7 +59,7 @@ type Phase = 'home' | 'waiting' | 'join' | 'chat' | 'solo-setup';
 const RED   = '#c0392b';
 const BLUE  = 'rgba(52,152,219,0.18)';
 const PAGE  = {
-  minHeight: '100vh', background: '#eef3f8', color: '#172033',
+  minHeight: '100vh', background: '#07070e', color: '#ede8e3',
   fontFamily: "'Noto Sans JP','Apple SD Gothic Neo',sans-serif",
   display: 'flex', justifyContent: 'center',
 } as const;
@@ -59,7 +72,7 @@ function PlayBtn({ text, lang, onPlay, label }: { text: string; lang: string; on
       title={label}
       style={{
         background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: 6, color: 'rgba(255,255,255,0.45)', fontSize: 12,
+        borderRadius: 6, color: '#b7c2d4', fontSize: 12,
         padding: '2px 6px', cursor: 'pointer', lineHeight: 1,
       }}
     >▶</button>
@@ -92,14 +105,14 @@ function MsgBubble({ msg, isKorean, learningMode, onPlay, ui }: {
                 </div>
               )}
               {hasRev && (
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>
+                <div style={{ fontSize: 11, color: '#b7c2d4', fontStyle: 'italic' }}>
                   <span style={{ opacity: 0.6 }}>{ui.reverseTranslation} </span>{msg.reverse_translated}
                 </div>
               )}
             </div>
           )}
         </div>
-        <span style={{ fontSize: 10, color: '#2e2e3e' }}>{LANGS[msg.lang]?.flag} {msg.time}</span>
+        <span style={{ fontSize: 10, color: '#aebbd0' }}>{LANGS[msg.lang]?.flag} {msg.time}</span>
       </div>
     );
   }
@@ -109,7 +122,7 @@ function MsgBubble({ msg, isKorean, learningMode, onPlay, ui }: {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
         <div style={{ maxWidth: '82%', borderRadius: '20px 20px 20px 4px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.07)', padding: '12px 16px' }}>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <div style={{ fontSize: 12, color: '#b7c2d4', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{ flex: 1 }}>{msg.original}</span>
             <PlayBtn text={msg.original} lang={msg.lang} onPlay={onPlay} label={ui.replay} />
           </div>
@@ -125,14 +138,14 @@ function MsgBubble({ msg, isKorean, learningMode, onPlay, ui }: {
                 </div>
               )}
               {hasRev && (
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>
+                <div style={{ fontSize: 11, color: '#b7c2d4', fontStyle: 'italic' }}>
                   <span style={{ opacity: 0.6 }}>{ui.reverseTranslation} </span>{msg.reverse_translated}
                 </div>
               )}
             </div>
           )}
         </div>
-        <span style={{ fontSize: 10, color: '#2e2e3e' }}>{LANGS[msg.lang]?.flag} {msg.time}</span>
+        <span style={{ fontSize: 10, color: '#aebbd0' }}>{LANGS[msg.lang]?.flag} {msg.time}</span>
       </div>
     );
   }
@@ -145,9 +158,9 @@ function MsgBubble({ msg, isKorean, learningMode, onPlay, ui }: {
           <span style={{ flex: 1 }}>{msg.translated}</span>
           <PlayBtn text={msg.translated} lang={msg.targetLang} onPlay={onPlay} label={ui.replay} />
         </div>
-        <div style={{ marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{msg.original}</div>
+        <div style={{ marginTop: 6, fontSize: 11, color: '#b7c2d4' }}>{msg.original}</div>
       </div>
-      <span style={{ fontSize: 10, color: '#2e2e3e' }}>{LANGS[msg.lang]?.flag} {msg.time}</span>
+      <span style={{ fontSize: 10, color: '#aebbd0' }}>{LANGS[msg.lang]?.flag} {msg.time}</span>
     </div>
   );
 }
@@ -197,9 +210,15 @@ function Toggle({ on, onToggle, labelOn, labelOff, color = RED }: {
 /* ════════ 메인 컴포넌트 ════════ */
 export default function TravelTalk() {
   const displayLanguage = useDisplayLanguage();
-  const ui = TRAVEL_UI[displayLanguage as keyof typeof TRAVEL_UI] || TRAVEL_UI.en;
   const [phase, setPhase]             = useState<Phase>('home');
   const [myLang, setMyLang]           = useState('ko');
+  const ui = TRAVEL_UI[myLang as keyof typeof TRAVEL_UI] || TRAVEL_UI.en;
+  const [error, setError] = useState('');
+  const [ready, setReady] = useState(false);
+  const reportError = useCallback((cause?: unknown) => setError(cause instanceof Error ? cause.message : String(cause || 'retry')), []);
+  const errorUi = ERROR_UI[myLang] || ERROR_UI.en;
+  const errorMessage = error.includes('429') ? errorUi.limit : error.includes('409') ? errorUi.room : error === 'mic_denied' ? errorUi.mic : errorUi.retry;
+  const notice = error ? <div role="alert" style={{ position: 'fixed', bottom: 16, left: 16, right: 16, zIndex: 100, padding: 16, background: '#fff3cd', color: '#704500', borderRadius: 12 }}>{errorMessage}<button aria-label="Close" onClick={() => setError('')} style={{ padding: 8 }}>×</button></div> : null;
   const [roomCode, setRoomCode]       = useState('');
   const [inputCode, setInputCode]     = useState('');
   const [pendingCode, setPendingCode] = useState('');
@@ -222,16 +241,14 @@ export default function TravelTalk() {
 
   const channelRef          = useRef<LocalChannel | null>(null);
   const eventSourceRef      = useRef<EventSource | null>(null);
-  const clientIdRef         = useRef(`travel_${Math.random().toString(36).slice(2)}_${Date.now()}`);
+  const clientIdRef         = useRef('host');
   const bottomRef           = useRef<HTMLDivElement>(null);
-  const travelTokenRef      = useRef<string>('');
-  const travelTokenReadyRef = useRef<Promise<void>>(Promise.resolve());
   const myLangRef        = useRef(myLang);
   const ttsEnabledRef    = useRef(ttsEnabled);
   const voiceGenderRef   = useRef(voiceGender);
   const partnerLangRef   = useRef(partnerLang);
   const translatingRef    = useRef(translating);
-  const audioUnlockedRef  = useRef(false);
+  const audioPlayerRef = useRef<FreeTalkAudio | null>(null);
   const learningModeRef      = useRef(learningMode);
   const modeRef              = useRef(mode);
   const partnerSpeakingRef   = useRef(false);
@@ -252,27 +269,23 @@ export default function TravelTalk() {
   useEffect(() => () => {
     if (unmuteTimerRef.current) clearTimeout(unmuteTimerRef.current);
     eventSourceRef.current?.close();
+    audioPlayerRef.current?.cancel();
   }, []);
 
   useEffect(() => {
-    setTravelUrl(`${window.location.origin}/travel`);
+    setTravelUrl(`${window.location.origin}/free-talk`);
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
-    if (code && code.length === 4) { setPendingCode(code); setPhase('join'); }
-    travelTokenReadyRef.current = fetch('/api/travel/session', { method: 'POST' })
-      .then(r => r.json())
-      .then(d => { if (d.token) travelTokenRef.current = d.token; })
-      .catch(() => {});
-  }, []);
+    if (code && /^\d{8}$/.test(code)) { setPendingCode(code); setPhase('join'); }
+    const selected = params.get('lang') || displayLanguage;
+    setMyLang(LANGS[selected] ? selected : selected === 'jp' ? 'ja' : 'en');
+    void ensureFreeTalkSession().then(() => setReady(true)).catch(reportError);
+  }, [displayLanguage, reportError]);
 
   /* 브라우저 자동재생 정책 우회 */
   const unlockAudio = useCallback(() => {
-    if (audioUnlockedRef.current) return;
-    try {
-      const sil = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==');
-      sil.volume = 0;
-      sil.play().then(() => { audioUnlockedRef.current = true; }).catch(() => {});
-    } catch {}
+    if (!audioPlayerRef.current) audioPlayerRef.current = new FreeTalkAudio();
+    audioPlayerRef.current.unlock();
   }, []);
 
   const muteSTTRef      = useRef<() => void>(() => {});
@@ -298,22 +311,23 @@ export default function TravelTalk() {
       return;
     }
     safeMute();
-    scheduleUnmute(60000);
-    playPremiumAudio(text, lang, voiceGenderRef.current, () => {
-      scheduleUnmute(soloModeRef.current ? 200 : 2000);
-    });
-  }, [safeMute, scheduleUnmute]);
+    // The queued audio player has bounded fetch/playback timeouts and always releases on idle.
+    if (!audioPlayerRef.current) audioPlayerRef.current = new FreeTalkAudio();
+    audioPlayerRef.current.speak(text, lang, voiceGenderRef.current, () => {
+      scheduleUnmute(2000);
+    }, reportError);
+  }, [safeMute, scheduleUnmute, reportError]);
 
   /* ── Spring SSE 채널: 2폰 입장·메시지·발화 상태 동기화 ── */
-  const subscribeChannel = useCallback((code: string, myRole: 'host' | 'guest', lang: string) => {
+  const subscribeChannel = useCallback((code: string, myRole: 'host' | 'guest') => {
     eventSourceRef.current?.close();
     void (async () => {
-      await travelTokenReadyRef.current;
-      const token = travelTokenRef.current;
-      if (!token) return;
-
-      const events = new EventSource(`/api/travel/events?room=${encodeURIComponent(code)}`);
+      await ensureFreeTalkSession();
+      const events = new EventSource(`/api/free-talk/events?room=${encodeURIComponent(code)}`);
       eventSourceRef.current = events;
+      let reconnectFailures=0;
+      events.addEventListener('connected', () => { reconnectFailures=0; });
+      events.onerror = () => { setPartner(false); if (++reconnectFailures > 3) { events.close(); reportError(); } };
       const readEvent = (event: Event) => {
         try {
           return JSON.parse((event as MessageEvent<string>).data) as {
@@ -351,6 +365,7 @@ export default function TravelTalk() {
         if (!data || data.senderId === clientIdRef.current) return;
         partnerSpeakingRef.current = true;
         setPartnerSpeaking(true);
+        if (modeRef.current === 'conversation') { safeMute(); scheduleUnmute(8000); }
       });
       events.addEventListener('speaking-end', event => {
         const data = readEvent(event);
@@ -361,29 +376,18 @@ export default function TravelTalk() {
 
       channelRef.current = {
         send: async ({ event, payload }) => {
-          await fetch('/api/travel/signal', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-travel-token': token },
-            body: JSON.stringify({ room: code, event, senderId: clientIdRef.current, payload }),
-          });
+          await freeTalkRequest('signal', { room: code, event, payload }).catch(reportError);
         },
       };
-
-      if (myRole === 'guest') {
-        const joined = await fetch('/api/travel/join', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ room: code, lang, senderId: clientIdRef.current }),
-        });
-        if (joined.ok) setPartner(true);
-      }
-    })();
-  }, [speakTTS]);
+    })().catch(reportError);
+  }, [speakTTS, safeMute, scheduleUnmute, reportError]);
 
   /* ── 메시지 전송 ── */
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || translatingRef.current) return;
+    translatingRef.current = true;
     unlockAudio();
+    setError('');
     setTranslating(true);
     setInputText('');
 
@@ -396,38 +400,11 @@ export default function TravelTalk() {
     }
 
     try {
-      let translated = '', pronunciation = '', reverse_translated = '';
-
-      if (!travelTokenRef.current) {
-        await travelTokenReadyRef.current;
-        if (!travelTokenRef.current) {
-          await fetch('/api/travel/session', { method: 'POST' })
-            .then(r => r.json())
-            .then(d => { if (d.token) travelTokenRef.current = d.token; })
-            .catch(() => {});
-        }
-      }
-      const authHeader = { 'x-travel-token': travelTokenRef.current };
-
-      if (learningModeRef.current) {
-        // 학습 모드: 발음(한글표기) + 역번역 포함 (1폰/2폰 공통)
-        const res = await fetch('/api/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeader },
-          body: JSON.stringify({ text, sl, tl }),
-        });
-        ({ translated = '', pronunciation = '', reverse_translated = '' } = await res.json());
-      } else {
-        const res = await fetch('/api/travel/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeader },
-          body: JSON.stringify({ text, from: sl, to: tl }),
-        });
-        ({ translated = '' } = await res.json());
-      }
+      const { translated, pronunciation = '', reverse_translated = '', normalizedText } = await freeTalkRequest('translate', { text, from: sl, to: tl, learning: learningModeRef.current });
+      if (!translated) throw new Error('empty_translation');
 
       const msg: Message = {
-        id: Date.now(), original: text, translated,
+        id: Date.now(), original: normalizedText || text, rawOriginal: text, translated,
         pronunciation, reverse_translated,
         mine: !isSoloPartner,
         lang: sl, targetLang: tl,
@@ -441,33 +418,35 @@ export default function TravelTalk() {
 
       if (!soloModeRef.current && translated) {
         // 2폰 모드: 채널로 브로드캐스트
-        channelRef.current?.send({
+        await channelRef.current?.send({
           type: 'broadcast',
           event: 'new-message',
           payload: { ...msg, mine: false },
         });
         safeMute();
-        scheduleUnmute(modeRef.current === 'simultaneous' ? 1500 : 3000);
+        scheduleUnmute(Math.min(8000, 1500 + translated.length * 150));
       }
 
       if (soloModeRef.current && translated) {
         // 1폰 모드: 번역된 텍스트를 직접 TTS로 재생 (speakTTS가 내부적으로 mute 처리)
         speakTTS(translated, tl);
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      setInputText(text);
+      reportError();
     } finally {
+      translatingRef.current = false;
       setTranslating(false);
       if (!soloModeRef.current) {
         channelRef.current?.send({ type: 'broadcast', event: 'speaking-end', payload: {} });
       }
     }
-  }, [unlockAudio, safeMute, scheduleUnmute, speakTTS]);
+  }, [unlockAudio, safeMute, scheduleUnmute, speakTTS, reportError]);
 
   const handleTranscript = useCallback((text: string) => {
     // 2폰 모드에서만 파트너 발화 중 억제
     if (!soloModeRef.current && partnerSpeakingRef.current && modeRef.current === 'conversation') return;
-    sendMessage(text);
+    return sendMessage(text);
   }, [sendMessage]);
 
   const handleSpeechStart = useCallback(() => {
@@ -504,6 +483,9 @@ export default function TravelTalk() {
 
   const { isRecording, toggle: toggleSTT, mute: muteSTT, unmute: unmuteSTT } = useCloudSTT({
     lang: activeSttLang,
+    endpoint: '/api/free-talk/stt',
+    context: 'chat',
+    onError: reportError,
     onTranscript: handleTranscript,
     onSpeechStart: handleSpeechStart,
     live: true,
@@ -515,33 +497,39 @@ export default function TravelTalk() {
   const createRoom = useCallback(async () => {
     unlockAudio();
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(t => t.stop());
-    } catch {}
-    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    const { room: code } = await freeTalkRequest('room', { lang: myLang });
+    clientIdRef.current = 'host';
     setRoomCode(code);
     setMyRole('host');
     setPhase('waiting');
-    subscribeChannel(code, 'host', myLang);
-  }, [myLang, subscribeChannel, unlockAudio]);
+    subscribeChannel(code, 'host');
+    } catch (error) { reportError(error); }
+  }, [myLang, subscribeChannel, unlockAudio, reportError]);
 
-  const joinRoom = useCallback((code: string, lang: string) => {
+  const joinRoom = useCallback(async (code: string, lang: string) => {
     unlockAudio();
+    try {
+    const joined = await freeTalkRequest('join', { room: code, lang });
+    clientIdRef.current = joined.senderId;
+    setPartnerLang(joined.partnerLang || null);
+    setPartner(true);
     setRoomCode(code);
     setMyLang(lang);
     setMyRole('guest');
     setPhase('chat');
-    subscribeChannel(code, 'guest', lang);
-  }, [subscribeChannel, unlockAudio]);
+    subscribeChannel(code, 'guest');
+    } catch (error) { reportError(error); }
+  }, [subscribeChannel, unlockAudio, reportError]);
 
   /* ── solo 모드 진입: 상대 언어 선택 후 바로 채팅 시작 ── */
-  const enterSoloMode = useCallback((pLang: string) => {
+  const enterSoloMode = useCallback(async (pLang: string) => {
     unlockAudio();
+    try { await ensureFreeTalkSession(); } catch { reportError(); return; }
     setSoloMode(true);
     setPartnerLang(pLang);
     setMyRole('host');
     setPhase('chat');
-  }, [unlockAudio]);
+  }, [unlockAudio, reportError]);
 
   const isKorean = myLang === 'ko';
   const isHost   = myRole === 'host';
@@ -549,6 +537,7 @@ export default function TravelTalk() {
   /* ════ HOME ════ */
   if (phase === 'home') return (
     <div style={PAGE}>
+      {notice}
       <div style={{ width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '56px 28px', minHeight: '100vh' }}>
         <div
           aria-hidden="true"
@@ -568,11 +557,12 @@ export default function TravelTalk() {
         />
         <div style={{ textAlign: 'center', marginBottom: 52 }}>
           <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 16 }}>SQ Link</p>
-          <h1 style={{ fontSize: 40, fontWeight: 200, letterSpacing: -2, margin: 0, lineHeight: 1.1 }}>Travel Talk</h1>
-          <p style={{ fontSize: 12, color: '#4a4a5a', marginTop: 10, letterSpacing: 2 }}>{ui.bridge}</p>
+          <h1 style={{ fontSize: 40, fontWeight: 200, letterSpacing: -2, margin: 0, lineHeight: 1.1 }}>Free Talk</h1>
+          <p style={{ marginTop: 12, color: '#a9c8ff', fontSize: 12 }}>{myLang === 'ko' ? '현장 용어집 적용 · 한국어 / English / 日本語 / 中文 / Việt' : 'Construction glossary · 5 languages'}</p>
+          <p style={{ fontSize: 12, color: '#aebbd0', marginTop: 10, letterSpacing: 2 }}>{ui.bridge}</p>
         </div>
 
-        <p style={{ fontSize: 10, color: '#444', letterSpacing: 3, marginBottom: 12, textTransform: 'uppercase' }}>{ui.myLanguage}</p>
+        <p style={{ fontSize: 10, color: '#aebbd0', letterSpacing: 3, marginBottom: 12, textTransform: 'uppercase' }}>{ui.myLanguage}</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, marginBottom: 32 }}>
           {Object.entries(LANGS).map(([code, info]) => (
             <button key={code} onClick={() => setMyLang(code)} style={{
@@ -589,12 +579,12 @@ export default function TravelTalk() {
         </div>
 
         {/* 2폰 모드 */}
-        <button onClick={createRoom} style={{ width: '100%', padding: 18, background: RED, border: 'none', borderRadius: 16, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 10 }}>
+        <button disabled={!ready} onClick={createRoom} style={{ width: '100%', padding: 18, background: RED, border: 'none', borderRadius: 16, color: '#fff', fontSize: 15, fontWeight: 700, cursor: ready ? 'pointer' : 'wait', opacity: ready ? 1 : 0.5, marginBottom: 10 }}>
           {ui.start}
         </button>
 
         {/* 1폰 solo 모드 */}
-        <button onClick={() => setPhase('solo-setup')} style={{
+        <button disabled={!ready} onClick={() => setPhase('solo-setup')} style={{
           width: '100%', padding: 15, marginBottom: 14,
           background: 'rgba(255,255,255,0.04)',
           border: '1px solid rgba(255,255,255,0.12)',
@@ -605,27 +595,29 @@ export default function TravelTalk() {
         </button>
 
         <div style={{ display: 'flex', gap: 8 }}>
-          <input placeholder="· · · ·" value={inputCode}
-            onChange={e => setInputCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+          <input aria-label={ui.codeEntry} inputMode="numeric" placeholder="00000000" value={inputCode}
+            onChange={e => setInputCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
             onKeyDown={e => e.key === 'Enter' && joinRoom(inputCode, myLang)}
-            style={{ flex: 1, padding: '15px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, color: '#ede8e3', fontSize: 26, textAlign: 'center', letterSpacing: 12, outline: 'none' }}
+            style={{ flex: 1, minWidth: 0, padding: '15px 12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, color: '#ede8e3', fontSize: 20, textAlign: 'center', letterSpacing: 3, outline: 'none' }}
           />
-          <button onClick={() => joinRoom(inputCode, myLang)} disabled={inputCode.length < 4} style={{ padding: '15px 22px', background: inputCode.length === 4 ? 'rgba(192,57,43,0.75)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, color: '#fff', fontSize: 13, cursor: inputCode.length === 4 ? 'pointer' : 'default', whiteSpace: 'nowrap' }}>{ui.enter}</button>
+          <button onClick={() => joinRoom(inputCode, myLang)} disabled={!ready || inputCode.length !== 8} style={{ padding: '15px 22px', background: inputCode.length === 8 ? 'rgba(192,57,43,0.75)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, color: '#fff', fontSize: 13, cursor: inputCode.length === 8 ? 'pointer' : 'default', whiteSpace: 'nowrap' }}>{ui.enter}</button>
         </div>
 
-        <p style={{ marginTop: 48, textAlign: 'center', fontSize: 11, color: '#2a2a3a', lineHeight: 2.2 }}>
+        <p style={{ marginTop: 48, textAlign: 'center', fontSize: 11, color: '#aebbd0', lineHeight: 2.2 }}>
           {ui.noInstall}
+          <br /><Link href="/" style={{ color: '#b8c9e3' }}>← SQ LINK</Link>
         </p>
       </div>
-      <style>{`*{box-sizing:border-box;margin:0;padding:0}input::placeholder{color:#333}`}</style>
+      <style>{`*{box-sizing:border-box;margin:0;padding:0}input::placeholder{color:#99a5b8}`}</style>
     </div>
   );
 
   /* ════ SOLO SETUP: 상대방 언어 선택 ════ */
   if (phase === 'solo-setup') return (
     <div style={{ ...PAGE, alignItems: 'center' }}>
+      {notice}
       <div style={{ width: '100%', maxWidth: 420, padding: '0 28px', textAlign: 'center' }}>
-        <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 40 }}>SQ Link · TRAVEL TALK</p>
+        <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 40 }}>SQ LINK · FREE TALK</p>
 
         <div style={{ marginBottom: 40, lineHeight: 2.6 }}>
           <p style={{ fontSize: 16, color: '#ede8e3', fontWeight: 300 }}>{ui.partnerLanguage}</p>
@@ -648,7 +640,7 @@ export default function TravelTalk() {
         </div>
 
         <button onClick={() => setPhase('home')} style={{
-          fontSize: 12, color: '#444', background: 'none', border: 'none', cursor: 'pointer',
+          fontSize: 12, color: '#aebbd0', background: 'none', border: 'none', cursor: 'pointer',
         }}>{ui.back}</button>
       </div>
       <style>{`*{box-sizing:border-box;margin:0;padding:0}`}</style>
@@ -658,14 +650,15 @@ export default function TravelTalk() {
   /* ════ JOIN ════ */
   if (phase === 'join') return (
     <div style={{ ...PAGE, alignItems: 'center' }}>
+      {notice}
       <div style={{ width: '100%', maxWidth: 420, padding: '0 28px', textAlign: 'center' }}>
-        <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 40 }}>SQ Link · TRAVEL TALK</p>
+        <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 40 }}>SQ LINK · FREE TALK</p>
         <div style={{ marginBottom: 40, lineHeight: 2.6 }}>
           <p style={{ fontSize: 16, color: '#ede8e3', fontWeight: 300 }}>{ui.selectLanguage}</p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: 48 }}>
           {Object.entries(LANGS).map(([code, info]) => (
-            <button key={code} onClick={() => joinRoom(pendingCode, code)} style={{
+            <button key={code} disabled={!ready} onClick={() => joinRoom(pendingCode, code)} style={{
               padding: '18px 4px', background: 'rgba(255,255,255,0.04)',
               border: '1px solid rgba(255,255,255,0.09)', borderRadius: 16,
               color: '#ede8e3', cursor: 'pointer',
@@ -676,7 +669,7 @@ export default function TravelTalk() {
             </button>
           ))}
         </div>
-        <p style={{ fontSize: 11, color: '#2a2a3a' }}>{ui.tapFlag}</p>
+        <p style={{ fontSize: 11, color: '#aebbd0' }}>{ui.tapFlag}</p>
       </div>
       <style>{`*{box-sizing:border-box;margin:0;padding:0}`}</style>
     </div>
@@ -687,8 +680,9 @@ export default function TravelTalk() {
     const qrUrl = `${travelUrl}?code=${roomCode}`;
     return (
       <div style={{ ...PAGE, alignItems: 'center' }}>
+        {notice}
         <div style={{ textAlign: 'center', padding: 36, maxWidth: 380 }}>
-          <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 16 }}>SQ Link · TRAVEL TALK</p>
+          <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 16 }}>SQ LINK · FREE TALK</p>
 
           <div style={{ marginBottom: 20, padding: '14px 18px', background: 'rgba(192,57,43,0.07)', border: '1px solid rgba(192,57,43,0.2)', borderRadius: 16 }}>
             <p style={{ fontSize: 14, color: '#e74c3c', fontWeight: 700, marginBottom: 10 }}>📷 {ui.showQr}</p>
@@ -705,14 +699,15 @@ export default function TravelTalk() {
               <QRCodeSVG value={qrUrl} size={200} fgColor="#07070e" bgColor="#ffffff" />
             </div>
           )}
-          <p style={{ fontSize: 11, color: '#3a3a4a', marginBottom: 12 }}>{ui.codeEntry}</p>
+          <p style={{ fontSize: 11, color: '#aebbd0', marginBottom: 12 }}>{ui.codeEntry}</p>
           <div style={{ background: 'rgba(192,57,43,0.07)', border: '1px solid rgba(192,57,43,0.22)', borderRadius: 20, padding: '16px 40px', marginBottom: 28, display: 'inline-block' }}>
-            <span style={{ fontSize: 64, fontWeight: 100, letterSpacing: 14, color: '#e74c3c' }}>{roomCode}</span>
+            <span data-testid="free-talk-room-code" style={{ fontSize: 30, fontWeight: 600, letterSpacing: 3, color: '#e74c3c' }}>{roomCode}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, color: '#444', fontSize: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, color: '#aebbd0', fontSize: 12 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: RED, display: 'inline-block', animation: 'blink 1.4s infinite' }} />
             {ui.waiting}
           </div>
+          <a href="/free-talk" style={{ display: 'block', marginTop: 24, color: '#b8c9e3' }}>{ui.back}</a>
         </div>
         <style>{`@keyframes blink{0%,100%{opacity:1}50%{opacity:0.15}}*{box-sizing:border-box;margin:0;padding:0}`}</style>
       </div>
@@ -725,10 +720,12 @@ export default function TravelTalk() {
 
   return (
     <div style={PAGE}>
+      {notice}
       <div style={{ width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
 
         {/* ── 헤더 ── */}
         <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.10)', background: 'rgba(15,15,25,0.88)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', position: 'sticky', top: 0, zIndex: 20, flexWrap: 'wrap', boxShadow: '0 1px 0 rgba(255,255,255,0.06)' }}>
+          <a href="/free-talk" aria-label={ui.back} style={{ color: '#b8c9e3', padding: 8 }}>←</a>
 
           {/* 연결 상태 + 언어 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 'auto' }}>
@@ -736,7 +733,7 @@ export default function TravelTalk() {
               <>
                 <span style={{ fontSize: 14 }}>📱</span>
                 <span style={{ fontSize: 16 }}>{LANGS[myLang]?.flag}</span>
-                <span style={{ fontSize: 10, color: '#333' }}>↔</span>
+                <span style={{ fontSize: 10, color: '#aebbd0' }}>↔</span>
                 <span style={{ fontSize: 16 }}>{LANGS[pLang]?.flag}</span>
                 <span style={{ fontSize: 9, color: '#c0392b', letterSpacing: 2 }}>1폰</span>
               </>
@@ -744,9 +741,9 @@ export default function TravelTalk() {
               <>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: partnerOnline ? '#2ecc71' : '#3a3a4a', display: 'inline-block' }} />
                 <span style={{ fontSize: 16 }}>{LANGS[myLang]?.flag}</span>
-                <span style={{ fontSize: 10, color: '#333' }}>↔</span>
+                <span style={{ fontSize: 10, color: '#aebbd0' }}>↔</span>
                 <span style={{ fontSize: 16 }}>{LANGS[pLang]?.flag}</span>
-                <span style={{ fontSize: 9, color: '#2a2a3a', letterSpacing: 3 }}>#{roomCode}</span>
+                <span style={{ fontSize: 9, color: '#aebbd0', letterSpacing: 3 }}>#{roomCode}</span>
               </>
             )}
           </div>
@@ -754,7 +751,7 @@ export default function TravelTalk() {
           {/* TTS 켜기/끄기 */}
           <Toggle
             on={ttsEnabled}
-            onToggle={() => setTtsEnabled(v => !v)}
+            onToggle={() => { if (ttsEnabled) { audioPlayerRef.current?.cancel(); scheduleUnmute(0); } setTtsEnabled(v => !v); }}
             labelOn="🔊"
             labelOff="🔇"
             color="#2ecc71"
@@ -823,9 +820,9 @@ export default function TravelTalk() {
         {/* 메시지 목록 */}
         <div style={{ flex: 1, padding: '20px 14px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
           {messages.length === 0 && (
-            <div style={{ textAlign: 'center', paddingTop: 60, color: '#2e2e3e' }}>
+            <div style={{ textAlign: 'center', paddingTop: 60, color: '#aebbd0' }}>
               <p style={{ fontSize: 34, marginBottom: 16 }}>💬</p>
-              <p style={{ fontSize: 12, lineHeight: 2.4, color: '#2e2e3e' }}>
+              <p style={{ fontSize: 12, lineHeight: 2.4, color: '#aebbd0' }}>
                 {soloMode
                   ? `${LANGS[myLang]?.flag} ${ui.meSpeak} → ${LANGS[pLang]?.flag} ${ui.partner} · ${ui.tapToSpeak}`
                   : isSim
@@ -843,11 +840,14 @@ export default function TravelTalk() {
           )}
 
           {messages.map(msg => (
-            <MsgBubble key={msg.id} msg={msg} isKorean={isKorean} learningMode={learningMode} onPlay={speakTTS} ui={ui} />
+            <div key={msg.id}>
+              <MsgBubble msg={msg} isKorean={isKorean} learningMode={learningMode} onPlay={speakTTS} ui={ui} />
+              {msg.rawOriginal && msg.rawOriginal !== msg.original && <details style={{ color: '#aebbd0', fontSize: 12, marginTop: 8 }}><summary>{myLang === 'ko' ? '용어 변환 전 원문' : 'Original before glossary'}</summary>{msg.rawOriginal}</details>}
+            </div>
           ))}
 
           {translating && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#3a3a4a', fontSize: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#aebbd0', fontSize: 12 }}>
               {[0, 1, 2].map(i => (
                 <span key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: RED, display: 'inline-block', animation: `dot 1s ${i * 0.2}s infinite` }} />
               ))}
@@ -860,12 +860,12 @@ export default function TravelTalk() {
         {/* 입력 영역 */}
         <div style={{ padding: '12px 14px 20px', borderTop: '1px solid rgba(255,255,255,0.055)', background: 'rgba(7,7,14,0.98)', backdropFilter: 'blur(20px)' }}>
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-            <input value={inputText} onChange={e => setInputText(e.target.value)}
+            <input aria-label={ui.textInput} maxLength={2000} value={inputText} onChange={e => setInputText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && sendMessage(inputText)}
               placeholder={ui.textInput}
               style={{ flex: 1, padding: '13px 15px', background: 'rgba(255,255,255,0.055)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 14, color: '#ede8e3', fontSize: 14, outline: 'none' }}
             />
-            <button onClick={() => sendMessage(inputText)} style={{ padding: '13px 17px', background: inputText.trim() ? RED : 'rgba(255,255,255,0.04)', border: 'none', borderRadius: 14, color: '#fff', fontSize: 20, cursor: 'pointer' }}>↑</button>
+            <button aria-label={ui.enter} disabled={translating || !inputText.trim()} onClick={() => sendMessage(inputText)} style={{ padding: '13px 17px', background: inputText.trim() ? RED : 'rgba(255,255,255,0.04)', border: 'none', borderRadius: 14, color: '#fff', fontSize: 20, cursor: 'pointer' }}>↑</button>
           </div>
 
           {/* ── solo 1폰 모드 버튼 ── */}
@@ -937,7 +937,7 @@ export default function TravelTalk() {
               width: '100%', padding: 11,
               background: 'rgba(255,255,255,0.03)',
               border: '1px solid rgba(255,255,255,0.07)',
-              borderRadius: 12, color: '#444', fontSize: 11, cursor: 'pointer',
+              borderRadius: 12, color: '#aebbd0', fontSize: 11, cursor: 'pointer',
             }}>
               {isRecording ? ui.pauseMic : ui.restartMic}
             </button>
@@ -950,7 +950,7 @@ export default function TravelTalk() {
         @keyframes blink{0%,100%{opacity:1}50%{opacity:0.15}}
         *{box-sizing:border-box;margin:0;padding:0}
         ::-webkit-scrollbar{width:0}
-        input::placeholder{color:#333}
+        input::placeholder{color:#99a5b8}
       `}</style>
     </div>
   );
