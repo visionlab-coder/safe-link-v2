@@ -114,9 +114,13 @@ public class TbmRepository {
     }
 
     public NoticeRow createPublished(Long siteId, Long createdBy, String title, String content, String idempotencyKey, String summary) {
+        return createPublished(siteId, createdBy, title, content, idempotencyKey, summary, List.of());
+    }
+
+    public NoticeRow createPublished(Long siteId, Long createdBy, String title, String content, String idempotencyKey, String summary, List<String> tradeTypes) {
         Long id = jdbc.sql("""
-                insert into tbm_notices(site_id, created_by, title, source_text, normalized_text, status, published_at, idempotency_key, summary_text)
-                values (:siteId, :createdBy, :title, :sourceText, :normalizedText, 'PUBLISHED', now(), :idempotencyKey, :summary)
+                insert into tbm_notices(site_id, created_by, title, source_text, normalized_text, status, published_at, idempotency_key, summary_text, trade_types)
+                values (:siteId, :createdBy, :title, :sourceText, :normalizedText, 'PUBLISHED', now(), :idempotencyKey, :summary, cast(:trades as jsonb))
                 on conflict (site_id, idempotency_key) where idempotency_key is not null
                 do update set idempotency_key = excluded.idempotency_key
                 returning id
@@ -128,6 +132,7 @@ public class TbmRepository {
             .param("normalizedText", content)
             .param("idempotencyKey", idempotencyKey)
             .param("summary", summary)
+            .param("trades", TbmTrades.json(tradeTypes))
             .query(Long.class)
             .single();
         return getNotice(id);
@@ -230,7 +235,7 @@ public class TbmRepository {
     private JdbcClient.StatementSpec noticeStatement(String clause) {
         return jdbc.sql("""
                 select t.id, t.site_id, s.name as site_name, t.created_by, t.title, t.source_text,
-                       t.normalized_text, t.status, t.published_at, t.created_at, t.summary_text
+                       t.normalized_text, t.status, t.published_at, t.created_at, t.summary_text, t.trade_types
                 from tbm_notices t
                 join sites s on s.id = t.site_id
                 %s
@@ -249,7 +254,7 @@ public class TbmRepository {
             rs.getString("status"),
             rs.getTimestamp("published_at") == null ? null : rs.getTimestamp("published_at").toInstant(),
             rs.getTimestamp("created_at").toInstant(),
-            rs.getString("summary_text")
+            rs.getString("summary_text"), TbmTrades.read(rs.getString("trade_types"))
         );
     }
 
@@ -264,7 +269,10 @@ public class TbmRepository {
         );
     }
 
-    public record NoticeRow(Long id, Long siteId, String siteName, Long createdBy, String title, String sourceText, String normalizedText, String status, Instant publishedAt, Instant createdAt, String summaryText) {
+    public record NoticeRow(Long id, Long siteId, String siteName, Long createdBy, String title, String sourceText, String normalizedText, String status, Instant publishedAt, Instant createdAt, String summaryText, List<String> tradeTypes) {
+        public NoticeRow(Long id, Long siteId, String siteName, Long createdBy, String title, String sourceText, String normalizedText, String status, Instant publishedAt, Instant createdAt, String summaryText) {
+            this(id, siteId, siteName, createdBy, title, sourceText, normalizedText, status, publishedAt, createdAt, summaryText, List.of());
+        }
         public NoticeRow(Long id, Long siteId, String siteName, Long createdBy, String title, String sourceText, String normalizedText, String status, Instant publishedAt, Instant createdAt) {
             this(id, siteId, siteName, createdBy, title, sourceText, normalizedText, status, publishedAt, createdAt, null);
         }

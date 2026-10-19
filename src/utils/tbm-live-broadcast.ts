@@ -3,6 +3,7 @@ export class TbmLiveBroadcast {
   private session: { sessionId: string; siteId: string } | null = null;
   private stoppedSession: { sessionId: string; siteId: string } | null = null;
   private pendingNationwideSession: { sessionId: string; siteId: string } | null = null;
+  private pendingNationwideTrades: string[] = [];
   private queue: Promise<void> = Promise.resolve();
   private endpoint(session: { siteId: string }, operation: string) {
     return session.siteId === "nationwide" ? `/api/tbm/nationwide/${operation}` : `/api/live/${operation}`;
@@ -27,7 +28,7 @@ export class TbmLiveBroadcast {
     }
   }
 
-  async start(siteId: string) {
+  async start(siteId: string, tradeTypes: string[] = []) {
     if (this.session) throw new Error("broadcast_already_started");
     // 일부 Android WebView에서는 crypto.randomUUID()가 없어, API 요청 전에 방송 시작이
     // 중단될 수 있다. 기존 라이브와 동일하게 브라우저 호환 식별자를 사용한다.
@@ -35,10 +36,14 @@ export class TbmLiveBroadcast {
       sessionId: `tbm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       siteId,
     };
-    if (siteId === "nationwide") this.pendingNationwideSession = session;
+    const trades = siteId === "nationwide" && this.pendingNationwideSession ? this.pendingNationwideTrades : [...tradeTypes];
+    if (siteId === "nationwide") {
+      this.pendingNationwideSession = session;
+      this.pendingNationwideTrades = trades;
+    }
     const response = await this.requestWithTimeout(this.endpoint(session,"sessions"), {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...session, ...(siteId === "nationwide" ? { confirmed: true } : {}) }),
+      body: JSON.stringify({ ...session, ...(trades.length ? { trade_types: trades } : {}), ...(siteId === "nationwide" ? { confirmed: true } : {}) }),
     });
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
@@ -50,6 +55,7 @@ export class TbmLiveBroadcast {
     this.session = session;
     this.pendingNationwideSession = null;
     this.stoppedSession = null;
+    return [...trades];
   }
   async announceSpeaking() {
     const session = this.session;

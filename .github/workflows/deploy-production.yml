@@ -55,6 +55,7 @@ jobs:
           node tests/glossary-additions-20261013.cjs
           node tests/tbm-admin-publication.cjs
           node --test tests/tbm-live-broadcast.cjs
+          node --test tests/tbm-trades.cjs
           node --test tests/profile-setup-i18n.test.cjs
           npm run build
 

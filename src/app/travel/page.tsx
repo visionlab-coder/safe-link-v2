@@ -217,7 +217,9 @@ export default function TravelTalk() {
   const [ready, setReady] = useState(false);
   const reportError = useCallback((cause?: unknown) => setError(cause instanceof Error ? cause.message : String(cause || 'retry')), []);
   const errorUi = ERROR_UI[myLang] || ERROR_UI.en;
-  const errorMessage = error.includes('429') ? errorUi.limit : error.includes('409') ? errorUi.room : error === 'mic_denied' ? errorUi.mic : errorUi.retry;
+  const errorMessage = error === 'voice_turn_too_long'
+    ? (myLang === 'ko' ? '말씀하신 내용이 2,000자를 넘었습니다. 입력창에 보존했으니 줄여서 전송해 주세요.' : 'The transcript exceeds 2,000 characters. It is preserved in the input; shorten it before sending.')
+    : error.includes('429') ? errorUi.limit : error.includes('409') ? errorUi.room : error === 'mic_denied' ? errorUi.mic : errorUi.retry;
   const notice = error ? <div role="alert" style={{ position: 'fixed', bottom: 16, left: 16, right: 16, zIndex: 100, padding: 16, background: '#fff3cd', color: '#704500', borderRadius: 12 }}>{errorMessage}<button aria-label="Close" onClick={() => setError('')} style={{ padding: 8 }}>×</button></div> : null;
   const [roomCode, setRoomCode]       = useState('');
   const [inputCode, setInputCode]     = useState('');
@@ -238,6 +240,10 @@ export default function TravelTalk() {
   /* ── solo mode ── */
   const [soloMode, setSoloMode]   = useState(false);
   const [soloTurn, setSoloTurn]   = useState<'mine' | 'partner'>('mine');
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const voiceBusyRef = useRef(false);
+  // Speech recognition may stream chunks; a conversation turn is sent only on stop.
+  const voiceTurnRef = useRef<{ active: boolean; parts: string[] }>({ active: false, parts: [] });
 
   const channelRef          = useRef<LocalChannel | null>(null);
   const eventSourceRef      = useRef<EventSource | null>(null);
@@ -385,6 +391,7 @@ export default function TravelTalk() {
   /* ── 메시지 전송 ── */
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || translatingRef.current) return;
+    if (text.trim().length > 2000) { setInputText(text); setError('voice_turn_too_long'); return; }
     translatingRef.current = true;
     unlockAudio();
     setError('');
@@ -444,6 +451,10 @@ export default function TravelTalk() {
   }, [unlockAudio, safeMute, scheduleUnmute, speakTTS, reportError]);
 
   const handleTranscript = useCallback((text: string) => {
+    if (voiceTurnRef.current.active) {
+      voiceTurnRef.current.parts.push(text);
+      return;
+    }
     // 2폰 모드에서만 파트너 발화 중 억제
     if (!soloModeRef.current && partnerSpeakingRef.current && modeRef.current === 'conversation') return;
     return sendMessage(text);
@@ -455,33 +466,12 @@ export default function TravelTalk() {
     }
   }, []);
 
-  /* ── solo 모드 턴 전환 ──
-     muteSTT 먼저 호출 → 인플라이트 청크 폐기 (race condition 방지)
-     이후 toggleSTT로 중지, setSoloTurn으로 activeSttLang 업데이트
-     다음 탭에서 unmuteSTT + toggleSTT로 새 언어로 시작 */
-  const handleSoloSpeak = useCallback((turn: 'mine' | 'partner', isRecording: boolean, toggleSTT: () => void) => {
-    if (soloTurnRef.current !== turn) {
-      // 다른 사람으로 전환: 인플라이트 청크 폐기 후 중지
-      muteSTTRef.current();
-      if (isRecording) toggleSTT();
-      setSoloTurn(turn);
-      return; // 한 번 더 탭하면 새 언어로 녹음 시작
-    }
-    // 같은 사람: 시작 or 중지
-    if (!isRecording) {
-      unmuteSTTRef.current();
-      toggleSTT();
-    } else {
-      toggleSTT();
-    }
-  }, []);
-
   /* activeSttLang: solo 모드에서 턴에 따라 STT 언어 전환 */
   const activeSttLang = (soloMode && soloTurn === 'partner')
     ? (LANGS[partnerLang || 'ja']?.stt || 'ja-JP')
     : (LANGS[myLang]?.stt || 'ko-KR');
 
-  const { isRecording, toggle: toggleSTT, mute: muteSTT, unmute: unmuteSTT } = useCloudSTT({
+  const { isRecording, toggle: toggleSTT, mute: muteSTT, unmute: unmuteSTT, stopAndDrain } = useCloudSTT({
     lang: activeSttLang,
     endpoint: '/api/free-talk/stt',
     context: 'chat',
@@ -493,6 +483,47 @@ export default function TravelTalk() {
   });
   useEffect(() => { muteSTTRef.current = muteSTT; }, [muteSTT]);
   useEffect(() => { unmuteSTTRef.current = unmuteSTT; }, [unmuteSTT]);
+
+  const toggleVoice = useCallback(async () => {
+    if (voiceBusyRef.current || translatingRef.current) return;
+    voiceBusyRef.current = true;
+    setVoiceBusy(true);
+    try {
+      if (isRecording) {
+        // Keep the speaker/language pinned until all trailing recognition has completed.
+        await stopAndDrain();
+        const turn = voiceTurnRef.current;
+        voiceTurnRef.current = { active: false, parts: [] };
+        const text = turn.parts.join(' ').trim();
+        if (turn.active && text) {
+          if (text.length > 2000) {
+            setInputText(text); // Preserve the complete transcript for editing; never silently truncate.
+            setError('voice_turn_too_long');
+          } else await sendMessage(text);
+        }
+      } else {
+        audioPlayerRef.current?.cancel();
+        if (unmuteTimerRef.current) { clearTimeout(unmuteTimerRef.current); unmuteTimerRef.current = null; }
+        unmuteSTTRef.current();
+        setError('');
+        voiceTurnRef.current = { active: soloModeRef.current || modeRef.current !== 'simultaneous', parts: [] };
+        if (!await toggleSTT()) voiceTurnRef.current = { active: false, parts: [] };
+      }
+    } finally {
+      voiceBusyRef.current = false;
+      setVoiceBusy(false);
+    }
+  }, [isRecording, stopAndDrain, toggleSTT, sendMessage]);
+
+  const handleSoloSpeak = useCallback(async (turn: 'mine' | 'partner') => {
+    if (voiceBusyRef.current || translatingRef.current) return;
+    if (soloTurnRef.current !== turn) {
+      if (isRecording) await toggleVoice(); // Deliver the old speaker's turn before switching language.
+      setSoloTurn(turn);
+      return;
+    }
+    await toggleVoice();
+  }, [isRecording, toggleVoice]);
 
   const createRoom = useCallback(async () => {
     unlockAudio();
@@ -770,13 +801,16 @@ export default function TravelTalk() {
           {!soloMode && isHost && (
             <Toggle
               on={isSim}
-              onToggle={() => {
+              onToggle={async () => {
+                if (voiceBusyRef.current || translatingRef.current) return;
                 const next: ChatMode = isSim ? 'conversation' : 'simultaneous';
+                if (isRecording) await toggleVoice();
                 setMode(next);
                 if (next === 'simultaneous') {
-                  if (!isRecording) toggleSTT();
-                } else {
-                  if (isRecording) toggleSTT();
+                  voiceTurnRef.current = { active: false, parts: [] };
+                  voiceBusyRef.current = true; setVoiceBusy(true);
+                  try { await toggleSTT(); }
+                  finally { voiceBusyRef.current = false; setVoiceBusy(false); }
                 }
               }}
               labelOn={ui.simultaneous}
@@ -859,13 +893,23 @@ export default function TravelTalk() {
 
         {/* 입력 영역 */}
         <div style={{ padding: '12px 14px 20px', borderTop: '1px solid rgba(255,255,255,0.055)', background: 'rgba(7,7,14,0.98)', backdropFilter: 'blur(20px)' }}>
+          {(soloMode || !isSim) && <p role="status" style={{ color: '#cbd5e1', fontSize: 12, marginBottom: 10, textAlign: 'center' }}>
+            {voiceBusy ? ui.translating : ({
+              ko: '한 번 눌러 녹음 시작 · 다시 눌러 종료 후 한 번에 전송',
+              en: 'Tap to record · Tap again to stop and send as one message',
+              ja: 'タップして録音 · もう一度タップして終了し、まとめて送信',
+              zh: '点击开始录音 · 再次点击结束并一次发送',
+              vi: 'Chạm để ghi âm · Chạm lần nữa để dừng và gửi một tin nhắn',
+              ru: 'Нажмите для записи · Нажмите ещё раз для отправки одним сообщением',
+            } as Record<string,string>)[myLang] || 'Tap to record · Tap again to stop and send as one message'}
+          </p>}
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-            <input aria-label={ui.textInput} maxLength={2000} value={inputText} onChange={e => setInputText(e.target.value)}
+            <input disabled={isRecording || voiceBusy} aria-label={ui.textInput} maxLength={2000} value={inputText} onChange={e => setInputText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && sendMessage(inputText)}
               placeholder={ui.textInput}
               style={{ flex: 1, padding: '13px 15px', background: 'rgba(255,255,255,0.055)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 14, color: '#ede8e3', fontSize: 14, outline: 'none' }}
             />
-            <button aria-label={ui.enter} disabled={translating || !inputText.trim()} onClick={() => sendMessage(inputText)} style={{ padding: '13px 17px', background: inputText.trim() ? RED : 'rgba(255,255,255,0.04)', border: 'none', borderRadius: 14, color: '#fff', fontSize: 20, cursor: 'pointer' }}>↑</button>
+            <button aria-label={ui.enter} disabled={isRecording || voiceBusy || translating || !inputText.trim() || inputText.length > 2000} onClick={() => sendMessage(inputText)} style={{ padding: '13px 17px', background: inputText.trim() ? RED : 'rgba(255,255,255,0.04)', border: 'none', borderRadius: 14, color: '#fff', fontSize: 20, cursor: 'pointer' }}>↑</button>
           </div>
 
           {/* ── solo 1폰 모드 버튼 ── */}
@@ -873,7 +917,8 @@ export default function TravelTalk() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {/* 내 버튼 */}
               <button
-                onClick={() => handleSoloSpeak('mine', isRecording, toggleSTT)}
+                disabled={voiceBusy || translating}
+                onClick={() => handleSoloSpeak('mine')}
                 style={{
                   padding: '14px 8px',
                   background: soloTurn === 'mine' && isRecording
@@ -895,7 +940,8 @@ export default function TravelTalk() {
 
               {/* 상대 버튼 */}
               <button
-                onClick={() => handleSoloSpeak('partner', isRecording, toggleSTT)}
+                disabled={voiceBusy || translating}
+                onClick={() => handleSoloSpeak('partner')}
                 style={{
                   padding: '14px 8px',
                   background: soloTurn === 'partner' && isRecording
@@ -917,7 +963,7 @@ export default function TravelTalk() {
             </div>
           ) : !isSim ? (
             /* ── 2폰 대화 모드 ── */
-            <button onClick={toggleSTT} style={{
+            <button disabled={voiceBusy || translating} onClick={toggleVoice} style={{
               width: '100%', padding: 16,
               background: isRecording ? `linear-gradient(135deg,#7b241c,${RED})` : 'rgba(192,57,43,0.1)',
               border: `1px solid rgba(192,57,43,${isRecording ? '0.9' : '0.35'})`,
@@ -933,7 +979,7 @@ export default function TravelTalk() {
             </button>
           ) : (
             /* ── 2폰 동시통역 모드 ── */
-            <button onClick={toggleSTT} style={{
+            <button disabled={voiceBusy || translating} onClick={toggleVoice} style={{
               width: '100%', padding: 11,
               background: 'rgba(255,255,255,0.03)',
               border: '1px solid rgba(255,255,255,0.07)',

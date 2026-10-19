@@ -5,6 +5,7 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import TbmReceivedSummary from "@/components/TbmReceivedSummary";
+import TbmTradeBadges from "@/components/TbmTradeBadges";
 import TbmFullTranscript from "@/components/TbmFullTranscript";
 import SwarmAgentHUD from "@/components/agents/SwarmAgentHUD";
 import RoleGuard from "@/components/RoleGuard";
@@ -563,6 +564,7 @@ function WorkerTBMDetailContent() {
                     )) : (
                         <>
                             {!liveReceiving && <TbmQuestionLink adminId={tbm.created_by} tbmId={String(tbm.id)} lang={preferredLang} />}
+                            <TbmTradeBadges trades={tbm.trade_types} lang={preferredLang} />
 
                             {hasNewTBM && (
                                 <div className="animate-in slide-in-from-top-4 fade-in duration-500 w-full mb-6 relative overflow-hidden p-6 glass-red rounded-3xl border-red-500 border-2 shadow-[0_0_60px_-15px_rgba(239,68,68,0.6)] flex items-center justify-center gap-4 text-white z-50">

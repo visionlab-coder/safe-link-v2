@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import ExportMenu from "@/components/ExportMenu";
+import TbmTradeBadges from "@/components/TbmTradeBadges";
 import { exportData, type ExportFormat } from "@/utils/export-files";
 import { resolveDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
@@ -661,6 +662,7 @@ function TBMStatusPageContent() {
                                 <span className="text-[10px] text-slate-700 font-bold">{new Date(latestTBM.created_at).toLocaleString(locale)}</span>
                             </div>
                             <p className="text-slate-400 font-bold leading-relaxed italic">&quot;{latestTBM.content_ko}&quot;</p>
+                            <TbmTradeBadges trades={latestTBM.trade_types} lang={displayLang || adminLang} />
                         </div>
                     )}
 

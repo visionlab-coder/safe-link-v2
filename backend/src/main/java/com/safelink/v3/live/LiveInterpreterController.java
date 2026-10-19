@@ -51,6 +51,8 @@ public class LiveInterpreterController {
         siteGuard.requireSiteAccess(actor, siteId, "live.broadcast.start", "live_broadcast_session", null);
         String sessionId = clean(request.sessionId());
         if (sessionId.isBlank()) throw new IllegalArgumentException("session_id_required");
+        var trades = com.safelink.v3.tbm.TbmTrades.normalize(request.tradeTypes());
+        if (!sessionId.startsWith("tbm_") && !trades.isEmpty()) throw new IllegalArgumentException("tbm_session_required");
 
         jdbc.sql("select pg_advisory_xact_lock(737037)").query((rs,n)->true).single();
         // Worker publishing must not terminate another person's ongoing broadcast.
@@ -70,15 +72,16 @@ public class LiveInterpreterController {
             .param("siteId", siteId)
             .update();
         jdbc.sql("""
-                insert into live_broadcast_sessions(session_id, site_id, started_by, active)
-                values (:sessionId, :siteId, :startedBy, true)
+                insert into live_broadcast_sessions(session_id, site_id, started_by, active, trade_types)
+                values (:sessionId, :siteId, :startedBy, true, cast(:trades as jsonb))
             """)
             .param("sessionId", sessionId)
             .param("siteId", siteId)
             .param("startedBy", actor.userId())
+            .param("trades", com.safelink.v3.tbm.TbmTrades.json(trades))
             .update();
 
-        var event = new BroadcastSessionEvent(sessionId, String.valueOf(siteId), String.valueOf(actor.userId()), true);
+        var event = new BroadcastSessionEvent(sessionId, String.valueOf(siteId), String.valueOf(actor.userId()), true, trades);
         audit.record(actor.userId(), siteId, "live.broadcast.start", "live_broadcast_session", sessionId, "ALLOWED", "server_api", Map.of());
         eventBus.publishAfterCommit(LiveInterpreterEventBus.translationsChannel(siteId), "broadcast-start", event);
         return event;
@@ -163,7 +166,7 @@ public class LiveInterpreterController {
         if (requestedSiteId == null) throw new IllegalArgumentException("site_id_required");
         siteGuard.requireSiteAccess(actor, requestedSiteId, "live.broadcast.current", "live_broadcast_session", null);
         var active = jdbc.sql("""
-                select session_id, started_by
+                select session_id, started_by, trade_types
                 from live_broadcast_sessions
                 where site_id = :siteId and active = true
                 order by started_at desc
@@ -174,7 +177,7 @@ public class LiveInterpreterController {
                 rs.getString("session_id"),
                 String.valueOf(requestedSiteId),
                 String.valueOf(rs.getLong("started_by")),
-                true
+                true, com.safelink.v3.tbm.TbmTrades.read(rs.getString("trade_types"))
             ))
             .optional();
         if (active.isEmpty()) return Map.of("active", false);
@@ -484,8 +487,12 @@ public class LiveInterpreterController {
 
     public record TranslationRequest(String sessionId, String siteId, @JsonProperty("text_ko") String textKo, Map<String, String> translations) {}
     public record TranslationEvent(String id, @JsonProperty("session_id") String sessionId, @JsonProperty("site_id") String siteId, @JsonProperty("text_ko") String textKo, Map<String, String> translations, @JsonProperty("created_by") String createdBy, @JsonProperty("created_at") String createdAt) {}
-    public record BroadcastSessionRequest(String sessionId, String siteId) {}
-    public record BroadcastSessionEvent(@JsonProperty("session_id") String sessionId, @JsonProperty("site_id") String siteId, @JsonProperty("started_by") String startedBy, boolean active) {}
+    public record BroadcastSessionRequest(String sessionId, String siteId, @JsonProperty("trade_types") List<String> tradeTypes) {
+        public BroadcastSessionRequest(String sessionId, String siteId) { this(sessionId, siteId, null); }
+    }
+    public record BroadcastSessionEvent(@JsonProperty("session_id") String sessionId, @JsonProperty("site_id") String siteId, @JsonProperty("started_by") String startedBy, boolean active, @JsonProperty("trade_types") List<String> tradeTypes) {
+        public BroadcastSessionEvent(String sessionId, String siteId, String startedBy, boolean active) { this(sessionId, siteId, startedBy, active, List.of()); }
+    }
     public record WorkerResponseRequest(String siteId, String adminId, String sourceLang, String sourceText, String translatedText, String speakerName) {}
     public record WorkerResponseEvent(String id, String siteId, String workerId, String adminId, String sourceLang, String sourceText, String translatedText, String speakerName, String createdAt) {}
 }

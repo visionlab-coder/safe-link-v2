@@ -49,7 +49,7 @@ class NationwideTbmDatabaseTest {
         for (String file : new String[]{"V001__create_identity_and_site_core.sql","V002__create_file_objects.sql",
             "V003__create_tbm_core.sql","V015__create_live_interpreter.sql","V025__add_tbm_notice_idempotency.sql",
             "V028__create_live_broadcast_sessions.sql","V031__live_tbm_summaries.sql","V032__tbm_notice_summary.sql",
-            "V035__tbm_live_participation.sql","V036__tbm_live_drafts.sql","V037__nationwide_tbm.sql"})
+            "V035__tbm_live_participation.sql","V036__tbm_live_drafts.sql","V037__nationwide_tbm.sql","V042__tbm_trade_types.sql"})
             scripts.addScript(new ClassPathResource("db/migration/"+file));
         scripts.execute(ds);
         var idleMigration=new ResourceDatabasePopulator(new ClassPathResource("db/migration/V041__tbm_idle_timeout.sql"));
@@ -67,6 +67,19 @@ class NationwideTbmDatabaseTest {
     }
     NationwideTbmController.Request req(String id) { return new NationwideTbmController.Request(id,true,"발화","수정한 원문","수정한 원문","- 보호구 확인"); }
     void start() { tx.executeWithoutResult(s->national.start(hq,req("tbm_nation"))); }
+    @Test void nationwideTradeMetadataSurvivesLivePublicationAndOrdinaryRetries() {
+        var trades = java.util.List.of("철근", "거푸집");
+        var request = new NationwideTbmController.Request("tbm_trades",true,null,null,"원문","- 요약",trades);
+        tx.executeWithoutResult(s -> national.start(hq,request));
+        assertEquals(2L,jdbc.sql("select count(*) from live_broadcast_sessions where trade_types='[\"철근\",\"거푸집\"]'::jsonb").query(Long.class).single());
+        tx.executeWithoutResult(s -> national.stop(hq,request));
+        tx.executeWithoutResult(s -> national.finish(hq,new NationwideTbmController.Request("tbm_trades",true,null,null,"원문","- 요약",java.util.List.of("정리"))));
+        assertEquals(2L,jdbc.sql("select count(*) from tbm_notices where trade_types='[\"철근\",\"거푸집\"]'::jsonb").query(Long.class).single());
+        var ordinary = new NationwideTbmController.Request("tbm_trade_text",true,null,null,"원문","- 요약",trades);
+        var first = tx.execute(s -> national.broadcast(hq,ordinary));
+        assertEquals(first,tx.execute(s -> national.broadcast(hq,ordinary)));
+        assertEquals(4L,jdbc.sql("select count(*) from tbm_notices where trade_types='[\"철근\",\"거푸집\"]'::jsonb").query(Long.class).single());
+    }
     long count(String table) { return jdbc.sql("select count(*) from "+table).query(Long.class).single(); }
 
     void expireIdle() {

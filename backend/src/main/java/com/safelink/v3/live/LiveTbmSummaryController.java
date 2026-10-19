@@ -91,7 +91,9 @@ public class LiveTbmSummaryController {
             usage.log(actor.userId(),request.siteId(),"tbm_summary",result.vendor(),result.model(),transcript.length(),summary.length(),Duration.between(start,Instant.now()).toMillis(),AiCostEstimator.estimate("tbm_summary",result.vendor(),transcript.length(),summary.length()));
         }
         if (summary.isBlank() || summary.length()>12000) throw new ServiceUnavailableException("tbm_summary_invalid");
-        var notice = tbm.createPublished(request.siteId(), actor.userId(), "TBM 안전 브리핑", transcript, "live-summary:"+request.sessionId(), summary);
+        var trades = com.safelink.v3.tbm.TbmTrades.read(jdbc.sql("select trade_types::text from live_broadcast_sessions where session_id=:id and site_id=:site")
+            .param("id",request.sessionId()).param("site",request.siteId()).query(String.class).single());
+        var notice = tbm.createPublished(request.siteId(), actor.userId(), "TBM 안전 브리핑", transcript, "live-summary:"+request.sessionId(), summary, trades);
         jdbc.sql("insert into live_tbm_summaries(session_id,site_id,created_by,source_transcript,summary_text,model,tbm_notice_id) values(:id,:site,:owner,:source,:summary,:model,:notice)")
             .param("id",request.sessionId()).param("site",request.siteId()).param("owner",actor.userId())
             .param("source",transcript).param("summary",summary).param("model",model).param("notice",notice.id()).update();

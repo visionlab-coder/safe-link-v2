@@ -169,7 +169,10 @@ public class TbmController {
         String cleanIdempotencyKey = cleanIdempotencyKey(idempotencyKey);
         String summary = request.summaryKo() == null || request.summaryKo().isBlank() ? null : request.summaryKo().trim();
         if (summary != null && summary.length() > 12000) throw new IllegalArgumentException("tbm_summary_too_long");
-        var notice = summary == null
+        var trades = TbmTrades.normalize(request.tradeTypes());
+        var notice = !trades.isEmpty()
+            ? tbm.createPublished(siteId, actor.userId(), title, content, cleanIdempotencyKey, summary, trades)
+            : summary == null
             ? tbm.createPublished(siteId, actor.userId(), title, content, cleanIdempotencyKey)
             : tbm.createPublished(siteId, actor.userId(), title, content, cleanIdempotencyKey, summary);
         audit.record(actor.userId(), siteId, "tbm.notice.create", "tbm_notice", String.valueOf(notice.id()), "ALLOWED", "compat_server_api", Map.of());
@@ -296,7 +299,7 @@ public class TbmController {
             notice.publishedAt() == null ? null : notice.publishedAt().toString(),
             notice.createdAt().toString(),
             notice.summaryText(),
-            notice.createdBy() == null ? null : String.valueOf(notice.createdBy())
+            notice.createdBy() == null ? null : String.valueOf(notice.createdBy()), notice.tradeTypes()
         );
     }
 
@@ -447,7 +450,8 @@ public class TbmController {
     public record TbmBroadcastResponse(CompatNoticeResponse tbm) {}
     public record AckListResponse(List<CompatAckResponse> acks) {}
     public record WorkerListResponse(List<CompatWorkerResponse> workers) {}
-    public record BroadcastRequest(@JsonProperty("content_ko") String contentKo, @JsonProperty("site_id") String siteId, String title, @JsonProperty("summary_ko") String summaryKo) {
+    public record BroadcastRequest(@JsonProperty("content_ko") String contentKo, @JsonProperty("site_id") String siteId, String title, @JsonProperty("summary_ko") String summaryKo, @JsonProperty("trade_types") List<String> tradeTypes) {
+        public BroadcastRequest(String contentKo, String siteId, String title, String summaryKo) { this(contentKo, siteId, title, summaryKo, null); }
         public BroadcastRequest(String contentKo, String siteId, String title) { this(contentKo, siteId, title, null); }
     }
     public record SignRequest(@JsonProperty("tbm_id") @NotBlank String tbmId, @JsonProperty("signature_data") @NotBlank String signatureData) {}
@@ -464,7 +468,8 @@ public class TbmController {
         @JsonProperty("published_at") String publishedAt,
         @JsonProperty("created_at") String createdAt,
         @JsonProperty("summary_ko") String summaryKo,
-        @JsonProperty("created_by") String createdBy
+        @JsonProperty("created_by") String createdBy,
+        @JsonProperty("trade_types") List<String> tradeTypes
     ) {}
     public record CompatAckResponse(
         @JsonProperty("worker_id") String workerId,

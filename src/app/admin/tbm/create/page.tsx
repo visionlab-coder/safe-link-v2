@@ -1,6 +1,9 @@
 "use client";
 import { tbmDraftSummaryUI } from "@/lib/tbm-draft-summary-ui";
 import { nationwideTbmUI } from "@/lib/tbm-nationwide-ui";
+import { TBM_TRADES, normalizeTbmTrades, toggleTbmTrade, tbmTradeHeading } from "@/lib/tbm-trades";
+import { displaySetupTrade } from "@/lib/profile-setup-ui";
+import TbmTradeBadges from "@/components/TbmTradeBadges";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -188,6 +191,7 @@ function AdminTBMCreateContent() {
     const recordingActionRef = useRef(false);
     const [isSending, setIsSending] = useState(false);
     const [history, setHistory] = useState<any[]>([]);
+    const [selectedTrades, setSelectedTrades] = useState<string[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
     const [hiddenNoticeIds, setHiddenNoticeIds] = useState<string[]>([]);
     const [normalizeResult, setNormalizeResult] = useState<{ normalized: string; changes: { from: string; to: string }[] } | null>(null);
@@ -312,6 +316,7 @@ function AdminTBMCreateContent() {
     const broadcaster = useRef(new TbmLiveBroadcast());
     const [broadcastBusy, setBroadcastBusy] = useState(false);
     const [broadcastActive, setBroadcastActive] = useState(false);
+    const tradesLocked = broadcastActive || broadcastBusy || isSending || isDraining || summaryBusy || (liveFinalizing && !liveCompleted);
     useEffect(() => {
         if (!draftEdited || (!broadcastActive && !liveFinalizing) || liveCompleted || isSending) return;
         // Coalesce typing and, after an edit, keep subsequent STT additions in the same snapshot.
@@ -474,7 +479,8 @@ function AdminTBMCreateContent() {
                     setBroadcastActive(false);
                 }
                 try {
-                    await broadcaster.current.start(broadcastTarget);
+            const startedTrades = await broadcaster.current.start(broadcastTarget, selectedTrades);
+            setSelectedTrades(startedTrades);
                 } catch (error) {
                     showBroadcastError(error);
                     return;
@@ -593,7 +599,7 @@ function AdminTBMCreateContent() {
                 setBroadcastResult({ type: "error", message: nationUI.confirm });
                 return;
             }
-            const fingerprint = JSON.stringify([normalized, summarySource === tbmText ? summaryText : ""]);
+            const fingerprint = JSON.stringify([normalized, summarySource === tbmText ? summaryText : "", selectedTrades]);
             if (nationwide && nationwidePublishRef.current?.fingerprint !== fingerprint)
                 nationwidePublishRef.current = { fingerprint, id: `tbm_${Date.now()}_${Math.random().toString(36).slice(2, 10)}` };
             const res = await fetch(nationwide ? "/api/tbm/nationwide/broadcast" : "/api/tbm/broadcast", {
@@ -606,6 +612,7 @@ function AdminTBMCreateContent() {
                     content_ko: normalized,
                     summary_ko: summarySource === tbmText ? summaryText.trim() || undefined : undefined,
                     site_id: adminSiteId ?? undefined,
+                    trade_types: selectedTrades,
                     ...(nationwide ? { sessionId: nationwidePublishRef.current!.id, confirmed: nationwideConfirmed } : {}),
                 }),
             });
@@ -687,6 +694,16 @@ function AdminTBMCreateContent() {
                 </div>
 
                 <main className="flex-1 flex flex-col p-4 md:p-8 gap-8 max-w-3xl mx-auto w-full pb-20">
+                    <fieldset disabled={tradesLocked} data-testid="tbm-trade-selector" className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm disabled:opacity-70">
+                        <legend className="px-2 text-sm font-bold text-slate-900">{tbmTradeHeading(displayLang || adminLang)}</legend>
+                        <p className="mb-4 text-sm text-slate-600">{(displayLang || adminLang) === "ko" ? "여러 공종을 선택할 수 있습니다. 선택한 공종은 TBM에 표시됩니다." : "Select one or more trades to display on this TBM."}</p>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                            {TBM_TRADES.map(trade => <label key={trade} className={`flex min-h-12 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold ${selectedTrades.includes(trade) ? "border-blue-400 bg-blue-50 text-blue-900" : "border-slate-200 bg-slate-50 text-slate-700"} ${tradesLocked ? "cursor-not-allowed" : "cursor-pointer"}`}>
+                                <input type="checkbox" name="tbm-trades" value={trade} checked={selectedTrades.includes(trade)} onChange={() => setSelectedTrades(current => toggleTbmTrade(current, trade))} className="h-4 w-4 shrink-0 accent-blue-600" />
+                                <span>{displaySetupTrade(trade, displayLang || adminLang)}</span>
+                            </label>)}
+                        </div>
+                    </fieldset>
                     {canBroadcastNationwide && <fieldset disabled={broadcastActive || broadcastBusy || isSending || isDraining || summaryBusy || (liveFinalizing && !liveCompleted)} className="rounded-3xl border border-blue-200 bg-blue-50 p-5 text-slate-900">
                         <legend className="px-2 text-sm font-bold">{nationUI.target}</legend>
                         <div className="flex flex-wrap gap-4 text-sm font-bold">
@@ -852,13 +869,14 @@ function AdminTBMCreateContent() {
                             ) : (
                                 history.filter(tbm => !hiddenNoticeIds.includes(tbm.id)).map((tbm) => (
                                     <div key={tbm.id} className="glass p-6 rounded-[32px] border-white/5 hover:border-white/10 transition-all group flex flex-col gap-4">
+                                        <TbmTradeBadges trades={tbm.trade_types} lang={displayLang || adminLang} />
                                         <div className="flex justify-between items-start gap-4">
                                             <p className="text-lg text-slate-300 font-bold leading-relaxed">{tbm.content_ko}</p>
                                             <div className="flex items-center gap-2 flex-shrink-0">
                                                 <button onClick={() => hideNotice(tbm.id)} title={t.deleteHistory} className="w-10 h-10 glass rounded-2xl flex items-center justify-center text-slate-700 hover:text-red-400 hover:bg-red-500/10 transition-colors tap-effect">
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                                                 </button>
-                                                <button onClick={() => { setTbmText(tbm.content_ko); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="w-12 h-12 glass rounded-2xl flex items-center justify-center text-blue-500 hover:bg-blue-500/10 transition-colors tap-effect">
+                                                <button onClick={() => { setTbmText(tbm.content_ko); if (!tradesLocked) setSelectedTrades(normalizeTbmTrades(tbm.trade_types)); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="w-12 h-12 glass rounded-2xl flex items-center justify-center text-blue-500 hover:bg-blue-500/10 transition-colors tap-effect">
                                                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                                                 </button>
                                             </div>

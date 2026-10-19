@@ -9,6 +9,19 @@ vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.Mo
   exports: exportsObject, crypto: require("node:crypto").webcrypto, AbortSignal, URLSearchParams, fetch,
 });
 const { TbmLiveBroadcast } = exportsObject;
+test("live start transmits multiple trades and a nationwide retry retains the initial selection", async () => {
+  const calls=[];
+  const broadcaster=new TbmLiveBroadcast(async (url,options)=>{
+    calls.push(JSON.parse(options.body));
+    if(calls.length===1) throw new Error('network_lost_after_commit');
+    return {ok:true};
+  });
+  await assert.rejects(broadcaster.start('nationwide',['철근','거푸집']));
+  await broadcaster.start('nationwide',['정리']);
+  assert.deepEqual(calls[0].trade_types,['철근','거푸집']);
+  assert.deepEqual(calls[1].trade_types,calls[0].trade_types);
+  assert.equal(calls[1].sessionId,calls[0].sessionId);
+});
 test("server-confirmed stop preserves the session for final publication without a second stop", async () => {
   const calls=[];
   const broadcaster=new TbmLiveBroadcast(async (url,options)=>{

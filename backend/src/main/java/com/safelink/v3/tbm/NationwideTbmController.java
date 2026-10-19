@@ -42,6 +42,7 @@ public class NationwideTbmController {
     public Map<String,Object> start(@AuthenticationPrincipal SessionPrincipal actor, @Valid @RequestBody Request request) {
         NationwideTbmAccess.require(actor);
         requireConfirmed(request);
+        var trades = TbmTrades.normalize(request.tradeTypes());
         // Serializes nationwide and ordinary session starts, not speech or unrelated APIs.
         lockStarts();
         var existing = group(request.sessionId());
@@ -59,7 +60,7 @@ public class NationwideTbmController {
         insertGroup(actor,request.sessionId(),"LIVE","ACTIVE");
         for (Long site : sites) {
             String child = request.sessionId()+"_s"+site;
-            live.startSession(actor,new LiveInterpreterController.BroadcastSessionRequest(child,site.toString()));
+            live.startSession(actor,new LiveInterpreterController.BroadcastSessionRequest(child,site.toString(),trades));
             jdbc.sql("insert into nationwide_tbm_targets(broadcast_id,site_id,session_id) values(:id,:site,:session)")
                 .param("id",request.sessionId()).param("site",site).param("session",child).update();
         }
@@ -140,6 +141,7 @@ public class NationwideTbmController {
     }
 
     private Publication publish(SessionPrincipal actor,Request request,boolean isLive) {
+        var requestedTrades = TbmTrades.normalize(request.tradeTypes());
         String source = required(request.contentKo(),60000,"content_required");
         String summary = request.summaryKo()==null ? null : request.summaryKo().trim();
         if (isLive) required(summary,12000,"tbm_summary_required");
@@ -153,8 +155,10 @@ public class NationwideTbmController {
                     .param("id",target.sessionId()).query(String.class).optional();
                 if (saved.isPresent() && !saved.get().trim().equals(source)) throw new IllegalArgumentException("tbm_draft_changed");
             }
+            var trades = isLive ? TbmTrades.read(jdbc.sql("select trade_types::text from live_broadcast_sessions where session_id=:id")
+                .param("id",target.sessionId()).query(String.class).single()) : requestedTrades;
             var notice = tbm.createPublished(target.siteId(),actor.userId(),"전국 TBM 안전 브리핑",source,
-                "nationwide:"+request.sessionId(),summary);
+                "nationwide:"+request.sessionId(),summary,trades);
             jdbc.sql("update nationwide_tbm_targets set tbm_notice_id=:notice where broadcast_id=:id and site_id=:site")
                 .param("notice",notice.id()).param("id",request.sessionId()).param("site",target.siteId()).update();
             if (isLive) {
@@ -221,5 +225,10 @@ public class NationwideTbmController {
     public record Request(@NotBlank @Pattern(regexp="tbm_[A-Za-z0-9_-]{1,70}") String sessionId,
         boolean confirmed, @Size(max=60000) @JsonProperty("text_ko") String textKo,
         @Size(max=60000) String content, @Size(max=60000) @JsonProperty("content_ko") String contentKo,
-        @Size(max=12000) @JsonProperty("summary_ko") String summaryKo) {}
+        @Size(max=12000) @JsonProperty("summary_ko") String summaryKo,
+        @JsonProperty("trade_types") List<String> tradeTypes) {
+        public Request(String sessionId, boolean confirmed, String textKo, String content, String contentKo, String summaryKo) {
+            this(sessionId, confirmed, textKo, content, contentKo, summaryKo, null);
+        }
+    }
 }

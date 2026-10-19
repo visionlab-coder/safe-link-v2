@@ -8,6 +8,8 @@ import { matchedTbmSummary, type TbmLiveSummary } from "@/lib/tbm-live-completio
 import { joinTbmLive } from "@/utils/tbm-participation";
 import { tbmLiveStateUI } from "@/lib/tbm-summary-ui";
 import TbmFullTranscript from "@/components/TbmFullTranscript";
+import TbmTradeBadges from "@/components/TbmTradeBadges";
+import { normalizeTbmTrades } from "@/lib/tbm-trades";
 
 /** Live events only: never fetch or replay historical utterances. */
 export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, translatedLabel, originalLabel, onActiveChange, onSession, onSummary, onPendingCleared, allowQuestions = false }: {
@@ -24,6 +26,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
   allowQuestions?: boolean;
 }) {
   const [active, setActive] = useState(false);
+  const [trades, setTrades] = useState<string[]>([]);
   const [broadcasterId, setBroadcasterId] = useState<string | null>(null);
   const [speaking, setSpeaking] = useState(false);
   const [lines, setLines] = useState<Array<{ id: string; source: string; translated?: string }>>([]);
@@ -231,6 +234,8 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
         const id = data.active === true && typeof data.session?.session_id === "string" ? data.session.session_id : null;
         if (id?.startsWith("tbm_")) {
           reset(id, data.session.started_by);
+          const nextTrades = normalizeTbmTrades(data.session.trade_types);
+          setTrades(current => JSON.stringify(current) === JSON.stringify(nextTrades) ? current : nextTrades);
           void checkDraft();
         } else if (session && (data.active === false || id)) {
           finalizeCurrentSentence();
@@ -337,6 +342,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
   const status = tbmLiveStateUI(lang);
 
   return <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-label="TBM live translation">
+    <div className="mb-3"><TbmTradeBadges trades={trades} lang={lang} /></div>
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
       <div className="flex items-center gap-3">
         <h2 className="text-lg font-extrabold text-slate-900">{translatedLabel}</h2>
