@@ -10,7 +10,7 @@ import { tbmLiveStateUI } from "@/lib/tbm-summary-ui";
 import TbmFullTranscript from "@/components/TbmFullTranscript";
 
 /** Live events only: never fetch or replay historical utterances. */
-export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, translatedLabel, originalLabel, pending = false, onActiveChange, onSession, onSummary, allowQuestions = false }: {
+export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, translatedLabel, originalLabel, pending = false, onActiveChange, onSession, onSummary, onPendingCleared, allowQuestions = false }: {
   siteId: string | null;
   lang: string;
   busyLabel: string;
@@ -21,6 +21,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
   onActiveChange?: (active: boolean) => void;
   onSession?: (sessionId: string) => void;
   onSummary?: (summary: TbmLiveSummary) => void;
+  onPendingCleared?: () => void;
   allowQuestions?: boolean;
 }) {
   const [active, setActive] = useState(false);
@@ -33,8 +34,8 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
   const [failed, setFailed] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
-  const callbacks = useRef({ onSession, onSummary });
-  callbacks.current = { onSession, onSummary };
+  const callbacks = useRef({ onSession, onSummary, onPendingCleared });
+  callbacks.current = { onSession, onSummary, onPendingCleared };
   const observation = useRef<{ siteId: string; sessionId: string } | null>(null);
 
   useEffect(() => {
@@ -178,8 +179,31 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
         if (!response.ok) return;
         const data = await response.json();
         const summary = matchedTbmSummary(data.summary, expected);
-        if (disposed || expected !== observedSession || !summary) return;
+        if (disposed || expected !== observedSession) return;
+        if (!summary) {
+          if (session) return; // A published notice must never interrupt an active live broadcast.
+          const pendingResponse = await fetch("/api/live/tbm-participation?" + new URLSearchParams({ siteId }), {
+            cache: "no-store", signal: timeout.signal,
+          });
+          if (!pendingResponse.ok) return; // Network failure is not evidence of completion.
+          const pendingState = await pendingResponse.json();
+          if (disposed || session || expected !== observedSession) return;
+          if (pendingState.attended === true && pendingState.sessionId === expected) return;
+          if (pendingState.attended !== false && pendingState.attended !== true) return;
+          // The server no longer considers this stopped session a pending handoff (e.g. a
+          // newer ordinary notice was published). Keep attendance records, not the overlay.
+          observedSession = null; observation.current = null; generation++;
+          if (sentenceCommitTimer) { clearTimeout(sentenceCommitTimer); sentenceCommitTimer = null; }
+          if (speakingTimer) { clearTimeout(speakingTimer); speakingTimer = null; }
+          activeLineId = null;
+          audioRef.current?.pause(); setActive(false); setSpeaking(false); setBusy(false);
+          setLines([]); setEditedDraft(null); setBroadcasterId(null);
+          callbacks.current.onPendingCleared?.();
+          return;
+        }
         completedSession = expected;
+        observedSession = null;
+        observation.current = null;
         // End the live audio queue, not replay the final notice as another recording.
         generation++;
         audioRef.current?.pause();

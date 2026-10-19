@@ -194,6 +194,7 @@ function WorkerTBMDetailContent() {
     const [summaryReadyKey, setSummaryReadyKey] = useState("");
     const [summaryReviewedKey, setSummaryReviewedKey] = useState("");
     const [summaryWaitLong, setSummaryWaitLong] = useState(false);
+    const [noticeRevision, setNoticeRevision] = useState(0);
     const loadVersionRef = useRef(0);
     const [transData, setTransData] = useState<{ text: string, pron: string, rev: string }>({ text: "", pron: "", rev: "" });
     const [isSigned, setIsSigned] = useState(false);
@@ -224,6 +225,26 @@ function WorkerTBMDetailContent() {
         setIsAudioFinished(false);
         signaturePadRef.current?.clear();
     }, []);
+    const onPendingCleared = useCallback(() => {
+        setObservedSession(null);
+        setLiveSummary(null);
+        setNoticeRevision(value => value + 1);
+    }, []);
+
+    useEffect(() => {
+        if (tbmId !== "today") return;
+        const received = (event: Event) => {
+            if (liveReceiving) return;
+            const noticeId = (event as CustomEvent<{ id?: string | number }>).detail?.id;
+            if (!noticeId || String(noticeId) === liveSummary?.tbmId || String(noticeId) === String(tbm?.id)) return;
+            // Reload the published notice, but never grant live attendance to that notice.
+            if (liveSummary) setObservedSession(null);
+            setLiveSummary(null);
+            setNoticeRevision(value => value + 1);
+        };
+        window.addEventListener("sq-link:tbm-received", received);
+        return () => window.removeEventListener("sq-link:tbm-received", received);
+    }, [tbmId, liveReceiving, liveSummary, tbm?.id]);
 
     const changeGender = (g: 'male' | 'female') => {
         voiceGenderRef.current = g;
@@ -233,6 +254,7 @@ function WorkerTBMDetailContent() {
     const loadTBM = useCallback(async () => {
         const version = ++loadVersionRef.current;
         setLoading(true);
+        setIsPlaying(false);
         setParticipatedNoticeId(null);
         setIsAudioFinished(false);
         setIsSigned(false);
@@ -357,7 +379,7 @@ function WorkerTBMDetailContent() {
         const versions = loadVersionRef;
         void loadTBM().catch(() => { setLoading(false); setSummaryWaitLong(true); });
         return () => { versions.current++; };
-    }, [loadTBM]);
+    }, [loadTBM, noticeRevision]);
 
     const [hasNewTBM] = useState(false);
 
@@ -521,7 +543,7 @@ function WorkerTBMDetailContent() {
                             <p className="mt-2 text-sm font-bold text-slate-100">{new Date(liveReceiving || waitingForSummary ? Date.now() : tbm.created_at).toLocaleDateString(({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[preferredLang] || "en-US", { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                         </div>
                     </div>}
-                    {tbmId === "today" && <TbmLiveReceiver siteId={liveSiteId} lang={preferredLang} busyLabel={t.translating} listenLabel={t.voice} translatedLabel={t.translated} originalLabel={t.original} pending={waitingForSummary} onActiveChange={setLiveReceiving} onSession={onLiveSession} onSummary={setLiveSummary} allowQuestions />}
+                    {tbmId === "today" && <TbmLiveReceiver siteId={liveSiteId} lang={preferredLang} busyLabel={t.translating} listenLabel={t.voice} translatedLabel={t.translated} originalLabel={t.original} pending={waitingForSummary} onActiveChange={setLiveReceiving} onSession={onLiveSession} onSummary={setLiveSummary} onPendingCleared={onPendingCleared} allowQuestions />}
                     {summaryWaitLong && waitingForSummary && <div role="status" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 font-bold text-amber-900">
                         <p>{tbmSummaryUI(preferredLang).failed}</p>
                         <button type="button" className="mt-3 underline" onClick={() => { void loadTBM().catch(() => setLoading(false)); }}>{tbmSummaryUI(preferredLang).retry}</button>

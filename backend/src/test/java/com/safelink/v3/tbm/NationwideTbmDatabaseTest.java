@@ -75,6 +75,40 @@ class NationwideTbmDatabaseTest {
     }
     void ageSessions() { jdbc.sql("update live_broadcast_sessions set last_activity_at=now()-interval '6 minutes'").update(); }
 
+    @Test void newerOrdinaryPublicationClearsStoppedPendingWithoutGrantingAttendance() {
+        start();
+        var participation=new TbmLiveParticipationController(jdbc,guard);
+        tx.executeWithoutResult(s->participation.join(worker,new TbmLiveParticipationController.Join("tbm_nation_s2",2L)));
+        tx.executeWithoutResult(s->national.stop(hq,req("tbm_nation")));
+        assertEquals(true,participation.read(worker,2L,null).get("attended"));
+        var ordinary=tx.execute(s->national.broadcast(hq,req("tbm_ordinary")));
+        assertEquals(false,participation.read(worker,2L,null).get("attended"));
+        assertEquals(false,participation.read(worker,2L,Long.valueOf(ordinary.tbmId())).get("attended"));
+        assertEquals(1L,count("tbm_live_participation")); // Never delete actual attendance.
+        // The original live broadcast can still be finalized with its own attendance credit.
+        var finalNotice=tx.execute(s->national.finish(hq,req("tbm_nation")));
+        assertEquals(true,participation.read(worker,2L,Long.valueOf(finalNotice.tbmId())).get("attended"));
+        assertEquals(0L,count("tbm_acknowledgements"));
+    }
+
+    @Test void pendingScopeExcludesOldDraftAndOtherSiteNoticesAndPreservesActiveLive() {
+        start();
+        var participation=new TbmLiveParticipationController(jdbc,guard);
+        tx.executeWithoutResult(s->participation.join(worker,new TbmLiveParticipationController.Join("tbm_nation_s2",2L)));
+        jdbc.sql("""
+            insert into tbm_notices(site_id,created_by,title,source_text,normalized_text,status,published_at)
+            values(2,10,'OLD','OLD','OLD','PUBLISHED',now()-interval '1 day'),
+                  (2,10,'DRAFT','DRAFT','DRAFT','DRAFT',null),
+                  (3,10,'OTHER SITE','OTHER SITE','OTHER SITE','PUBLISHED',now())
+            """).update();
+        tx.executeWithoutResult(s->national.stop(hq,req("tbm_nation")));
+        assertEquals(true,participation.read(worker,2L,null).get("attended"));
+        assertThrows(AccessDeniedException.class,()->participation.read(worker,3L,null));
+        jdbc.sql("update live_broadcast_sessions set active=true,ended_at=null where session_id='tbm_nation_s2'").update();
+        tx.execute(s->national.broadcast(hq,req("tbm_ordinary")));
+        assertEquals(true,participation.read(worker,2L,null).get("attended"));
+    }
+
     @Test void idleNationwideStopsAllSitesOnceAndCanStillPublish() {
         start();
         tx.executeWithoutResult(s->national.translate(hq,req("tbm_nation")));

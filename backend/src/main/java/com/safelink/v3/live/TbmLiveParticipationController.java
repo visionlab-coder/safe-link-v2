@@ -40,7 +40,14 @@ public class TbmLiveParticipationController {
         requireWorker(actor);
         guard.requireSiteAccess(actor,siteId,"tbm.live.participation.read","site",siteId.toString());
         String filter = tbmId == null
-            ? "and m.tbm_notice_id is null and b.started_at > now() - interval '12 hours'"
+            ? """
+                and m.tbm_notice_id is null and b.started_at > now() - interval '12 hours'
+                and (b.active or not exists (
+                    select 1 from tbm_notices n
+                    where n.site_id=p.site_id and n.status='PUBLISHED'
+                      and coalesce(n.published_at,n.created_at) >= b.started_at
+                ))
+                """
             : "and m.tbm_notice_id=:notice";
         var query = jdbc.sql("""
             select p.session_id, m.tbm_notice_id
