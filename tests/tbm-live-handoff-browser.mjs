@@ -93,6 +93,9 @@ try {
   await page.getByText('今天没有简报', {exact: true}).waitFor({timeout: 60000});
   for (let i = 0; clients.size === 0 && i < 30; i++) await wait(100);
   assert.ok(clients.size > 0);
+  emit('broadcast-start', {session_id: 'tbm_stale_start', started_by: '10'});
+  await wait(4000);
+  assert.equal(await page.getByTestId('tbm-live-state').count(), 0, 'stale start SSE cannot override inactive server state');
   active = true; emit('broadcast-start', {session_id: sessionId, started_by: '10'});
   await page.getByLabel('TBM live translation', {exact: true}).waitFor();
   await page.getByTestId('tbm-briefing-hero').waitFor();
@@ -112,23 +115,19 @@ try {
   emit('tbm-draft', {sessionId, content: '오래된 수정', revision: 0});
   assert.equal(await page.getByText('다른 방송', {exact: true}).count(), 0);
   // A server idle timeout can be missed during mobile backgrounding or on another API instance.
-  // Deliberately omit broadcast-stop SSE: polling must end LIVE without erasing the transcript.
+  // Deliberately omit broadcast-stop SSE: polling must restore the ordinary TBM page.
   active = false;
-  await page.getByTestId('tbm-live-state').filter({hasText: '等待最终 TBM'}).waitFor();
-  await page.getByText('修改后的内容 1', {exact: true}).waitFor();
-  await page.getByText('수정 테스트 1', {exact: true}).waitFor();
-  assert.equal(await page.getByTestId('tbm-briefing-hero').count(), 1, 'same TBM shell after stop');
+  await page.getByText('今天没有简报', {exact: true}).waitFor();
+  assert.equal(await page.getByTestId('tbm-live-state').count(), 0);
   assert.equal(await page.getByTestId('tbm-live-badge').count(), 0, 'LIVE badge only while broadcasting');
   assert.equal(await page.getByText('直播已结束。管理员发布最终 TBM 后，请查看摘要并签名。', {exact: true}).count(), 0);
   await page.screenshot({path: path.join(workspace, 'pending-mobile.png'), fullPage: true});
-  // Stopped-but-unpublished drafts remain editable; a lost SSE is recovered by polling.
+  // Drafts remain stored but must not force a stopped broadcast back onto the screen.
   editedDraft = {sessionId, content: '수정 테스트 2', revision: 2};
-  await page.getByText('修改后的内容 2', {exact: true}).waitFor({timeout: 15000});
-  assert.equal(await page.getByText('수정 테스트 1', {exact: true}).count(), 0);
   await page.reload();
-  await page.getByTestId('tbm-live-state').filter({hasText: '等待最终 TBM'}).waitFor();
-  assert.equal(await page.getByTestId('tbm-briefing-hero').count(), 1);
-  await page.getByText('修改后的内容 2', {exact: true}).waitFor();
+  await page.getByText('今天没有简报', {exact: true}).waitFor();
+  await wait(4000);
+  assert.equal(await page.getByTestId('tbm-live-state').count(), 0);
   published = true; summaryAvailable = true;
   // Intentionally omit tbm-summary SSE: the same-page polling recovery must work.
   await page.getByRole('button', {name: '摘要翻译失败 — 重试', exact: true}).waitFor({timeout: 20000});
@@ -184,9 +183,9 @@ try {
   console.error(logs.slice(-6000));
   throw error;
 } finally {
-  await browser?.close();
   for (const res of clients) res.end();
   fixture.close();
   frontend.kill('SIGTERM');
   console.log(`Isolated build artifacts retained at ${workspace}`);
+  await browser?.close();
 }

@@ -39,12 +39,13 @@ test("question, unavailable and return labels exist in all 20 selected languages
 
 test("live sender is taken from session API/events, never the previous published TBM", () => {
   const receiver = fs.readFileSync("src/components/TbmLiveReceiver.tsx", "utf8");
-  assert.match(receiver, /data\.started_by/);
-  assert.match(receiver, /data\.session\?\.started_by/);
+  assert.match(receiver, /reset\(id, data\.session\.started_by\)/);
   assert.match(receiver, /allowQuestions = false/); // no permission expansion on other consumers
   assert.match(receiver, /adminId=\{broadcasterId\}/);
   const page = fs.readFileSync("src/app/worker/tbm/[id]/page.tsx", "utf8");
   assert.match(page, /!liveReceiving && <TbmQuestionLink adminId=\{tbm.created_by\}/);
   assert.equal(page.match(/<TbmLiveReceiver /g).length, 1);
-  assert.ok(page.indexOf("<TbmLiveReceiver ") < page.indexOf("{liveReceiving || waitingForSummary ?")); // live works before first publication
+  assert.ok(page.indexOf("<TbmLiveReceiver ") < page.indexOf("{liveReceiving ?")); // live works before first publication
+  assert.match(receiver, /if \(!active\) return null/);
+  assert.doesNotMatch(page, /waitingForSummary/);
 });

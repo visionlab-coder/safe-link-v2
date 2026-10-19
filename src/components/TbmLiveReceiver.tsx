@@ -10,14 +10,13 @@ import { tbmLiveStateUI } from "@/lib/tbm-summary-ui";
 import TbmFullTranscript from "@/components/TbmFullTranscript";
 
 /** Live events only: never fetch or replay historical utterances. */
-export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, translatedLabel, originalLabel, pending = false, onActiveChange, onSession, onSummary, onPendingCleared, allowQuestions = false }: {
+export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, translatedLabel, originalLabel, onActiveChange, onSession, onSummary, onPendingCleared, allowQuestions = false }: {
   siteId: string | null;
   lang: string;
   busyLabel: string;
   listenLabel: string;
   translatedLabel: string;
   originalLabel: string;
-  pending?: boolean;
   onActiveChange?: (active: boolean) => void;
   onSession?: (sessionId: string) => void;
   onSummary?: (summary: TbmLiveSummary) => void;
@@ -218,38 +217,46 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
     };
     events.addEventListener("tbm-summary", () => { void checkSummary(); });
     let checkingSession = false;
-    const checkStopped = async () => {
-      const expected = session;
-      if (!expected || checkingSession) return;
+    let lifecycleVersion = 0;
+    const checkSession = async () => {
+      const version = lifecycleVersion;
+      if (checkingSession) return;
       checkingSession = true;
       try {
-        const response = await fetch("/api/live/sessions?" + new URLSearchParams({ siteId }), { cache: "no-store", signal: abort.signal });
+        const response = await fetch("/api/live/sessions?" + new URLSearchParams({ siteId }), { cache: "no-store", signal: AbortSignal.any([abort.signal, AbortSignal.timeout(10000)]) });
         if (!response.ok) return;
         const data = await response.json();
-        if (disposed || session !== expected) return;
-        if (data.active === false || (data.active === true && data.session?.session_id !== expected)) {
+        if (disposed || lifecycleVersion !== version) return;
+        // Only server-confirmed active TBM sessions can show the live screen.
+        const id = data.active === true && typeof data.session?.session_id === "string" ? data.session.session_id : null;
+        if (id?.startsWith("tbm_")) {
+          reset(id, data.session.started_by);
+          void checkDraft();
+        } else if (session && (data.active === false || id)) {
           finalizeCurrentSentence();
           session = null; setActive(false); setSpeaking(false);
-          // Preserve the transcript and participation, just like a broadcast-stop event.
+        }
+        if (data.active === false && !observedSession) {
+          // Restore only background summary tracking, never the visible live state.
+          const response = await fetch("/api/live/tbm-participation?" + new URLSearchParams({ siteId }), { cache: "no-store", signal: AbortSignal.any([abort.signal, AbortSignal.timeout(10000)]) });
+          const participation = response.ok ? await response.json() : null;
+          if (disposed || lifecycleVersion !== version || session || observedSession || !participation?.attended || !participation.sessionId) return;
+          observedSession = participation.sessionId;
+          observation.current = { siteId, sessionId: participation.sessionId };
+          void checkSummary();
         }
       } catch { /* Backgrounding/network failure is not evidence that a session ended. */ }
       finally { checkingSession = false; }
     };
     const summaryPoll = setInterval(() => {
       if (session) void register(session);
-      void checkStopped();
+      void checkSession();
       void checkDraft();
       void checkSummary();
     }, 3000);
-    let lifecycleVersion = 0;
-    events.addEventListener("broadcast-start", event => {
+    events.addEventListener("broadcast-start", () => {
       lifecycleVersion++;
-      try {
-        const data = JSON.parse((event as MessageEvent).data);
-        const id = data.session_id as string;
-        reset(id?.startsWith("tbm_") ? id : null, data.started_by);
-        void checkDraft();
-      } catch { /* ignore malformed events */ }
+      void checkSession();
     });
     events.addEventListener("broadcast-stop", event => {
       lifecycleVersion++;
@@ -322,31 +329,11 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
         });
       } catch { /* ignore malformed events */ }
     });
-    events.onopen = () => {
-      const version = lifecycleVersion;
-      void fetch("/api/live/sessions?" + new URLSearchParams({ siteId }), { cache: "no-store", signal: abort.signal })
-        .then(response => response.ok ? response.json() : null).then(data => {
-          if (disposed || lifecycleVersion !== version || !data) return;
-          const id = data.active ? data.session?.session_id : null;
-          reset(id?.startsWith("tbm_") ? id : null, data.session?.started_by);
-          void checkDraft();
-          if (!id && !observedSession) {
-            // A reload between recording-stop and manual publication keeps the same pending session.
-            void fetch("/api/live/tbm-participation?" + new URLSearchParams({ siteId }), { cache: "no-store", signal: abort.signal })
-              .then(response => response.ok ? response.json() : null).then(participation => {
-                if (disposed || lifecycleVersion !== version || observedSession || !participation?.attended || !participation.sessionId) return;
-                observedSession = participation.sessionId;
-                observation.current = { siteId, sessionId: participation.sessionId };
-                callbacks.current.onSession?.(participation.sessionId);
-                void checkDraft();
-                void checkSummary();
-              }).catch(() => {});
-          }
-        }).catch(() => {});
-    };
+    events.onopen = () => { void checkSession(); };
+    void checkSession(); // Polling also works when the SSE connection cannot open.
     return () => { disposed = true; generation++; clearInterval(summaryPoll); if (speakingTimer) clearTimeout(speakingTimer); if (sentenceCommitTimer) clearTimeout(sentenceCommitTimer); abort.abort(); events.close(); audioRef.current?.pause(); audioRef.current = null; };
   }, [siteId, lang]);
-  if (!active && !pending) return null;
+  if (!active) return null;
   const status = tbmLiveStateUI(lang);
 
   return <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-label="TBM live translation">

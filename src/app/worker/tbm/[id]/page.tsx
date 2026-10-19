@@ -188,12 +188,10 @@ function WorkerTBMDetailContent() {
     const [preferredLang, setPreferredLang] = useState("ko");
     const [liveSiteId, setLiveSiteId] = useState<string | null>(null);
     const [liveReceiving, setLiveReceiving] = useState(false);
-    const [observedSession, setObservedSession] = useState<string | null>(null);
     const [liveSummary, setLiveSummary] = useState<TbmLiveSummary | null>(null);
     const [participatedNoticeId, setParticipatedNoticeId] = useState<string | null>(null);
     const [summaryReadyKey, setSummaryReadyKey] = useState("");
     const [summaryReviewedKey, setSummaryReviewedKey] = useState("");
-    const [summaryWaitLong, setSummaryWaitLong] = useState(false);
     const [noticeRevision, setNoticeRevision] = useState(0);
     const loadVersionRef = useRef(0);
     const [transData, setTransData] = useState<{ text: string, pron: string, rev: string }>({ text: "", pron: "", rev: "" });
@@ -207,26 +205,25 @@ function WorkerTBMDetailContent() {
     const voiceGenderRef = useRef<'male' | 'female'>('female');
     const isLiveSummary = Boolean(tbm?.summary_ko && participatedNoticeId === String(tbm?.id));
     const summaryKey = `${tbm?.id}:${preferredLang}:${tbm?.summary_ko || ""}`;
-    const waitingForSummary = Boolean(observedSession && !liveSummary);
-    useEffect(() => {
-        setSummaryWaitLong(false);
-    }, [waitingForSummary, liveReceiving, observedSession]);
-    const canSign = canSignTbm({ liveActive: liveReceiving, pending: waitingForSummary,
+    // Historical participation tracks summary delivery, never controls the live screen.
+    const canSign = canSignTbm({ liveActive: liveReceiving, pending: false,
         liveSummary: isLiveSummary, summaryReady: summaryReadyKey === summaryKey,
         summaryReviewed: summaryReviewedKey === summaryKey, audioFinished: isAudioFinished });
     const onSummaryReady = useCallback((ready: boolean) => {
         setSummaryReadyKey(ready ? summaryKey : "");
     }, [summaryKey]);
-    const onLiveSession = useCallback((id: string) => {
-        setObservedSession(id);
+    const onLiveSession = useCallback(() => {
         setLiveSummary(null);
         setSummaryReadyKey("");
         setSummaryReviewedKey("");
         setIsAudioFinished(false);
         signaturePadRef.current?.clear();
     }, []);
+    const onLiveActiveChange = useCallback((active: boolean) => {
+        setLiveReceiving(active);
+        if (!active) setNoticeRevision(value => value + 1);
+    }, []);
     const onPendingCleared = useCallback(() => {
-        setObservedSession(null);
         setLiveSummary(null);
         setNoticeRevision(value => value + 1);
     }, []);
@@ -238,7 +235,6 @@ function WorkerTBMDetailContent() {
             const noticeId = (event as CustomEvent<{ id?: string | number }>).detail?.id;
             if (!noticeId || String(noticeId) === liveSummary?.tbmId || String(noticeId) === String(tbm?.id)) return;
             // Reload the published notice, but never grant live attendance to that notice.
-            if (liveSummary) setObservedSession(null);
             setLiveSummary(null);
             setNoticeRevision(value => value + 1);
         };
@@ -377,7 +373,7 @@ function WorkerTBMDetailContent() {
 
     useEffect(() => {
         const versions = loadVersionRef;
-        void loadTBM().catch(() => { setLoading(false); setSummaryWaitLong(true); });
+        void loadTBM().catch(() => { setLoading(false); });
         return () => { versions.current++; };
     }, [loadTBM, noticeRevision]);
 
@@ -531,7 +527,7 @@ function WorkerTBMDetailContent() {
                 </header>
 
                 <main className="flex-1 flex flex-col pt-8 pb-32 px-4 md:px-8 max-w-2xl mx-auto w-full gap-8">
-                    {(tbm || liveReceiving || waitingForSummary) && <div data-testid="tbm-briefing-hero" className="admin-concept-hero relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
+                    {(tbm || liveReceiving) && <div data-testid="tbm-briefing-hero" className="admin-concept-hero relative h-40 w-full overflow-hidden rounded-[32px] border border-white/10 shadow-2xl">
                         <picture>
                             <source media="(max-width: 639px)" srcSet="/images/mobile-v4/mobile/tbm/03.webp" />
                             <Image src="/images/mobile-v4/web/tbm/03.webp" alt="TBM worker briefing" fill className="object-cover" priority />
@@ -540,14 +536,10 @@ function WorkerTBMDetailContent() {
                         <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
                             <p className="text-[10px] font-black tracking-[.18em] text-red-200">SQ LINK TBM</p>
                             <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h1>
-                            <p className="mt-2 text-sm font-bold text-slate-100">{new Date(liveReceiving || waitingForSummary ? Date.now() : tbm.created_at).toLocaleDateString(({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[preferredLang] || "en-US", { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                            <p className="mt-2 text-sm font-bold text-slate-100">{new Date(liveReceiving ? Date.now() : tbm.created_at).toLocaleDateString(({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[preferredLang] || "en-US", { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                         </div>
                     </div>}
-                    {tbmId === "today" && <TbmLiveReceiver siteId={liveSiteId} lang={preferredLang} busyLabel={t.translating} listenLabel={t.voice} translatedLabel={t.translated} originalLabel={t.original} pending={waitingForSummary} onActiveChange={setLiveReceiving} onSession={onLiveSession} onSummary={setLiveSummary} onPendingCleared={onPendingCleared} allowQuestions />}
-                    {summaryWaitLong && waitingForSummary && <div role="status" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 font-bold text-amber-900">
-                        <p>{tbmSummaryUI(preferredLang).failed}</p>
-                        <button type="button" className="mt-3 underline" onClick={() => { void loadTBM().catch(() => setLoading(false)); }}>{tbmSummaryUI(preferredLang).retry}</button>
-                    </div>}
+                    {tbmId === "today" && <TbmLiveReceiver siteId={liveSiteId} lang={preferredLang} busyLabel={t.translating} listenLabel={t.voice} translatedLabel={t.translated} originalLabel={t.original} onActiveChange={onLiveActiveChange} onSession={onLiveSession} onSummary={setLiveSummary} onPendingCleared={onPendingCleared} allowQuestions />}
 
                     {fromCache && (
                         <div className="rounded-2xl bg-amber-500/15 border border-amber-400/30 text-amber-200 text-sm px-4 py-3">
@@ -555,7 +547,7 @@ function WorkerTBMDetailContent() {
                         </div>
                     )}
 
-                    {liveReceiving || waitingForSummary ? null : loading ? (
+                    {liveReceiving ? null : loading ? (
                         <div className="flex-1 flex items-center justify-center">
                             <div className="w-12 h-12 border-4 border-slate-700 border-t-red-500 rounded-full animate-spin" />
                         </div>
@@ -772,7 +764,7 @@ function WorkerTBMDetailContent() {
                 </main>
 
                 {/* 🚀 Sticky CTA Button */}
-                {!loading && tbm && !liveReceiving && !waitingForSummary && (
+                {!loading && tbm && !liveReceiving && (
                     <div className="safe-area-fixed-bottom fixed bottom-0 inset-x-0 md:p-10 pointer-events-none">
                         <div className="max-w-2xl mx-auto pointer-events-auto">
                             <button
