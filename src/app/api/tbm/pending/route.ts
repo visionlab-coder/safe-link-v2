@@ -14,7 +14,8 @@ export async function GET(req: NextRequest) {
     const value = req.nextUrl.searchParams.get(key);
     if (value) query.set(key, value);
   }
-  const res = await proxyV3Api(req, `/api/v1/tbm/compat/pending?${query}`);
+  const endpoint = req.nextUrl.searchParams.get("scope") === "other" ? "pending-other" : "pending";
+  const res = await proxyV3Api(req, `/api/v1/tbm/compat/${endpoint}?${query}`);
   res.headers.set("Cache-Control", "private, no-store");
   return withMobileCors(res, req.headers.get("origin"));
 }

@@ -15,7 +15,7 @@ import { getT as getAuthT } from "@/app/auth/translations";
 import { tbmPublishLabel } from "@/lib/tbm-publish-ui";
 import { workerRegistrationUI } from "@/lib/worker-registration-ui";
 import homeStyles from "./worker-home.module.css";
-import WorkerTbmNotices from "@/components/WorkerTbmNotices";
+import WorkerDailyTrades from "@/components/WorkerDailyTrades";
 
 const WORKER_COMMON: Record<string, Record<string, string>> = {
     ko: { profile:"프로필", connecting:"연결 중...", safetyHome:"근로자 안전 홈", todayTitle:"오늘 할 일", todayDesc:"교육을 확인하고 서명하면 완료됩니다.", step1:"교육 확인", step2:"서명", step3:"완료", helperTitle:"필요한 기능", logoutFailed:"로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.", pledgeTitle:"TBM 안전 서약", pledgeDesc:"서명으로 안전 서약 확인" },
@@ -865,7 +865,7 @@ function WorkerHomeContent() {
                     </div>
                 )}
 
-                {profile?.site_id && <WorkerTbmNotices
+                {profile?.site_id && <WorkerDailyTrades
                     key={`${profile.id}:${profile.site_id}:${temporary}`}
                     siteId={String(profile.site_id)} temporary={temporary} lang={lang} message={t.newTBM}
                 />}
@@ -891,7 +891,7 @@ function WorkerHomeContent() {
                     </div>
 
                     <button
-                        onClick={() => router.push("/worker/tbm/today")}
+                        onClick={() => document.getElementById("today-tbm")?.scrollIntoView({ behavior: "smooth", block: "start" })}
                         className="relative w-full py-6 bg-green-400 text-slate-950 text-2xl font-black rounded-[28px] shadow-[0_20px_50px_-15px_rgba(34,197,94,0.45)] transition-all tap-effect hover:bg-green-300 active:scale-95"
                     >
                         {t.tbmBtn.toUpperCase()}

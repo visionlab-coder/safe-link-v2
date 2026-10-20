@@ -1,0 +1,14 @@
+const assert = require("node:assert/strict");
+const load = require("./helpers/load-typescript.cjs")();
+const { matchesDailyTrades, isCurrentDailyTrades, dailyTradeUI } = load("src/lib/worker-daily-trades.ts");
+const { QR_LANGUAGE_OPTIONS } = load("src/utils/qr/language-options.ts");
+const selection = {date:"2026-10-21",selected:true,trades:["로프공","정리"]};
+assert.equal(matchesDailyTrades([],selection),true);
+assert.equal(matchesDailyTrades(["철근"],selection),false);
+assert.equal(matchesDailyTrades(["정리","철근"],selection),true);
+assert.equal(matchesDailyTrades(["로프공"],{...selection,selected:false}),false);
+assert.equal(isCurrentDailyTrades(selection,new Date("2026-10-20T14:59:59Z")),false);
+assert.equal(isCurrentDailyTrades(selection,new Date("2026-10-20T15:00:00Z")),true);
+assert.equal(isCurrentDailyTrades(selection,new Date("2026-10-21T15:00:00Z")),false);
+for (const {lang} of QR_LANGUAGE_OPTIONS) for (const text of Object.values(dailyTradeUI(lang))) assert.ok(text);
+console.log("PASS: daily trade intersection/common/unselected, KST day boundaries, 20 UI languages");

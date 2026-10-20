@@ -44,12 +44,61 @@ class TbmPendingNoticesTest {
         jdbc.sql("create table live_broadcast_sessions(session_id text primary key)").update();
         new ResourceDatabasePopulator(new ClassPathResource("db/migration/V042__tbm_trade_types.sql")).execute(ds);
         new ResourceDatabasePopulator(new ClassPathResource("db/migration/V043__tbm_home_notification_visibility.sql")).execute(ds);
+        new ResourceDatabasePopulator(new ClassPathResource("db/migration/V044__worker_daily_trades.sql")).execute(ds);
         jdbc.sql("insert into organizations(id,name) values(1,'TEST')").update();
         jdbc.sql("insert into sites(id,organization_id,name,status) values(2,1,'A','ACTIVE'),(3,1,'B','ACTIVE')").update();
         jdbc.sql("insert into users(id,email,display_name,account_status) values(10,'admin@example.invalid','Admin','ACTIVE'),(11,'worker@example.invalid','Worker','ACTIVE'),(12,'other@example.invalid','Other','ACTIVE')").update();
         repository = new TbmRepository(jdbc);
         var audit = mock(AuditService.class);
         controller = new TbmController(repository, mock(FileObjectRepository.class), mock(ObjectStorageService.class), new SiteGuard(audit), audit);
+        daily().save(worker, 2L, new WorkerDailyTradesController.Input(LocalDate.now(ZoneId.of("Asia/Seoul")).toString(), TbmTrades.ALL));
+    }
+
+    WorkerDailyTradesController daily() {
+        var audit = mock(AuditService.class);
+        return new WorkerDailyTradesController(jdbc, new SiteGuard(audit), audit);
+    }
+
+    @Test void selectionPersistsPerWorkerSiteAndKoreanDayWithValidatedInput() {
+        var api = daily();
+        var day = api.get(worker, 2L).date();
+        api.save(worker, 2L, new WorkerDailyTradesController.Input(day, List.of("로프공", "정리", "정리")));
+        assertThat(api.get(worker, 2L).trades()).containsExactly("정리", "로프공");
+        var second = new SessionPrincipal(12L, null, "Other", Set.of(Role.WORKER), Set.of(2L, 3L));
+        assertThat(api.get(second, 2L).selected()).isFalse();
+        assertThat(api.get(second, 3L).selected()).isFalse();
+        assertThatThrownBy(() -> api.get(worker, 3L)).isInstanceOf(AccessDeniedException.class);
+        var temp = new SessionPrincipal(12L, null, "TEMP", Set.of(Role.TEMP_WORKER), Set.of(2L));
+        assertThatThrownBy(() -> api.save(temp, 2L, new WorkerDailyTradesController.Input(day, List.of("정리")))).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> api.save(worker, 2L, new WorkerDailyTradesController.Input(day, List.of()))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> api.save(worker, 2L, new WorkerDailyTradesController.Input(day, List.of("INVALID")))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> api.save(worker, 2L, new WorkerDailyTradesController.Input("2000-01-01", List.of("정리")))).isInstanceOf(IllegalArgumentException.class);
+        var audit = mock(AuditService.class);
+        var nextDay = new WorkerDailyTradesController(jdbc, new SiteGuard(audit), audit,
+            java.time.Clock.fixed(LocalDate.parse(day).plusDays(1).atStartOfDay(ZoneId.of("Asia/Seoul")).toInstant(), ZoneId.of("Asia/Seoul")));
+        assertThat(nextDay.get(worker, 2L).selected()).isFalse();
+        assertThat(api.get(worker, 2L).trades()).containsExactly("정리", "로프공");
+    }
+
+    @Test void onlyCommonAndIntersectingTradesAreRequiredAndOtherTradesRemainReadable() {
+        var api = daily();
+        api.save(worker, 2L, new WorkerDailyTradesController.Input(api.get(worker, 2L).date(), List.of("로프공")));
+        var rope = repository.createPublished(2L, 10L, "rope", "rope", null, null, List.of("로프공", "정리"));
+        var other = repository.createPublished(2L, 10L, "rebar", "rebar", null, null, List.of("철근"));
+        var common = repository.createPublished(2L, 10L, "common", "common", null);
+        assertThat(controller.pending(worker, 2L, null, 50).tbms()).extracting(TbmController.CompatNoticeResponse::id)
+            .containsExactly(common.id().toString(), rope.id().toString());
+        assertThat(controller.pendingOther(worker, 2L, null, 50).tbms()).extracting(TbmController.CompatNoticeResponse::id)
+            .containsExactly(other.id().toString());
+        assertThat(controller.today(worker, other.id().toString(), 1).tbms()).hasSize(1);
+        repository.acknowledge(rope.id(), worker.userId(), 2L, null);
+        api.save(worker, 2L, new WorkerDailyTradesController.Input(api.get(worker, 2L).date(), List.of("철근")));
+        assertThat(controller.pending(worker, 2L, null, 50).tbms()).extracting(TbmController.CompatNoticeResponse::id)
+            .containsExactly(common.id().toString(), other.id().toString());
+        assertThat(repository.findAck(rope.id(), worker.userId())).isPresent();
+        jdbc.sql("delete from worker_daily_trades").update(); // Only disposable test database.
+        assertThat(controller.pending(worker, 2L, null, 50).tbms()).extracting(TbmController.CompatNoticeResponse::id)
+            .containsExactly(common.id().toString());
     }
 
     TbmRepository.NoticeRow notice(long site) {

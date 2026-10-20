@@ -88,13 +88,25 @@ public class TbmController {
         @RequestParam(required = false) Long cursor,
         @RequestParam(defaultValue = "50") int limit
     ) {
+        return pendingPage(actor, siteId, cursor, limit, false);
+    }
+
+    @GetMapping("/pending-other")
+    public TbmPageResponse pendingOther(
+        @AuthenticationPrincipal SessionPrincipal actor, @RequestParam Long siteId,
+        @RequestParam(required = false) Long cursor, @RequestParam(defaultValue = "50") int limit
+    ) {
+        return pendingPage(actor, siteId, cursor, limit, true);
+    }
+
+    private TbmPageResponse pendingPage(SessionPrincipal actor, Long siteId, Long cursor, int limit, boolean otherTrades) {
         requireWorker(actor);
         siteGuard.requireSiteAccess(actor, siteId, "tbm.notice.list", "tbm_notice", null);
         int safeLimit = Math.max(1, Math.min(limit, 100));
         LocalDate today = LocalDate.now(KST);
         Instant start = today.atStartOfDay(KST).toInstant();
         Instant end = today.plusDays(1).atStartOfDay(KST).toInstant();
-        var fetched = tbm.listPending(siteId, actor.userId(), start, end, cursor, safeLimit + 1);
+        var fetched = tbm.listPending(siteId, actor.userId(), start, end, cursor, safeLimit + 1, otherTrades);
         boolean hasMore = fetched.size() > safeLimit;
         var page = hasMore ? fetched.subList(0, safeLimit) : fetched;
         return new TbmPageResponse(page.stream().map(this::toCompatNotice).toList(),

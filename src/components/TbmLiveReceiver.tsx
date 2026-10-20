@@ -10,9 +10,10 @@ import { tbmLiveStateUI } from "@/lib/tbm-summary-ui";
 import TbmFullTranscript from "@/components/TbmFullTranscript";
 import TbmTradeBadges from "@/components/TbmTradeBadges";
 import { normalizeTbmTrades } from "@/lib/tbm-trades";
+import { loadDailyTrades, matchesDailyTrades } from "@/lib/worker-daily-trades";
 
 /** Live events only: never fetch or replay historical utterances. */
-export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, translatedLabel, originalLabel, onActiveChange, onSession, onSummary, onPendingCleared, allowQuestions = false }: {
+export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, translatedLabel, originalLabel, onActiveChange, onSession, onSummary, onPendingCleared, allowQuestions = false, dailyTradesOnly = false }: {
   siteId: string | null;
   lang: string;
   busyLabel: string;
@@ -24,6 +25,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
   onSummary?: (summary: TbmLiveSummary) => void;
   onPendingCleared?: () => void;
   allowQuestions?: boolean;
+  dailyTradesOnly?: boolean;
 }) {
   const [active, setActive] = useState(false);
   const [trades, setTrades] = useState<string[]>([]);
@@ -229,6 +231,14 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
         const response = await fetch("/api/live/sessions?" + new URLSearchParams({ siteId }), { cache: "no-store", signal: AbortSignal.any([abort.signal, AbortSignal.timeout(10000)]) });
         if (!response.ok) return;
         const data = await response.json();
+        if (dailyTradesOnly && data.active === true) {
+          const selection = await loadDailyTrades(siteId, abort.signal);
+          if (disposed || lifecycleVersion !== version) return;
+          if (!selection.selected || !matchesDailyTrades(data.session?.trade_types, selection)) {
+            if (session) { reset(null); observation.current = null; observedSession = null; }
+            return;
+          }
+        }
         if (disposed || lifecycleVersion !== version) return;
         // Only server-confirmed active TBM sessions can show the live screen.
         const id = data.active === true && typeof data.session?.session_id === "string" ? data.session.session_id : null;
@@ -337,7 +347,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
     events.onopen = () => { void checkSession(); };
     void checkSession(); // Polling also works when the SSE connection cannot open.
     return () => { disposed = true; generation++; clearInterval(summaryPoll); if (speakingTimer) clearTimeout(speakingTimer); if (sentenceCommitTimer) clearTimeout(sentenceCommitTimer); abort.abort(); events.close(); audioRef.current?.pause(); audioRef.current = null; };
-  }, [siteId, lang]);
+  }, [siteId, lang, dailyTradesOnly]);
   if (!active) return null;
   const status = tbmLiveStateUI(lang);
 

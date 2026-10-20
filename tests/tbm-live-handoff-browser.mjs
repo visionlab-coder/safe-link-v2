@@ -15,6 +15,7 @@ fs.cpSync(path.join(root, 'src'), path.join(workspace, 'src'), { recursive: true
 for (const dir of ['node_modules', 'public']) fs.symlinkSync(path.join(root, dir), path.join(workspace, dir));
 const clients = new Set();
 let active = false, published = false, summaryAvailable = false, signCount = 0;
+let liveTrades = [];
 let editedDraft = null;
 const participants = new Set();
 const sessionId = 'tbm_browser_fixture';
@@ -40,8 +41,10 @@ const fixture = http.createServer((req, res) => {
     res.write('event: connected\ndata: {}\n\n'); clients.add(res);
     res.on('close', () => clients.delete(res)); return;
   }
-  if (url.pathname.endsWith('/live/sessions')) return send({active, session: active ? {session_id: sessionId, started_by: '10'} : null});
+  if (url.pathname.endsWith('/live/sessions')) return send({active, session: active ? {session_id: sessionId, started_by: '10', trade_types: liveTrades} : null});
   if (url.pathname.endsWith('/live/summary')) return send(summaryAvailable ? {summary} : {});
+  if (url.pathname.endsWith('/tbm/compat/daily-trades')) return send({date:new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date()),selected:true,trades:['로프공']});
+  if (url.pathname.endsWith('/tbm/compat/pending')) return send({tbms:published?[notice]:[],has_more:false,next_cursor:null});
   if (url.pathname.endsWith('/tbm/compat/today')) return send({tbms: published ? [notice] : []});
   if (url.pathname.endsWith('/tbm/compat/sign')) {
     if (req.method === 'POST') { signCount++; return send({ok: true}); }
@@ -96,6 +99,12 @@ try {
   emit('broadcast-start', {session_id: 'tbm_stale_start', started_by: '10'});
   await wait(4000);
   assert.equal(await page.getByTestId('tbm-live-state').count(), 0, 'stale start SSE cannot override inactive server state');
+  active = true; liveTrades = ['철근'];
+  emit('broadcast-start', {session_id: sessionId, started_by: '10'});
+  await wait(4000);
+  assert.equal(await page.getByTestId('tbm-live-state').count(), 0, 'unselected trade must not auto-join');
+  assert.equal(participants.has(11), false, 'unrelated live must not register attendance');
+  liveTrades = ['로프공'];
   active = true; emit('broadcast-start', {session_id: sessionId, started_by: '10'});
   await page.getByLabel('TBM live translation', {exact: true}).waitFor();
   await page.getByTestId('tbm-briefing-hero').waitFor();

@@ -282,7 +282,11 @@ function WorkerTBMDetailContent() {
         } else {
             tbmParams.set("limit", "1");
         }
-        const tbmRes = await fetch(`/api/tbm/today?${tbmParams.toString()}`, { cache: "no-store", credentials: "include" });
+        const defaultPage = !liveSummary && tbmId === "today";
+        const tbmPath = defaultPage
+            ? `/api/tbm/pending?${new URLSearchParams({ siteId: String(me.profile?.site_id ?? ""), limit: "1" })}`
+            : `/api/tbm/today?${tbmParams.toString()}`;
+        const tbmRes = await fetch(tbmPath, { cache: "no-store", credentials: "include" });
         const tbmJson = tbmRes.ok ? await tbmRes.json() as { tbms?: any[] } : { tbms: [] };
         tbmData = tbmJson.tbms?.[0] || null;
         if (version !== loadVersionRef.current) return;
@@ -540,7 +544,7 @@ function WorkerTBMDetailContent() {
                             <p className="mt-2 text-sm font-bold text-slate-100">{new Date(liveReceiving ? Date.now() : tbm.created_at).toLocaleDateString(({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[preferredLang] || "en-US", { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                         </div>
                     </div>}
-                    {tbmId === "today" && <TbmLiveReceiver siteId={liveSiteId} lang={preferredLang} busyLabel={t.translating} listenLabel={t.voice} translatedLabel={t.translated} originalLabel={t.original} onActiveChange={onLiveActiveChange} onSession={onLiveSession} onSummary={setLiveSummary} onPendingCleared={onPendingCleared} allowQuestions />}
+                    {tbmId === "today" && <TbmLiveReceiver siteId={liveSiteId} lang={preferredLang} busyLabel={t.translating} listenLabel={t.voice} translatedLabel={t.translated} originalLabel={t.original} onActiveChange={onLiveActiveChange} onSession={onLiveSession} onSummary={setLiveSummary} onPendingCleared={onPendingCleared} dailyTradesOnly={searchParams.get("allTrades") !== "1"} allowQuestions />}
 
                     {fromCache && (
                         <div className="rounded-2xl bg-amber-500/15 border border-amber-400/30 text-amber-200 text-sm px-4 py-3">

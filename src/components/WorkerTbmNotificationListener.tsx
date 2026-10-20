@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { playNotificationSound } from "@/utils/notifications";
 import { ensureLocalNotifyPermission, notifyNative } from "@/utils/native/local-notify";
+import { loadDailyTrades, matchesDailyTrades } from "@/lib/worker-daily-trades";
 
 type TbmNotice = {
   id?: string | number;
@@ -34,8 +35,9 @@ export default function WorkerTbmNotificationListener() {
   }, []);
 
   useEffect(() => {
-    if (!allowed) return;
+    if (!allowed || !siteId) return;
     let cancelled = false;
+    latestTbmIdRef.current = null;
 
     const alertWorker = (notice: TbmNotice) => {
       playNotificationSound();
@@ -49,7 +51,9 @@ export default function WorkerTbmNotificationListener() {
 
     const refresh = async () => {
       try {
-        const response = await fetch("/api/tbm/today?limit=1", {
+        const selection = await loadDailyTrades(siteId);
+        if (!selection.selected || cancelled) return;
+        const response = await fetch(`/api/tbm/pending?${new URLSearchParams({ siteId, limit: "1" })}`, {
           cache: "no-store",
           credentials: "include",
         });
@@ -61,6 +65,8 @@ export default function WorkerTbmNotificationListener() {
         const timestamp = latest.published_at ?? latest.created_at ?? "";
         const id = latest.id == null ? `${timestamp}:${latest.content_ko ?? ""}` : String(latest.id);
         const previousId = latestTbmIdRef.current;
+        // Signing removes the newest pending row; older remaining rows are not new broadcasts.
+        if (previousId && /^\d+$/.test(id) && /^\d+$/.test(previousId) && BigInt(id) <= BigInt(previousId)) return;
         latestTbmIdRef.current = id;
 
         if (previousId && previousId !== id) alertWorker(latest);
@@ -76,12 +82,15 @@ export default function WorkerTbmNotificationListener() {
       if (document.visibilityState === "visible") void refresh();
     };
     document.addEventListener("visibilitychange", onVisible);
+    const changed = () => { latestTbmIdRef.current = null; void refresh(); };
+    window.addEventListener("sq-link:daily-trades-changed", changed);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("sq-link:daily-trades-changed", changed);
     };
-  }, [allowed]);
+  }, [allowed, siteId]);
 
   // 최종 TBM 전파 전에도, 방송 시작 신호를 즉시 근로자에게 알린다.
   // SSE는 앱이 실행 중일 때 실시간으로 수신한다. 앱이 완전히 종료된 상태의 원격 푸시는
@@ -90,11 +99,20 @@ export default function WorkerTbmNotificationListener() {
     if (!siteId) return;
     const announced = new Set<string>();
     const events = new EventSource("/api/live/events?" + new URLSearchParams({ type: "translations", siteId }));
-    events.addEventListener("broadcast-start", event => {
+    events.addEventListener("broadcast-start", async event => {
       try {
         const broadcast = JSON.parse((event as MessageEvent<string>).data) as { session_id?: string };
         const sessionId = broadcast.session_id;
         if (!sessionId?.startsWith("tbm_") || announced.has(sessionId)) return;
+        if (allowed) {
+          const [selection, response] = await Promise.all([
+            loadDailyTrades(siteId),
+            fetch(`/api/live/sessions?${new URLSearchParams({ siteId })}`, { cache: "no-store" }),
+          ]);
+          if (!response.ok) return;
+          const live = await response.json();
+          if (!selection.selected || live.session?.session_id !== sessionId || !matchesDailyTrades(live.session.trade_types, selection)) return;
+        }
         announced.add(sessionId);
         playNotificationSound();
         navigator.vibrate?.([300, 120, 300]);
@@ -119,7 +137,7 @@ export default function WorkerTbmNotificationListener() {
       }
     });
     return () => events.close();
-  }, [siteId]);
+  }, [siteId, allowed]);
 
   return null;
 }

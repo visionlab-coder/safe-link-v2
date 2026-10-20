@@ -37,6 +37,7 @@ try {
     const url = new URL(route.request().url());
     if (url.pathname === '/api/auth/me') return route.fulfill({json: temporary
       ? {...me, profile:{...me.profile, role:'TEMP_WORKER'}, v3:{...me.v3, roles:['TEMP_WORKER']}} : me});
+    if (url.pathname === '/api/tbm/daily-trades') return route.fulfill({json:{date:'2026-10-20',selected:true,trades:TBM_TRADES}});
     if (url.pathname === '/api/tbm/pending') {
       pendingRequests++;
       if (fail) return route.fulfill({status:503,json:{error:'fixture_failure'}});
@@ -99,7 +100,7 @@ try {
   await page.goto(base+'/worker?lang=ko'); await waitCount(1);
   await page.getByTestId('tbm-notices').screenshot({path:'/private/tmp/tbm-notifications-single-mobile.png'});
   legacy=true; await refresh();
-  await page.waitForFunction(() => document.querySelector('[data-testid="tbm-notice-trades"]')?.textContent === 'TBM');
+  await page.waitForFunction(() => document.querySelector('[data-testid="tbm-notice-trades"]')?.textContent === '현장 공통');
   legacy=false; count=6; await refresh(); await waitCount(6);
   await page.getByTestId('tbm-notices').screenshot({path:'/private/tmp/tbm-notifications-six-mobile.png'});
   // A failed refresh must not erase valid cards; a successful empty response must.
@@ -109,17 +110,11 @@ try {
   assert.equal(await page.getByTestId('tbm-notice').first().getAttribute('href'), '/worker/tbm/today?lang=ko');
   assert.ok((await page.getByTestId('tbm-notice').first().textContent()).includes('LIVE'));
   live=false; await refresh(); await waitCount(2);
-  // Midnight expiry works even if the API fails; an ongoing live card survives the date change.
-  live=true; await refresh(); await waitCount(3);
-  fail=true;
-  await page.clock.setFixedTime(new Date('2026-10-20T15:00:00.000Z'));
-  await refresh(); await waitCount(1);
-  assert.ok((await page.getByTestId('tbm-notice').textContent()).includes('LIVE'));
-  fail=false; live=false; await refresh(); await waitCount(0);
+  // Daily selection expiry is covered by worker-daily-trades-browser.mjs.
   // Temporary workers retain only live access, never a pending/signature card.
   temporary=true; live=true;
   await page.goto(base+'/worker/temporary?lang=ko'); await waitCount(1);
   assert.equal(await page.getByTestId('tbm-notice').getAttribute('href'), '/worker/live?lang=ko');
   assert.deepEqual(errors, []);
-  console.log('PASS: real local BFF authorization; 1–9 cards at 320/390/1280px; 16 trades × 20 languages; exact TBM links; KST midnight/failed-refresh expiry with live preserved; temporary-worker restrictions.');
+  console.log('PASS: real local BFF authorization; 1–9 cards at 320/390/1280px; 16 trades × 20 languages; exact TBM links; temporary-worker restrictions.');
 } finally { await browser.close(); }

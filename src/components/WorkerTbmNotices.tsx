@@ -6,9 +6,11 @@ import { loadPendingTbms, tbmNotificationColumns, todayTbmNotices, type TbmHomeN
 import { normalizeTbmTrades } from "@/lib/tbm-trades";
 import { tbmLanguage, tbmTradeLabel } from "@/lib/tbm-trade-labels";
 import styles from "./WorkerTbmNotices.module.css";
+import { dailyTradeUI, matchesDailyTrades, type DailyTrades } from "@/lib/worker-daily-trades";
 
-export default function WorkerTbmNotices({ siteId, temporary, lang, message }: {
+export default function WorkerTbmNotices({ siteId, temporary, lang, message, selection, otherTrades = false }: {
   siteId: string; temporary: boolean; lang: string; message: string;
+  selection?: DailyTrades; otherTrades?: boolean;
 }) {
   const [notices, setNotices] = useState<TbmHomeNotice[]>([]);
   const [live, setLive] = useState<TbmHomeNotice | null>(null);
@@ -23,7 +25,7 @@ export default function WorkerTbmNotices({ siteId, temporary, lang, message }: {
       setNotices(current => todayTbmNotices(current));
       const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(15000)]);
       await Promise.allSettled([
-        temporary ? Promise.resolve() : loadPendingTbms(siteId, signal).then(rows => {
+        temporary ? Promise.resolve() : loadPendingTbms(siteId, signal, otherTrades).then(rows => {
           if (!abort.signal.aborted) setNotices(todayTbmNotices(rows));
         }),
         fetch(`/api/live/sessions?${new URLSearchParams({ siteId })}`, {
@@ -34,7 +36,8 @@ export default function WorkerTbmNotices({ siteId, temporary, lang, message }: {
           if (abort.signal.aborted) return;
           const session = data.session;
           // Never infer live state merely because a notice exists or an old session ended.
-          setLive(data.active === true && typeof session?.session_id === "string" && session.session_id.startsWith("tbm_")
+          const relevant = !selection || matchesDailyTrades(session?.trade_types, selection);
+          setLive(relevant !== otherTrades && data.active === true && typeof session?.session_id === "string" && session.session_id.startsWith("tbm_")
             ? { id: session.session_id, trade_types: session.trade_types, created_at: session.started_at }
             : null);
         }),
@@ -54,7 +57,7 @@ export default function WorkerTbmNotices({ siteId, temporary, lang, message }: {
       events.forEach(event => window.removeEventListener(event, refresh));
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [siteId, temporary]);
+  }, [siteId, temporary, selection, otherTrades]);
 
   const cards = [...(live ? [{ notice: live, isLive: true }] : []), ...notices.map(notice => ({ notice, isLive: false }))];
   if (!cards.length) return null;
@@ -67,7 +70,7 @@ export default function WorkerTbmNotices({ siteId, temporary, lang, message }: {
       const timestamp = notice.published_at ?? notice.created_at;
       const date = timestamp ? new Date(timestamp) : null;
       return <Link key={notice.id} data-testid="tbm-notice" data-tbm-id={notice.id}
-        href={`${isLive && temporary ? "/worker/live" : `/worker/tbm/${isLive ? "today" : encodeURIComponent(notice.id)}`}?lang=${encodeURIComponent(lang)}`}
+        href={`${isLive && temporary ? "/worker/live" : `/worker/tbm/${isLive ? "today" : encodeURIComponent(notice.id)}`}?lang=${encodeURIComponent(lang)}${otherTrades && isLive ? "&allTrades=1" : ""}`}
         className={`tbm-new-notice ${styles.card} ${cards.length === 1 ? styles.single : styles.compact}`}>
         <div className={styles.icon} aria-hidden="true">
           <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -76,7 +79,7 @@ export default function WorkerTbmNotices({ siteId, temporary, lang, message }: {
         </div>
         <div className={styles.body}>
           <p className={styles.trades} data-testid="tbm-notice-trades">
-            {trades.length ? trades.map(trade => <span key={trade}>{tbmTradeLabel(trade, lang)}</span>) : <span>TBM</span>}
+            {trades.length ? trades.map(trade => <span key={trade}>{tbmTradeLabel(trade, lang)}</span>) : <span>{dailyTradeUI(lang).common}</span>}
             {isLive && <span className={styles.live}>LIVE</span>}
           </p>
           <h2>{message}</h2>

@@ -58,6 +58,7 @@ jobs:
           node --test tests/tbm-live-broadcast.cjs
           node --test tests/tbm-trades.cjs
           node tests/tbm-notifications.cjs
+          node tests/worker-daily-trades.cjs
           node --test tests/profile-setup-i18n.test.cjs
           npm run build
 

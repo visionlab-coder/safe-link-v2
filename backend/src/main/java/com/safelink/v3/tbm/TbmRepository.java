@@ -47,11 +47,23 @@ public class TbmRepository {
 
     /** Worker home day window, independent of the administrator's all-date recent history. */
     public List<NoticeRow> listPending(Long siteId, Long workerId, Instant start, Instant end, Long cursor, int limit) {
+        return listPending(siteId, workerId, start, end, cursor, limit, false);
+    }
+
+    public List<NoticeRow> listPending(Long siteId, Long workerId, Instant start, Instant end, Long cursor, int limit, boolean otherTrades) {
         var statement = noticeStatement("""
                 where t.status = 'PUBLISHED' and t.site_id = :siteId
                   and t.home_notification_hidden_at is null
                   and coalesce(t.published_at, t.created_at) >= :start
                   and coalesce(t.published_at, t.created_at) < :end
+                  and (
+                    t.trade_types = '[]'::jsonb or exists (
+                      select 1 from worker_daily_trades d
+                      where d.worker_id=:workerId and d.site_id=t.site_id and d.work_date=:day
+                        and exists (select 1 from jsonb_array_elements_text(d.trade_types) x
+                                    where t.trade_types @> jsonb_build_array(x.value))
+                    )
+                  ) = :matching
                   and not exists (
                     select 1 from tbm_acknowledgements a
                     where a.tbm_notice_id = t.id and a.worker_id = :workerId
@@ -61,6 +73,8 @@ public class TbmRepository {
                 limit :limit
             """.formatted(cursor == null ? "" : "and t.id < :cursor"))
             .param("siteId", siteId).param("workerId", workerId).param("limit", limit)
+            .param("day", start.atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate())
+            .param("matching", !otherTrades)
             .param("start", Timestamp.from(start)).param("end", Timestamp.from(end));
         if (cursor != null) statement = statement.param("cursor", cursor);
         return statement.query(this::mapNotice).list();

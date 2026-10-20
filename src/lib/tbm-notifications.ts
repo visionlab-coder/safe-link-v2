@@ -25,12 +25,13 @@ export function todayTbmNotices(notices: TbmHomeNotice[], now = new Date()): Tbm
 }
 
 /** Collect every page atomically: a failed page must not remove existing cards. */
-export async function loadPendingTbms(siteId: string, signal: AbortSignal): Promise<TbmHomeNotice[]> {
+export async function loadPendingTbms(siteId: string, signal: AbortSignal, otherTrades = false): Promise<TbmHomeNotice[]> {
   const notices = new Map<string, TbmHomeNotice>();
   const cursors = new Set<string>();
   let cursor: string | null = null;
   do {
     const query = new URLSearchParams({ siteId, limit: "50" });
+    if (otherTrades) query.set("scope", "other");
     if (cursor) query.set("cursor", cursor);
     const response = await fetch(`/api/tbm/pending?${query}`, { cache: "no-store", credentials: "include", signal });
     if (!response.ok) throw new Error("tbm_pending_unavailable");
