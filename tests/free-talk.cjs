@@ -46,6 +46,16 @@ const post=(action,body,headers)=>route.POST(request(action,body,headers),{param
   assert.equal((await post('translate',{text:'hi',from:'en',to:'ko'},{cookie:''})).status,401);
   assert.equal((await post('translate',{text:'hi',from:'xx',to:'ko'})).status,400);
   assert.equal((await post('translate',{text:'a'.repeat(2001),from:'en',to:'ko'})).status,400);
+  const { FREE_TALK_LANGUAGES: languages }=load('src/lib/free-talk-languages.ts');
+  for (const code of Object.keys(languages)) {
+    for (const [from,to] of [['ko',code],[code,'ko']]) {
+      assert.equal((await post('translate',{text:'나라시 하지 마세요.',from,to})).status,200);
+      assert.equal(calls.at(-1).body.from,from); assert.equal(calls.at(-1).body.to,to);
+      if (from==='ko') assert.equal(calls.at(-1).body.text,'평탄화 하지 마세요.');
+    }
+  }
+  assert.equal((await post('translate',{text:'hello',from:'ph',to:'jp'})).status,200);
+  assert.equal(calls.at(-1).body.from,'tl'); assert.equal(calls.at(-1).body.to,'ja');
   assert.equal((await post('admin',{})).status,404);
   const tts=await post('tts',{text:'hello',lang:'en',gender:'female'});
   assert.equal(tts.headers.get('content-type'),'audio/mpeg'); assert.equal(await tts.text(),'audio fixture');

@@ -15,6 +15,7 @@ import { getT as getAuthT } from "@/app/auth/translations";
 import { tbmPublishLabel } from "@/lib/tbm-publish-ui";
 import { workerRegistrationUI } from "@/lib/worker-registration-ui";
 import homeStyles from "./worker-home.module.css";
+import WorkerTbmNotices from "@/components/WorkerTbmNotices";
 
 const WORKER_COMMON: Record<string, Record<string, string>> = {
     ko: { profile:"프로필", connecting:"연결 중...", safetyHome:"근로자 안전 홈", todayTitle:"오늘 할 일", todayDesc:"교육을 확인하고 서명하면 완료됩니다.", step1:"교육 확인", step2:"서명", step3:"완료", helperTitle:"필요한 기능", logoutFailed:"로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.", pledgeTitle:"TBM 안전 서약", pledgeDesc:"서명으로 안전 서약 확인" },
@@ -572,9 +573,6 @@ function WorkerHomeContent() {
     const [profile, setProfile] = useState<any>(null);
     const pathname = usePathname();
     const temporary = pathname === "/worker/temporary" || profile?.role === "TEMP_WORKER";
-    const [hasNewTBM, setHasNewTBM] = useState(false);
-    const [newTBMTime, setNewTBMTime] = useState<string>("");
-    const [liveTbmActive, setLiveTbmActive] = useState(false);
 
     const [showStopWorkModal, setShowStopWorkModal] = useState(false);
     const [stopWorkReason, setStopWorkReason] = useState("");
@@ -674,80 +672,6 @@ function WorkerHomeContent() {
         // 네이티브 앱에서만 로컬 알림 권한 요청(브라우저 no-op)
         if (!temporary) ensureLocalNotifyPermission();
     }, [urlLang, temporary]);
-
-    // 실시간 TBM 방송 시작도 기존 TBM 전파 알림 카드로 보여 준다.
-    useEffect(() => {
-        const onLiveStart = () => {
-            setLiveTbmActive(true);
-            setHasNewTBM(true);
-            setNewTBMTime(new Date().toLocaleTimeString());
-        };
-        const onLiveStop = () => setLiveTbmActive(false);
-        window.addEventListener("sq-link:tbm-live-start", onLiveStart);
-        window.addEventListener("sq-link:tbm-live-stop", onLiveStop);
-        return () => {
-            window.removeEventListener("sq-link:tbm-live-start", onLiveStart);
-            window.removeEventListener("sq-link:tbm-live-stop", onLiveStop);
-        };
-    }, []);
-
-    // 관리자 PC에서 발송한 TBM은 근로자 앱/웹이 같은 API에서 주기적으로 확인한다.
-    // 기존 구현은 hasNewTBM 상태를 한 번도 갱신하지 않아 알림 카드가 영구히 숨겨졌다.
-    useEffect(() => {
-        if (!profile || temporary) return;
-        let cancelled = false;
-
-        const refreshTbm = async () => {
-            try {
-                const response = await fetch("/api/tbm/today?limit=1", {
-                    cache: "no-store",
-                    credentials: "include",
-                });
-                if (!response.ok || cancelled) return;
-                const payload = await response.json() as {
-                    tbms?: Array<{ id?: string | number; title?: string | null; content_ko?: string | null; created_at?: string | null; published_at?: string | null }>;
-                };
-                const latest = payload.tbms?.[0];
-                if (!latest) {
-                    if (!cancelled && !liveTbmActive) setHasNewTBM(false);
-                    return;
-                }
-
-                // 공지가 존재한다는 것과 아직 확인·서명해야 한다는 것은 다르다.
-                // 이전 구현은 최신 TBM이 있으면 무조건 알림을 표시해, 서명 완료 후에도
-                // 홈에 "새 안전 지침" 카드가 계속 남았다.
-                const signResponse = latest.id == null
-                    ? null
-                    : await fetch(`/api/tbm/sign?tbmId=${encodeURIComponent(String(latest.id))}`, {
-                        cache: "no-store",
-                        credentials: "include",
-                    }).catch(() => null);
-                const signStatus = signResponse?.ok
-                    ? await signResponse.json() as { signed?: boolean }
-                    : null;
-                if (!cancelled) {
-                    setHasNewTBM(liveTbmActive || !signStatus?.signed);
-                    const timestamp = latest.published_at ?? latest.created_at;
-                    setNewTBMTime(timestamp ? new Date(timestamp).toLocaleTimeString() : "");
-
-                }
-            } catch {
-                // 네트워크 일시 실패는 다음 주기에 다시 조회한다.
-            }
-        };
-
-        void refreshTbm();
-        const interval = window.setInterval(refreshTbm, 15_000);
-        const onVisibilityChange = () => {
-            if (document.visibilityState === "visible") void refreshTbm();
-        };
-        document.addEventListener("visibilitychange", onVisibilityChange);
-        return () => {
-            cancelled = true;
-            window.clearInterval(interval);
-            document.removeEventListener("visibilitychange", onVisibilityChange);
-        };
-    }, [profile, temporary, liveTbmActive]);
 
     // 현재 브라우저에서 고른 언어가 프로필의 기본 한국어값보다 우선한다.
     const lang = resolveDisplayLanguage(profile?.preferred_lang, urlLang, displayLang);
@@ -941,31 +865,10 @@ function WorkerHomeContent() {
                     </div>
                 )}
 
-                {/* 🚀 New Notification (High Impact) */}
-                {hasNewTBM && (
-                    <div
-                        className="tbm-new-notice relative overflow-hidden p-8 glass-red rounded-[40px] border-red-500 border-2 shadow-[0_0_60px_-15px_rgba(239,68,68,0.6)] cursor-pointer tap-effect group"
-                        onClick={() => { if (!liveTbmActive) setHasNewTBM(false); router.push("/worker/tbm/today"); }}
-                    >
-                        <div className="flex items-center gap-6 relative z-10">
-                            <div className="w-16 h-16 bg-white/10 rounded-3xl flex items-center justify-center text-white relative">
-                                <div className="absolute inset-0 bg-white rounded-3xl animate-ping opacity-20" />
-                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                                </svg>
-                            </div>
-                            <div className="flex-1">
-                                <h2 className="text-2xl font-bold text-white italic lowercase tracking-tight">{t.newTBM}</h2>
-                                {newTBMTime && <p className="text-red-200/60 font-medium text-sm">{newTBMTime}</p>}
-                            </div>
-                            <div className="w-12 h-12 glass rounded-full flex items-center justify-center text-white group-hover:translate-x-1 transition-transform">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {profile?.site_id && <WorkerTbmNotices
+                    key={`${profile.id}:${profile.site_id}:${temporary}`}
+                    siteId={String(profile.site_id)} temporary={temporary} lang={lang} message={t.newTBM}
+                />}
                 {/* 🎯 Daily TBM (The Main Mission) */}
                 <section inert={temporary || undefined} data-worker-locked={temporary || undefined} className="glass rounded-[36px] p-6 md:p-8 border-white/10 shadow-3xl relative overflow-hidden flex flex-col gap-6">
                     <div className="absolute top-0 right-0 w-40 h-40 bg-green-500/10 blur-[70px] rounded-full -mr-20 -mt-20 pointer-events-none" />

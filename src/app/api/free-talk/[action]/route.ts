@@ -4,10 +4,10 @@ import { SAFE_LINK_V3_API_BASE_URL } from "@/utils/auth/v3-proxy";
 import { freeTalkGlossary, normalizeFreeTalk } from "@/utils/free-talk-glossary";
 import { normalizeKoreanGlossary, GLOSSARY_POLICY_VERSION } from "@/utils/korean-glossary";
 import { hangulize } from "@/utils/hangulize";
+import { isFreeTalkLanguage, normalizeFreeTalkLanguage } from "@/lib/free-talk-languages";
 
 export const runtime = "nodejs";
 const COOKIE = "SAFE_LINK_FREE_TALK";
-const LANGS = new Set(["ko", "ja", "en", "zh", "vi"]);
 const ACTIONS = new Set(["session", "room", "join", "signal", "translate", "stt", "tts", "events"]);
 type Context = { params: Promise<{ action: string }> };
 
@@ -54,9 +54,11 @@ async function handle(request: NextRequest, context: Context) {
     const body = request.method === "GET" ? Object.fromEntries(request.nextUrl.searchParams) : JSON.parse(raw || "{}");
     let stage: ReturnType<typeof normalizeFreeTalk> | undefined;
     if (action === "translate") {
-      if (typeof body.text !== "string" || !body.text.trim() || body.text.length > 2000 || !LANGS.has(body.from) || !LANGS.has(body.to)) {
+      if (typeof body.text !== "string" || !body.text.trim() || body.text.length > 2000 || !isFreeTalkLanguage(body.from) || !isFreeTalkLanguage(body.to)) {
         return NextResponse.json({ error: "invalid_translation_input" }, { status: 400 });
       }
+      body.from = normalizeFreeTalkLanguage(body.from);
+      body.to = normalizeFreeTalkLanguage(body.to);
       stage = normalizeFreeTalk(body.text, body.from, body.to, await freeTalkGlossary(SAFE_LINK_V3_API_BASE_URL));
     }
     const res = await upstream(action, stage ? { ...body, text: stage.normalized } : body);

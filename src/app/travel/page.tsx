@@ -8,14 +8,7 @@ import { FreeTalkAudio } from '@/utils/free-talk-audio';
 import { ensureFreeTalkSession, freeTalkRequest } from '@/utils/free-talk-client';
 import { useCloudSTT } from '@/hooks/useCloudSTT';
 import { useDisplayLanguage } from '@/hooks/useDisplayLanguage';
-
-const LANGS: Record<string, { label: string; flag: string; stt: string }> = {
-  ko: { label: '한국어', flag: '🇰🇷', stt: 'ko-KR' },
-  ja: { label: '日本語', flag: '🇯🇵', stt: 'ja-JP' },
-  en: { label: 'English', flag: '🇺🇸', stt: 'en-US' },
-  zh: { label: '中文',    flag: '🇨🇳', stt: 'zh-CN' },
-  vi: { label: 'Việt',   flag: '🇻🇳', stt: 'vi-VN' },
-};
+import { FREE_TALK_LANGUAGES as LANGS, isFreeTalkLanguage, normalizeFreeTalkLanguage } from '@/lib/free-talk-languages';
 
 const TRAVEL_UI = {
   ja: { bridge: '言葉の壁を越えて', myLanguage: '自分の言語', start: '新しい会話', solo: '1台のスマホで会話', enter: '参加', noInstall: 'アプリ不要、ブラウザーで接続', partnerLanguage: '相手の言語を選択', selectLanguage: '言語を選択してください', back: '← 戻る', tapFlag: '国旗をタップして接続', showQr: '相手にこの画面を見せてください', codeEntry: 'またはコードを入力', waiting: '相手の参加を待っています', male: '♂ 男性', female: '♀ 女性', simultaneous: '同時通訳', conversation: '会話', learning: '学習', quick: 'クイック', interpreting: '同時通訳中', microphoneStarting: 'マイクを起動中…', partnerSpeaking: '相手が話しています', startConversation: 'ボタンを押して会話を開始', autoTranslate: '話すと自動翻訳されます', learningHint: '韓国語の発音表記と逆翻訳を表示', learningSub: '相手の言語を読み上げてみましょう', translating: '翻訳中', textInput: 'メッセージ入力', listening: '◉ 聞き取り中', meSpeak: '自分 · 話す', partner: '相手', tapToSpeak: 'タップして話す', pauseMic: 'マイク停止', restartMic: 'マイク再開', replay: '再生', pronunciation: '発音', reverseTranslation: '逆翻訳' },
@@ -284,7 +277,7 @@ export default function TravelTalk() {
     const code = params.get('code');
     if (code && /^\d{8}$/.test(code)) { setPendingCode(code); setPhase('join'); }
     const selected = params.get('lang') || displayLanguage;
-    setMyLang(LANGS[selected] ? selected : selected === 'jp' ? 'ja' : 'en');
+    setMyLang(isFreeTalkLanguage(selected) ? normalizeFreeTalkLanguage(selected) : 'en');
     void ensureFreeTalkSession().then(() => setReady(true)).catch(reportError);
   }, [displayLanguage, reportError]);
 
@@ -589,19 +582,19 @@ export default function TravelTalk() {
         <div style={{ textAlign: 'center', marginBottom: 52 }}>
           <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 16 }}>SQ Link</p>
           <h1 style={{ fontSize: 40, fontWeight: 200, letterSpacing: -2, margin: 0, lineHeight: 1.1 }}>Free Talk</h1>
-          <p style={{ marginTop: 12, color: '#a9c8ff', fontSize: 12 }}>{myLang === 'ko' ? '현장 용어집 적용 · 한국어 / English / 日本語 / 中文 / Việt' : 'Construction glossary · 5 languages'}</p>
+          <p style={{ marginTop: 12, color: '#a9c8ff', fontSize: 12 }}>{myLang === 'ko' ? '현장 용어집 적용 · SQ Link 20개 언어' : 'Construction glossary · 20 SQ Link languages'}</p>
           <p style={{ fontSize: 12, color: '#aebbd0', marginTop: 10, letterSpacing: 2 }}>{ui.bridge}</p>
         </div>
 
         <p style={{ fontSize: 10, color: '#aebbd0', letterSpacing: 3, marginBottom: 12, textTransform: 'uppercase' }}>{ui.myLanguage}</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, marginBottom: 32 }}>
+        <div data-testid="free-talk-my-languages" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 6, marginBottom: 32 }}>
           {Object.entries(LANGS).map(([code, info]) => (
-            <button key={code} onClick={() => setMyLang(code)} style={{
+            <button key={code} data-language={code} aria-pressed={myLang === code} onClick={() => setMyLang(code)} style={{
               padding: '12px 4px',
               background: myLang === code ? 'rgba(192,57,43,0.14)' : 'rgba(255,255,255,0.03)',
               border: myLang === code ? '1px solid rgba(192,57,43,0.55)' : '1px solid rgba(255,255,255,0.07)',
-              borderRadius: 12, color: myLang === code ? '#e74c3c' : '#666',
-              cursor: 'pointer', fontSize: 10, transition: 'all 0.18s',
+              borderRadius: 12, color: myLang === code ? '#ff9b8e' : '#b7c2d4',
+              cursor: 'pointer', fontSize: 12, overflowWrap: 'anywhere', transition: 'all 0.18s',
             }}>
               <div style={{ fontSize: 20, marginBottom: 4 }}>{info.flag}</div>
               {info.label}
@@ -615,7 +608,7 @@ export default function TravelTalk() {
         </button>
 
         {/* 1폰 solo 모드 */}
-        <button disabled={!ready} onClick={() => setPhase('solo-setup')} style={{
+        <button data-testid="free-talk-solo-start" disabled={!ready} onClick={() => setPhase('solo-setup')} style={{
           width: '100%', padding: 15, marginBottom: 14,
           background: 'rgba(255,255,255,0.04)',
           border: '1px solid rgba(255,255,255,0.12)',
@@ -647,21 +640,21 @@ export default function TravelTalk() {
   if (phase === 'solo-setup') return (
     <div style={{ ...PAGE, alignItems: 'center' }}>
       {notice}
-      <div style={{ width: '100%', maxWidth: 420, padding: '0 28px', textAlign: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 420, padding: '28px', textAlign: 'center' }}>
         <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 40 }}>SQ LINK · FREE TALK</p>
 
         <div style={{ marginBottom: 40, lineHeight: 2.6 }}>
           <p style={{ fontSize: 16, color: '#ede8e3', fontWeight: 300 }}>{ui.partnerLanguage}</p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: 48 }}>
+        <div data-testid="free-talk-partner-languages" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10, marginBottom: 48 }}>
           {Object.entries(LANGS)
             .filter(([code]) => code !== myLang)
             .map(([code, info]) => (
-              <button key={code} onClick={() => enterSoloMode(code)} style={{
+              <button key={code} data-language={code} onClick={() => enterSoloMode(code)} style={{
                 padding: '18px 4px', background: 'rgba(255,255,255,0.04)',
                 border: '1px solid rgba(255,255,255,0.09)', borderRadius: 16,
-                color: '#ede8e3', cursor: 'pointer',
+                color: '#ede8e3', cursor: 'pointer', overflowWrap: 'anywhere',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
               }}>
                 <span style={{ fontSize: 32 }}>{info.flag}</span>
@@ -682,17 +675,17 @@ export default function TravelTalk() {
   if (phase === 'join') return (
     <div style={{ ...PAGE, alignItems: 'center' }}>
       {notice}
-      <div style={{ width: '100%', maxWidth: 420, padding: '0 28px', textAlign: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 420, padding: '28px', textAlign: 'center' }}>
         <p style={{ fontSize: 10, letterSpacing: 7, color: RED, fontWeight: 700, marginBottom: 40 }}>SQ LINK · FREE TALK</p>
         <div style={{ marginBottom: 40, lineHeight: 2.6 }}>
           <p style={{ fontSize: 16, color: '#ede8e3', fontWeight: 300 }}>{ui.selectLanguage}</p>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: 48 }}>
+        <div data-testid="free-talk-join-languages" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10, marginBottom: 48 }}>
           {Object.entries(LANGS).map(([code, info]) => (
-            <button key={code} disabled={!ready} onClick={() => joinRoom(pendingCode, code)} style={{
+            <button key={code} data-language={code} disabled={!ready} onClick={() => joinRoom(pendingCode, code)} style={{
               padding: '18px 4px', background: 'rgba(255,255,255,0.04)',
               border: '1px solid rgba(255,255,255,0.09)', borderRadius: 16,
-              color: '#ede8e3', cursor: 'pointer',
+              color: '#ede8e3', cursor: 'pointer', overflowWrap: 'anywhere',
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
             }}>
               <span style={{ fontSize: 32 }}>{info.flag}</span>

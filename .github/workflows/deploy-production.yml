@@ -47,6 +47,7 @@ jobs:
           node tests/korean-glossary.cjs
           node tests/korean-glossary-api.cjs
           node tests/free-talk.cjs
+          node tests/free-talk-languages.cjs
           node tests/free-talk-audio.cjs
           node tests/live-glossary-policy.cjs
           node tests/deepl-routing.cjs
@@ -56,6 +57,7 @@ jobs:
           node tests/tbm-admin-publication.cjs
           node --test tests/tbm-live-broadcast.cjs
           node --test tests/tbm-trades.cjs
+          node tests/tbm-notifications.cjs
           node --test tests/profile-setup-i18n.test.cjs
           npm run build
 

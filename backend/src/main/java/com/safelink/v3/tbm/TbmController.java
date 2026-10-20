@@ -80,6 +80,24 @@ public class TbmController {
         return new TbmListResponse(rows);
     }
 
+    /** Worker home: unsigned published notices, scoped to the currently selected site. */
+    @GetMapping("/pending")
+    public TbmPageResponse pending(
+        @AuthenticationPrincipal SessionPrincipal actor,
+        @RequestParam Long siteId,
+        @RequestParam(required = false) Long cursor,
+        @RequestParam(defaultValue = "50") int limit
+    ) {
+        requireWorker(actor);
+        siteGuard.requireSiteAccess(actor, siteId, "tbm.notice.list", "tbm_notice", null);
+        int safeLimit = Math.max(1, Math.min(limit, 100));
+        var fetched = tbm.listPending(siteId, actor.userId(), cursor, safeLimit + 1);
+        boolean hasMore = fetched.size() > safeLimit;
+        var page = hasMore ? fetched.subList(0, safeLimit) : fetched;
+        return new TbmPageResponse(page.stream().map(this::toCompatNotice).toList(),
+            hasMore ? String.valueOf(page.getLast().id()) : null, hasMore);
+    }
+
     @GetMapping("/notices")
     public TbmListResponse notices(
         @AuthenticationPrincipal SessionPrincipal actor,

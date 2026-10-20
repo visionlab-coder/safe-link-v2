@@ -4,6 +4,14 @@
 
 GitHub Actions의 `Deploy SQ Link V3 production` workflow는 `refactor/v3-commercialization-20260710` 브랜치 push 또는 수동 실행으로 frontend와 backend를 테스트·빌드하고 운영 서버에 불변 release로 배포한다. 이 브랜치에 push하기 전 운영 배포 권한과 백업 상태를 확인한다. 배포 중에는 release 디렉터리를 새로 만들고 `current` 심볼릭 링크만 교체하므로, 실패한 빌드를 현재 운영 파일 위에 덮어쓰지 않는다.
 
+## 2026-10-20 TBM 개별 알림·프리토크 20개 언어 배포 준비
+
+- 사용자 승인으로 TBM 미서명 개별 알림/1~3열 배치/공종 20개 언어 표시와 앞서 요청한 프리토크 20개 언어 확장을 프론트·백엔드 함께 배포한다. 관리자 권한 개편, 공종별 동시 라이브 생성, DB migration, 공급자/키 변경, 운영 계정·서명 데이터 변경은 제외한다.
+- 기준 SHA: `6b630b03066c417ca8b2c54292bce3fccfddf900`. 원격 브랜치, 직전 성공 Actions `39202249842`, 운영 current 링크가 일치한다. 운영 두 서비스 active, readiness UP, 활성 방송 0건을 확인했다.
+- 사전 백업: 기존 `safelink-v3-backup.service` 성공(2026-10-20 06:25:00 UTC). DB·객체 저장소 백업 manifest: `safelink-20261020T062458Z.manifest`. 이전 실행본은 롤백 후보로 유지한다.
+- 로컬 검증: 백엔드 188건 중 186건 통과/외부 DeepL 실호출 2건 제외, TypeScript/ESLint, 기존 TBM·프리토크 회귀, 320/390/1280px 알림 1~9개 배치 및 16개 공종×20개 언어 브라우저 검사. 실제 휴대폰 음성 정확도 시험과 구분한다.
+- Actions의 깨끗한 체크아웃에서 frontend build 및 backend test/bootJar를 다시 실행한다. 성공 후 활성화·readiness·인증 리다이렉트 및 실제 current SHA를 확인해야 운영 반영 완료로 판단한다. 기존 배포 절차에는 서비스 재시작이 포함된다.
+
 ## 2026-10-19 TBM 무활동 자동 종료 / 최근 이력 복원
 
 - 사용자 요청: 10/14 sk.park 전국 방송 종료, 이후 TBM 5분 무활동 자동 종료. 앞서 요청한 날짜 제한 없는 최근 10건 복원도 포함한다. 보류된 관리자 권한/직원 분류는 제외한다.

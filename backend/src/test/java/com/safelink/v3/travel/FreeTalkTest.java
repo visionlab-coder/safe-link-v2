@@ -34,7 +34,9 @@ class FreeTalkTest {
         properties=new AiProperties(); properties.setInternalGatewaySecret("fixture-secret"); properties.setVendorEnabled(true);
         access=new FreeTalkAccess(redis,properties,10000);
         vendor=mock(AiVendorService.class); media=mock(AiMediaService.class); events=mock(TravelRealtimeEventBus.class);
-        controller=new FreeTalkController(access,redis,events,vendor,media,mock(AiUsageRepository.class),mock(JdbcClient.class));
+        var jdbc=mock(JdbcClient.class,RETURNS_DEEP_STUBS);
+        when(jdbc.sql(anyString()).query(String.class).list()).thenReturn(List.of());
+        controller=new FreeTalkController(access,redis,events,vendor,media,mock(AiUsageRepository.class),jdbc);
     }
     @AfterEach void close() { factory.destroy(); }
     MockHttpServletRequest request() {
@@ -93,5 +95,37 @@ class FreeTalkTest {
         assertEquals(429,assertThrows(ResponseStatusException.class,()->access.paid(r,access.require(r))).getStatusCode().value());
         var broken=mock(StringRedisTemplate.class); when(broken.hasKey(anyString())).thenThrow(new IllegalStateException("offline"));
         assertThrows(IllegalStateException.class,()->new FreeTalkAccess(broken,properties,10).require(r));
+    }
+
+    @Test void allTwentyLanguagesReachRoomTranslationSpeechAndVoiceWithCanonicalCodes() {
+        assertEquals(20,FreeTalkController.LANGS.size());
+        when(vendor.translateAuto(anyString(),anyString(),anyString())).thenReturn(new AiVendorService.VendorResult("translated","fixture","test"));
+        when(media.transcribe(anyString(),anyString(),anyString(),eq(16000),eq(true),anyList(),isNull(),anyList()))
+            .thenReturn(new AiMediaService.SttResult("recognized","fixture","test",Map.of()));
+        when(media.synthesize(isNull(),anyString(),anyString(),isNull(),eq("female"),eq(true),eq(false),eq("MP3")))
+            .thenReturn(new AiMediaService.AudioResult("YWJj","audio/mpeg","fixture","test"));
+        MockHttpServletRequest host=null,partner=null;
+        int index=0;
+        for (var entry:FreeTalkController.LANGS.entrySet()) {
+            // Respect the real room/join/session quotas; do not weaken them for more languages.
+            if (index++ % 10 == 0) { host=guest(); partner=guest(); }
+            String lang=entry.getKey(),locale=entry.getValue();
+            String room=controller.room(host,new FreeTalkController.RoomRequest(null,lang)).get("room");
+            assertEquals(lang,controller.join(partner,new FreeTalkController.RoomRequest(room,lang)).get("partnerLang"));
+            assertEquals("translated",controller.translate(host,new FreeTalkController.TranslateRequest("text",lang,"ko")).get("translated"));
+            assertEquals("translated",controller.translate(host,new FreeTalkController.TranslateRequest("text","ko",lang)).get("translated"));
+            verify(vendor,atLeastOnce()).translateAuto("text",lang,"ko");
+            verify(vendor,atLeastOnce()).translateAuto("text","ko",lang);
+            assertEquals("recognized",controller.stt(host,new FreeTalkController.SpeechRequest("YWJj",locale,"audio/pcm;encoding=s16le;rate=16000",16000)).get("transcript"));
+            verify(media).transcribe("YWJj","audio/pcm;encoding=s16le;rate=16000",locale,16000,true,List.of(),null,List.of());
+            controller.tts(host,new FreeTalkController.VoiceRequest("text",lang,"female"));
+            verify(media).synthesize(null,"text",lang.equals("ar")?"ar-XA":locale,null,"female",true,false,"MP3");
+            controller.signal(host,new FreeTalkController.SignalRequest(room,"new-message",Map.of("original","text","translated","translated","lang",lang,"targetLang","ko")));
+        }
+        assertEquals("ja",FreeTalkController.language("jp"));
+        assertEquals("tl",FreeTalkController.language("ph"));
+        assertEquals("tl",FreeTalkController.language("fil-PH"));
+        assertEquals("ja",FreeTalkController.language("JA_jp"));
+        assertThrows(IllegalArgumentException.class,()->FreeTalkController.language("xx"));
     }
 }

@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -32,7 +33,15 @@ public class FreeTalkController {
     public ResponseEntity<Map<String,String>> storageUnavailable() {
         return ResponseEntity.status(503).body(Map.of("error","free_talk_storage_unavailable"));
     }
-    private static final Map<String, String> LANGS = Map.of("ko", "ko-KR", "en", "en-US", "ja", "ja-JP", "zh", "zh-CN", "vi", "vi-VN");
+    // Same 20 choices as SQ Link. Translation uses ja/tl, not UI aliases jp/ph.
+    static final Map<String, String> LANGS = Map.ofEntries(
+        Map.entry("ko", "ko-KR"), Map.entry("vi", "vi-VN"), Map.entry("zh", "zh-CN"),
+        Map.entry("th", "th-TH"), Map.entry("uz", "uz-UZ"), Map.entry("tl", "fil-PH"),
+        Map.entry("km", "km-KH"), Map.entry("id", "id-ID"), Map.entry("mn", "mn-MN"),
+        Map.entry("my", "my-MM"), Map.entry("ne", "ne-NP"), Map.entry("bn", "bn-IN"),
+        Map.entry("kk", "kk-KZ"), Map.entry("ru", "ru-RU"), Map.entry("en", "en-US"),
+        Map.entry("ja", "ja-JP"), Map.entry("fr", "fr-FR"), Map.entry("es", "es-ES"),
+        Map.entry("ar", "ar-SA"), Map.entry("hi", "hi-IN"));
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final DefaultRedisScript<Long> JOIN = new DefaultRedisScript<>("""
         if redis.call('EXISTS',KEYS[1])==0 then return 0 end
@@ -146,7 +155,7 @@ public class FreeTalkController {
         if (body.gender()==null || !Set.of("male","female").contains(body.gender())) throw new IllegalArgumentException("invalid_gender");
         access.paid(request,token);
         long started=System.currentTimeMillis();
-        var result=media.synthesize(null,text,LANGS.get(lang),null,body.gender(),true,false,"MP3");
+        var result=media.synthesize(null,text,lang.equals("ar") ? "ar-XA" : LANGS.get(lang),null,body.gender(),true,false,"MP3");
         usage.log(null,null,"free_talk_tts",result.vendor(),result.model(),text.length(),result.audioBase64().length(),System.currentTimeMillis()-started,AiCostEstimator.estimate("tts",result.vendor(),text.length(),result.audioBase64().length()));
         return result;
     }
@@ -163,7 +172,8 @@ public class FreeTalkController {
         return code;
     }
     static String language(String value) {
-        String lang=value==null?"":value.split("-")[0];
+        String lang=value==null?"":value.trim().toLowerCase(Locale.ROOT).split("[-_]", -1)[0];
+        lang=switch (lang) { case "jp" -> "ja"; case "ph", "fil" -> "tl"; default -> lang; };
         if (!LANGS.containsKey(lang)) throw new IllegalArgumentException("unsupported_free_talk_language");
         return lang;
     }
