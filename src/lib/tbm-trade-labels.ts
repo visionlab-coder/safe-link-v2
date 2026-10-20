@@ -36,3 +36,32 @@ export function tbmTradeLabel(trade: string, lang: string): string {
   const index = TBM_TRADES.indexOf(trade as typeof TBM_TRADES[number]);
   return index < 0 ? trade : labels[tbmLanguage(lang)].split("|")[index];
 }
+
+// [Select all, composer heading, composer guidance]
+const selectorLabels: Record<QrLanguageCode, [string, string, string]> = {
+  ko: ["전체", "TBM 공종", "여러 공종을 선택할 수 있습니다. 선택한 공종은 TBM에 표시됩니다."],
+  en: ["All", "TBM trades", "Select one or more trades to display on this TBM."],
+  vi: ["Tất cả", "Công việc TBM", "Chọn một hoặc nhiều loại công việc để hiển thị trên TBM này."],
+  zh: ["全部", "TBM 工种", "可选择一个或多个工种，所选工种将显示在此 TBM 中。"],
+  th: ["ทั้งหมด", "ประเภทงาน TBM", "เลือกประเภทงานอย่างน้อยหนึ่งรายการเพื่อแสดงใน TBM นี้"],
+  uz: ["Barchasi", "TBM ish turlari", "Ushbu TBMda ko‘rsatish uchun bir yoki bir nechta ish turini tanlang."],
+  ph: ["Lahat", "Mga uri ng trabaho sa TBM", "Pumili ng isa o higit pang uri ng trabaho na ipapakita sa TBM na ito."],
+  km: ["ទាំងអស់", "ប្រភេទការងារ TBM", "ជ្រើសរើសប្រភេទការងារមួយ ឬច្រើន ដើម្បីបង្ហាញនៅលើ TBM នេះ។"],
+  id: ["Semua", "Jenis pekerjaan TBM", "Pilih satu atau beberapa jenis pekerjaan untuk ditampilkan pada TBM ini."],
+  mn: ["Бүгд", "TBM ажлын төрөл", "Энэ TBM дээр харуулах нэг буюу хэд хэдэн ажлын төрлийг сонгоно уу."],
+  my: ["အားလုံး", "TBM အလုပ်အမျိုးအစားများ", "ဤ TBM တွင် ဖော်ပြရန် အလုပ်အမျိုးအစား တစ်ခု သို့မဟုတ် တစ်ခုထက်ပို၍ ရွေးချယ်ပါ။"],
+  ne: ["सबै", "TBM कामका प्रकार", "यस TBM मा देखाउन एक वा बढी कामका प्रकार छान्नुहोस्।"],
+  bn: ["সব", "TBM কাজের ধরন", "এই TBM-এ দেখানোর জন্য এক বা একাধিক কাজের ধরন বেছে নিন।"],
+  kk: ["Барлығы", "TBM жұмыс түрлері", "Осы TBM-де көрсету үшін бір немесе бірнеше жұмыс түрін таңдаңыз."],
+  ru: ["Все", "Виды работ TBM", "Выберите один или несколько видов работ для отображения в этом TBM."],
+  jp: ["すべて", "TBM 工種", "このTBMに表示する工種を1つ以上選択してください。"],
+  fr: ["Tous", "Métiers du TBM", "Sélectionnez un ou plusieurs métiers à afficher sur ce TBM."],
+  es: ["Todos", "Oficios del TBM", "Seleccione uno o varios oficios para mostrar en este TBM."],
+  ar: ["الكل", "تخصصات TBM", "اختر تخصصًا واحدًا أو أكثر لعرضه في هذا TBM."],
+  hi: ["सभी", "TBM कार्य प्रकार", "इस TBM में दिखाने के लिए एक या अधिक कार्य प्रकार चुनें।"],
+};
+
+export function tbmTradeSelectorUI(lang: string) {
+  const [all, heading, hint] = selectorLabels[tbmLanguage(lang)];
+  return { all, heading, hint };
+}

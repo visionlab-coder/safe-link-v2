@@ -1,8 +1,9 @@
 "use client";
 import { tbmDraftSummaryUI } from "@/lib/tbm-draft-summary-ui";
 import { nationwideTbmUI } from "@/lib/tbm-nationwide-ui";
-import { TBM_TRADES, normalizeTbmTrades, toggleTbmTrade, tbmTradeHeading } from "@/lib/tbm-trades";
-import { displaySetupTrade } from "@/lib/profile-setup-ui";
+import { normalizeTbmTrades } from "@/lib/tbm-trades";
+import { tbmTradeSelectorUI } from "@/lib/tbm-trade-labels";
+import TbmTradeOptions from "@/components/TbmTradeOptions";
 import TbmTradeBadges from "@/components/TbmTradeBadges";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -695,14 +696,9 @@ function AdminTBMCreateContent() {
 
                 <main className="flex-1 flex flex-col p-4 md:p-8 gap-8 max-w-3xl mx-auto w-full pb-20">
                     <fieldset disabled={tradesLocked} data-testid="tbm-trade-selector" className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm disabled:opacity-70">
-                        <legend className="px-2 text-sm font-bold text-slate-900">{tbmTradeHeading(displayLang || adminLang)}</legend>
-                        <p className="mb-4 text-sm text-slate-600">{(displayLang || adminLang) === "ko" ? "여러 공종을 선택할 수 있습니다. 선택한 공종은 TBM에 표시됩니다." : "Select one or more trades to display on this TBM."}</p>
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                            {TBM_TRADES.map(trade => <label key={trade} className={`flex min-h-12 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold ${selectedTrades.includes(trade) ? "border-blue-400 bg-blue-50 text-blue-900" : "border-slate-200 bg-slate-50 text-slate-700"} ${tradesLocked ? "cursor-not-allowed" : "cursor-pointer"}`}>
-                                <input type="checkbox" name="tbm-trades" value={trade} checked={selectedTrades.includes(trade)} onChange={() => setSelectedTrades(current => toggleTbmTrade(current, trade))} className="h-4 w-4 shrink-0 accent-blue-600" />
-                                <span>{displaySetupTrade(trade, displayLang || adminLang)}</span>
-                            </label>)}
-                        </div>
+                        <legend className="px-2 text-sm font-bold text-slate-900">{tbmTradeSelectorUI(displayLang || adminLang).heading}</legend>
+                        <p className="mb-4 text-sm text-slate-600">{tbmTradeSelectorUI(displayLang || adminLang).hint}</p>
+                        <TbmTradeOptions selected={selectedTrades} onChange={setSelectedTrades} lang={displayLang || adminLang} />
                     </fieldset>
                     {canBroadcastNationwide && <fieldset disabled={broadcastActive || broadcastBusy || isSending || isDraining || summaryBusy || (liveFinalizing && !liveCompleted)} className="rounded-3xl border border-blue-200 bg-blue-50 p-5 text-slate-900">
                         <legend className="px-2 text-sm font-bold">{nationUI.target}</legend>

@@ -86,7 +86,7 @@ try {
     },lang);
     await page.goto(base+"/worker?lang="+lang);
     await page.getByTestId("daily-trades").getByRole("heading",{name:dailyTradeUI(lang).title,exact:true}).waitFor();
-    await page.waitForFunction(()=>document.querySelectorAll('[data-testid="daily-trades"] input[type="checkbox"]').length===16);
+    await page.waitForFunction(()=>document.querySelectorAll('[data-testid="daily-trades"] input[type="checkbox"]').length===17);
     assert.equal(await page.getByTestId("daily-trades").evaluate(n=>n.scrollWidth>n.clientWidth+1),false,lang+" overflow");
   }
   assert.deepEqual(errors,[]);

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { TBM_TRADES, toggleTbmTrade } from "@/lib/tbm-trades";
+import TbmTradeOptions from "./TbmTradeOptions";
 import { tbmTradeLabel } from "@/lib/tbm-trade-labels";
 import { dailyTradeUI, isCurrentDailyTrades, loadDailyTrades, type DailyTrades } from "@/lib/worker-daily-trades";
 import WorkerTbmNotices from "./WorkerTbmNotices";
@@ -69,12 +69,7 @@ export default function WorkerDailyTrades(props: { siteId: string; temporary: bo
       {!selection && !error && <p role="status" className="text-slate-500">…</p>}
       {selection && (editing || !selection.selected) ? <fieldset disabled={busy} className="mt-4">
         <legend className="sr-only">{ui.title}</legend>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {TBM_TRADES.map(trade => <label key={trade} className={`flex min-h-12 min-w-0 cursor-pointer items-center gap-2 rounded-xl border p-3 text-sm font-bold ${draft.includes(trade) ? "border-blue-600 bg-blue-50 text-blue-900" : "border-slate-200 text-slate-700"}`}>
-            <input type="checkbox" className="shrink-0" checked={draft.includes(trade)} onChange={() => setDraft(value => toggleTbmTrade(value, trade))} />
-            <span className="min-w-0 break-words">{tbmTradeLabel(trade, lang)}</span>
-          </label>)}
-        </div>
+        <TbmTradeOptions selected={draft} onChange={setDraft} lang={lang} />
         <div className="mt-4 flex gap-3">
           <button type="button" disabled={!draft.length || busy} onClick={save} className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white disabled:opacity-40">{busy ? "…" : ui.save}</button>
           {selection.selected && <button type="button" onClick={() => { setDraft(selection.trades); setEditing(false); }} className="rounded-xl border border-slate-300 px-4 py-3 text-slate-700">{ui.cancel}</button>}

@@ -9,6 +9,10 @@ export function toggleTbmTrade(selected: string[], trade: string): string[] {
   return normalizeTbmTrades(selected.includes(trade) ? selected.filter(item => item !== trade) : [...selected, trade]);
 }
 
+export function toggleAllTbmTrades(selected: string[]): string[] {
+  return normalizeTbmTrades(selected).length === TBM_TRADES.length ? [] : [...TBM_TRADES];
+}
+
 export function tbmTradeHeading(lang: string) {
   return ({ ko: "TBM 공종", en: "TBM trades", zh: "TBM 工种", vi: "Công việc TBM", jp: "TBM 工種", ja: "TBM 工種" } as Record<string, string>)[lang] || "TBM trades";
 }
