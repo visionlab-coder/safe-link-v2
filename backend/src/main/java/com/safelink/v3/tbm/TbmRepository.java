@@ -45,10 +45,13 @@ public class TbmRepository {
         return statement.query(this::mapNotice).list();
     }
 
-    /** No date cutoff or latest-N truncation; acknowledgement belongs to the requesting worker. */
-    public List<NoticeRow> listPending(Long siteId, Long workerId, Long cursor, int limit) {
+    /** Worker home day window, independent of the administrator's all-date recent history. */
+    public List<NoticeRow> listPending(Long siteId, Long workerId, Instant start, Instant end, Long cursor, int limit) {
         var statement = noticeStatement("""
                 where t.status = 'PUBLISHED' and t.site_id = :siteId
+                  and t.home_notification_hidden_at is null
+                  and coalesce(t.published_at, t.created_at) >= :start
+                  and coalesce(t.published_at, t.created_at) < :end
                   and not exists (
                     select 1 from tbm_acknowledgements a
                     where a.tbm_notice_id = t.id and a.worker_id = :workerId
@@ -57,7 +60,8 @@ public class TbmRepository {
                 order by t.id desc
                 limit :limit
             """.formatted(cursor == null ? "" : "and t.id < :cursor"))
-            .param("siteId", siteId).param("workerId", workerId).param("limit", limit);
+            .param("siteId", siteId).param("workerId", workerId).param("limit", limit)
+            .param("start", Timestamp.from(start)).param("end", Timestamp.from(end));
         if (cursor != null) statement = statement.param("cursor", cursor);
         return statement.query(this::mapNotice).list();
     }

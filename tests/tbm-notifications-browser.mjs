@@ -25,6 +25,8 @@ try {
   assert.ok(Object.hasOwn(realPending, 'next_cursor'));
   assert.equal((await context.request.get(base + '/api/tbm/pending?siteId=12345')).status(), 403);
   const page = await context.newPage();
+  // Fixed KST date, independent of the machine/browser timezone or test execution day.
+  await page.clock.setFixedTime(new Date('2026-10-20T14:59:59.000Z'));
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   let count = 1, live = false, fail = false, temporary = false, pendingRequests = 0, legacy = false;
@@ -107,10 +109,17 @@ try {
   assert.equal(await page.getByTestId('tbm-notice').first().getAttribute('href'), '/worker/tbm/today?lang=ko');
   assert.ok((await page.getByTestId('tbm-notice').first().textContent()).includes('LIVE'));
   live=false; await refresh(); await waitCount(2);
+  // Midnight expiry works even if the API fails; an ongoing live card survives the date change.
+  live=true; await refresh(); await waitCount(3);
+  fail=true;
+  await page.clock.setFixedTime(new Date('2026-10-20T15:00:00.000Z'));
+  await refresh(); await waitCount(1);
+  assert.ok((await page.getByTestId('tbm-notice').textContent()).includes('LIVE'));
+  fail=false; live=false; await refresh(); await waitCount(0);
   // Temporary workers retain only live access, never a pending/signature card.
   temporary=true; live=true;
   await page.goto(base+'/worker/temporary?lang=ko'); await waitCount(1);
   assert.equal(await page.getByTestId('tbm-notice').getAttribute('href'), '/worker/live?lang=ko');
   assert.deepEqual(errors, []);
-  console.log('PASS: real local BFF authorization; 1–9 cards at 320/390/1280px; 16 trades × 20 languages; exact TBM links; refresh failure/empty/signature removal; live coexistence and temporary-worker restrictions.');
+  console.log('PASS: real local BFF authorization; 1–9 cards at 320/390/1280px; 16 trades × 20 languages; exact TBM links; KST midnight/failed-refresh expiry with live preserved; temporary-worker restrictions.');
 } finally { await browser.close(); }

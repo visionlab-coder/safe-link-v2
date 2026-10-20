@@ -9,6 +9,21 @@ export function tbmNotificationColumns(count: number): number {
   return count === 4 ? 2 : Math.max(1, Math.min(count, 3));
 }
 
+const koreanDay = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
+});
+
+/** Expire yesterday's cached cards even when the next refresh fails. Live cards are separate. */
+export function todayTbmNotices(notices: TbmHomeNotice[], now = new Date()): TbmHomeNotice[] {
+  const today = koreanDay.format(now);
+  return notices.filter(notice => {
+    const timestamp = notice.published_at ?? notice.created_at;
+    if (!timestamp) return false;
+    const date = new Date(timestamp);
+    return !Number.isNaN(date.getTime()) && koreanDay.format(date) === today;
+  });
+}
+
 /** Collect every page atomically: a failed page must not remove existing cards. */
 export async function loadPendingTbms(siteId: string, signal: AbortSignal): Promise<TbmHomeNotice[]> {
   const notices = new Map<string, TbmHomeNotice>();

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { loadPendingTbms, tbmNotificationColumns, type TbmHomeNotice } from "@/lib/tbm-notifications";
+import { loadPendingTbms, tbmNotificationColumns, todayTbmNotices, type TbmHomeNotice } from "@/lib/tbm-notifications";
 import { normalizeTbmTrades } from "@/lib/tbm-trades";
 import { tbmLanguage, tbmTradeLabel } from "@/lib/tbm-trade-labels";
 import styles from "./WorkerTbmNotices.module.css";
@@ -20,10 +20,11 @@ export default function WorkerTbmNotices({ siteId, temporary, lang, message }: {
       if (abort.signal.aborted) return;
       if (busy) { queued = true; return; }
       busy = true;
+      setNotices(current => todayTbmNotices(current));
       const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(15000)]);
       await Promise.allSettled([
         temporary ? Promise.resolve() : loadPendingTbms(siteId, signal).then(rows => {
-          if (!abort.signal.aborted) setNotices(rows);
+          if (!abort.signal.aborted) setNotices(todayTbmNotices(rows));
         }),
         fetch(`/api/live/sessions?${new URLSearchParams({ siteId })}`, {
           cache: "no-store", credentials: "include", signal,

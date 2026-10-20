@@ -80,7 +80,7 @@ public class TbmController {
         return new TbmListResponse(rows);
     }
 
-    /** Worker home: unsigned published notices, scoped to the currently selected site. */
+    /** Worker home only: today's unsigned publications in Korea, scoped to the selected site. */
     @GetMapping("/pending")
     public TbmPageResponse pending(
         @AuthenticationPrincipal SessionPrincipal actor,
@@ -91,7 +91,10 @@ public class TbmController {
         requireWorker(actor);
         siteGuard.requireSiteAccess(actor, siteId, "tbm.notice.list", "tbm_notice", null);
         int safeLimit = Math.max(1, Math.min(limit, 100));
-        var fetched = tbm.listPending(siteId, actor.userId(), cursor, safeLimit + 1);
+        LocalDate today = LocalDate.now(KST);
+        Instant start = today.atStartOfDay(KST).toInstant();
+        Instant end = today.plusDays(1).atStartOfDay(KST).toInstant();
+        var fetched = tbm.listPending(siteId, actor.userId(), start, end, cursor, safeLimit + 1);
         boolean hasMore = fetched.size() > safeLimit;
         var page = hasMore ? fetched.subList(0, safeLimit) : fetched;
         return new TbmPageResponse(page.stream().map(this::toCompatNotice).toList(),
