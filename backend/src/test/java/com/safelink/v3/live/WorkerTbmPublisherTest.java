@@ -20,15 +20,18 @@ class WorkerTbmPublisherTest {
     private final LiveInterpreterController controller = new LiveInterpreterController(jdbc,new ObjectMapper(),new SiteGuard(audit),audit,mock(LiveInterpreterEventBus.class));
 
     @Test void workerCanStartTbmAtOwnSite() {
+        when(jdbc.sql(anyString()).param(anyString(),any()).query(any(org.springframework.jdbc.core.RowMapper.class)).optional()).thenReturn(Optional.empty());
+        when(jdbc.sql(anyString()).param(anyString(),any()).param(anyString(),any()).param(anyString(),any()).query(Boolean.class).single()).thenReturn(false);
         when(jdbc.sql(anyString()).param(anyString(),any()).param(anyString(),any()).query(Boolean.class).single()).thenReturn(false);
         when(jdbc.sql(anyString()).param(anyString(),any()).query(Boolean.class).single()).thenReturn(false);
         var result=controller.startSession(worker,new LiveInterpreterController.BroadcastSessionRequest("tbm_test","2"));
         assertThat(result.active()).isTrue();
     }
     @Test void workerCannotTakeOverSomeoneElsesBroadcast() {
-        when(jdbc.sql(anyString()).param(anyString(),any()).param(anyString(),any()).query(Boolean.class).single()).thenReturn(true);
+        when(jdbc.sql(anyString()).param(anyString(),any()).query(any(org.springframework.jdbc.core.RowMapper.class)).optional()).thenReturn(Optional.empty());
+        when(jdbc.sql(anyString()).param(anyString(),any()).param(anyString(),any()).param(anyString(),any()).query(Boolean.class).single()).thenReturn(true);
         assertThatThrownBy(()->controller.startSession(worker,new LiveInterpreterController.BroadcastSessionRequest("tbm_test","2")))
-            .hasMessage("live_broadcast_already_active");
+            .hasMessage("tbm_trade_live_conflict");
     }
     @Test void workerCannotStartAtOtherSite() {
         assertThatThrownBy(()->controller.startSession(worker,new LiveInterpreterController.BroadcastSessionRequest("tbm_test","3")))

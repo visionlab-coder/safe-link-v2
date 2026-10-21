@@ -393,6 +393,10 @@ function AdminTBMCreateContent() {
 
     const showBroadcastError = (error: unknown) => {
         const code = error instanceof Error ? error.message : "";
+        if (code === "tbm_trade_live_conflict") {
+            setSttError((displayLang || adminLang) === "ko" ? "선택한 공종 또는 전체 방송이 이미 진행 중입니다. 다른 공종을 선택하거나 방송 종료 후 다시 시도해 주세요." : "A broadcast for the selected trade or site-wide channel is already active. Choose another trade or wait until it ends.");
+            return;
+        }
         if (code.startsWith("nationwide_")) {
             setSttError(code === "nationwide_tbm_live_conflict" ? nationUI.conflict : nationUI.failed);
             return;
@@ -698,7 +702,7 @@ function AdminTBMCreateContent() {
                     <fieldset disabled={tradesLocked} data-testid="tbm-trade-selector" className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm disabled:opacity-70">
                         <legend className="px-2 text-sm font-bold text-slate-900">{tbmTradeSelectorUI(displayLang || adminLang).heading}</legend>
                         <p className="mb-4 text-sm text-slate-600">{tbmTradeSelectorUI(displayLang || adminLang).hint}</p>
-                        <TbmTradeOptions selected={selectedTrades} onChange={setSelectedTrades} lang={displayLang || adminLang} />
+                        <TbmTradeOptions selected={selectedTrades} onChange={setSelectedTrades} lang={displayLang || adminLang} commonChannel />
                     </fieldset>
                     {canBroadcastNationwide && <fieldset disabled={broadcastActive || broadcastBusy || isSending || isDraining || summaryBusy || (liveFinalizing && !liveCompleted)} className="rounded-3xl border border-blue-200 bg-blue-50 p-5 text-slate-900">
                         <legend className="px-2 text-sm font-bold">{nationUI.target}</legend>

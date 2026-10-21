@@ -56,6 +56,9 @@ class NationwideTbmDatabaseTest {
         // PostgreSQL function bodies contain semicolons; do not split them with Spring's generic parser.
         idleMigration.setSeparator(org.springframework.jdbc.datasource.init.ScriptUtils.EOF_STATEMENT_SEPARATOR);
         idleMigration.execute(ds);
+        var channels=new ResourceDatabasePopulator(new ClassPathResource("db/migration/V045__concurrent_tbm_channels.sql"));
+        channels.setSeparator(org.springframework.jdbc.datasource.init.ScriptUtils.EOF_STATEMENT_SEPARATOR);
+        channels.execute(ds);
         jdbc.sql("insert into organizations(id,name) values(1,'Local test')").update();
         jdbc.sql("insert into sites(id,organization_id,name,status) values(2,1,'A','ACTIVE'),(3,1,'B','ACTIVE'),(4,1,'Archived','ARCHIVED')").update();
         jdbc.sql("insert into users(id,email,display_name,account_status) values(10,'hq@example.invalid','HQ','ACTIVE'),(11,'worker@example.invalid','Worker','ACTIVE'),(12,'other@example.invalid','Other','ACTIVE')").update();
@@ -67,6 +70,59 @@ class NationwideTbmDatabaseTest {
     }
     NationwideTbmController.Request req(String id) { return new NationwideTbmController.Request(id,true,"발화","수정한 원문","수정한 원문","- 보호구 확인"); }
     void start() { tx.executeWithoutResult(s->national.start(hq,req("tbm_nation"))); }
+    void startChannel(String id, String... trades) {
+        tx.executeWithoutResult(s->live.startSession(hq,new LiveInterpreterController.BroadcastSessionRequest(id,"2",java.util.List.of(trades))));
+    }
+    @Test void commonAndSeparateTradesCoexistWithoutReplacingEachOther() {
+        startChannel("tbm_common"); startChannel("tbm_rope","로프공"); startChannel("tbm_rebar","철근");
+        assertEquals(3,((java.util.List<?>)live.currentSession(worker,"2").get("sessions")).size());
+        assertNull(live.currentSession(worker,"2").get("session"));
+        assertEquals("tbm_rope",((LiveInterpreterController.BroadcastSessionEvent)live.currentSession(worker,"2","tbm_rope").get("session")).sessionId());
+        assertEquals(false,live.currentSession(worker,"2","tbm_missing").get("active"));
+        assertThrows(AccessDeniedException.class,()->live.currentSession(worker,"3","tbm_rope"));
+        assertThrows(IllegalArgumentException.class,()->startChannel("tbm_common2"));
+        assertThrows(IllegalArgumentException.class,()->startChannel("tbm_overlap","정리","로프공"));
+        assertThrows(IllegalArgumentException.class,()->startChannel("generic_live"));
+        assertThrows(AccessDeniedException.class,()->tx.execute(s->live.stopSession(otherHq,"tbm_rope","2")));
+        assertEquals(3L,jdbc.sql("select count(*) from live_broadcast_sessions where active").query(Long.class).single());
+        startChannel("tbm_rope","로프공"); // retry must not create or stop anything
+        tx.executeWithoutResult(s->live.stopSession(hq,"tbm_rope","2"));
+        startChannel("tbm_rope2","로프공");
+        assertEquals(3L,jdbc.sql("select count(*) from live_broadcast_sessions where active").query(Long.class).single());
+    }
+    @Test void nationwideCommonLeavesLocalTradeAndAttendanceIsSessionSpecific() {
+        startChannel("tbm_rope","로프공"); start();
+        var participation=new TbmLiveParticipationController(jdbc,guard);
+        tx.executeWithoutResult(s->participation.join(worker,new TbmLiveParticipationController.Join("tbm_rope",2L)));
+        assertEquals(true,participation.read(worker,2L,null,"tbm_rope").get("attended"));
+        assertEquals(false,participation.read(worker,2L,null,"tbm_nation_s2").get("attended"));
+        tx.executeWithoutResult(s->national.stop(hq,req("tbm_nation")));
+        var result=tx.execute(s->national.finish(hq,req("tbm_nation")));
+        assertEquals(false,participation.read(worker,2L,Long.valueOf(result.tbmId())).get("attended"));
+        assertEquals(true,live.currentSession(worker,"2","tbm_rope").get("active"));
+        tx.executeWithoutResult(s->live.stopSession(hq,"tbm_rope","2"));
+        tx.execute(s->national.broadcast(hq,req("tbm_other_notice")));
+        assertEquals(true,participation.read(worker,2L,null,"tbm_rope").get("attended"));
+        assertEquals(0L,count("tbm_acknowledgements"));
+    }
+    @Test void overlappingNationwideTradeFailsAtomicallyAndDatabaseAlsoGuardsChannels() {
+        startChannel("tbm_rope","로프공");
+        assertThrows(IllegalArgumentException.class,()->tx.execute(s->national.start(hq,new NationwideTbmController.Request("tbm_national_rope",true,null,null,null,null,java.util.List.of("로프공")))));
+        assertEquals(0L,count("nationwide_tbm_broadcasts"));
+        assertEquals(1L,count("live_broadcast_sessions"));
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->jdbc.sql("insert into live_broadcast_sessions(session_id,site_id,started_by,active,trade_types) values('tbm_bypass',2,10,true,'[\"로프공\"]'::jsonb)").update());
+    }
+    @Test void concurrentStartsAllowOnlyOneOwnerPerChannel() throws Exception {
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        var gate=new java.util.concurrent.CountDownLatch(1);
+        try {
+            var results=new java.util.ArrayList<java.util.concurrent.Future<Boolean>>();
+            for(int i=0;i<2;i++) { final String id="tbm_race_"+i; results.add(pool.submit(()->{gate.await();try {startChannel(id,"로프공");return true;}catch(IllegalArgumentException e){return false;}})); }
+            gate.countDown(); int successes=0;
+            for(var result:results) if(result.get(20,java.util.concurrent.TimeUnit.SECONDS)) successes++;
+            assertEquals(1,successes); assertEquals(1L,count("live_broadcast_sessions"));
+        } finally {pool.shutdownNow();}
+    }
     @Test void nationwideTradeMetadataSurvivesLivePublicationAndOrdinaryRetries() {
         var trades = java.util.List.of("철근", "거푸집");
         var request = new NationwideTbmController.Request("tbm_trades",true,null,null,"원문","- 요약",trades);

@@ -1,7 +1,14 @@
 # SQ Link V3 GitHub Actions 운영 배포
 
+## 2026-10-21 전체·공종 동시 라이브
+
+- 사용자 승인으로 공통 1개 + 겹치지 않는 공종별 동시 방송을 구현했다. 기존 현장 전체 종료를 제거하고 exact session 수신/참여/요약으로 분리했다. 상세 변경·검증·롤백 제한은 `CONCURRENT_TBM_CHANNELS.md` 참조.
+- 배포 전 운영 current `8798ccd5dce1447e41766a952ec02313d1c32fe9`, 활성 방송 0건 확인. backup service Result=success / ExecMainStatus=0.
+- 프론트·백엔드·V045를 같이 배포한다. Actions 빌드/테스트, 실제 release SHA, DB trigger/migration, readiness 확인 후 완료 판정. 운영 계정으로 시험 방송하지 않는다.
+
 ## 2026-10-20 공종 전체 선택·작성 화면 번역 보완
 
+- 완료: `8798ccd5dce1447e41766a952ec02313d1c32fe9`, Actions `39392499804` 성공. 운영 current SHA 일치, 두 서비스 active, `/auth` HTTP 200, backend readiness UP 확인. 기동 직후 일시적 502 이후 정상화 확인. 운영 사용자 계정으로 시험 발송은 하지 않았다.
 - 사용자 승인: 오늘 공종 및 TBM 전파 공종의 첫 항목에 전체 선택/해제 추가. 작성 화면의 가입용 번역표 참조를 공종 전용 20개 언어 번역표로 교체한다. 이름·선택 안내도 번역한다. 기존 16개 서버 식별값/발송 권한/방송 중 선택 잠금 유지, DB migration 및 운영 데이터 수정 없음.
 - 로컬 검증: 공종 단위 4건, 기존 전파 6건/라이브 10건, 알림 및 당일 공종 단위 검사, TypeScript/ESLint 통과. 모의 API 브라우저에서 오늘 공종/근로자·관리자 작성 화면의 전체·부분·해제 및 저장/전파 요청, 320px 20개 언어 확인. 영어 화면 캡처 시각 확인 완료. 외부 번역 API·운영 시험 발송은 수행하지 않았다.
 - 배포 전 기준: 운영 current/원격 HEAD `bdf89045706e138fbc5fe0e5e8f32c51fd0b6852`, 활성 방송 0건, backup service Result=success / ExecMainStatus=0. Actions 전체 빌드/백엔드 테스트 및 활성화 후 실제 SHA/health 확인으로 완료 판단한다.

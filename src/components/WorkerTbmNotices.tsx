@@ -6,14 +6,16 @@ import { loadPendingTbms, tbmNotificationColumns, todayTbmNotices, type TbmHomeN
 import { normalizeTbmTrades } from "@/lib/tbm-trades";
 import { tbmLanguage, tbmTradeLabel } from "@/lib/tbm-trade-labels";
 import styles from "./WorkerTbmNotices.module.css";
+import { liveTbmSessions } from "@/lib/tbm-live-sessions";
 import { dailyTradeUI, matchesDailyTrades, type DailyTrades } from "@/lib/worker-daily-trades";
 
-export default function WorkerTbmNotices({ siteId, temporary, lang, message, selection, otherTrades = false }: {
+export default function WorkerTbmNotices({ siteId, temporary, lang, message, selection, otherTrades = false, liveOnly = false }: {
   siteId: string; temporary: boolean; lang: string; message: string;
   selection?: DailyTrades; otherTrades?: boolean;
+  liveOnly?: boolean;
 }) {
   const [notices, setNotices] = useState<TbmHomeNotice[]>([]);
-  const [live, setLive] = useState<TbmHomeNotice | null>(null);
+  const [live, setLive] = useState<TbmHomeNotice[]>([]);
   useEffect(() => {
     const abort = new AbortController();
     let busy = false;
@@ -25,7 +27,7 @@ export default function WorkerTbmNotices({ siteId, temporary, lang, message, sel
       setNotices(current => todayTbmNotices(current));
       const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(15000)]);
       await Promise.allSettled([
-        temporary ? Promise.resolve() : loadPendingTbms(siteId, signal, otherTrades).then(rows => {
+        temporary || liveOnly ? Promise.resolve() : loadPendingTbms(siteId, signal, otherTrades).then(rows => {
           if (!abort.signal.aborted) setNotices(todayTbmNotices(rows));
         }),
         fetch(`/api/live/sessions?${new URLSearchParams({ siteId })}`, {
@@ -34,12 +36,8 @@ export default function WorkerTbmNotices({ siteId, temporary, lang, message, sel
           if (!response.ok) return;
           const data = await response.json();
           if (abort.signal.aborted) return;
-          const session = data.session;
-          // Never infer live state merely because a notice exists or an old session ended.
-          const relevant = !selection || matchesDailyTrades(session?.trade_types, selection);
-          setLive(relevant !== otherTrades && data.active === true && typeof session?.session_id === "string" && session.session_id.startsWith("tbm_")
-            ? { id: session.session_id, trade_types: session.trade_types, created_at: session.started_at }
-            : null);
+          setLive(liveTbmSessions(data).filter(session => (!selection || matchesDailyTrades(session.trade_types, selection)) !== otherTrades)
+            .map(session => ({ id: session.session_id, trade_types: session.trade_types, created_at: session.started_at })));
         }),
       ]);
       busy = false;
@@ -57,9 +55,9 @@ export default function WorkerTbmNotices({ siteId, temporary, lang, message, sel
       events.forEach(event => window.removeEventListener(event, refresh));
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [siteId, temporary, selection, otherTrades]);
+  }, [siteId, temporary, selection, otherTrades, liveOnly]);
 
-  const cards = [...(live ? [{ notice: live, isLive: true }] : []), ...notices.map(notice => ({ notice, isLive: false }))];
+  const cards = [...live.map(notice => ({ notice, isLive: true })), ...notices.map(notice => ({ notice, isLive: false }))];
   if (!cards.length) return null;
   const language = tbmLanguage(lang);
   const locale = language === "jp" ? "ja" : language === "ph" ? "fil" : language;
@@ -70,7 +68,7 @@ export default function WorkerTbmNotices({ siteId, temporary, lang, message, sel
       const timestamp = notice.published_at ?? notice.created_at;
       const date = timestamp ? new Date(timestamp) : null;
       return <Link key={notice.id} data-testid="tbm-notice" data-tbm-id={notice.id}
-        href={`${isLive && temporary ? "/worker/live" : `/worker/tbm/${isLive ? "today" : encodeURIComponent(notice.id)}`}?lang=${encodeURIComponent(lang)}${otherTrades && isLive ? "&allTrades=1" : ""}`}
+        href={`${isLive && temporary ? "/worker/live" : `/worker/tbm/${isLive ? "today" : encodeURIComponent(notice.id)}`}?lang=${encodeURIComponent(lang)}${isLive ? `&broadcastSession=${encodeURIComponent(notice.id)}` : ""}${otherTrades && isLive ? "&allTrades=1" : ""}`}
         className={`tbm-new-notice ${styles.card} ${cards.length === 1 ? styles.single : styles.compact}`}>
         <div className={styles.icon} aria-hidden="true">
           <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">

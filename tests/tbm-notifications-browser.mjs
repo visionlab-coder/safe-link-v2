@@ -107,14 +107,14 @@ try {
   fail=true; await refresh(); await waitCount(6);
   fail=false; count=0; await refresh(); await waitCount(0);
   count=2; live=true; await refresh(); await waitCount(3);
-  assert.equal(await page.getByTestId('tbm-notice').first().getAttribute('href'), '/worker/tbm/today?lang=ko');
+  assert.equal(await page.getByTestId('tbm-notice').first().getAttribute('href'), '/worker/tbm/today?lang=ko&broadcastSession=tbm_fixture_live');
   assert.ok((await page.getByTestId('tbm-notice').first().textContent()).includes('LIVE'));
   live=false; await refresh(); await waitCount(2);
   // Daily selection expiry is covered by worker-daily-trades-browser.mjs.
   // Temporary workers retain only live access, never a pending/signature card.
   temporary=true; live=true;
   await page.goto(base+'/worker/temporary?lang=ko'); await waitCount(1);
-  assert.equal(await page.getByTestId('tbm-notice').getAttribute('href'), '/worker/live?lang=ko');
+  assert.equal(await page.getByTestId('tbm-notice').getAttribute('href'), '/worker/live?lang=ko&broadcastSession=tbm_fixture_live');
   assert.deepEqual(errors, []);
   console.log('PASS: real local BFF authorization; 1–9 cards at 320/390/1280px; 16 trades × 20 languages; exact TBM links; temporary-worker restrictions.');
 } finally { await browser.close(); }

@@ -1,7 +1,9 @@
 "use client";
 import { joinTbmLive } from "@/utils/tbm-participation";
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import TbmLiveReceiver from "@/components/TbmLiveReceiver";
+import WorkerTbmNotices from "@/components/WorkerTbmNotices";
 import Image from "next/image";
 import RoleGuard from "@/components/RoleGuard";
 import { playLiveBroadcastAudio, VoiceGender } from "@/utils/tts";
@@ -64,6 +66,23 @@ const LIVE_COMMON: Record<string, Record<string, string>> = {
 const LIVE_LOCALES: Record<string, string> = { ko:"ko-KR", en:"en-US", zh:"zh-CN", vi:"vi-VN", ru:"ru-RU" };
 
 export default function WorkerLivePage() {
+    return <Suspense><WorkerLiveEntry /></Suspense>;
+}
+function WorkerLiveEntry() {
+    const params = useSearchParams();
+    const sessionId = params.get("broadcastSession");
+    return sessionId?.startsWith("tbm_") ? <SelectedWorkerTbm key={sessionId} sessionId={sessionId} /> : <LegacyWorkerLivePage />;
+}
+function SelectedWorkerTbm({sessionId}: {sessionId:string}) {
+    const lang=useDisplayLanguage();
+    const [siteId,setSiteId]=useState<string|null>(null);
+    const [active,setActive]=useState(false);
+    const router=useRouter();
+    const t=getT(lang);
+    useEffect(()=>{let cancelled=false;void fetch("/api/auth/me",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(me=>{if(!cancelled)setSiteId(me?.profile?.site_id?String(me.profile.site_id):null);}).catch(()=>{});return()=>{cancelled=true;};},[]);
+    return <RoleGuard allowedRole="worker"><main className="visualization-light min-h-screen space-y-5 p-5"><button className="rounded-xl border p-3" onClick={()=>router.push("/worker/live?lang="+lang)}>← {t.back}</button><h1 className="text-xl font-bold">{t.title}</h1><TbmLiveReceiver siteId={siteId} lang={lang} requestedSession={sessionId} onActiveChange={setActive} busyLabel={t.waiting} listenLabel="▶" translatedLabel={t.title} originalLabel="TBM" />{!active && <p className="text-slate-500">{t.waiting}</p>}</main></RoleGuard>;
+}
+function LegacyWorkerLivePage() {
     const router = useRouter();
     const lang = useDisplayLanguage();
     const common = LIVE_COMMON[lang] || LIVE_COMMON.en;
@@ -268,7 +287,7 @@ export default function WorkerLivePage() {
         const handleTranslation = async (row: TranslationRow) => {
             if (cancelled || seenRowsRef.current.has(row.id)) return;
             // 방송 시작 신호를 받은 세션만 수신한다. 종료된/이전 세션은 절대 재생하지 않는다.
-            if (activeSessionIdRef.current && row.session_id !== activeSessionIdRef.current) return;
+            if (!activeSessionIdRef.current || row.session_id !== activeSessionIdRef.current) return;
             if (!activeSessionIdRef.current && sessionLifecycleSupportedRef.current) return;
             // 이전 운영 백엔드 호환: 세션 API가 아직 없는 경우에도 화면 진입 뒤
             // 새로 도착한 첫 발화만 방송으로 잡는다. 과거 이력은 불러오지 않는다.
@@ -345,6 +364,7 @@ export default function WorkerLivePage() {
         events.addEventListener("broadcast-start", event => {
             try {
                 const broadcast = JSON.parse((event as MessageEvent<string>).data) as { session_id?: string; started_by?: string };
+                if (broadcast.session_id?.startsWith("tbm_")) { window.dispatchEvent(new Event("sq-link:tbm-live-start")); return; }
                 activeSessionIdRef.current = broadcast.session_id ?? null;
                 if (broadcast.session_id && siteId) void joinTbmLive(broadcast.session_id, String(siteId));
                 if (broadcast.started_by) setActiveAdminId(broadcast.started_by);
@@ -396,7 +416,7 @@ export default function WorkerLivePage() {
             }
             if (!res.ok || cancelled) return;
             const data = await res.json() as { active?: boolean; session?: { session_id?: string; started_by?: string } };
-            if (!data.active || !data.session?.session_id) return;
+            if (!data.active || !data.session?.session_id || data.session.session_id.startsWith("tbm_")) return;
             activeSessionIdRef.current = data.session.session_id;
             if (siteId) void joinTbmLive(data.session.session_id, String(siteId));
             if (data.session.started_by) setActiveAdminId(data.session.started_by);
@@ -419,6 +439,7 @@ export default function WorkerLivePage() {
     return (
         <RoleGuard allowedRole="worker">
             <div className="visualization-light h-screen font-sans flex flex-col overflow-hidden">
+                {authReady?.siteId && <div className="max-h-[50vh] overflow-y-auto p-3"><WorkerTbmNotices siteId={authReady.siteId} temporary lang={lang} message={getT(lang).title} liveOnly /></div>}
                 <header className="concept-page-header safe-area-sticky-top sticky z-50">
                     <div className="flex items-center gap-3">
                         <button onClick={() => router.push("/worker")} className="p-2 -ml-2 rounded-full hover:bg-white/5 tap-effect text-slate-400">

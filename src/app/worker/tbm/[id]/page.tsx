@@ -179,6 +179,7 @@ function WorkerTBMDetailContent() {
     const searchParams = useSearchParams();
     const tbmId = params?.id as string | undefined;
     const urlLang = searchParams.get("lang");
+    const broadcastSession = searchParams.get("broadcastSession");
     const displayLang = useDisplayLanguage();
     const signaturePadRef = useRef<SignatureCanvas | null>(null);
 
@@ -232,7 +233,7 @@ function WorkerTBMDetailContent() {
     useEffect(() => {
         if (tbmId !== "today") return;
         const received = (event: Event) => {
-            if (liveReceiving) return;
+            if (liveReceiving || broadcastSession) return;
             const noticeId = (event as CustomEvent<{ id?: string | number }>).detail?.id;
             if (!noticeId || String(noticeId) === liveSummary?.tbmId || String(noticeId) === String(tbm?.id)) return;
             // Reload the published notice, but never grant live attendance to that notice.
@@ -241,7 +242,7 @@ function WorkerTBMDetailContent() {
         };
         window.addEventListener("sq-link:tbm-received", received);
         return () => window.removeEventListener("sq-link:tbm-received", received);
-    }, [tbmId, liveReceiving, liveSummary, tbm?.id]);
+    }, [tbmId, liveReceiving, liveSummary, tbm?.id, broadcastSession]);
 
     const changeGender = (g: 'male' | 'female') => {
         voiceGenderRef.current = g;
@@ -286,8 +287,8 @@ function WorkerTBMDetailContent() {
         const tbmPath = defaultPage
             ? `/api/tbm/pending?${new URLSearchParams({ siteId: String(me.profile?.site_id ?? ""), limit: "1" })}`
             : `/api/tbm/today?${tbmParams.toString()}`;
-        const tbmRes = await fetch(tbmPath, { cache: "no-store", credentials: "include" });
-        const tbmJson = tbmRes.ok ? await tbmRes.json() as { tbms?: any[] } : { tbms: [] };
+        const tbmRes = defaultPage && broadcastSession ? null : await fetch(tbmPath, { cache: "no-store", credentials: "include" });
+        const tbmJson = tbmRes?.ok ? await tbmRes.json() as { tbms?: any[] } : { tbms: [] };
         tbmData = tbmJson.tbms?.[0] || null;
         if (version !== loadVersionRef.current) return;
 
@@ -297,7 +298,7 @@ function WorkerTBMDetailContent() {
         if (tbmData) {
             saveTbmCache(me.user.id, tbmData);
             setFromCache(false);
-        } else if (isOffline()) {
+        } else if (isOffline() && !broadcastSession) {
             const cached = loadTbmCache(me.user.id);
             if (cached) {
                 tbmData = cached;
@@ -374,7 +375,7 @@ function WorkerTBMDetailContent() {
         }
 
         setLoading(false);
-    }, [tbmId, urlLang, displayLang, liveSummary]);
+    }, [tbmId, urlLang, displayLang, liveSummary, broadcastSession]);
 
     useEffect(() => {
         const versions = loadVersionRef;
@@ -544,7 +545,7 @@ function WorkerTBMDetailContent() {
                             <p className="mt-2 text-sm font-bold text-slate-100">{new Date(liveReceiving ? Date.now() : tbm.created_at).toLocaleDateString(({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[preferredLang] || "en-US", { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                         </div>
                     </div>}
-                    {tbmId === "today" && <TbmLiveReceiver siteId={liveSiteId} lang={preferredLang} busyLabel={t.translating} listenLabel={t.voice} translatedLabel={t.translated} originalLabel={t.original} onActiveChange={onLiveActiveChange} onSession={onLiveSession} onSummary={setLiveSummary} onPendingCleared={onPendingCleared} dailyTradesOnly={searchParams.get("allTrades") !== "1"} allowQuestions />}
+                    {tbmId === "today" && <TbmLiveReceiver key={broadcastSession || "auto"} requestedSession={broadcastSession} siteId={liveSiteId} lang={preferredLang} busyLabel={t.translating} listenLabel={t.voice} translatedLabel={t.translated} originalLabel={t.original} onActiveChange={onLiveActiveChange} onSession={onLiveSession} onSummary={setLiveSummary} onPendingCleared={onPendingCleared} dailyTradesOnly={searchParams.get("allTrades") !== "1"} allowQuestions />}
 
                     {fromCache && (
                         <div className="rounded-2xl bg-amber-500/15 border border-amber-400/30 text-amber-200 text-sm px-4 py-3">
@@ -817,7 +818,12 @@ function WorkerTBMDetailContent() {
 export default function WorkerTBMDetailPage() {
     return (
         <Suspense fallback={<div className="min-h-screen bg-mesh" />}>
-            <WorkerTBMDetailContent />
+            <WorkerTBMDetailEntry />
         </Suspense>
     );
+}
+
+function WorkerTBMDetailEntry() {
+    const params = useSearchParams();
+    return <WorkerTBMDetailContent key={params.get("broadcastSession") || "notice"} />;
 }

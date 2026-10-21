@@ -54,9 +54,7 @@ public class NationwideTbmController {
         }
         var sites = activeSites();
         if (sites.isEmpty()) throw new IllegalArgumentException("nationwide_tbm_no_sites");
-        if (jdbc.sql("select exists(select 1 from live_broadcast_sessions where active=true and site_id in (:sites))")
-                .param("sites",sites).query(Boolean.class).single())
-            throw new IllegalArgumentException("nationwide_tbm_live_conflict");
+        for (Long site : sites) live.requireChannelAvailable(site, request.sessionId(), trades);
         insertGroup(actor,request.sessionId(),"LIVE","ACTIVE");
         for (Long site : sites) {
             String child = request.sessionId()+"_s"+site;

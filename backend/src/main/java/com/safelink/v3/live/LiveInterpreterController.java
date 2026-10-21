@@ -55,22 +55,16 @@ public class LiveInterpreterController {
         if (!sessionId.startsWith("tbm_") && !trades.isEmpty()) throw new IllegalArgumentException("tbm_session_required");
 
         jdbc.sql("select pg_advisory_xact_lock(737037)").query((rs,n)->true).single();
-        // Worker publishing must not terminate another person's ongoing broadcast.
-        if (isWorkerPublisher(actor) && jdbc.sql("select exists(select 1 from live_broadcast_sessions where site_id=:site and active=true and started_by<>:owner)")
-                .param("site",siteId).param("owner",actor.userId()).query(Boolean.class).single())
-            throw new AccessDeniedException("live_broadcast_already_active");
-        if (jdbc.sql("select exists(select 1 from live_broadcast_sessions s join nationwide_tbm_targets t on t.session_id=s.session_id where s.site_id=:site and s.active=true)")
-                .param("site",siteId).query(Boolean.class).single())
-            throw new IllegalArgumentException("nationwide_tbm_live_conflict");
-
-        // 이전 방송은 종료 처리한 뒤 새 방송을 단 하나만 활성화한다.
-        jdbc.sql("""
-                update live_broadcast_sessions
-                set active = false, ended_at = now()
-                where site_id = :siteId and active = true
-            """)
-            .param("siteId", siteId)
-            .update();
+        var existing = jdbc.sql("select site_id,started_by,active,trade_types::text from live_broadcast_sessions where session_id=:id")
+            .param("id",sessionId).query((rs,n)->new Object[]{rs.getLong(1),rs.getLong(2),rs.getBoolean(3),rs.getString(4)}).optional();
+        if (existing.isPresent()) {
+            var saved=existing.get();
+            if (!saved[0].equals(siteId) || !saved[1].equals(actor.userId())) throw new AccessDeniedException("live_session_owner_required");
+            if (!Boolean.TRUE.equals(saved[2]) || !com.safelink.v3.tbm.TbmTrades.read((String)saved[3]).equals(trades))
+                throw new IllegalArgumentException("live_session_retry_mismatch");
+            return new BroadcastSessionEvent(sessionId,siteId.toString(),actor.userId().toString(),true,trades);
+        }
+        requireChannelAvailable(siteId, sessionId, trades);
         jdbc.sql("""
                 insert into live_broadcast_sessions(session_id, site_id, started_by, active, trade_types)
                 values (:sessionId, :siteId, :startedBy, true, cast(:trades as jsonb))
@@ -98,7 +92,7 @@ public class LiveInterpreterController {
         Long requestedSiteId = siteId == null || siteId.isBlank() ? firstSiteId(actor) : parseLong(siteId, "siteId_invalid");
         if (requestedSiteId == null) throw new IllegalArgumentException("site_id_required");
         siteGuard.requireSiteAccess(actor, requestedSiteId, "live.broadcast.stop", "live_broadcast_session", null);
-        if (isWorkerPublisher(actor)) {
+        {
             var owner = jdbc.sql("select started_by from live_broadcast_sessions where session_id=:id and site_id=:site")
                 .param("id",clean(sessionId)).param("site",requestedSiteId).query(Long.class).optional();
             if (owner.isEmpty() || !owner.get().equals(actor.userId()))
@@ -159,7 +153,8 @@ public class LiveInterpreterController {
     @GetMapping("/sessions")
     public Map<String, Object> currentSession(
         @AuthenticationPrincipal SessionPrincipal actor,
-        @RequestParam(required = false) String siteId
+        @RequestParam(required = false) String siteId,
+        @RequestParam(required = false) String sessionId
     ) {
         if (actor == null) throw new AccessDeniedException("authentication_required");
         Long requestedSiteId = siteId == null || siteId.isBlank() ? firstSiteId(actor) : parseLong(siteId, "siteId_invalid");
@@ -169,20 +164,36 @@ public class LiveInterpreterController {
                 select session_id, started_by, trade_types
                 from live_broadcast_sessions
                 where site_id = :siteId and active = true
+                  and (:sessionId='' or session_id=:sessionId)
                 order by started_at desc
-                limit 1
             """)
             .param("siteId", requestedSiteId)
+            .param("sessionId", clean(sessionId))
             .query((rs, rowNum) -> new BroadcastSessionEvent(
                 rs.getString("session_id"),
                 String.valueOf(requestedSiteId),
                 String.valueOf(rs.getLong("started_by")),
                 true, com.safelink.v3.tbm.TbmTrades.read(rs.getString("trade_types"))
             ))
-            .optional();
-        if (active.isEmpty()) return Map.of("active", false);
-        var session = active.get();
-        return Map.of("active", true, "session", session);
+            .list();
+        if (active.isEmpty()) return Map.of("active", false, "sessions", active);
+        // Old clients may follow a sole session, but must never pick a random
+        // stream when several broadcasts are active.
+        if (active.size()==1) return Map.of("active", true, "session", active.getFirst(), "sessions", active);
+        return Map.of("active", true, "sessions", active);
+    }
+
+    public Map<String,Object> currentSession(SessionPrincipal actor,String siteId) { return currentSession(actor,siteId,null); }
+
+    public void requireChannelAvailable(Long siteId, String sessionId, List<String> trades) {
+        boolean conflict=jdbc.sql("""
+            select exists(select 1 from live_broadcast_sessions s where s.site_id=:site and s.active
+              and (left(s.session_id,4)<>'tbm_' or :tbm=false
+                or (s.trade_types='[]'::jsonb and cast(:trades as jsonb)='[]'::jsonb)
+                or exists(select 1 from jsonb_array_elements_text(cast(:trades as jsonb)) t(value) where jsonb_exists(s.trade_types,t.value))))
+            """).param("site",siteId).param("tbm",sessionId.startsWith("tbm_"))
+            .param("trades",com.safelink.v3.tbm.TbmTrades.json(trades)).query(Boolean.class).single();
+        if (conflict) throw new IllegalArgumentException("tbm_trade_live_conflict");
     }
 
     /** Exact owned session status; polling never renews the idle deadline. */

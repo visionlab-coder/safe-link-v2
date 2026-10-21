@@ -36,10 +36,11 @@ public class TbmLiveParticipationController {
 
     @GetMapping
     public Map<String,Object> read(@AuthenticationPrincipal SessionPrincipal actor,
-            @RequestParam Long siteId, @RequestParam(required=false) Long tbmId) {
+            @RequestParam Long siteId, @RequestParam(required=false) Long tbmId,
+            @RequestParam(required=false) String sessionId) {
         requireWorker(actor);
         guard.requireSiteAccess(actor,siteId,"tbm.live.participation.read","site",siteId.toString());
-        String filter = tbmId == null
+        String filter = sessionId != null && !sessionId.isBlank() ? "and p.session_id=:session" : tbmId == null
             ? """
                 and m.tbm_notice_id is null and b.started_at > now() - interval '12 hours'
                 and (b.active or not exists (
@@ -48,7 +49,8 @@ public class TbmLiveParticipationController {
                       and coalesce(n.published_at,n.created_at) >= b.started_at
                 ))
                 """
-            : "and m.tbm_notice_id=:notice";
+            : "";
+        if (tbmId != null) filter += " and m.tbm_notice_id=:notice";
         var query = jdbc.sql("""
             select p.session_id, m.tbm_notice_id
             from tbm_live_participation p
@@ -58,10 +60,12 @@ public class TbmLiveParticipationController {
             """ + filter + " order by p.joined_at desc limit 1")
             .param("worker",actor.userId()).param("site",siteId);
         if (tbmId != null) query.param("notice",tbmId);
+        if (sessionId != null && !sessionId.isBlank()) query.param("session",sessionId);
         return query.query((rs,n) -> Map.<String,Object>of("attended",true,"sessionId",rs.getString(1),
             "tbmId",rs.getString(2)==null ? "" : rs.getString(2)))
             .optional().orElse(Map.of("attended",false));
     }
+    public Map<String,Object> read(SessionPrincipal actor,Long siteId,Long tbmId) { return read(actor,siteId,tbmId,null); }
     private void requireWorker(SessionPrincipal actor) {
         if (actor==null || !(actor.hasRole(Role.WORKER) || actor.hasRole(Role.TEMP_WORKER)))
             throw new AccessDeniedException("worker_required");

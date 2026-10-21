@@ -11,9 +11,11 @@ import TbmFullTranscript from "@/components/TbmFullTranscript";
 import TbmTradeBadges from "@/components/TbmTradeBadges";
 import { normalizeTbmTrades } from "@/lib/tbm-trades";
 import { loadDailyTrades, matchesDailyTrades } from "@/lib/worker-daily-trades";
+import { liveTbmSessions, type LiveTbmSession } from "@/lib/tbm-live-sessions";
+import Link from "next/link";
 
 /** Live events only: never fetch or replay historical utterances. */
-export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, translatedLabel, originalLabel, onActiveChange, onSession, onSummary, onPendingCleared, allowQuestions = false, dailyTradesOnly = false }: {
+export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, translatedLabel, originalLabel, onActiveChange, onSession, onSummary, onPendingCleared, allowQuestions = false, dailyTradesOnly = false, requestedSession }: {
   siteId: string | null;
   lang: string;
   busyLabel: string;
@@ -26,8 +28,10 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
   onPendingCleared?: () => void;
   allowQuestions?: boolean;
   dailyTradesOnly?: boolean;
+  requestedSession?: string | null;
 }) {
   const [active, setActive] = useState(false);
+  const [choices, setChoices] = useState<LiveTbmSession[]>([]);
   const [trades, setTrades] = useState<string[]>([]);
   const [broadcasterId, setBroadcasterId] = useState<string | null>(null);
   const [speaking, setSpeaking] = useState(false);
@@ -54,7 +58,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
     if (!siteId) return;
     let disposed = false, session: string | null = null, generation = 0;
     // Keep the pending handoff when the display language changes, never across sites.
-    let observedSession: string | null = observation.current?.siteId === siteId ? observation.current.sessionId : null;
+    let observedSession: string | null = requestedSession || (observation.current?.siteId === siteId ? observation.current.sessionId : null);
     let completedSession: string | null = null;
     let checkingSummary = false;
     let registeredSession: string | null = null;
@@ -186,7 +190,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
         if (disposed || expected !== observedSession) return;
         if (!summary) {
           if (session) return; // A published notice must never interrupt an active live broadcast.
-          const pendingResponse = await fetch("/api/live/tbm-participation?" + new URLSearchParams({ siteId }), {
+          const pendingResponse = await fetch("/api/live/tbm-participation?" + new URLSearchParams({ siteId, sessionId: expected }), {
             cache: "no-store", signal: timeout.signal,
           });
           if (!pendingResponse.ok) return; // Network failure is not evidence of completion.
@@ -228,30 +232,31 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
       if (checkingSession) return;
       checkingSession = true;
       try {
-        const response = await fetch("/api/live/sessions?" + new URLSearchParams({ siteId }), { cache: "no-store", signal: AbortSignal.any([abort.signal, AbortSignal.timeout(10000)]) });
+        const pinned = requestedSession || observedSession || completedSession;
+        const response = await fetch("/api/live/sessions?" + new URLSearchParams({ siteId, ...(pinned ? {sessionId:pinned} : {}) }), { cache: "no-store", signal: AbortSignal.any([abort.signal, AbortSignal.timeout(10000)]) });
         if (!response.ok) return;
         const data = await response.json();
-        if (dailyTradesOnly && data.active === true) {
+        let sessions = liveTbmSessions(data).filter(row => !pinned || row.session_id === pinned);
+        if (dailyTradesOnly && !pinned && data.active === true) {
           const selection = await loadDailyTrades(siteId, abort.signal);
           if (disposed || lifecycleVersion !== version) return;
-          if (!selection.selected || !matchesDailyTrades(data.session?.trade_types, selection)) {
-            if (session) { reset(null); observation.current = null; observedSession = null; }
-            return;
-          }
+          sessions = selection.selected ? sessions.filter(row => matchesDailyTrades(row.trade_types, selection)) : [];
         }
         if (disposed || lifecycleVersion !== version) return;
         // Only server-confirmed active TBM sessions can show the live screen.
-        const id = data.active === true && typeof data.session?.session_id === "string" ? data.session.session_id : null;
+        setChoices(!pinned && sessions.length > 1 ? sessions : []);
+        const chosen = sessions.length === 1 ? sessions[0] : null;
+        const id = chosen?.session_id ?? null;
         if (id?.startsWith("tbm_")) {
-          reset(id, data.session.started_by);
-          const nextTrades = normalizeTbmTrades(data.session.trade_types);
+          reset(id, chosen?.started_by);
+          const nextTrades = normalizeTbmTrades(chosen?.trade_types);
           setTrades(current => JSON.stringify(current) === JSON.stringify(nextTrades) ? current : nextTrades);
           void checkDraft();
         } else if (session && (data.active === false || id)) {
           finalizeCurrentSentence();
           session = null; setActive(false); setSpeaking(false);
         }
-        if (data.active === false && !observedSession) {
+        if (data.active === false && !observedSession && !requestedSession && !completedSession) {
           // Restore only background summary tracking, never the visible live state.
           const response = await fetch("/api/live/tbm-participation?" + new URLSearchParams({ siteId }), { cache: "no-store", signal: AbortSignal.any([abort.signal, AbortSignal.timeout(10000)]) });
           const participation = response.ok ? await response.json() : null;
@@ -347,8 +352,8 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
     events.onopen = () => { void checkSession(); };
     void checkSession(); // Polling also works when the SSE connection cannot open.
     return () => { disposed = true; generation++; clearInterval(summaryPoll); if (speakingTimer) clearTimeout(speakingTimer); if (sentenceCommitTimer) clearTimeout(sentenceCommitTimer); abort.abort(); events.close(); audioRef.current?.pause(); audioRef.current = null; };
-  }, [siteId, lang, dailyTradesOnly]);
-  if (!active) return null;
+  }, [siteId, lang, dailyTradesOnly, requestedSession]);
+  if (!active) return choices.length ? <section data-testid="tbm-live-choices" className="grid gap-3 sm:grid-cols-2">{choices.map(choice => <Link key={choice.session_id} className="rounded-2xl border border-red-200 bg-white p-5" href={`/worker/tbm/today?${new URLSearchParams({lang,broadcastSession:choice.session_id,...(!dailyTradesOnly ? {allTrades:"1"} : {})})}`}><span className="font-bold text-red-600">LIVE · {listenLabel}</span><TbmTradeBadges trades={choice.trade_types} lang={lang} /></Link>)}</section> : null;
   const status = tbmLiveStateUI(lang);
 
   return <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-label="TBM live translation">

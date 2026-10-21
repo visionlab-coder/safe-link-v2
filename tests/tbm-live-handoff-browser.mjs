@@ -16,6 +16,8 @@ for (const dir of ['node_modules', 'public']) fs.symlinkSync(path.join(root, dir
 const clients = new Set();
 let active = false, published = false, summaryAvailable = false, signCount = 0;
 let liveTrades = [];
+let otherSessions = [];
+const joinedSessions = [];
 let editedDraft = null;
 const participants = new Set();
 const sessionId = 'tbm_browser_fixture';
@@ -28,6 +30,7 @@ const fixture = http.createServer((req, res) => {
   if (url.pathname.endsWith('/auth/me')) return send({id: workerId, displayName: 'UI fixture', roles: ['WORKER'], siteIds: [2], preferredLanguage: 'zh'});
   if (url.pathname.endsWith('/live/tbm-participation')) {
     if (req.method === 'POST') {
+      let body='';req.on('data',chunk=>body+=chunk);req.on('end',()=>joinedSessions.push(JSON.parse(body).sessionId));
       if (!active) { res.statusCode = 400; return send({attended: false}); }
       participants.add(workerId); return send({attended: true});
     }
@@ -41,7 +44,11 @@ const fixture = http.createServer((req, res) => {
     res.write('event: connected\ndata: {}\n\n'); clients.add(res);
     res.on('close', () => clients.delete(res)); return;
   }
-  if (url.pathname.endsWith('/live/sessions')) return send({active, session: active ? {session_id: sessionId, started_by: '10', trade_types: liveTrades} : null});
+  if (url.pathname.endsWith('/live/sessions')) {
+    const requested=url.searchParams.get('sessionId');
+    const sessions=[...(active?[{session_id:sessionId,started_by:'10',trade_types:liveTrades}]:[]),...otherSessions].filter(s=>!requested||s.session_id===requested);
+    return send({active:sessions.length>0,sessions,...(sessions.length===1?{session:sessions[0]}:{})});
+  }
   if (url.pathname.endsWith('/live/summary')) return send(summaryAvailable ? {summary} : {});
   if (url.pathname.endsWith('/tbm/compat/daily-trades')) return send({date:new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date()),selected:true,trades:['로프공']});
   if (url.pathname.endsWith('/tbm/compat/pending')) return send({tbms:published?[notice]:[],has_more:false,next_cursor:null});
@@ -186,6 +193,38 @@ try {
   await latePage.getByText('🔒 请先完整听取简报语音。', {exact: true}).waitFor();
   assert.equal(participants.has(12), false, 'finished broadcast cannot create new attendance');
   await lateContext.close();
+  // Common + today's rope trade are both visible, other trades stay optional.
+  published=false; summaryAvailable=false; active=true; liveTrades=['로프공']; editedDraft=null;
+  otherSessions=[{session_id:'tbm_common',started_by:'12',trade_types:[]},{session_id:'tbm_rebar',started_by:'12',trade_types:['철근']}];
+  await page.goto(`${origin}/worker?lang=zh`);
+  await page.waitForFunction(()=>document.querySelectorAll('[data-testid="tbm-notice"]').length===2);
+  const links=await page.getByTestId('tbm-notice').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('href')));
+  assert.ok(links.some(h=>h.includes('broadcastSession=tbm_common')));
+  assert.ok(links.some(h=>h.includes('broadcastSession='+sessionId)));
+  assert.ok(!links.some(h=>h.includes('tbm_rebar')));
+  await page.goto(`${origin}/worker/tbm/today?lang=zh`);
+  await page.getByTestId('tbm-live-choices').waitFor();
+  assert.equal(await page.getByTestId('tbm-live-state').count(),0,'never randomly choose between two live broadcasts');
+  await page.getByTestId('tbm-live-choices').locator(`a[href*="broadcastSession=${sessionId}"]`).click();
+  await page.getByTestId('tbm-live-state').waitFor();
+  emit('broadcast-start',{session_id:'tbm_common',started_by:'12'});
+  emit('translation',{id:'wrong_stream',session_id:'tbm_common',text_ko:'DO NOT MIX COMMON'});
+  emit('tbm-draft',{sessionId:'tbm_common',content:'DO NOT MIX DRAFT',revision:100});
+  emit('broadcast-stop',{session_id:'tbm_common'});
+  emit('translation',{id:'correct_stream',session_id:sessionId,text_ko:'안전대를 점검하세요'});
+  await page.getByText('请检查安全带。',{exact:true}).waitFor();
+  await wait(3500);
+  assert.equal(await page.getByText('DO NOT MIX COMMON',{exact:true}).count(),0);
+  assert.equal(await page.getByText('DO NOT MIX DRAFT',{exact:true}).count(),0);
+  assert.ok(joinedSessions.every(id=>id===sessionId),'attendance belongs only to selected broadcast');
+  active=false; published=true; summaryAvailable=true;
+  emit('broadcast-stop',{session_id:sessionId});
+  await page.getByText('检查防护用品',{exact:true}).waitFor({timeout:20000});
+  assert.equal(await page.getByTestId('tbm-live-state').count(),0,'other live broadcasts cannot replace selected summary');
+  await page.getByRole('checkbox').check();
+  assert.equal(await page.getByRole('button',{name:/确认并签名/}).isEnabled(),true);
+  await page.screenshot({path:path.join(workspace,'concurrent-selected-summary.png'),fullPage:true});
+  otherSessions=[];
   assert.deepEqual(errors, []);
   console.log('PASS: live → stop → polling recovery → summary retry + full translated/original transcript → explicit review → signature, without navigation/replay; mobile/desktop screenshots saved');
 } catch (error) {

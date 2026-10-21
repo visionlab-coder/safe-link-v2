@@ -107,7 +107,7 @@ export default function WorkerTbmNotificationListener() {
         if (allowed) {
           const [selection, response] = await Promise.all([
             loadDailyTrades(siteId),
-            fetch(`/api/live/sessions?${new URLSearchParams({ siteId })}`, { cache: "no-store" }),
+            fetch(`/api/live/sessions?${new URLSearchParams({ siteId, sessionId })}`, { cache: "no-store" }),
           ]);
           if (!response.ok) return;
           const live = await response.json();

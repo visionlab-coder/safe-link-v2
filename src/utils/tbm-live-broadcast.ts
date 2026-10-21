@@ -50,7 +50,7 @@ export class TbmLiveBroadcast {
       console.error("[TBM live] session start rejected", { status: response.status, detail, session });
       let code = "";
       try { code = JSON.parse(detail).error || ""; } catch {}
-      throw new Error(code.startsWith("nationwide_") ? code : `broadcast_start_failed_${response.status}`);
+      throw new Error(code.startsWith("nationwide_") || code === "tbm_trade_live_conflict" ? code : `broadcast_start_failed_${response.status}`);
     }
     this.session = session;
     this.pendingNationwideSession = null;

@@ -53,6 +53,16 @@ try{
     await box.locator('input[type="checkbox"]').last().waitFor();
     assert.deepEqual(await box.locator("label").allTextContents(),[tbmTradeSelectorUI(lang).all,...TBM_TRADES.map(t=>tbmTradeLabel(t,lang))]);
     const all=box.getByRole("checkbox").first();
+    if(selector==="tbm-trade-selector") {
+      await all.check(); assert.equal(await box.locator('input:checked').count(),1);
+      await box.getByRole("checkbox").nth(2).check();
+      assert.equal(await all.isChecked(),false);
+      await box.getByRole("checkbox").nth(3).check();
+      assert.equal(await box.locator('input:checked').count(),2);
+      await all.check();assert.equal(await box.locator('input:checked').count(),1);
+      assert.equal(await box.evaluate(n=>n.scrollWidth>n.clientWidth+1),false,lang+" overflow");
+      return;
+    }
     await all.check();assert.equal(await box.locator('input:checked').count(),17);
     await box.getByRole("checkbox").nth(2).uncheck();
     assert.equal(await all.evaluate(n=>n.indeterminate),true);
@@ -79,7 +89,7 @@ try{
   await page.locator("textarea").first().fill("Check your safety helmet.");
   await page.getByRole("button",{name:"🚀 PUSH BROADCAST",exact:true}).click();
   await page.getByText("Push Successful",{exact:true}).first().waitFor();
-  assert.deepEqual(saved,TBM_TRADES);assert.ok(!saved.includes("all"));
+  assert.deepEqual(saved,[]);assert.ok(!saved.includes("all"));
   role="SITE_ADMIN";await page.goto(origin+"/admin/tbm/create?lang=en");
   await verify("tbm-trade-selector","en");
   await page.setViewportSize({width:1280,height:900});
