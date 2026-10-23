@@ -38,6 +38,9 @@ class WorkerUpgradeDatabaseTest {
             new ClassPathResource("db/migration/V034__worker_upgrade_requests.sql"),
             new ClassPathResource("db/migration/V040__worker_birth_date_login.sql")
         ).execute(ds);
+        var reservations = new ResourceDatabasePopulator(new ClassPathResource("db/migration/V046__reserved_worker_test_iris.sql"));
+        reservations.setSeparator(org.springframework.jdbc.datasource.init.ScriptUtils.EOF_STATEMENT_SEPARATOR);
+        reservations.execute(ds);
         jdbc.sql("insert into organizations(id,name) values(1,'Test')").update();
         jdbc.sql("insert into sites(id,organization_id,name) values(2,1,'Training'),(3,1,'Contract site')").update();
         jdbc.sql("insert into users(id,phone,display_name,account_status) values(11,'01012345678','Kim','ACTIVE'),(20,'01087654321','Manager','ACTIVE')").update();
@@ -111,6 +114,28 @@ class WorkerUpgradeDatabaseTest {
         assertThrows(IllegalArgumentException.class,()->labels.sites(temp,"xx"));
     }
     String role() {return jdbc.sql("select role from user_roles where user_id=11 and revoked_at is null").query(String.class).single();}
+    @Test void reservedIrisIsOwnerOnlyAndConsumedBySuccessfulConversionOnce() {
+        jdbc.sql("insert into worker_quick_login_credentials(user_id,name_initials,phone_last4,birth_date) values(11,'TEMP','5678','991111')").update();
+        jdbc.sql("insert into worker_test_iris_reservations(iris_id,user_id,reason) values('990001',11,'fixture')").update();
+        assertThrows(RuntimeException.class, () -> jdbc.sql("insert into worker_upgrade_requests(user_id,site_id,display_name,phone,iris_id,consent_version) values(20,3,'Other','01087654321','990001','test')").update());
+        assertThrows(RuntimeException.class, () -> tx.execute(status -> service.submit(temp,new WorkerUpgradeService.Application(null,null,999L,"990001",true,WorkerUpgradeService.CONSENT_VERSION))));
+        assertTrue(jdbc.sql("select consumed_at is null from worker_test_iris_reservations").query(Boolean.class).single());
+        // A later failure must roll back both conversion and reservation consumption.
+        tx.execute(status -> {
+            service.submit(temp,new WorkerUpgradeService.Application(null,null,3L,"990001",true,WorkerUpgradeService.CONSENT_VERSION));
+            status.setRollbackOnly(); return null;
+        });
+        assertEquals("TEMP_WORKER",role());
+        assertTrue(jdbc.sql("select consumed_at is null from worker_test_iris_reservations").query(Boolean.class).single());
+        assertEquals("APPROVED",tx.execute(status -> service.submit(temp,new WorkerUpgradeService.Application(null,null,3L,"990001",true,WorkerUpgradeService.CONSENT_VERSION))).get("status"));
+        assertFalse(jdbc.sql("select consumed_at is null from worker_test_iris_reservations").query(Boolean.class).single());
+        assertThrows(RuntimeException.class, () -> tx.execute(status -> service.submit(temp,new WorkerUpgradeService.Application(null,null,3L,"990001",true,WorkerUpgradeService.CONSENT_VERSION))));
+        assertThrows(RuntimeException.class, () -> jdbc.sql("update worker_upgrade_requests set status='REJECTED' where user_id=11").update());
+        jdbc.sql("update worker_upgrade_requests set decision_reason='unchanged identity' where user_id=11").update();
+        // Even removal of the request by an operator does not make the ID reusable.
+        jdbc.sql("delete from worker_upgrade_requests where user_id=11").update();
+        assertThrows(RuntimeException.class, () -> jdbc.sql("insert into worker_upgrade_requests(user_id,site_id,display_name,phone,iris_id,consent_version) values(11,3,'Kim','01012345678','990001','test')").update());
+    }
     @Test void pendingDoesNotGrantAndApprovalTransitionsSameUserExactlyOnce() {
         long id=submit(); assertEquals("TEMP_WORKER",role());
         assertThrows(IllegalArgumentException.class,()->tx.execute(status->service.decide(manager,id,true,false,null,1)));
