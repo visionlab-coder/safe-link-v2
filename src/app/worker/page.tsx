@@ -13,6 +13,7 @@ import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
 import { persistDisplayLanguage, resolveDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 import { getT as getAuthT } from "@/app/auth/translations";
 import { tbmPublishLabel } from "@/lib/tbm-publish-ui";
+import { koreanHelpText, withKoreanHelp } from "@/lib/korean-help";
 import { workerRegistrationUI } from "@/lib/worker-registration-ui";
 import homeStyles from "./worker-home.module.css";
 import WorkerDailyTrades from "@/components/WorkerDailyTrades";
@@ -676,9 +677,9 @@ function WorkerHomeContent() {
     // 현재 브라우저에서 고른 언어가 프로필의 기본 한국어값보다 우선한다.
     const lang = resolveDisplayLanguage(profile?.preferred_lang, urlLang, displayLang);
     const newChatCount = useUnreadChatCount(temporary ? null : profile?.id);
-    const t = getUI(lang);
-    const registration = workerRegistrationUI(lang);
-    const common = getWorkerCommon(lang);
+    const t = withKoreanHelp(getUI(lang), getUI("ko"), lang);
+    const registration = withKoreanHelp(workerRegistrationUI(lang), workerRegistrationUI("ko"), lang);
+    const common = withKoreanHelp(getWorkerCommon(lang), getWorkerCommon("ko"), lang);
     const iso = isoMap[lang] || isoMap.ko;
     const simpleHome = {
         todayTitle: common.todayTitle,
@@ -737,11 +738,11 @@ function WorkerHomeContent() {
                             />
                             <span className="text-[10px] text-[#172033] font-black">{lang.toUpperCase()}</span>
                         </div>
-                        <button disabled={temporary} onClick={() => router.push('/auth/setup')} className="whitespace-nowrap rounded-lg px-2 py-2 text-[9px] font-black text-blue-600 hover:bg-blue-50 uppercase tracking-widest transition-colors disabled:text-slate-400">
+                        <button disabled={temporary} onClick={() => router.push('/auth/setup')} className="max-w-24 whitespace-normal break-keep rounded-lg px-2 py-2 text-[9px] font-black text-blue-600 hover:bg-blue-50 transition-colors disabled:text-slate-400">
                             {temporary && <span aria-hidden="true">🔒 </span>}
                             {common.profile}
                         </button>
-                        <button onClick={handleSignOut} className="whitespace-nowrap rounded-lg px-2 py-2 text-[9px] font-black text-slate-500 hover:bg-red-50 hover:text-red-500 uppercase tracking-widest transition-colors">
+                        <button onClick={handleSignOut} className="max-w-24 whitespace-normal break-keep rounded-lg px-2 py-2 text-[9px] font-black text-slate-500 hover:bg-red-50 hover:text-red-500 transition-colors">
                             {t.signOut}
                         </button>
                     </div>
@@ -751,13 +752,13 @@ function WorkerHomeContent() {
                 </header>
 
                 {/* 🛑 작업중지권 (Stop Work Authority) — 긴급 버튼 */}
-                <div className="admin-concept-hero relative overflow-hidden h-40 w-full rounded-[32px] border border-white/10 shadow-2xl">
+                <div className="admin-concept-hero relative overflow-hidden min-h-40 w-full rounded-[32px] border border-white/10 shadow-2xl">
                     <picture>
                         <source media="(max-width: 639px)" srcSet="/images/mobile-v4/mobile/tbm/03.webp" />
                         <Image src="/images/mobile-v4/web/tbm/03.webp" alt="Field worker safety briefing" fill className="object-cover" priority />
                     </picture>
                     <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
-                    <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+                    <div className="relative z-10 p-5 text-white sm:p-8">
                         <p className="text-[10px] font-black tracking-[.18em] text-green-200">SQ LINK FIELD SAFETY</p>
                         <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">
                             {common.safetyHome}
@@ -775,7 +776,7 @@ function WorkerHomeContent() {
                             <path d="m3 10 13-5v14L3 14zM3 10v4M7 16l1 5h3l-1-4M20 9l2-1M20 12h2M20 15l2 1" />
                         </svg>
                     </span>
-                    <span className={homeStyles.publishLabel}>{tbmPublishLabel(lang)}</span>
+                    <span className={homeStyles.publishLabel}>{koreanHelpText(tbmPublishLabel(lang), tbmPublishLabel("ko"), lang)}</span>
                     <svg className={homeStyles.publishArrow} aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 5 7 7-7 7" /></svg>
                 </Link>}
                 <section inert={temporary || undefined} data-worker-locked={temporary || undefined} className="relative">

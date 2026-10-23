@@ -6,13 +6,14 @@ import { useRouter } from "next/navigation";
 import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 import { workerRegistrationUI } from "@/lib/worker-registration-ui";
+import { withKoreanHelp } from "@/lib/korean-help";
 import { isWorkerBirthDate, workerLoginUI } from "@/lib/worker-login";
 
 export default function TemporaryRegistration() {
   const router = useRouter();
   const language = useDisplayLanguage();
-  const t = workerRegistrationUI(language);
-  const login = workerLoginUI(language);
+  const t = withKoreanHelp(workerRegistrationUI(language), workerRegistrationUI("ko"), language);
+  const login = withKoreanHelp(workerLoginUI(language), workerLoginUI("ko"), language);
   const [birthDate, setBirthDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

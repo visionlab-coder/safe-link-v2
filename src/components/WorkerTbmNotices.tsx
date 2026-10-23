@@ -5,6 +5,7 @@ import Link from "next/link";
 import { loadPendingTbms, tbmNotificationColumns, todayTbmNotices, type TbmHomeNotice } from "@/lib/tbm-notifications";
 import { normalizeTbmTrades } from "@/lib/tbm-trades";
 import { tbmLanguage, tbmTradeLabel } from "@/lib/tbm-trade-labels";
+import { koreanHelpText } from "@/lib/korean-help";
 import styles from "./WorkerTbmNotices.module.css";
 import { liveTbmSessions } from "@/lib/tbm-live-sessions";
 import { dailyTradeUI, matchesDailyTrades, type DailyTrades } from "@/lib/worker-daily-trades";
@@ -77,8 +78,8 @@ export default function WorkerTbmNotices({ siteId, temporary, lang, message, sel
         </div>
         <div className={styles.body}>
           <p className={styles.trades} data-testid="tbm-notice-trades">
-            {trades.length ? trades.map(trade => <span key={trade}>{tbmTradeLabel(trade, lang)}</span>) : <span>{dailyTradeUI(lang).common}</span>}
-            {isLive && <span className={styles.live}>LIVE</span>}
+            {trades.length ? trades.map(trade => <span key={trade}>{koreanHelpText(tbmTradeLabel(trade, lang), tbmTradeLabel(trade, "ko"), lang)}</span>) : <span>{koreanHelpText(dailyTradeUI(lang).common, dailyTradeUI("ko").common, lang)}</span>}
+            {isLive && <span className={styles.live}>{koreanHelpText("LIVE", "방송 중", lang)}</span>}
           </p>
           <h2>{message}</h2>
           {date && !Number.isNaN(date.getTime()) && <time dateTime={date.toISOString()}>

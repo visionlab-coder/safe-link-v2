@@ -1,6 +1,7 @@
 "use client";
 import EnglishNameField from "@/components/EnglishNameField";
 import { englishNameUI } from "@/lib/english-name";
+import { koreanHelpText, withKoreanHelp } from "@/lib/korean-help";
 import { isWorkerBirthDate, workerLoginUI } from "@/lib/worker-login";
 import { ADMIN_PASSWORD_MIN_LENGTH, adminPasswordHint, adminSignupIssues } from "@/lib/admin-signup-validation";
 
@@ -235,11 +236,12 @@ function AuthContent() {
 
   const urlLang = searchParams.get("lang");
   const [lang, setLang] = useState<string>(urlLang || "");
-  const t = getT(lang || "en");
-  const workerLogin = workerLoginUI(lang);
+  const workerLogin = withKoreanHelp(workerLoginUI(lang), workerLoginUI("ko"), lang);
+  const workerName = withKoreanHelp(englishNameUI(lang), englishNameUI("ko"), lang);
   const emailLabel = EMAIL_LABELS[lang || "en"] || EMAIL_LABELS.en;
 
   const [mode, setMode] = useState<Mode>(urlLang ? "role" : "lang");
+  const t = withKoreanHelp(getT(lang || "en"), getT("ko"), lang, mode !== "admin");
   const [loading, setLoading] = useState(false);
   const [existingUser, setExistingUser] = useState<{ email: string; role: string | null } | null>(null);
 
@@ -325,7 +327,7 @@ function AuthContent() {
   const submitQuickLogin = async (siteId?: string) => {
     setLoading(true);
     const activeLang = lang || "ko";
-    const notices = AUTH_NOTICES[activeLang] ?? AUTH_NOTICES.en;
+    const notices = withKoreanHelp(AUTH_NOTICES[activeLang] ?? AUTH_NOTICES.en, AUTH_NOTICES.ko, activeLang);
 
     if (legacyWorkerLogin ? !initials.trim() : !isWorkerBirthDate(birthDate)) {
       setWorkerLoginError(legacyWorkerLogin ? t.workerNameRequired : workerLogin.invalid);
@@ -349,7 +351,7 @@ function AuthContent() {
       });
 
       if (!result.ok && result.status === 429) {
-        setWorkerLoginError(sanitizeAuthError("rate limit", activeLang));
+        setWorkerLoginError(koreanHelpText(sanitizeAuthError("rate limit", activeLang), sanitizeAuthError("rate limit", "ko"), activeLang));
         setLoading(false);
         return;
       }
@@ -371,7 +373,8 @@ function AuthContent() {
       }
 
       if (!result.ok) {
-        setWorkerLoginError(sanitizeAuthError("error" in result ? result.error : "unknown", activeLang));
+        const errorCode = "error" in result ? result.error : "unknown";
+        setWorkerLoginError(koreanHelpText(sanitizeAuthError(errorCode, activeLang), sanitizeAuthError(errorCode, "ko"), activeLang));
         setLoading(false);
         return;
       }
@@ -390,7 +393,7 @@ function AuthContent() {
         setWorkerLoginError(notices.retry);
       }
     } catch {
-      setWorkerLoginError(sanitizeAuthError("network", activeLang));
+      setWorkerLoginError(koreanHelpText(sanitizeAuthError("network", activeLang), sanitizeAuthError("network", "ko"), activeLang));
     }
     setLoading(false);
   };
@@ -687,7 +690,7 @@ function AuthContent() {
                   </div>
                   <div>
                     <h2 className="text-base font-black" style={{ color: "#6EE7B7" }}>{t.workerTitle}</h2>
-                    <p className="text-xs text-slate-500 mt-0.5 leading-snug">{englishNameUI(lang).loginId} / {workerLogin.birth} · {workerLogin.password}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 leading-snug">{workerName.loginId} / {workerLogin.birth} · {workerLogin.password}</p>
                   </div>
                 </div>
 
@@ -695,7 +698,7 @@ function AuthContent() {
                 <div style={fieldBox}>
                   <input
                     type="text"
-                    aria-label={`${englishNameUI(lang).loginId} / ${workerLogin.birth}`}
+                    aria-label={`${workerName.loginId} / ${workerLogin.birth}`}
                     placeholder="BK / NGUYEN / 900521"
                     inputMode="text"
                     autoCapitalize="characters"
@@ -742,7 +745,7 @@ function AuthContent() {
                 {/* 복수 사이트 매칭 시 사이트 선택 */}
                 {multipleSites.length > 0 && (
                   <div className="flex flex-col gap-2 p-3 rounded-xl" style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.25)" }}>
-                    <p className="text-amber-300 text-xs font-bold">{(AUTH_NOTICES[lang || "en"] ?? AUTH_NOTICES.en).multipleSites}</p>
+                    <p className="text-amber-300 text-xs font-bold">{koreanHelpText((AUTH_NOTICES[lang || "en"] ?? AUTH_NOTICES.en).multipleSites, AUTH_NOTICES.ko.multipleSites, lang)}</p>
                     {multipleSites.map(s => (
                       <button
                         key={s.site_id}
@@ -759,7 +762,7 @@ function AuthContent() {
                 {/* Hint */}
                 <div className="flex items-start gap-2">
                   <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-slate-600" />
-                  <p className="text-[11px] text-slate-600 leading-snug">{englishNameUI(lang).loginId} (BK, NGUYEN) / {workerLogin.birth} (900521)<br />{workerLogin.password}</p>
+                  <p className="text-[11px] text-slate-600 leading-snug">{workerName.loginId} (BK, NGUYEN) / {workerLogin.birth} (900521)<br />{workerLogin.password}</p>
                 </div>
 
                 {/* CTA */}

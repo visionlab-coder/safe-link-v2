@@ -6,14 +6,15 @@ import WorkerRegistrationFrame from "@/components/WorkerRegistrationFrame";
 
 import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 import { workerRegistrationUI } from "@/lib/worker-registration-ui";
+import { withKoreanHelp } from "@/lib/korean-help";
 import EnglishNameField from "@/components/EnglishNameField";
 import { workerLoginUI } from "@/lib/worker-login";
 
 type Application = { status: string; birth_date?: string; local_enrollment_test?: boolean; decision_reason?: string; display_name?: string; phone?: string; site_id?: number; iris_id?: string; login_id?: string };
 export default function WorkerUpgrade() {
   const language = useDisplayLanguage();
-  const t = workerRegistrationUI(language);
-  const login = workerLoginUI(language);
+  const t = withKoreanHelp(workerRegistrationUI(language), workerRegistrationUI("ko"), language);
+  const login = withKoreanHelp(workerLoginUI(language), workerLoginUI("ko"), language);
   const [application, setApplication] = useState<Application | null>(null);
   const [sites, setSites] = useState<Array<{id:number; name:string; original_name?:string; translation_available?:boolean}>>([]);
   const [siteBusy, setSiteBusy] = useState(false);
@@ -51,7 +52,7 @@ export default function WorkerUpgrade() {
     <p>{application?.birth_date ? login.upgrade : t.upgradeIntro}</p>
     {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">{error}</p>}
     {!application && !error && <p role="status">{t.busy}</p>}
-    {application?.status === "APPROVED" ? <div className="space-y-4"><p role="status">{t.approved}</p><p>{t.loginHint.replace("{id}", application.login_id || "")}</p><Link className="block rounded-xl bg-blue-700 p-4 text-center font-bold text-white" href="/worker">{t.home}</Link></div> : application?.status === "PENDING" ? <p role="status" className="rounded-xl bg-amber-50 p-4 text-amber-900">{t.pending}</p> : application && <form noValidate className="space-y-4" onSubmit={async event => {
+    {application?.status === "APPROVED" ? <div className="space-y-4"><p role="status">{t.approved}</p><p>{t.loginHint.replaceAll("{id}", application.login_id || "")}</p><Link className="block rounded-xl bg-blue-700 p-4 text-center font-bold text-white" href="/worker">{t.home}</Link></div> : application?.status === "PENDING" ? <p role="status" className="rounded-xl bg-amber-50 p-4 text-amber-900">{t.pending}</p> : application && <form noValidate className="space-y-4" onSubmit={async event => {
       event.preventDefault(); if (busy || !consent || !nameReady) return;
       const data = new FormData(event.currentTarget);
       if (!application.birth_date && !String(data.get("name") || "").trim()) { setError(t.workerNameRequired); return; }
@@ -70,7 +71,7 @@ export default function WorkerUpgrade() {
       {application.birth_date ? <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
         <label className="block">{login.nickname}<input value={name} readOnly className="mt-1 w-full rounded-xl border border-slate-300 bg-slate-100 p-3" /></label>
         <label className="block">{login.birth}<input value={application.birth_date} readOnly className="mt-1 w-full rounded-xl border border-slate-300 bg-slate-100 p-3" /></label>
-      </section> : <EnglishNameField language={language} value={name} onChange={setName} onReadyChange={setNameReady} />}
+      </section> : <EnglishNameField language={language} value={name} onChange={setName} onReadyChange={setNameReady} koreanHelp />}
       <label className="block">{t.phone}<input name="phone" type="tel" autoComplete="tel" defaultValue={application.phone} readOnly={Boolean(application.birth_date)} required className="mt-1 w-full rounded-xl border border-slate-400 p-3 read-only:bg-slate-100" /></label>
       <label className="block">{t.site}<select name="site" disabled={siteBusy} defaultValue={application.site_id || ""} required className="mt-1 w-full rounded-xl border border-slate-400 p-3"><option value="" disabled>{siteBusy ? t.busy : t.site}</option>{sites.map(site => <option key={site.id} value={site.id}>{site.name}{site.original_name && site.original_name !== site.name ? ` (${site.original_name})` : ""}</option>)}</select></label>
       {sites.some(site => site.translation_available === false) && <p role="status" className="text-sm text-amber-800">{login.siteFallback}</p>}

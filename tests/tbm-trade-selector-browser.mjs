@@ -8,6 +8,7 @@ const load=loadFactory();
 const {TBM_TRADES}=load("src/lib/tbm-trades.ts");
 const {tbmTradeSelectorUI,tbmTradeLabel}=load("src/lib/tbm-trade-labels.ts");
 const {QR_LANGUAGE_OPTIONS}=load("src/utils/qr/language-options.ts");
+const {koreanHelpText}=load("src/lib/korean-help.ts");
 const origin="http://127.0.0.1:3117";
 let role="WORKER";
 const actor=()=>({id:99002,displayName:"LOCAL TEST",roles:[role],siteIds:[99001],preferredLanguage:"en"});
@@ -51,7 +52,10 @@ try{
   async function verify(selector,lang){
     const box=page.getByTestId(selector);
     await box.locator('input[type="checkbox"]').last().waitFor();
-    assert.deepEqual(await box.locator("label").allTextContents(),[tbmTradeSelectorUI(lang).all,...TBM_TRADES.map(t=>tbmTradeLabel(t,lang))]);
+    assert.deepEqual(await box.locator("label").allTextContents(),[
+      koreanHelpText(tbmTradeSelectorUI(lang).all,tbmTradeSelectorUI("ko").all,lang,role==="WORKER"),
+      ...TBM_TRADES.map(t=>koreanHelpText(tbmTradeLabel(t,lang),tbmTradeLabel(t,"ko"),lang,role==="WORKER")),
+    ]);
     const all=box.getByRole("checkbox").first();
     if(selector==="tbm-trade-selector") {
       await all.check(); assert.equal(await box.locator('input:checked').count(),1);
@@ -74,7 +78,7 @@ try{
   await page.goto(origin+"/worker?lang=en");
   await verify("daily-trades","en");
   await page.getByTestId("daily-trades").getByRole("checkbox").first().check();
-  await page.getByTestId("daily-trades").getByRole("button",{name:"Save selection",exact:true}).click();
+  await page.getByTestId("daily-trades").getByRole("button",{name:"Save selection (선택 완료)",exact:true}).click();
   await page.waitForFunction(()=>document.querySelectorAll('[data-testid="daily-trades"] input').length===0);
   assert.deepEqual(saved,TBM_TRADES);
   await page.setViewportSize({width:320,height:844});
@@ -87,8 +91,8 @@ try{
   await language("en");await page.goto(origin+"/worker/tbm/create?lang=en");
   await page.getByTestId("tbm-trade-selector").getByRole("checkbox").first().check();
   await page.locator("textarea").first().fill("Check your safety helmet.");
-  await page.getByRole("button",{name:"🚀 PUSH BROADCAST",exact:true}).click();
-  await page.getByText("Push Successful",{exact:true}).first().waitFor();
+  await page.getByRole("button",{name:"🚀 PUSH BROADCAST (📡 TBM 브로드캐스트)",exact:true}).click();
+  await page.getByText("Push Successful (전파 완료)",{exact:true}).first().waitFor();
   assert.deepEqual(saved,[]);assert.ok(!saved.includes("all"));
   role="SITE_ADMIN";await page.goto(origin+"/admin/tbm/create?lang=en");
   await verify("tbm-trade-selector","en");

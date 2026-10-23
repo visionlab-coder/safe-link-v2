@@ -60,6 +60,7 @@ jobs:
           node tests/tbm-notifications.cjs
           node tests/worker-daily-trades.cjs
           node --test tests/profile-setup-i18n.test.cjs
+          node --test tests/korean-help.test.cjs
           npm run build
 
       - uses: actions/setup-java@v4

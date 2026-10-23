@@ -1,13 +1,15 @@
 "use client";
 import { useEffect, useId, useState } from "react";
 import { englishNameUI, filterEnglishNameInput, isEnglishName, normalizeEnglishName } from "@/lib/english-name";
+import { withKoreanHelp } from "@/lib/korean-help";
 
 /** Accept Roman letters directly, with no transliteration requests or suggestions. */
-export default function EnglishNameField({ language, value, onChange, onReadyChange, name = "name" }: {
+export default function EnglishNameField({ language, value, onChange, onReadyChange, name = "name", koreanHelp = false }: {
   language: string; value: string; onChange: (value: string) => void;
   onReadyChange: (ready: boolean) => void; name?: string;
+  koreanHelp?: boolean;
 }) {
-  const t = englishNameUI(language);
+  const t = withKoreanHelp(englishNameUI(language), englishNameUI("ko"), language, koreanHelp);
   const id = useId();
   const [confirmedValue, setConfirmedValue] = useState<string | null>(null);
   const valid = isEnglishName(value);

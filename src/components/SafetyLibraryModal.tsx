@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useDisplayLanguage } from "@/hooks/useDisplayLanguage";
+import { withKoreanHelp } from "@/lib/korean-help";
 import { filterRiskLibrary, riskLibraryDraft, type RiskLibraryItem, type RiskLibrarySource } from "@/lib/tbm-risk-library";
 
 interface SafetyLibraryModalProps {
@@ -10,6 +11,7 @@ interface SafetyLibraryModalProps {
     onSelect: (text: string) => void;
     lang?: string;
     disabled?: boolean;
+    koreanHelp?: boolean;
 }
 
 const UI_TEXT: Record<string, Record<string, string>> = {
@@ -88,10 +90,10 @@ const EXTRA: Record<string, string[]> = {
     vi: ["Nguồn", "Tìm kiếm", "Tìm công việc, nguy cơ hoặc biện pháp", "Không tải được danh sách.", "Thử lại", "Tài liệu gốc tiếng Hàn. Kiểm tra trước khi thêm.", "mục", "Trước", "Sau", "Dòng", "Hạng mục"],
     ru: ["Источник", "Поиск", "Работы, риски или меры", "Не удалось загрузить список.", "Повторить", "Оригинал на корейском. Проверьте пункты перед добавлением.", "пунктов", "Назад", "Далее", "Строка", "Подкатегория"],
 };
-export default function SafetyLibraryModal({ isOpen, onClose, onSelect, lang, disabled = false }: SafetyLibraryModalProps) {
+export default function SafetyLibraryModal({ isOpen, onClose, onSelect, lang, disabled = false, koreanHelp = false }: SafetyLibraryModalProps) {
     const displayLanguage = useDisplayLanguage();
     const language = lang ?? displayLanguage;
-    const t = UI_TEXT[language] || UI_TEXT.en;
+    const t = withKoreanHelp(UI_TEXT[language] || UI_TEXT.en, UI_TEXT.ko, language, koreanHelp);
     const e = EXTRA[language] || EXTRA.en;
     const [items, setItems] = useState<RiskLibraryItem[]>([]);
     const [sources, setSources] = useState<RiskLibrarySource[]>([]);

@@ -5,6 +5,7 @@ import loadFactory from "./helpers/load-typescript.cjs";
 const load = loadFactory();
 const { QR_LANGUAGE_OPTIONS } = load("src/utils/qr/language-options.ts");
 const { dailyTradeUI } = load("src/lib/worker-daily-trades.ts");
+const { koreanHelpText } = load("src/lib/korean-help.ts");
 const base = "http://localhost:3000";
 const browser = await chromium.launch({ executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", headless: true });
 try {
@@ -85,7 +86,7 @@ try {
       window.dispatchEvent(new Event("safe-link-language-changed"));
     },lang);
     await page.goto(base+"/worker?lang="+lang);
-    await page.getByTestId("daily-trades").getByRole("heading",{name:dailyTradeUI(lang).title,exact:true}).waitFor();
+    await page.getByTestId("daily-trades").getByRole("heading",{name:koreanHelpText(dailyTradeUI(lang).title,dailyTradeUI("ko").title,lang),exact:true}).waitFor();
     await page.waitForFunction(()=>document.querySelectorAll('[data-testid="daily-trades"] input[type="checkbox"]').length===17);
     assert.equal(await page.getByTestId("daily-trades").evaluate(n=>n.scrollWidth>n.clientWidth+1),false,lang+" overflow");
   }

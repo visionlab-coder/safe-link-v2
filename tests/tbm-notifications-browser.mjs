@@ -6,6 +6,7 @@ const load = loadFactory();
 const { QR_LANGUAGE_OPTIONS } = load('src/utils/qr/language-options.ts');
 const { TBM_TRADES } = load('src/lib/tbm-trades.ts');
 const { tbmTradeLabel } = load('src/lib/tbm-trade-labels.ts');
+const { koreanHelpText } = load('src/lib/korean-help.ts');
 const base = 'http://localhost:3000';
 const browser = await chromium.launch({ executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless:true });
 try {
@@ -87,7 +88,7 @@ try {
     }, lang);
     await page.goto(base + '/worker?lang=' + lang); await waitCount(16);
     const text = await page.getByTestId('tbm-notice-trades').allTextContents();
-    assert.deepEqual(text, TBM_TRADES.map(t=>tbmTradeLabel(t,lang)), lang);
+    assert.deepEqual(text, TBM_TRADES.map(t=>koreanHelpText(tbmTradeLabel(t,lang),tbmTradeLabel(t,'ko'),lang)), lang);
     assert.equal(await page.getByTestId('tbm-notices').evaluate(n=>n.scrollWidth>n.clientWidth+1), false, lang+' grid overflow');
   }
   count=1;

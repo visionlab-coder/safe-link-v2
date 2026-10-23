@@ -5,6 +5,7 @@ import { ArrowLeft, HardHat, ShieldCheck } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
 import styles from "./WorkerRegistrationFrame.module.css";
 import { workerRegistrationUI } from "@/lib/worker-registration-ui";
+import { withKoreanHelp } from "@/lib/korean-help";
 
 export default function WorkerRegistrationFrame({ children, title, mode, backHref, language }: {
   children: ReactNode;
@@ -14,7 +15,7 @@ export default function WorkerRegistrationFrame({ children, title, mode, backHre
   language: string;
 }) {
   const Icon = mode === "temporary" ? HardHat : ShieldCheck;
-  const t = workerRegistrationUI(language);
+  const t = withKoreanHelp(workerRegistrationUI(language), workerRegistrationUI("ko"), language);
   return (
     <main className={styles.page} lang={language === "jp" ? "ja" : language === "ph" ? "fil" : language} dir={language === "ar" ? "rtl" : "ltr"}>
       <div className={styles.container}>

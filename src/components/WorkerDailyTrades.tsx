@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import TbmTradeOptions from "./TbmTradeOptions";
+import { koreanHelpText, withKoreanHelp } from "@/lib/korean-help";
 import { tbmTradeLabel } from "@/lib/tbm-trade-labels";
 import { dailyTradeUI, isCurrentDailyTrades, loadDailyTrades, type DailyTrades } from "@/lib/worker-daily-trades";
 import WorkerTbmNotices from "./WorkerTbmNotices";
@@ -16,7 +17,7 @@ export default function WorkerDailyTrades(props: { siteId: string; temporary: bo
   const [other, setOther] = useState(false);
   const current = useRef<DailyTrades | null>(null);
   const generation = useRef(0);
-  const ui = dailyTradeUI(lang);
+  const ui = withKoreanHelp(dailyTradeUI(lang), dailyTradeUI("ko"), lang);
   useEffect(() => {
     if (temporary) return;
     const abort = new AbortController();
@@ -69,13 +70,13 @@ export default function WorkerDailyTrades(props: { siteId: string; temporary: bo
       {!selection && !error && <p role="status" className="text-slate-500">…</p>}
       {selection && (editing || !selection.selected) ? <fieldset disabled={busy} className="mt-4">
         <legend className="sr-only">{ui.title}</legend>
-        <TbmTradeOptions selected={draft} onChange={setDraft} lang={lang} />
+        <TbmTradeOptions selected={draft} onChange={setDraft} lang={lang} koreanHelp />
         <div className="mt-4 flex gap-3">
           <button type="button" disabled={!draft.length || busy} onClick={save} className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white disabled:opacity-40">{busy ? "…" : ui.save}</button>
           {selection.selected && <button type="button" onClick={() => { setDraft(selection.trades); setEditing(false); }} className="rounded-xl border border-slate-300 px-4 py-3 text-slate-700">{ui.cancel}</button>}
         </div>
       </fieldset> : selection && <div className="mt-3 flex flex-wrap items-center gap-2">
-        {selection.trades.map(trade => <span key={trade} className="rounded-xl bg-blue-50 px-3 py-2 font-bold text-blue-900">{tbmTradeLabel(trade, lang)}</span>)}
+        {selection.trades.map(trade => <span key={trade} className="rounded-xl bg-blue-50 px-3 py-2 font-bold text-blue-900">{koreanHelpText(tbmTradeLabel(trade, lang), tbmTradeLabel(trade, "ko"), lang)}</span>)}
         <button type="button" onClick={() => setEditing(true)} className="rounded-xl border border-blue-300 px-3 py-2 font-bold text-blue-700">{ui.change}</button>
       </div>}
     </section>

@@ -18,6 +18,8 @@ import { TbmLiveBroadcast } from "@/utils/tbm-live-broadcast";
 import { appendTbmTranscript, cleanTbmTranscriptFragment } from "@/utils/tbm-transcript";
 import { prepareTbmSpeechDraft } from "@/utils/tbm-speech-draft";
 import SafetyLibraryModal from "@/components/SafetyLibraryModal";
+import { koreanHelpText, withKoreanHelp } from "@/lib/korean-help";
+import { workerRegistrationUI } from "@/lib/worker-registration-ui";
 import { resolveDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
 
 const adminUI: Record<string, any> = {
@@ -105,7 +107,8 @@ type BroadcastResult = {
     message: string;
 };
 
-function getBroadcastErrorMessage(lang: string, error?: string, detail?: string) {
+function getBroadcastErrorMessage(lang: string, error?: string, detail?: string, koreanHelp = false): string {
+    if (koreanHelp) return koreanHelpText(getBroadcastErrorMessage(lang, error, detail), getBroadcastErrorMessage("ko", error, detail), lang);
     if (lang === "ko") {
         if (error === "site_id_required" || error === "admin_site_required") {
             return "TBM을 전파할 현장이 연결되어 있지 않습니다. 관리자 프로필에서 현장을 설정한 뒤 다시 시도하세요.";
@@ -221,7 +224,7 @@ function AdminTBMCreateContent() {
     const [targetError, setTargetError] = useState(false);
     const scopeUserRef = useRef<string | null>(null);
     const nationwidePublishRef = useRef<{ fingerprint: string; id: string } | null>(null);
-    const nationUI = nationwideTbmUI(displayLang || adminLang);
+    const nationUI = withKoreanHelp(nationwideTbmUI(displayLang || adminLang), nationwideTbmUI("ko"), displayLang || adminLang, workerMode);
     const broadcastTarget = nationwide && canBroadcastNationwide ? "nationwide" : adminSiteId;
     const nationwideReady = !nationwide || (canBroadcastNationwide && nationwideConfirmed && (targetCount ?? 0) > 0 && !targetError);
 
@@ -323,11 +326,11 @@ function AdminTBMCreateContent() {
         // Coalesce typing and, after an edit, keep subsequent STT additions in the same snapshot.
         const timer = setTimeout(() => {
             void broadcaster.current.syncDraft(tbmText).catch(() => {
-                setBroadcastResult({ type: "error", message: getBroadcastErrorMessage(displayLang || adminLang) });
+                setBroadcastResult({ type: "error", message: getBroadcastErrorMessage(displayLang || adminLang, undefined, undefined, workerMode) });
             });
         }, 700);
         return () => clearTimeout(timer);
-    }, [tbmText, draftEdited, broadcastActive, liveFinalizing, liveCompleted, isSending, displayLang, adminLang]);
+    }, [tbmText, draftEdited, broadcastActive, liveFinalizing, liveCompleted, isSending, displayLang, adminLang, workerMode]);
     useEffect(() => {
         const current = broadcaster.current;
         return () => { void current.stop().catch(() => {}); };
@@ -465,7 +468,7 @@ function AdminTBMCreateContent() {
                 setIsDraining(false);
                 if (!finalDraftRef.current.trim()) {
                     setLiveFinalizing(false);
-                    setSttError(getBroadcastErrorMessage(displayLang || adminLang, "content_required"));
+                    setSttError(getBroadcastErrorMessage(displayLang || adminLang, "content_required", undefined, workerMode));
                     return;
                 }
                 await completeLiveTbm();
@@ -626,7 +629,7 @@ function AdminTBMCreateContent() {
             if (!res.ok) {
                 setBroadcastResult({
                     type: "error",
-                    message: getBroadcastErrorMessage(displayLang || adminLang, result.error, result.detail),
+                    message: getBroadcastErrorMessage(displayLang || adminLang, result.error, result.detail, workerMode),
                 });
                 return;
             }
@@ -639,21 +642,22 @@ function AdminTBMCreateContent() {
             console.error(e);
             setBroadcastResult({
                 type: "error",
-                message: getBroadcastErrorMessage(displayLang || adminLang),
+                message: getBroadcastErrorMessage(displayLang || adminLang, undefined, undefined, workerMode),
             });
         } finally {
             setIsSending(false);
         }
     };
 
-    const t = getUI(displayLang || adminLang);
-    const summaryUI = tbmDraftSummaryUI(displayLang || adminLang);
+    const t = withKoreanHelp(getUI(displayLang || adminLang), getUI("ko"), displayLang || adminLang, workerMode);
+    const summaryUI = withKoreanHelp(tbmDraftSummaryUI(displayLang || adminLang), tbmDraftSummaryUI("ko"), displayLang || adminLang, workerMode);
+    const tradeUI = withKoreanHelp(tbmTradeSelectorUI(displayLang || adminLang), tbmTradeSelectorUI("ko"), displayLang || adminLang, workerMode);
     const locale = ({ ko: "ko-KR", en: "en-US", zh: "zh-CN", vi: "vi-VN", ru: "ru-RU" } as Record<string, string>)[displayLang || adminLang] || "en-US";
 
     return (
         <RoleGuard allowedRole={workerMode ? "worker" : "admin"}>
             <div className="visualization-light min-h-screen font-sans flex flex-col selection:bg-blue-500/30">
-                <header className="concept-page-header safe-area-sticky-top sticky z-50">
+                <header className={`concept-page-header safe-area-sticky-top sticky z-50 ${workerMode ? "flex-wrap gap-3" : ""}`}>
                     <div className="flex items-center gap-4">
                         <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors tap-effect text-slate-400">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -663,7 +667,7 @@ function AdminTBMCreateContent() {
                         <div className="flex flex-col">
                             <div className="flex items-center gap-2">
                                 <span className="text-xl font-black tracking-tight text-white uppercase italic">SQ Link</span>
-                                <span className="px-2 py-0.5 bg-blue-500 text-[10px] font-black rounded text-white tracking-widest uppercase">{workerMode ? "Worker" : "Admin"}</span>
+                                <span className="px-2 py-0.5 bg-blue-500 text-[10px] font-black rounded text-white tracking-widest uppercase">{workerMode ? koreanHelpText(workerRegistrationUI(displayLang || adminLang).workerRole, workerRegistrationUI("ko").workerRole, displayLang || adminLang) : "Admin"}</span>
                             </div>
                         </div>
                     </div>
@@ -685,13 +689,13 @@ function AdminTBMCreateContent() {
                     </div>
                 </header>
 
-                <div className="admin-concept-hero relative overflow-hidden h-40 w-full">
+                <div className={`admin-concept-hero relative overflow-hidden w-full ${workerMode ? "min-h-40" : "h-40"}`}>
                   <picture>
                     <source media="(max-width: 639px)" srcSet="/images/mobile-v4/mobile/tbm/03.webp" />
                     <Image src="/images/mobile-v4/web/tbm/03.webp" alt="TBM Field Briefing" fill className="object-cover" />
                   </picture>
                   <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-slate-950/15" />
-                  <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-8">
+                  <div className={`z-10 p-5 text-white sm:p-8 ${workerMode ? "relative" : "absolute inset-x-0 bottom-0"}`}>
                     <p className="text-[10px] font-black tracking-[.18em] text-blue-200">SQ LINK TBM</p>
                     <h2 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{t.title}</h2>
                     <p className="mt-2 text-sm font-bold text-slate-100">{nationwide ? nationUI.all : t.subtitle}</p>
@@ -700,9 +704,9 @@ function AdminTBMCreateContent() {
 
                 <main className="flex-1 flex flex-col p-4 md:p-8 gap-8 max-w-3xl mx-auto w-full pb-20">
                     <fieldset disabled={tradesLocked} data-testid="tbm-trade-selector" className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm disabled:opacity-70">
-                        <legend className="px-2 text-sm font-bold text-slate-900">{tbmTradeSelectorUI(displayLang || adminLang).heading}</legend>
-                        <p className="mb-4 text-sm text-slate-600">{tbmTradeSelectorUI(displayLang || adminLang).hint}</p>
-                        <TbmTradeOptions selected={selectedTrades} onChange={setSelectedTrades} lang={displayLang || adminLang} commonChannel />
+                        <legend className="px-2 text-sm font-bold text-slate-900">{tradeUI.heading}</legend>
+                        <p className="mb-4 text-sm text-slate-600">{tradeUI.hint}</p>
+                        <TbmTradeOptions selected={selectedTrades} onChange={setSelectedTrades} lang={displayLang || adminLang} commonChannel koreanHelp={workerMode} />
                     </fieldset>
                     {canBroadcastNationwide && <fieldset disabled={broadcastActive || broadcastBusy || isSending || isDraining || summaryBusy || (liveFinalizing && !liveCompleted)} className="rounded-3xl border border-blue-200 bg-blue-50 p-5 text-slate-900">
                         <legend className="px-2 text-sm font-bold">{nationUI.target}</legend>
@@ -737,9 +741,9 @@ function AdminTBMCreateContent() {
                     </section>
 
                     <section className="flex flex-col flex-1 gap-6">
-                        <div className="glass tbm-compose-panel rounded-[48px] p-8 border-white/10 shadow-3xl flex flex-col gap-6 relative min-h-[400px]">
-                            <div className="flex justify-between items-center">
-                                <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">{t.koreanDraft}</h3>
+                        <div className={`glass tbm-compose-panel rounded-[48px] ${workerMode ? "p-5 sm:p-8" : "p-8"} border-white/10 shadow-3xl flex flex-col gap-6 relative min-h-[400px]`}>
+                            <div className="flex flex-wrap gap-3 justify-between items-center">
+                                <h3 className={`text-xs font-black text-slate-500 ${workerMode ? "leading-relaxed" : "uppercase tracking-[0.3em]"}`}>{t.koreanDraft}</h3>
                                 <button onClick={handleRecording} disabled={isDraining || isSending || broadcastBusy || summaryBusy || (liveFinalizing && !liveCompleted) || !broadcastTarget || (!isRecording && !nationwideReady)} className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all tap-effect relative ${isRecording ? "bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)]" : "glass border-white/10 text-slate-400 hover:text-white"}`}>
                                     {isRecording && (
                                         <span className="absolute inset-0 rounded-full bg-red-500/40 animate-ping" />
@@ -750,7 +754,7 @@ function AdminTBMCreateContent() {
                                                 <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
                                                 {t.recTime} {formatRecTime(recSeconds)}
                                             </>
-                                        ) : (broadcastBusy ? t.processing : (adminLang === "ko" ? "TBM 방송 시작" : t.voiceInput))}
+                                        ) : (broadcastBusy ? t.processing : ((displayLang || adminLang) === "ko" ? "TBM 방송 시작" : t.voiceInput))}
                                     </span>
                                 </button>
                             </div>
@@ -841,7 +845,7 @@ function AdminTBMCreateContent() {
 
                             <div className="mt-auto pt-6 border-t border-white/5 flex flex-col gap-3">
                                 <button onClick={handleSendTBM} disabled={liveCompleted || isSending || !tbmText.trim() || isRecording || isDraining || summaryBusy || pendingSpeechCount > 0 || !nationwideReady} className="w-full py-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-[32px] text-2xl font-black text-slate-950 shadow-[0_20px_50px_-15px_rgba(59,130,246,0.4)] tap-effect flex items-center justify-center gap-4 disabled:opacity-30 disabled:grayscale transition-all">
-                                    {isSending ? <div className="w-8 h-8 border-4 border-slate-950 border-t-transparent rounded-full animate-spin" /> : <><svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>{liveCompleted ? t.pushSuccess : t.pushBtn}</>}
+                                    {isSending ? <div className="w-8 h-8 border-4 border-slate-950 border-t-transparent rounded-full animate-spin" /> : <><svg className="w-8 h-8 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg><span className={workerMode ? "min-w-0 break-keep text-base leading-relaxed sm:text-xl" : undefined}>{liveCompleted ? t.pushSuccess : t.pushBtn}</span></>}
                                 </button>
                                 <button
                                     onClick={() => router.push(workerMode ? "/worker/chat" : "/admin/chat")}
@@ -869,7 +873,7 @@ function AdminTBMCreateContent() {
                             ) : (
                                 history.filter(tbm => !hiddenNoticeIds.includes(tbm.id)).map((tbm) => (
                                     <div key={tbm.id} className="glass p-6 rounded-[32px] border-white/5 hover:border-white/10 transition-all group flex flex-col gap-4">
-                                        <TbmTradeBadges trades={tbm.trade_types} lang={displayLang || adminLang} />
+                                        <TbmTradeBadges trades={tbm.trade_types} lang={displayLang || adminLang} koreanHelp={workerMode} />
                                         <div className="flex justify-between items-start gap-4">
                                             <p className="text-lg text-slate-300 font-bold leading-relaxed">{tbm.content_ko}</p>
                                             <div className="flex items-center gap-2 flex-shrink-0">
@@ -896,7 +900,8 @@ function AdminTBMCreateContent() {
                     isOpen={isLibraryOpen}
                     onClose={() => setIsLibraryOpen(false)}
                     onSelect={handleLibrarySelect}
-                    lang={adminLang}
+                    lang={workerMode ? displayLang || adminLang : adminLang}
+                    koreanHelp={workerMode}
                     disabled={liveFinalizing}
                 />
             </div>
