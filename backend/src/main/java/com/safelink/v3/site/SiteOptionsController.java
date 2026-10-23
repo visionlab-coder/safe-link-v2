@@ -37,7 +37,8 @@ public class SiteOptionsController {
         if (actor == null) {
             return new SiteOptionsResponse(List.of());
         }
-        if (actor.hasAnyGlobalRole()) {
+        // Listing site names is not permission to access their TBM or worker data.
+        if (actor.hasAnyGlobalRole() || actor.roles().equals(java.util.Set.of(com.safelink.v3.domain.Role.WORKER))) {
             return new SiteOptionsResponse(findActiveSites());
         }
         if (actor.siteIds().isEmpty()) {

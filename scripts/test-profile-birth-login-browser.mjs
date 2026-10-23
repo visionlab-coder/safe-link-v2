@@ -15,7 +15,7 @@ try {
     let saved, fail=false, emptySites=false;
     await page.route('**/api/**',route=>{
       const path=new URL(route.request().url()).pathname;
-      if(path==='/api/auth/me') return route.fulfill({json:{v3:{id:99099,displayName:'5678',roles:['WORKER'],siteIds:[2,3],workerBirthDate:'010203',profileDetails:{activeSiteId:saved?3:2,siteCode:saved?'SITE B':'SITE A'}}}});
+      if(path==='/api/auth/me') return route.fulfill({json:{v3:{id:99099,displayName:'5678',roles:['WORKER'],siteIds:saved?[3]:[2],workerBirthDate:'010203',profileDetails:{activeSiteId:saved?3:2,siteCode:saved?'SITE B':'SITE A'}}}});
       if(path==='/api/sites/options') return route.fulfill({json:{sites:emptySites?[]:[{id:'2',name:'SITE A'},{id:'3',name:'SITE B'}]}});
       if(path==='/api/auth/setup-profile') {
         saved=route.request().postDataJSON();

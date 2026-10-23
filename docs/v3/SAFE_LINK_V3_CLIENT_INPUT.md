@@ -205,3 +205,7 @@ TBM 서명 상태, 알림, 관리자 dashboard에는 SSE를 우선 사용한다.
 - Redis rate limits and quota
 - object storage abstraction
 - Actuator health checks
+# 2026-10-23 추가 승인 — 근로자 전체 현장 선택
+
+- 근로자 프로필의 현장 선택에서 전체 활성 현장을 보여 주고 선택·저장할 수 있도록 요청받았다.
+- 기존 영문/생년월일 로그인은 유지한다. 현장 선택은 새 근무 현장으로 이동이며 전국 현장의 TBM 데이터 열람 권한을 동시에 주는 것이 아니다.

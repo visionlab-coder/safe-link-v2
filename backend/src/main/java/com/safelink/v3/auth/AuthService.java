@@ -130,10 +130,19 @@ public class AuthService {
             try { activeSiteId = Long.valueOf(requestedSite); }
             catch (NumberFormatException ex) { throw new IllegalArgumentException("site_id_invalid"); }
             if (activeSiteId <= 0) throw new IllegalArgumentException("site_id_invalid");
-            if (!principal.hasAnyGlobalRole() && !principal.siteIds().contains(activeSiteId)) {
+            boolean selfServiceWorker = principal.roles().equals(Set.of(Role.WORKER));
+            if (!selfServiceWorker && !principal.hasAnyGlobalRole() && !principal.siteIds().contains(activeSiteId)) {
                 throw new org.springframework.security.access.AccessDeniedException("cross_site_access_denied");
             }
             users.assertActiveSite(activeSiteId);
+            if (selfServiceWorker) {
+                var previousSites = users.moveOwnWorkerSite(principal.userId(), activeSiteId);
+                if (!previousSites.equals(Set.of(activeSiteId))) {
+                    audit.record(principal.userId(), activeSiteId, "worker.site.change", "user",
+                        String.valueOf(principal.userId()), "ALLOWED", "self_selected_active_site",
+                        Map.of("previousSiteIds", previousSites.toString(), "newSiteId", activeSiteId, "ip", ipAddress));
+                }
+            }
         }
         users.updateProfile(principal.userId(), resolvedDisplayName, resolvedLanguage);
         users.saveProfileDetails(principal.userId(), activeSiteId,
@@ -152,7 +161,8 @@ public class AuthService {
             Map.of(
                 "ip", ipAddress,
                 "roleAssignment", "server_controlled",
-                "siteAssignment", "authorized_active_site_only",
+                "siteAssignment", principal.roles().equals(Set.of(Role.WORKER)) && activeSiteId != null
+                    ? "worker_self_selected_active_site" : "authorized_active_site_only",
                 "requestedProfile", requestedProfile.toString()
             )
         );

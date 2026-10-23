@@ -55,7 +55,7 @@ try {
     await checkText(page, lang, t.pgTitle);
     await page.locator('main input[type=checkbox]').check();
     await page.getByRole('button', { name: t.next, exact: true }).click();
-    await page.getByPlaceholder(t.siteTitle).fill('TEST SITE');
+    await page.locator('main select:has(option[value="99001"])').selectOption('99001');
     await page.locator('input[type=tel]').fill('01000000000');
     await page.getByRole('button', { name: SETUP_TRADES[0].label[lang], exact: true }).click();
     assert.equal(await page.getByPlaceholder(t.tradeTitle).inputValue(), SETUP_TRADES[0].label[lang]);
@@ -75,15 +75,15 @@ try {
       assert.ok(bounds.left >= 0 && bounds.right <= 390, `${lang}: card is clipped`);
       await page.screenshot({ path: `outputs/profile-setup-qa/${lang}-step3.png`, fullPage: true });
     }
-    const dialog = page.waitForEvent('dialog');
-    await page.getByRole('button', { name: t.save, exact: true }).click();
-    const alert = await dialog;
-    assert.equal(alert.message(), t.saveFailed);
-    await alert.dismiss();
+    const dialog = page.waitForEvent('dialog').then(async alert => {
+      assert.equal(alert.message(), t.saveFailed);
+      await alert.dismiss();
+    });
+    await Promise.all([page.getByRole('button', { name: t.save, exact: true }).click(), dialog]);
     assert.equal(payload.preferred_lang, lang);
     assert.equal(payload.trade, SETUP_TRADES[0].ko, 'stored canonical trade remains stable');
     await page.getByRole('button', { name: t.prev, exact: true }).click();
-    await page.getByPlaceholder(t.siteTitle).waitFor();
+    await page.locator('main select:has(option[value="99001"])').waitFor();
     await page.getByRole('button', { name: t.prev, exact: true }).click();
     await page.locator('main select').waitFor();
     await page.getByRole('button').filter({ hasText: t.safety_officer_desc }).click();

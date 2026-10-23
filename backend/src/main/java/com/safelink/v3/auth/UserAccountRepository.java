@@ -361,6 +361,30 @@ public class UserAccountRepository {
             .list();
     }
 
+    public Set<Long> moveOwnWorkerSite(Long userId, Long siteId) {
+        // Serialize self-service transfers; recheck server-owned roles after taking the lock.
+        String status = jdbc.sql("select account_status from users where id=:id for update")
+            .param("id", userId).query(String.class).single();
+        if (!"ACTIVE".equals(status) || !rolesFor(userId).equals(Set.of(Role.WORKER))) {
+            throw new org.springframework.security.access.AccessDeniedException("worker_site_change_denied");
+        }
+        jdbc.sql("select id from sites where id=:site and status='ACTIVE' for share")
+            .param("site", siteId).query(Long.class).optional()
+            .orElseThrow(() -> new IllegalArgumentException("target_site_not_found"));
+        boolean suspended = jdbc.sql("select exists(select 1 from site_memberships where user_id=:id and site_id=:site and status='SUSPENDED')")
+            .param("id", userId).param("site", siteId).query(Boolean.class).single();
+        if (suspended) throw new org.springframework.security.access.AccessDeniedException("worker_site_change_denied");
+        Set<Long> previous = sitesFor(userId);
+        jdbc.sql("update site_memberships set status='REVOKED' where user_id=:id and role='WORKER' and site_id<>:site and status='ACTIVE'")
+            .param("id", userId).param("site", siteId).update();
+        jdbc.sql("insert into site_memberships(user_id,site_id,role,status) values(:id,:site,'WORKER','ACTIVE') on conflict(user_id,site_id,role) do update set status='ACTIVE'")
+            .param("id", userId).param("site", siteId).update();
+        // Match the existing administrator transfer policy: old-site NFC stickers cannot travel.
+        jdbc.sql("update worker_stickers set is_active=false,revoked_at=now(),revoked_by=:id,revoke_reason='worker_moved_site' where worker_id=:id and site_id<>:site and is_active=true")
+            .param("id", userId).param("site", siteId).update();
+        return previous;
+    }
+
     public void assertActiveSite(Long siteId) {
         Boolean exists = jdbc.sql("""
                 select exists (

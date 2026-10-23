@@ -150,6 +150,7 @@ function SetupContent() {
   const [name, setName] = useState("");
   const [nameReady, setNameReady] = useState(false);
   const [workerBirthDate, setWorkerBirthDate] = useState<string | null>(null);
+  const [isWorkerAccount, setIsWorkerAccount] = useState(false);
   const isBirthDateWorker = workerBirthDate !== null;
   const identityReady = isBirthDateWorker ? Boolean(name.trim()) : nameReady;
   const [nameError, setNameError] = useState(false);
@@ -174,6 +175,7 @@ function SetupContent() {
       }
 
       if (user.displayName) setName((current) => current || user.displayName);
+      setIsWorkerAccount(user.roles.length === 1 && user.roles[0] === "WORKER");
       setWorkerBirthDate(user.roles.length === 1 && user.roles[0] === "WORKER"
         && isWorkerBirthDate(user.workerBirthDate || "") ? user.workerBirthDate! : null);
       const saved = user.profileDetails;
@@ -184,7 +186,7 @@ function SetupContent() {
         setSiteCode(saved.siteCode || "");
         if (saved.activeSiteId != null) setSelectedSiteId(String(saved.activeSiteId));
       }
-      if (user.workerBirthDate && saved?.activeSiteId == null && user.siteIds.length === 1) {
+      if (user.roles.length === 1 && user.roles[0] === "WORKER" && saved?.activeSiteId == null && user.siteIds.length === 1) {
         setSelectedSiteId(String(user.siteIds[0]));
       }
       const hasRoot = user.roles.includes("ROOT");
@@ -216,8 +218,9 @@ function SetupContent() {
   const isAdminSiteRole = role === "site_manager" || role === "safety_officer" || role === "gongmu";
   const canProceedStep1 = () => Boolean(identityReady && role);
   const canProceedStep2 = () => {
+    if (isWorkerAccount && role === "worker" && !siteList.some(site => site.id === selectedSiteId)) return false;
     if (isBirthDateWorker && role === "worker") return siteList.some(site => site.id === selectedSiteId);
-    if (role === "worker" && (!trade || !siteCode)) return false;
+    if (role === "worker" && (!trade || (!isWorkerAccount && !siteCode))) return false;
     if (isAdminSiteRole) {
       if (!title) return false;
       return siteList.length > 0 ? Boolean(selectedSiteId) : Boolean(siteCode);
@@ -246,7 +249,7 @@ function SetupContent() {
       alert(t.err);
       return;
     }
-    if (isBirthDateWorker && role === "worker" && !siteList.some(site => site.id === selectedSiteId)) {
+    if (isWorkerAccount && role === "worker" && !siteList.some(site => site.id === selectedSiteId)) {
       alert(t.err);
       return;
     }
@@ -265,7 +268,7 @@ function SetupContent() {
         phoneNumber: phone.trim() || undefined,
         trade: trade.trim() || undefined,
         title: title.trim() || undefined,
-        siteCode: (isBirthDateWorker ? siteList.find(site => site.id === resolvedSiteId)?.name : siteCode.trim()) || undefined,
+        siteCode: (isWorkerAccount ? siteList.find(site => site.id === resolvedSiteId)?.name : siteCode.trim()) || undefined,
         siteId: resolvedSiteId || undefined,
       });
 
@@ -296,6 +299,7 @@ function SetupContent() {
     isMasterEmail,
     identityReady,
     isBirthDateWorker,
+    isWorkerAccount,
     siteList,
     language,
     name,
@@ -468,11 +472,11 @@ function SetupContent() {
                 >
                   <div>
                     <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest" style={{ color:"#475569" }}>
-                      {isBirthDateWorker || ((isAdminSiteRole || isMasterEmail || isHQAuthorized) && siteList.length > 0)
+                      {isWorkerAccount || ((isAdminSiteRole || isMasterEmail || isHQAuthorized) && siteList.length > 0)
                         ? t.selectSite
                         : t.siteTitle}
                     </label>
-                    {isBirthDateWorker || ((isAdminSiteRole || isMasterEmail || isHQAuthorized) && siteList.length > 0) ? (
+                    {isWorkerAccount || ((isAdminSiteRole || isMasterEmail || isHQAuthorized) && siteList.length > 0) ? (
                       <>
                         <div style={fieldBox}>
                           <select
