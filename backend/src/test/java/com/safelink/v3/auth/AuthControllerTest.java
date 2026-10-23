@@ -40,6 +40,16 @@ class AuthControllerTest {
     }
 
     @Test
+    void ownProfileReturnsServerOwnedWorkerBirthDate() {
+        var principal=new SessionPrincipal(31L,null,"5678",Set.of(Role.WORKER),Set.of(2L));
+        when(authService.workerBirthDate(principal)).thenReturn("010203");
+        assertThat(authController.me(principal).workerBirthDate()).isEqualTo("010203");
+        when(authService.updateOwnProfile(eq(principal),eq("5678"),eq("ko"),any(),any())).thenReturn(principal);
+        var response=authController.setupProfile(principal,Map.of("display_name","5678","preferred_lang","ko","workerBirthDate","999999"),new MockHttpServletRequest(),new MockHttpServletResponse());
+        assertThat(response.workerBirthDate()).isEqualTo("010203");
+    }
+
+    @Test
     void adminSignupCreatesPendingAccountWithoutSession() {
         var signup = new AuthService.PendingAdminSignup(
             31L,

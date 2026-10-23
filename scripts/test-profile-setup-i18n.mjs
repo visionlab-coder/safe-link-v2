@@ -6,7 +6,8 @@ import fs from 'node:fs';
 const require = createRequire(import.meta.url);
 const { setupUI, SETUP_TRADES } = require('../tests/helpers/load-typescript.cjs')()('src/lib/profile-setup-ui.ts');
 const locales = process.env.SETUP_TEST_LANGUAGES?.split(',') ?? ['ko','vi','zh','th','uz','ph','km','id','mn','my','ne','bn','kk','ru','en','jp','fr','es','ar','hi'];
-const base = 'http://127.0.0.1:3000';
+const base = process.env.SETUP_TEST_ORIGIN || 'http://127.0.0.1:3000';
+assert.ok(['127.0.0.1','localhost'].includes(new URL(base).hostname));
 fs.mkdirSync('outputs/profile-setup-qa', { recursive: true });
 const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
 

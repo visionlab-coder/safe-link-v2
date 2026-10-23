@@ -148,7 +148,7 @@ public class AuthController {
 
     @GetMapping("/me")
     public CurrentUserResponse me(@AuthenticationPrincipal SessionPrincipal principal) {
-        return CurrentUserResponse.from(principal, authService.profileDetails(principal));
+        return CurrentUserResponse.from(principal, authService.profileDetails(principal), authService.workerBirthDate(principal));
     }
 
     @PostMapping("/setup-profile")
@@ -166,7 +166,7 @@ public class AuthController {
             clientIp(servletRequest)
         );
         establishSession(updated, servletRequest, servletResponse);
-        return CurrentUserResponse.from(updated, authService.profileDetails(updated));
+        return CurrentUserResponse.from(updated, authService.profileDetails(updated), authService.workerBirthDate(updated));
     }
 
     @PostMapping("/logout")
@@ -284,11 +284,14 @@ public class AuthController {
             );
         }
     }
-    public record CurrentUserResponse(Long id, String email, String displayName, String preferredLanguage, List<String> roles, List<Long> siteIds, UserAccountRepository.ProfileDetails profileDetails) {
+    public record CurrentUserResponse(Long id, String email, String displayName, String preferredLanguage, List<String> roles, List<Long> siteIds, UserAccountRepository.ProfileDetails profileDetails, String workerBirthDate) {
         static CurrentUserResponse from(SessionPrincipal principal) {
             return from(principal, null);
         }
         static CurrentUserResponse from(SessionPrincipal principal, UserAccountRepository.ProfileDetails details) {
+            return from(principal, details, null);
+        }
+        static CurrentUserResponse from(SessionPrincipal principal, UserAccountRepository.ProfileDetails details, String workerBirthDate) {
             return new CurrentUserResponse(
                 principal.userId(),
                 principal.email(),
@@ -296,7 +299,8 @@ public class AuthController {
                 principal.preferredLanguage(),
                 principal.roles().stream().map(Enum::name).sorted().toList(),
                 principal.siteIds().stream().sorted().toList(),
-                details
+                details,
+                workerBirthDate
             );
         }
     }

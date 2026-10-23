@@ -161,6 +161,12 @@ public class AuthService {
             .toPrincipal();
     }
 
+    public String workerBirthDate(SessionPrincipal principal) {
+        // Authenticated self only; never infer a login type from the display name or request body.
+        if (principal == null || !principal.roles().equals(Set.of(Role.WORKER))) return null;
+        return users.findWorkerBirthDate(principal.userId());
+    }
+
     public UserAccountRepository.ProfileDetails profileDetails(SessionPrincipal principal) {
         var details = users.findProfileDetails(principal.userId());
         if (details == null) return new UserAccountRepository.ProfileDetails(null, "", "", "", "");

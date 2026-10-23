@@ -34,6 +34,7 @@ class WorkerUpgradeDatabaseTest {
         new ResourceDatabasePopulator(
             new ClassPathResource("db/migration/V001__create_identity_and_site_core.sql"),
             new ClassPathResource("db/migration/V007__create_worker_quick_login_credentials.sql"),
+            new ClassPathResource("db/migration/V030__persist_profile_details.sql"),
             new ClassPathResource("db/migration/V033__temporary_worker.sql"),
             new ClassPathResource("db/migration/V034__worker_upgrade_requests.sql"),
             new ClassPathResource("db/migration/V040__worker_birth_date_login.sql")
@@ -113,6 +114,31 @@ class WorkerUpgradeDatabaseTest {
         assertThrows(org.springframework.security.access.AccessDeniedException.class,()->labels.sites(manager,"en"));
         assertThrows(IllegalArgumentException.class,()->labels.sites(temp,"xx"));
     }
+    @Test void birthWorkerCanChangeAuthorizedSiteWithoutChangingNameOrLogin() {
+        jdbc.sql("update users set display_name='5678' where id=11").update();
+        jdbc.sql("insert into worker_quick_login_credentials(user_id,name_initials,phone_last4,birth_date) values(11,'TEMP','5678','010203')").update();
+        tx.execute(status -> service.submit(temp,new WorkerUpgradeService.Application(null,null,2L,"009876",true,WorkerUpgradeService.CONSENT_VERSION)));
+        jdbc.sql("insert into site_memberships(user_id,site_id,role) values(11,3,'WORKER')").update();
+        var repository=new UserAccountRepository(jdbc);
+        var auth=new AuthService(repository,mock(org.springframework.security.crypto.password.PasswordEncoder.class),mock(AuditService.class));
+        var principal=repository.findById(11L).orElseThrow().toPrincipal();
+        assertEquals("010203",auth.workerBirthDate(principal));
+        var before=jdbc.sql("select * from worker_quick_login_credentials where user_id=11").query().singleRow();
+        tx.execute(status -> auth.updateOwnProfile(principal,"5678","en",java.util.Map.of("requestedSiteId","3"),"test"));
+        assertEquals(3L,auth.profileDetails(principal).activeSiteId());
+        assertEquals("5678",repository.findById(11L).orElseThrow().displayName());
+        assertEquals(before,jdbc.sql("select * from worker_quick_login_credentials where user_id=11").query().singleRow());
+        assertInstanceOf(AuthService.WorkerQuickLoginSuccess.class,auth.authenticateWorkerBirthLogin("010203","5678",3L,"en","test"));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,() -> tx.execute(status -> auth.updateOwnProfile(principal,"5678","en",java.util.Map.of("requestedSiteId","999"),"test")));
+        jdbc.sql("update sites set status='SUSPENDED' where id=2").update();
+        assertThrows(IllegalArgumentException.class,() -> tx.execute(status -> auth.updateOwnProfile(principal,"5678","en",java.util.Map.of("requestedSiteId","2"),"test")));
+        assertEquals(3L,auth.profileDetails(principal).activeSiteId());
+        assertNull(auth.workerBirthDate(manager));
+        jdbc.sql("update worker_quick_login_credentials set birth_date=null,name_initials='KIM' where user_id=11").update();
+        assertNull(auth.workerBirthDate(principal));
+        assertInstanceOf(AuthService.WorkerQuickLoginSuccess.class,auth.authenticateWorkerQuickLogin("KIM","5678",3L,"en","test"));
+    }
+
     String role() {return jdbc.sql("select role from user_roles where user_id=11 and revoked_at is null").query(String.class).single();}
     @Test void reservedIrisIsOwnerOnlyAndConsumedBySuccessfulConversionOnce() {
         jdbc.sql("insert into worker_quick_login_credentials(user_id,name_initials,phone_last4,birth_date) values(11,'TEMP','5678','991111')").update();

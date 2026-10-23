@@ -180,6 +180,11 @@ public class UserAccountRepository {
 
     public record ProfileDetails(Long activeSiteId, String title, String trade, String phoneNumber, String siteCode) {}
 
+    public String findWorkerBirthDate(Long userId) {
+        return jdbc.sql("select birth_date from worker_quick_login_credentials where user_id=:id and enabled=true and birth_date is not null")
+            .param("id", userId).query(String.class).optional().orElse(null);
+    }
+
     public ProfileDetails findProfileDetails(Long userId) {
         return jdbc.sql("select active_site_id, title, trade, phone_number, site_code from user_profile_details where user_id=:id")
             .param("id", userId)

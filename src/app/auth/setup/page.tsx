@@ -1,6 +1,7 @@
 "use client";
 import EnglishNameField from "@/components/EnglishNameField";
 import { englishNameUI } from "@/lib/english-name";
+import { isWorkerBirthDate, workerLoginUI } from "@/lib/worker-login";
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -148,6 +149,9 @@ function SetupContent() {
   const [role, setRole] = useState<RoleKey>(getInitialSetupRole(searchParams.get("role")));
   const [name, setName] = useState("");
   const [nameReady, setNameReady] = useState(false);
+  const [workerBirthDate, setWorkerBirthDate] = useState<string | null>(null);
+  const isBirthDateWorker = workerBirthDate !== null;
+  const identityReady = isBirthDateWorker ? Boolean(name.trim()) : nameReady;
   const [nameError, setNameError] = useState(false);
   const [phone, setPhone] = useState("");
   const [trade, setTrade] = useState("");
@@ -170,6 +174,8 @@ function SetupContent() {
       }
 
       if (user.displayName) setName((current) => current || user.displayName);
+      setWorkerBirthDate(user.roles.length === 1 && user.roles[0] === "WORKER"
+        && isWorkerBirthDate(user.workerBirthDate || "") ? user.workerBirthDate! : null);
       const saved = user.profileDetails;
       if (saved) {
         setTitle(saved.title || "");
@@ -177,6 +183,9 @@ function SetupContent() {
         setPhone(saved.phoneNumber || "");
         setSiteCode(saved.siteCode || "");
         if (saved.activeSiteId != null) setSelectedSiteId(String(saved.activeSiteId));
+      }
+      if (user.workerBirthDate && saved?.activeSiteId == null && user.siteIds.length === 1) {
+        setSelectedSiteId(String(user.siteIds[0]));
       }
       const hasRoot = user.roles.includes("ROOT");
       const hasHq = user.roles.includes("HQ_ADMIN");
@@ -205,8 +214,9 @@ function SetupContent() {
   }, []);
 
   const isAdminSiteRole = role === "site_manager" || role === "safety_officer" || role === "gongmu";
-  const canProceedStep1 = () => Boolean(nameReady && role);
+  const canProceedStep1 = () => Boolean(identityReady && role);
   const canProceedStep2 = () => {
+    if (isBirthDateWorker && role === "worker") return siteList.some(site => site.id === selectedSiteId);
     if (role === "worker" && (!trade || !siteCode)) return false;
     if (isAdminSiteRole) {
       if (!title) return false;
@@ -217,7 +227,7 @@ function SetupContent() {
   };
 
   const handleSave = useCallback(async () => {
-    if (!role || !nameReady) {
+    if (!role || !identityReady) {
       setNameError(true); setStep(1);
       return;
     }
@@ -232,7 +242,11 @@ function SetupContent() {
       alert(t.adminLimit);
       return;
     }
-    if (role === "worker" && (!trade || !phone)) {
+    if (role === "worker" && !isBirthDateWorker && (!trade || !phone)) {
+      alert(t.err);
+      return;
+    }
+    if (isBirthDateWorker && role === "worker" && !siteList.some(site => site.id === selectedSiteId)) {
       alert(t.err);
       return;
     }
@@ -251,7 +265,7 @@ function SetupContent() {
         phoneNumber: phone.trim() || undefined,
         trade: trade.trim() || undefined,
         title: title.trim() || undefined,
-        siteCode: siteCode.trim() || undefined,
+        siteCode: (isBirthDateWorker ? siteList.find(site => site.id === resolvedSiteId)?.name : siteCode.trim()) || undefined,
         siteId: resolvedSiteId || undefined,
       });
 
@@ -280,7 +294,9 @@ function SetupContent() {
     isEditMode,
     isHQAuthorized,
     isMasterEmail,
-    nameReady,
+    identityReady,
+    isBirthDateWorker,
+    siteList,
     language,
     name,
     phone,
@@ -391,8 +407,17 @@ function SetupContent() {
                     })}
                   </div>
 
-                  <EnglishNameField language={language} value={name} onChange={setName} onReadyChange={setNameReady} />
-                  {nameError && !nameReady && <p role="alert" className="text-sm text-red-700">{englishNameUI(language).error}</p>}
+                  {isBirthDateWorker ? (
+                    <div className="space-y-2 text-sm text-slate-700">
+                      <label htmlFor="worker-birth-login" className="block font-bold">{englishNameUI(language).loginId} · {workerLoginUI(language).birth}</label>
+                      <input id="worker-birth-login" value={workerBirthDate || ""} readOnly dir="ltr"
+                        className="w-full rounded-xl border border-slate-300 bg-slate-100 px-4 py-3 text-slate-700" />
+                      <p className="text-xs leading-relaxed">{workerLoginUI(language).hint}</p>
+                    </div>
+                  ) : (
+                    <EnglishNameField language={language} value={name} onChange={setName} onReadyChange={setNameReady} />
+                  )}
+                  {nameError && !identityReady && <p role="alert" className="text-sm text-red-700">{englishNameUI(language).error}</p>}
 
                   <div>
                     <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest" style={{ color:"#475569" }}>
@@ -443,11 +468,11 @@ function SetupContent() {
                 >
                   <div>
                     <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest" style={{ color:"#475569" }}>
-                      {(isAdminSiteRole || isMasterEmail || isHQAuthorized) && siteList.length > 0
+                      {isBirthDateWorker || ((isAdminSiteRole || isMasterEmail || isHQAuthorized) && siteList.length > 0)
                         ? t.selectSite
                         : t.siteTitle}
                     </label>
-                    {(isAdminSiteRole || isMasterEmail || isHQAuthorized) && siteList.length > 0 ? (
+                    {isBirthDateWorker || ((isAdminSiteRole || isMasterEmail || isHQAuthorized) && siteList.length > 0) ? (
                       <>
                         <div style={fieldBox}>
                           <select

@@ -6,6 +6,7 @@ export type V3CurrentUser = {
   displayName: string;
   roles: V3Role[];
   siteIds: number[];
+  workerBirthDate?: string | null;
   profileDetails?: { activeSiteId?: number | null; title?: string; trade?: string; phoneNumber?: string; siteCode?: string };
 };
 

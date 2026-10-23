@@ -46,6 +46,7 @@ async function handleV3Me(req: NextRequest): Promise<NextResponse> {
     preferredLanguage?: string | null;
     roles?: string[];
     siteIds?: number[];
+    workerBirthDate?: string | null;
     profileDetails?: { activeSiteId?: number | null; title?: string; trade?: string; phoneNumber?: string; siteCode?: string };
   };
   if (typeof currentUser.id !== "number") {
