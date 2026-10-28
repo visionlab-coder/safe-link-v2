@@ -107,6 +107,8 @@ safe-link:
     open-ai-api-key: ${OPENAI_API_KEY:}
     deepl-api-key: ${DEEPL_API_KEY:}
     deepl-api-base-url: ${DEEPL_API_BASE_URL:https://api.deepl.com}
+    deepl-glossary-id: ${DEEPL_GLOSSARY_ID:}
+    deepl-glossary-revision: ${DEEPL_GLOSSARY_REVISION:}
     open-ai-text-model: ${OPENAI_TEXT_MODEL:gpt-4o-mini}
     open-ai-vision-model: ${OPENAI_VISION_MODEL:gpt-4o-mini}
     internal-gateway-secret: ${TRAVEL_API_SECRET:}

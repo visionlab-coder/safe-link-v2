@@ -72,7 +72,7 @@ public class AiGatewayController {
         }
 
         var cached = translationCache.get(
-            properties.getTranslationProvider(),
+            properties.translationCacheNamespace(),
             request.siteId(),
             request.sourceLanguage(),
             request.targetLanguage(),
@@ -102,7 +102,7 @@ public class AiGatewayController {
         Instant started = Instant.now();
         var result = vendor.translateAuto(request.text(), request.sourceLanguage(), request.targetLanguage());
         long durationMs = Duration.between(started, Instant.now()).toMillis();
-        translationCache.put(properties.getTranslationProvider(), request.siteId(), request.sourceLanguage(), request.targetLanguage(), request.text(), result.text());
+        translationCache.put(properties.translationCacheNamespace(), request.siteId(), request.sourceLanguage(), request.targetLanguage(), request.text(), result.text());
         usage.log(actor.userId(), request.siteId(), "translate", result.vendor(), result.model(), request.text().length(), result.text().length(), durationMs, AiCostEstimator.estimate("translate", result.vendor(), request.text().length(), result.text().length()));
         audit.record(actor.userId(), request.siteId(), "ai.translate", "ai_vendor", result.vendor(), "ALLOWED", "translated", Map.of("sourceLanguage", request.sourceLanguage(), "targetLanguage", request.targetLanguage()));
         return ResponseEntity.ok(new TranslateResponse(result.text(), result.vendor(), result.model()));

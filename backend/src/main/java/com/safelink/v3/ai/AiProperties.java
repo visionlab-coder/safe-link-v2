@@ -16,6 +16,8 @@ public class AiProperties {
     private String openAiApiKey = "";
     private String deeplApiKey = "";
     private String deeplApiBaseUrl = "https://api.deepl.com";
+    private String deeplGlossaryId = "";
+    private String deeplGlossaryRevision = "";
     private String openAiTextModel = "gpt-4o-mini";
     private String openAiVisionModel = "gpt-4o-mini";
     private String internalGatewaySecret = "";
@@ -49,6 +51,14 @@ public class AiProperties {
     public void setDeeplApiKey(String deeplApiKey) { this.deeplApiKey = deeplApiKey; }
     public String getDeeplApiBaseUrl() { return deeplApiBaseUrl; }
     public void setDeeplApiBaseUrl(String deeplApiBaseUrl) { this.deeplApiBaseUrl = deeplApiBaseUrl; }
+    public String getDeeplGlossaryId() { return deeplGlossaryId; }
+    public void setDeeplGlossaryId(String value) { this.deeplGlossaryId = value; }
+    public String getDeeplGlossaryRevision() { return deeplGlossaryRevision; }
+    public void setDeeplGlossaryRevision(String value) { this.deeplGlossaryRevision = value; }
+    // Old, unglossarized results must not survive a glossary enable/update/rollback.
+    public String translationCacheNamespace() {
+        return translationProvider + "|deepl-glossary-v1|" + deeplGlossaryId + "|" + deeplGlossaryRevision;
+    }
     public String getOpenAiTextModel() { return openAiTextModel; }
     public void setOpenAiTextModel(String openAiTextModel) { this.openAiTextModel = openAiTextModel; }
     public String getOpenAiVisionModel() { return openAiVisionModel; }

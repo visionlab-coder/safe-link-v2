@@ -61,6 +61,48 @@ class DeepLClientTest {
         assertTrue(DeepLClient.supportsVoice("zh-CN"));
         assertTrue(DeepLClient.supportsVoice("fil-PH"));
     }
+    @Test void glossaryOnlyAppliesToFourKoreanOutboundPairsAndKeepsTextUnchanged() throws Exception {
+        properties.setDeeplGlossaryId("52f898a5-98d7-4538-b907-46a645fb5136");
+        for (String target : List.of("en", "en-US", "ja", "jp", "vi-VN", "zh", "zh-CN")) {
+            clearInvocations(http);
+            respond(200, "{\"translations\":[{\"text\":\"fixture\"}]}");
+            String input = "셈을 확인하세요. 거푸집이 없으면 작업하지 마세요. 들어가도 됩니까? 작업 시작합시다.";
+            assertEquals("translate-v2-glossary", client.translate(input, "ko-KR", target).model());
+            var request = ArgumentCaptor.forClass(HttpRequest.class);
+            verify(http).send(request.capture(), any());
+            var payload = mapper.readTree(body(request.getValue()));
+            assertEquals(properties.getDeeplGlossaryId(), payload.path("glossary_id").asText());
+            assertEquals(input, payload.path("text").path(0).asText(), "Never reverse standard Korean into slang");
+            assertEquals("KO", payload.path("source_lang").asText());
+        }
+        for (String[] pair : List.of(new String[]{"en","ko"}, new String[]{"ja","en"}, new String[]{"ko","th"})) {
+            clearInvocations(http);
+            client.translate("fixture", pair[0], pair[1]);
+            var request = ArgumentCaptor.forClass(HttpRequest.class);
+            verify(http).send(request.capture(), any());
+            assertFalse(mapper.readTree(body(request.getValue())).has("glossary_id"));
+        }
+    }
+    @Test void glossaryConfigurationAndProviderErrorsNeverSilentlyDropTheGlossary() throws Exception {
+        properties.setDeeplGlossaryId("not-a-uuid");
+        assertThrows(ServiceUnavailableException.class, () -> client.translate("셈", "ko", "en"));
+        verifyNoInteractions(http);
+        properties.setDeeplGlossaryId("52f898a5-98d7-4538-b907-46a645fb5136");
+        respond(404, "{\"message\":\"private glossary details\"}");
+        var error = assertThrows(ServiceUnavailableException.class, () -> client.translate("셈", "ko", "en"));
+        assertFalse(error.getMessage().contains("private"));
+        verify(http, times(1)).send(any(), any());
+    }
+    @Test void disabledGlossaryPreservesExistingProviderAndIdentityBehavior() throws Exception {
+        respond(200, "{\"translations\":[{\"text\":\"fixture\"}]}");
+        assertEquals("translate-v2", client.translate("셈", "ko", "en").model());
+        var request = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(http).send(request.capture(), any());
+        assertFalse(mapper.readTree(body(request.getValue())).has("glossary_id"));
+        clearInvocations(http);
+        assertEquals("셈", client.translate("셈", "ko", "ko").text());
+        verifyNoInteractions(http);
+    }
     @Test void missingKeyAndUntrustedEndpointNeverSend() {
         properties.setDeeplApiKey("");
         assertThrows(ServiceUnavailableException.class,()->client.translate("Hello","en","ko"));

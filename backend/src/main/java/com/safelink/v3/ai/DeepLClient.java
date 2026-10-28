@@ -14,6 +14,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -62,13 +63,23 @@ public class DeepLClient {
         String sourceCode = textLanguage(source, false), targetCode = textLanguage(target, true);
         if (text == null || text.isBlank() || text.length() > 12000) throw new IllegalArgumentException("invalid_translation_text");
         if (language(source).equals(language(target))) return new AiVendorService.VendorResult(text, "identity", "same-language");
-        JsonNode response = post("/v2/translate", Map.of(
+        Map<String, Object> payload = new LinkedHashMap<>(Map.of(
             "text", List.of(text), "source_lang", sourceCode, "target_lang", targetCode,
             "preserve_formatting", true, "model_type", "quality_optimized"
-        ), "deepl_translation");
+        ));
+        String glossaryId = properties.getDeeplGlossaryId();
+        boolean useGlossary = "ko".equals(language(source)) && Set.of("en", "ja", "vi", "zh").contains(language(target))
+            && glossaryId != null && !glossaryId.isBlank();
+        if (useGlossary) {
+            if (!glossaryId.trim().matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")) {
+                throw new ServiceUnavailableException("deepl_glossary_invalid_configuration");
+            }
+            payload.put("glossary_id", glossaryId.trim());
+        }
+        JsonNode response = post("/v2/translate", payload, "deepl_translation");
         String translated = response.path("translations").path(0).path("text").asText("");
         if (translated.isBlank()) throw new ServiceUnavailableException("deepl_translation_empty");
-        return new AiVendorService.VendorResult(translated, "deepl", "translate-v2");
+        return new AiVendorService.VendorResult(translated, "deepl", useGlossary ? "translate-v2-glossary" : "translate-v2");
     }
 
     public String transcribe(String audio, String mimeType, String source, int sampleRate) {
