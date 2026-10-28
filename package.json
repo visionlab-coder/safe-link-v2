@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/patch-next-font-extension.cjs && next build",
     "deploy": "opennextjs-cloudflare build && node scripts/strip-oversized-cf-assets.mjs && wrangler deploy",
     "preview": "opennextjs-cloudflare build && wrangler dev",
     "start": "next start",
