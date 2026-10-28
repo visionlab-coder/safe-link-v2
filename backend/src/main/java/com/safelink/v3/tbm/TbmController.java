@@ -203,7 +203,9 @@ public class TbmController {
         String summary = request.summaryKo() == null || request.summaryKo().isBlank() ? null : request.summaryKo().trim();
         if (summary != null && summary.length() > 12000) throw new IllegalArgumentException("tbm_summary_too_long");
         var trades = TbmTrades.normalize(request.tradeTypes());
-        var notice = !trades.isEmpty()
+        var notice = request.sourceText() != null
+            ? tbm.createPublished(siteId, actor.userId(), title, content, cleanIdempotencyKey, summary, trades, request.sourceText())
+            : !trades.isEmpty()
             ? tbm.createPublished(siteId, actor.userId(), title, content, cleanIdempotencyKey, summary, trades)
             : summary == null
             ? tbm.createPublished(siteId, actor.userId(), title, content, cleanIdempotencyKey)
@@ -483,7 +485,8 @@ public class TbmController {
     public record TbmBroadcastResponse(CompatNoticeResponse tbm) {}
     public record AckListResponse(List<CompatAckResponse> acks) {}
     public record WorkerListResponse(List<CompatWorkerResponse> workers) {}
-    public record BroadcastRequest(@JsonProperty("content_ko") String contentKo, @JsonProperty("site_id") String siteId, String title, @JsonProperty("summary_ko") String summaryKo, @JsonProperty("trade_types") List<String> tradeTypes) {
+    public record BroadcastRequest(@JsonProperty("content_ko") String contentKo, @JsonProperty("site_id") String siteId, String title, @JsonProperty("summary_ko") String summaryKo, @JsonProperty("trade_types") List<String> tradeTypes, @JsonProperty("source_text") String sourceText) {
+        public BroadcastRequest(String contentKo, String siteId, String title, String summaryKo, List<String> tradeTypes) { this(contentKo, siteId, title, summaryKo, tradeTypes, null); }
         public BroadcastRequest(String contentKo, String siteId, String title, String summaryKo) { this(contentKo, siteId, title, summaryKo, null); }
         public BroadcastRequest(String contentKo, String siteId, String title) { this(contentKo, siteId, title, null); }
     }

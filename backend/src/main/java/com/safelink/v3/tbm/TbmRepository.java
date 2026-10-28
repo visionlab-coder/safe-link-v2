@@ -153,6 +153,12 @@ public class TbmRepository {
     }
 
     public NoticeRow createPublished(Long siteId, Long createdBy, String title, String content, String idempotencyKey, String summary, List<String> tradeTypes) {
+        return createPublished(siteId, createdBy, title, content, idempotencyKey, summary, tradeTypes, content);
+    }
+
+    public NoticeRow createPublished(Long siteId, Long createdBy, String title, String content, String idempotencyKey, String summary, List<String> tradeTypes, String sourceText) {
+        String original = sourceText == null || sourceText.isBlank() ? content : sourceText.trim();
+        if (original.length() > 60000) throw new IllegalArgumentException("tbm_source_too_long");
         Long id = jdbc.sql("""
                 insert into tbm_notices(site_id, created_by, title, source_text, normalized_text, status, published_at, idempotency_key, summary_text, trade_types)
                 values (:siteId, :createdBy, :title, :sourceText, :normalizedText, 'PUBLISHED', now(), :idempotencyKey, :summary, cast(:trades as jsonb))
@@ -163,7 +169,7 @@ public class TbmRepository {
             .param("siteId", siteId)
             .param("createdBy", createdBy)
             .param("title", title)
-            .param("sourceText", content)
+            .param("sourceText", original)
             .param("normalizedText", content)
             .param("idempotencyKey", idempotencyKey)
             .param("summary", summary)

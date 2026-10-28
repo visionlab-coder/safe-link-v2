@@ -1,0 +1,182 @@
+[
+  {
+    "source": "가꾸목",
+    "standard": "각목",
+    "targets": {
+      "EN": "square-section timber",
+      "JA": "正方形断面の木材",
+      "VI": "gỗ có tiết diện vuông",
+      "ZH": "方形截面木材"
+    }
+  },
+  {
+    "source": "가쿠목",
+    "standard": "각목",
+    "targets": {
+      "EN": "square timber",
+      "JA": "角材",
+      "VI": "gỗ vuông",
+      "ZH": "方木"
+    }
+  },
+  {
+    "source": "기리바",
+    "standard": "자투리",
+    "targets": {
+      "EN": "offcut",
+      "JA": "端材",
+      "VI": "mẩu vật liệu thừa",
+      "ZH": "边角料"
+    }
+  },
+  {
+    "source": "기리빠시",
+    "standard": "자투리",
+    "targets": {
+      "EN": "leftover material offcut",
+      "JA": "使い残しの端材",
+      "VI": "mẩu vật liệu còn thừa",
+      "ZH": "剩余边角料"
+    }
+  },
+  {
+    "source": "루베",
+    "standard": "입방미터",
+    "targets": {
+      "EN": "cubic meter (m³)",
+      "JA": "立方メートル（m³）",
+      "VI": "mét khối (m³)",
+      "ZH": "立方米（m³）"
+    }
+  },
+  {
+    "source": "류베",
+    "standard": "입방미터",
+    "targets": {
+      "EN": "cubic meter",
+      "JA": "立方メートル",
+      "VI": "mét khối",
+      "ZH": "立方米"
+    }
+  },
+  {
+    "source": "마에가리",
+    "standard": "가불",
+    "targets": {
+      "EN": "advance payment",
+      "JA": "前借り",
+      "VI": "tạm ứng",
+      "ZH": "预付款"
+    }
+  },
+  {
+    "source": "몰타르",
+    "standard": "모르타르",
+    "targets": {
+      "EN": "mortar",
+      "JA": "モルタル",
+      "VI": "vữa",
+      "ZH": "砂浆"
+    }
+  },
+  {
+    "source": "몰탈",
+    "standard": "모르타르",
+    "targets": {
+      "EN": "mortar",
+      "JA": "モルタル",
+      "VI": "vữa",
+      "ZH": "砂浆"
+    }
+  },
+  {
+    "source": "미쓰모리",
+    "standard": "견적",
+    "targets": {
+      "EN": "cost estimate",
+      "JA": "見積り",
+      "VI": "dự toán chi phí",
+      "ZH": "工程估价"
+    }
+  },
+  {
+    "source": "스미",
+    "standard": "먹줄",
+    "targets": {
+      "EN": "ink line",
+      "JA": "墨糸",
+      "VI": "dây bật mực",
+      "ZH": "墨线"
+    }
+  },
+  {
+    "source": "스페샤",
+    "standard": "스페이서",
+    "targets": {
+      "EN": "spacer",
+      "JA": "スペーサー",
+      "VI": "con kê",
+      "ZH": "间隔件"
+    }
+  },
+  {
+    "source": "시멘트풀",
+    "standard": "모르타르",
+    "targets": {
+      "EN": "cement paste",
+      "JA": "セメントペースト",
+      "VI": "hồ xi măng",
+      "ZH": "水泥浆"
+    }
+  },
+  {
+    "source": "시아게",
+    "standard": "마무리",
+    "targets": {
+      "EN": "final finishing",
+      "JA": "最終仕上げ",
+      "VI": "hoàn thiện lần cuối",
+      "ZH": "最终修整"
+    }
+  },
+  {
+    "source": "오사마리",
+    "standard": "마무리",
+    "targets": {
+      "EN": "finishing",
+      "JA": "納まり",
+      "VI": "hoàn thiện",
+      "ZH": "收尾"
+    }
+  },
+  {
+    "source": "쫄대",
+    "standard": "스페이서",
+    "targets": {
+      "EN": "narrow strip",
+      "JA": "細長い帯状材",
+      "VI": "thanh nẹp",
+      "ZH": "窄条材"
+    }
+  },
+  {
+    "source": "후렌지",
+    "standard": "플랜지",
+    "targets": {
+      "EN": "pipe flange",
+      "JA": "配管フランジ",
+      "VI": "mặt bích nối ống",
+      "ZH": "管道法兰"
+    }
+  },
+  {
+    "source": "후렌찌",
+    "standard": "플랜지",
+    "targets": {
+      "EN": "flange",
+      "JA": "フランジ",
+      "VI": "mặt bích",
+      "ZH": "法兰"
+    }
+  }
+]

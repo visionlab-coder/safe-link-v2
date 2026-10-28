@@ -54,7 +54,7 @@ interface UseCloudSTTOptions {
     endpoint?: string;
     /** ROOT 관리자가 라이브 화면에서 선택한 방송 현장 */
     siteId?: string | number | null;
-    onTranscript: (text: string, translations?: Record<string, string>, sourceLanguage?: string) => void | Promise<void>;
+    onTranscript: (text: string, translations?: Record<string, string>, sourceLanguage?: string, originalTranscript?: string) => void | Promise<void>;
     onError?: (type: STTErrorType, message: string) => void;
     /** VAD가 음성 시작을 감지하는 즉시 호출 — STT 완료 전 파트너에게 조기 신호 전달용 */
     onSpeechStart?: () => void;
@@ -287,7 +287,7 @@ export function useCloudSTT({
                 emptyStreakRef.current = 0;
                 // muted 상태(TTS 재생 중 / 파트너 발화 중)면 결과 버림
                 if (!mutedRef.current) {
-                    await onTranscriptForChunk(data.transcript.trim(), data.translations, languageForChunk);
+                    await onTranscriptForChunk(data.transcript.trim(), data.translations, languageForChunk, data.originalTranscript?.trim());
                 }
             } else {
                 emptyStreakRef.current += 1;

@@ -51,6 +51,7 @@ jobs:
           node tests/free-talk-audio.cjs
           node tests/live-glossary-policy.cjs
           node tests/deepl-routing.cjs
+          node tests/deepl-source-provenance.cjs
           python3 tests/deepl-glossary-plan.test.py
           node tests/next-font-extension.cjs
           node tests/admin-signup-guidance.cjs

@@ -70,7 +70,10 @@ def build(rows, terms, policy):
                 missing.append({'language': lang, 'source': source})
         accepted = {}
         for source, targets in sorted(candidates.items()):
-            if len(targets) == 1:
+            if source in originals[lang]:
+                # A literal source entry has priority over aliases of other source words.
+                accepted[source] = originals[lang][source]
+            elif len(targets) == 1:
                 accepted[source] = next(iter(targets))
             else:
                 excluded.append({'language': lang, 'source': source, 'reason': 'conflicting_targets', 'targets': sorted(targets)})

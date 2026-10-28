@@ -93,7 +93,9 @@ public class LiveTbmSummaryController {
         if (summary.isBlank() || summary.length()>12000) throw new ServiceUnavailableException("tbm_summary_invalid");
         var trades = com.safelink.v3.tbm.TbmTrades.read(jdbc.sql("select trade_types::text from live_broadcast_sessions where session_id=:id and site_id=:site")
             .param("id",request.sessionId()).param("site",request.siteId()).query(String.class).single());
-        var notice = tbm.createPublished(request.siteId(), actor.userId(), "TBM 안전 브리핑", transcript, "live-summary:"+request.sessionId(), summary, trades);
+        var notice = request.sourceText() == null
+            ? tbm.createPublished(request.siteId(), actor.userId(), "TBM 안전 브리핑", transcript, "live-summary:"+request.sessionId(), summary, trades)
+            : tbm.createPublished(request.siteId(), actor.userId(), "TBM 안전 브리핑", transcript, "live-summary:"+request.sessionId(), summary, trades, request.sourceText());
         jdbc.sql("insert into live_tbm_summaries(session_id,site_id,created_by,source_transcript,summary_text,model,tbm_notice_id) values(:id,:site,:owner,:source,:summary,:model,:notice)")
             .param("id",request.sessionId()).param("site",request.siteId()).param("owner",actor.userId())
             .param("source",transcript).param("summary",summary).param("model",model).param("notice",notice.id()).update();
@@ -124,7 +126,9 @@ public class LiveTbmSummaryController {
     private record Session(Long owner,boolean active) {}
     public record Request(@NotBlank @Size(max=120) String sessionId,@NotNull @Positive Long siteId,
             @com.fasterxml.jackson.annotation.JsonProperty("content_ko") @Size(max=60000) String contentKo,
-            @com.fasterxml.jackson.annotation.JsonProperty("summary_ko") @Size(max=12000) String summaryKo) {
+            @com.fasterxml.jackson.annotation.JsonProperty("summary_ko") @Size(max=12000) String summaryKo,
+            @com.fasterxml.jackson.annotation.JsonProperty("source_text") @Size(max=60000) String sourceText) {
+        public Request(String sessionId, Long siteId, String contentKo, String summaryKo) { this(sessionId, siteId, contentKo, summaryKo, null); }
         public Request(String sessionId, Long siteId) { this(sessionId, siteId, null, null); }
         public Request(String sessionId, Long siteId, String contentKo) { this(sessionId, siteId, contentKo, null); }
     }

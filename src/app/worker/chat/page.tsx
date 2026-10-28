@@ -11,6 +11,7 @@ import { Users, QrCode } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { playPremiumAudio } from "@/utils/tts";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
+import { TranslationSourceBuffer } from "@/utils/translation-source-buffer";
 import { usePresence } from "@/hooks/usePresence";
 import ChatPlayButton from "@/components/ChatPlayButton";
 import { resolveDisplayLanguage, useDisplayLanguage } from "@/hooks/useDisplayLanguage";
@@ -487,6 +488,8 @@ function WorkerChatContent() {
         if (!messageText.trim() || !myId || !activeAdmin || isSending) return;
 
         const originalText = messageText.trim();
+        const translationOriginal = translationSource.current.resolve(originalText);
+        translationSource.current.clear();
         const tempId = `temp-${crypto.randomUUID()}`;
 
         // 🚀 즉시 표시 (번역 전)
@@ -512,7 +515,7 @@ function WorkerChatContent() {
                     const transRes = await fetch('/api/translate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: originalText, sl: lang, tl: 'ko', fast: true, quality: 'high', pronunciation: false })
+                        body: JSON.stringify({ text: originalText, originalText: translationOriginal, sl: lang, tl: 'ko', fast: true, quality: 'high', pronunciation: false })
                     });
                     if (transRes.ok) {
                         const transData = await transRes.json() as { translated?: string; pronunciation?: string; reverse_translated?: string };
@@ -557,9 +560,10 @@ function WorkerChatContent() {
         }
     };
 
-    const handleTranscript = useCallback((transcript: string) => {
+    const translationSource = useRef(new TranslationSourceBuffer());
+    const handleTranscript = useCallback((transcript: string, _translations?: Record<string, string>, _language?: string, original?: string) => {
         setSttError("");
-        setText(prev => prev ? `${prev} ${transcript}` : transcript);
+        setText(prev => translationSource.current.append(prev, transcript, original));
     }, []);
 
     const { isRecording, toggle: toggleRecording } = useCloudSTT({

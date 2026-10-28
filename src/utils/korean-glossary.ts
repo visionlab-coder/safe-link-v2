@@ -1,4 +1,5 @@
 import policy from "../constants/glossary-delivery-policy.json";
+import sourceTerms from "../constants/deepl-source-terms.json";
 
 export const GLOSSARY_POLICY_VERSION = policy.version;
 const reviewed: Record<string, string> = policy.reviewedTerms;
@@ -55,7 +56,7 @@ function adjustedParticle(text: string, end: number, replacement: string): { len
 }
 
 /** Scan the ORIGINAL once: longest whole term, no recursive replacement, no sentence rewriting. */
-export function normalizeKoreanGlossary(text: string, dictionary: Record<string, string>) {
+export function normalizeKoreanGlossary(text: string, dictionary: Record<string, string>, preserveTranslationSource = false) {
     const entries = Object.entries(dictionary).filter(([term]) => term.trim().length > 0)
         .map(([term, standard]) => [term, glossaryDeliveryTerm(term, standard)] as const);
     // A delivery term is terminal across STT → draft → translation as well as within a single pass.
@@ -68,7 +69,9 @@ export function normalizeKoreanGlossary(text: string, dictionary: Record<string,
     for (let index = 0; index < text.length;) {
         const match = sorted.find(([term]) => text.startsWith(term, index) && hasKoreanTermAt(text, index, term));
         if (!match) { normalized += text[index++]; continue; }
-        const [from, to] = match;
+        const [from, delivery] = match;
+        // Only preserve a reviewed source when its current delivery still matches the snapshot.
+        const to = preserveTranslationSource && (sourceTerms as Record<string, string>)[from] === delivery ? from : delivery;
         normalized += to;
         index += from.length;
         if (from !== to) {
@@ -78,4 +81,19 @@ export function normalizeKoreanGlossary(text: string, dictionary: Record<string,
         }
     }
     return { original: text, normalized, changes, policyVersion: GLOSSARY_POLICY_VERSION };
+}
+
+/** Parallel provider input; never replaces the Korean display/record or reverses a guessed synonym. */
+export function koreanTranslationSource(text: string, dictionary: Record<string, string>, evidence?: unknown): string {
+    let source = text;
+    if (typeof evidence === "string" && evidence.length <= 60000
+        && normalizeKoreanGlossary(evidence, dictionary).normalized === normalizeKoreanGlossary(text, dictionary).normalized) {
+        source = evidence;
+    }
+    return normalizeKoreanGlossary(source, dictionary, true).normalized;
+}
+
+export function usesDeepLGlossaryPair(source: string, target: string): boolean {
+    return source.toLowerCase().split(/[-_]/)[0] === "ko"
+        && ["en", "ja", "jp", "vi", "zh"].includes(target.toLowerCase().split(/[-_]/)[0]);
 }

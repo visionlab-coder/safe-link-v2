@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { SAFE_LINK_V3_API_BASE_URL } from "@/utils/auth/v3-proxy";
 import { freeTalkGlossary, normalizeFreeTalk } from "@/utils/free-talk-glossary";
-import { normalizeKoreanGlossary, GLOSSARY_POLICY_VERSION } from "@/utils/korean-glossary";
+import { normalizeKoreanGlossary, koreanTranslationSource, usesDeepLGlossaryPair, GLOSSARY_POLICY_VERSION } from "@/utils/korean-glossary";
 import { hangulize } from "@/utils/hangulize";
 import { isFreeTalkLanguage, normalizeFreeTalkLanguage } from "@/lib/free-talk-languages";
 
@@ -53,15 +53,18 @@ async function handle(request: NextRequest, context: Context) {
     if (raw.length > (action === "stt" ? 2_801_000 : 20000)) return NextResponse.json({ error: "payload_too_large" }, { status: 413 });
     const body = request.method === "GET" ? Object.fromEntries(request.nextUrl.searchParams) : JSON.parse(raw || "{}");
     let stage: ReturnType<typeof normalizeFreeTalk> | undefined;
+    let translationSource: string | undefined;
     if (action === "translate") {
       if (typeof body.text !== "string" || !body.text.trim() || body.text.length > 2000 || !isFreeTalkLanguage(body.from) || !isFreeTalkLanguage(body.to)) {
         return NextResponse.json({ error: "invalid_translation_input" }, { status: 400 });
       }
       body.from = normalizeFreeTalkLanguage(body.from);
       body.to = normalizeFreeTalkLanguage(body.to);
-      stage = normalizeFreeTalk(body.text, body.from, body.to, await freeTalkGlossary(SAFE_LINK_V3_API_BASE_URL));
+      const terms = await freeTalkGlossary(SAFE_LINK_V3_API_BASE_URL);
+      stage = normalizeFreeTalk(body.text, body.from, body.to, terms);
+      translationSource = usesDeepLGlossaryPair(body.from, body.to) ? koreanTranslationSource(body.text, terms, body.originalText) : stage.normalized;
     }
-    const res = await upstream(action, stage ? { ...body, text: stage.normalized } : body);
+    const res = await upstream(action, stage ? { ...body, text: translationSource } : body);
     if (!res.ok) return NextResponse.json({ error: res.status === 401 ? "free_talk_session_expired" : res.status === 429 ? "free_talk_rate_limited" : "free_talk_request_failed" }, { status: res.status });
     const data = await res.json();
     if (action === "session") {

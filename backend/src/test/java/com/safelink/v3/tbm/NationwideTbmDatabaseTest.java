@@ -49,7 +49,7 @@ class NationwideTbmDatabaseTest {
         for (String file : new String[]{"V001__create_identity_and_site_core.sql","V002__create_file_objects.sql",
             "V003__create_tbm_core.sql","V015__create_live_interpreter.sql","V025__add_tbm_notice_idempotency.sql",
             "V028__create_live_broadcast_sessions.sql","V031__live_tbm_summaries.sql","V032__tbm_notice_summary.sql",
-            "V035__tbm_live_participation.sql","V036__tbm_live_drafts.sql","V037__nationwide_tbm.sql","V042__tbm_trade_types.sql"})
+            "V035__tbm_live_participation.sql","V036__tbm_live_drafts.sql","V037__nationwide_tbm.sql","V042__tbm_trade_types.sql","V047__tbm_draft_translation_source.sql"})
             scripts.addScript(new ClassPathResource("db/migration/"+file));
         scripts.execute(ds);
         var idleMigration=new ResourceDatabasePopulator(new ClassPathResource("db/migration/V041__tbm_idle_timeout.sql"));

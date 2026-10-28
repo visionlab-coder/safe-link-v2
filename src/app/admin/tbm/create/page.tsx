@@ -13,9 +13,10 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import RoleGuard from "@/components/RoleGuard";
 import { Suspense } from "react";
 import { normalizeKo, normalizeKoAsync } from "@/utils/normalize";
+import { TranslationSourceBuffer } from "@/utils/translation-source-buffer";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
 import { TbmLiveBroadcast } from "@/utils/tbm-live-broadcast";
-import { appendTbmTranscript, cleanTbmTranscriptFragment } from "@/utils/tbm-transcript";
+import { cleanTbmTranscriptFragment } from "@/utils/tbm-transcript";
 import { prepareTbmSpeechDraft } from "@/utils/tbm-speech-draft";
 import SafetyLibraryModal from "@/components/SafetyLibraryModal";
 import { koreanHelpText, withKoreanHelp } from "@/lib/korean-help";
@@ -201,7 +202,8 @@ function AdminTBMCreateContent() {
     const [normalizeResult, setNormalizeResult] = useState<{ normalized: string; changes: { from: string; to: string }[] } | null>(null);
     const [broadcastResult, setBroadcastResult] = useState<BroadcastResult | null>(null);
     const [speechSource, setSpeechSource] = useState("");
-    const pendingSpeechRef = useRef<Array<{ text: string; language: string; target: string | null }>>([]);
+    const pendingSpeechRef = useRef<Array<{ text: string; language: string; target: string | null; original?: string }>>([]);
+    const translationSource = useRef(new TranslationSourceBuffer());
     const speechFlushRef = useRef<Promise<void> | null>(null);
     const [pendingSpeechCount, setPendingSpeechCount] = useState(0);
     const [speechRetrying, setSpeechRetrying] = useState(false);
@@ -325,7 +327,7 @@ function AdminTBMCreateContent() {
         if (!draftEdited || (!broadcastActive && !liveFinalizing) || liveCompleted || isSending) return;
         // Coalesce typing and, after an edit, keep subsequent STT additions in the same snapshot.
         const timer = setTimeout(() => {
-            void broadcaster.current.syncDraft(tbmText).catch(() => {
+            void broadcaster.current.syncDraft(tbmText, translationSource.current.resolve(tbmText)).catch(() => {
                 setBroadcastResult({ type: "error", message: getBroadcastErrorMessage(displayLang || adminLang, undefined, undefined, workerMode) });
             });
         }, 700);
@@ -344,11 +346,12 @@ function AdminTBMCreateContent() {
                 const korean = await prepareTbmSpeechDraft(item.text, item.language, item.target);
                 const liveText = cleanTbmTranscriptFragment(korean);
                 if (!liveText) throw new Error("tbm_speech_draft_empty");
-                draftRef.current = appendTbmTranscript(draftRef.current, liveText);
+                const original = item.language.split('-')[0] === 'ko' ? cleanTbmTranscriptFragment(item.original || item.text) : liveText;
+                draftRef.current = translationSource.current.append(draftRef.current, liveText, original);
                 setTbmText(draftRef.current);
                 pendingSpeechRef.current.shift();
                 setPendingSpeechCount(pendingSpeechRef.current.length);
-                await broadcaster.current.publish(liveText).catch(() => {
+                await broadcaster.current.publish(liveText, original).catch(() => {
                     setSttError("일부 음성을 실시간 전송하지 못했습니다. 초안은 보존되며 종료 후 최종 전파할 수 있습니다.");
                 });
             }
@@ -367,11 +370,11 @@ function AdminTBMCreateContent() {
         finally { setSpeechRetrying(false); }
     }, [flushSpeech, displayLang, adminLang]);
 
-    const handleTranscript = useCallback(async (text: string, _translations?: Record<string, string>, sourceLanguage?: string) => {
+    const handleTranscript = useCallback(async (text: string, _translations?: Record<string, string>, sourceLanguage?: string, original?: string) => {
         if (!text.trim()) return;
         const language = sourceLanguage || displayLang || adminLang;
         setSpeechSource(previous => [previous, `[${language}] ${text.trim()}`].filter(Boolean).join("\n"));
-        pendingSpeechRef.current.push({ text: text.trim(), language, target: broadcastTarget });
+        pendingSpeechRef.current.push({ text: text.trim(), language, target: broadcastTarget, original });
         setPendingSpeechCount(pendingSpeechRef.current.length);
         await retrySpeech();
     }, [displayLang, adminLang, broadcastTarget, retrySpeech]);
@@ -496,6 +499,7 @@ function AdminTBMCreateContent() {
                 setBroadcastActive(true);
                 if (liveCompleted) {
                     draftRef.current = "";
+                    translationSource.current.clear();
                     setTbmText("");
                     setSpeechSource("");
                 }
@@ -590,12 +594,12 @@ function AdminTBMCreateContent() {
 
             if (liveFinalizing) {
                 // Save the same final source first, then publish only a summary of that source.
-                await broadcaster.current.syncDraft(normalized);
+                await broadcaster.current.syncDraft(normalized, translationSource.current.resolve(tbmText.trim()));
                 const reviewedSummary = summarySource === tbmText && summaryText.trim()
                     ? summaryText.trim() : await completeLiveTbm();
                 if (!reviewedSummary) return;
                 // Manual publication links the final notice to this exact live session.
-                await broadcaster.current.complete(normalized, reviewedSummary);
+                await broadcaster.current.complete(normalized, reviewedSummary, translationSource.current.resolve(tbmText.trim()));
                 setNormalizeResult({ normalized, changes });
                 setLiveCompleted(true);
                 setBroadcastResult({ type: "success", message: t.pushSuccess });
@@ -618,6 +622,7 @@ function AdminTBMCreateContent() {
                 },
                 body: JSON.stringify({
                     content_ko: normalized,
+                    source_text: translationSource.current.resolve(tbmText.trim()),
                     summary_ko: summarySource === tbmText ? summaryText.trim() || undefined : undefined,
                     site_id: adminSiteId ?? undefined,
                     trade_types: selectedTrades,
@@ -637,6 +642,7 @@ function AdminTBMCreateContent() {
             setNormalizeResult({ normalized, changes });
             setBroadcastResult({ type: "success", message: t.pushSuccess });
             setTbmText("");
+            translationSource.current.clear();
             await fetchHistory();
         } catch (e) {
             console.error(e);

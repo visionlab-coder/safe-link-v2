@@ -9,6 +9,7 @@ function handler(name, context) {
   context.nationwide ??= false;
   context.pendingSpeechRef ??= {current: []};
   context.sttErrors ??= [];
+  context.translationSource ??= {current:{resolve:text=>text,clear:()=>{}}};
   let initializer;
   function visit(node) {
     if (ts.isVariableDeclaration(node) && node.name.getText(tree) === name) initializer = node.initializer;
@@ -79,7 +80,7 @@ test('broadcast click publishes the reviewed source and summary exactly once', a
     fetchHistory: async () => {}, console,
   };
   await handler('handleSendTBM', context)();
-  assert.deepEqual(calls, [['sync', 'source'], ['source', '- edited'], ['completed', true]]);
+  assert.deepEqual(calls, [['sync', 'source'], ['source', '- edited', 'source'], ['completed', true]]);
 });
 test('editing the source regenerates a stale summary instead of silently blocking broadcast', async () => {
   const calls = [];
@@ -94,7 +95,7 @@ test('editing the source regenerates a stale summary instead of silently blockin
     fetchHistory: async () => {}, console,
   };
   await handler('handleSendTBM', context)();
-  assert.deepEqual(calls, [['sync', 'corrected source'], ['regenerate'], ['corrected source', '- fresh']]);
+  assert.deepEqual(calls, [['sync', 'corrected source'], ['regenerate'], ['corrected source', '- fresh', 'corrected source']]);
 });
 test('an older summary response cannot overwrite a newer edit', async () => {
   const values = [];

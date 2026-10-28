@@ -27,9 +27,9 @@ public class TbmLiveDraftController {
     public Map<String,Object> get(@AuthenticationPrincipal SessionPrincipal actor,
             @RequestParam String sessionId, @RequestParam Long siteId) {
         guard.requireSiteAccess(actor,siteId,"tbm.live.draft.read","live_broadcast_session",sessionId);
-        return jdbc.sql("select content_ko,revision from tbm_live_drafts where session_id=:id and site_id=:site")
+        return jdbc.sql("select content_ko,revision,source_text from tbm_live_drafts where session_id=:id and site_id=:site")
             .param("id",sessionId).param("site",siteId)
-            .query((rs,n) -> new Draft(sessionId,rs.getString(1),rs.getLong(2)))
+            .query((rs,n) -> new Draft(sessionId,rs.getString(1),rs.getLong(2),rs.getString(3)))
             .optional().<Map<String,Object>>map(draft -> Map.of("draft",draft)).orElse(Map.of());
     }
     @PostMapping
@@ -45,12 +45,13 @@ public class TbmLiveDraftController {
                 .param("id",request.sessionId()).query(Boolean.class).single())
             throw new IllegalArgumentException("tbm_already_published");
         Draft draft = jdbc.sql("""
-            insert into tbm_live_drafts(session_id,site_id,content_ko) values(:id,:site,:text)
-            on conflict(session_id) do update set content_ko=excluded.content_ko,
+            insert into tbm_live_drafts(session_id,site_id,content_ko,source_text) values(:id,:site,:text,:source)
+            on conflict(session_id) do update set content_ko=excluded.content_ko,source_text=excluded.source_text,
                 revision=tbm_live_drafts.revision+1,updated_at=now()
-            returning content_ko,revision
+            returning content_ko,revision,source_text
             """).param("id",request.sessionId()).param("site",request.siteId()).param("text",request.content())
-            .query((rs,n) -> new Draft(request.sessionId(),rs.getString(1),rs.getLong(2))).single();
+            .param("source",request.sourceText(),java.sql.Types.VARCHAR)
+            .query((rs,n) -> new Draft(request.sessionId(),rs.getString(1),rs.getLong(2),rs.getString(3))).single();
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void afterCommit() {
                 events.publish(LiveInterpreterEventBus.translationsChannel(request.siteId()),"tbm-draft",draft);
@@ -59,6 +60,8 @@ public class TbmLiveDraftController {
         return draft;
     }
     public record Request(@NotBlank @Size(max=120) String sessionId,@NotNull @Positive Long siteId,
-            @NotNull @Size(max=60000) String content) {}
-    public record Draft(String sessionId,String content,long revision) {}
+            @NotNull @Size(max=60000) String content, @Size(max=60000) String sourceText) {
+        public Request(String sessionId,Long siteId,String content) { this(sessionId,siteId,content,null); }
+    }
+    public record Draft(String sessionId,String content,long revision,String sourceText) {}
 }

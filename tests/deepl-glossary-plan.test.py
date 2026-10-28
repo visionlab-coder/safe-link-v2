@@ -42,6 +42,14 @@ class PlanTest(unittest.TestCase):
         self.assertEqual(first['revision'], self.plan([('간조', 'calculation')], terms)['revision'])
         self.assertNotEqual(first['revision'], self.plan([('간조', 'settlement')], terms)['revision'])
 
+    def test_literal_source_has_priority_over_a_conflicting_generated_alias(self):
+        result = self.plan([('마에가리', 'advance payment'), ('가불', 'advance')],
+                           [self.term('마에가리', '가불'), self.term('가불', '선급')])
+        for d in result['payload']['dictionaries']:
+            entries = dict(line.split('\t') for line in d['entries'].splitlines())
+            self.assertEqual(entries['마에가리'], 'advance payment')
+            self.assertEqual(entries['가불'], 'advance')
+
     def test_preserved_words_and_unreviewed_explanations_stay_intact(self):
         self.assertEqual('거푸집', planner.delivery('거푸집', '틀', POLICY))
         self.assertEqual('테스트', planner.delivery('테스트', '주입(그라우팅)한다', POLICY))

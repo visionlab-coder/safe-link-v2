@@ -37,6 +37,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
   const [speaking, setSpeaking] = useState(false);
   const [lines, setLines] = useState<Array<{ id: string; source: string; translated?: string }>>([]);
   const [editedDraft, setEditedDraft] = useState<string | null>(null);
+  const [editedSource, setEditedSource] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -82,6 +83,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
     const displayedRevisionByLine = new Map<string, number>();
     let activeLineId: string | null = null;
     let activeSource = "";
+    let activeOriginal = "";
     let activeRevision = 0;
     const abort = new AbortController();
     const reset = (id: string | null, startedBy?: unknown) => {
@@ -97,7 +99,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
         callbacks.current.onSession?.(id);
         void register(id);
       }
-      activeLineId = null; activeSource = ""; activeRevision = 0;
+      activeLineId = null; activeSource = ""; activeOriginal = ""; activeRevision = 0;
       committedLineIds.clear(); spokenLineIds.clear(); latestTextByLine.clear(); latestRevisionByLine.clear();
       displayedRevisionByLine.clear();
       if (speakingTimer) { clearTimeout(speakingTimer); speakingTimer = null; }
@@ -135,6 +137,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
       committedLineIds.add(id);
       activeLineId = null;
       activeSource = "";
+      activeOriginal = "";
       activeRevision = 0;
       sentenceCommitTimer = null;
       speakCommittedLine(id, generation);
@@ -144,16 +147,17 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
     const normalizeFragment = cleanTbmTranscriptFragment;
     const appendFragment = appendTbmTranscript;
     const events = new EventSource("/api/live/events?" + new URLSearchParams({ type: "translations", siteId }));
-    const acceptDraft = (draft: { sessionId?: string; content?: unknown; revision?: number }) => {
+    const acceptDraft = (draft: { sessionId?: string; content?: unknown; sourceText?: string; revision?: number }) => {
       if (disposed || !observedSession || draft.sessionId !== observedSession || completedSession === observedSession
           || typeof draft.content !== "string" || !draft.revision || draft.revision <= draftRevision) return;
       draftRevision = draft.revision;
       // Corrections replace the displayed document; never replay the entire corrected TBM.
       setEditedDraft(draft.content);
+      setEditedSource(draft.sourceText || undefined);
       generation++;
       audioRef.current?.pause();
       if (sentenceCommitTimer) { clearTimeout(sentenceCommitTimer); sentenceCommitTimer = null; }
-      activeLineId = null; activeSource = ""; activeRevision = 0;
+      activeLineId = null; activeSource = ""; activeOriginal = ""; activeRevision = 0;
       setBusy(false); setSpeaking(false);
     };
     const checkDraft = async () => {
@@ -297,7 +301,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
     });
     events.addEventListener("translation", event => {
       try {
-        const row = JSON.parse((event as MessageEvent).data) as { id: string; session_id: string; text_ko: string };
+        const row = JSON.parse((event as MessageEvent).data) as { id: string; session_id: string; text_ko: string; translations?: Record<string, string> };
         if (!session || row.session_id !== session || seen.has(row.id)) return;
         seen.add(row.id);
         const token = generation;
@@ -308,7 +312,9 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
         if (!activeLineId) activeLineId = `sentence_${row.id}`;
         const lineId = activeLineId;
         activeSource = appendFragment(activeSource, fragment);
+        activeOriginal = appendFragment(activeOriginal, row.translations?.__sq_source || fragment);
         const source = activeSource;
+        const originalText = activeOriginal;
         const revision = ++activeRevision;
         latestRevisionByLine.set(lineId, revision);
         latestTextByLine.delete(lineId);
@@ -325,7 +331,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
         const translated = lang === "ko" ? Promise.resolve(source) : fetch("/api/translate", {
           method: "POST", headers: { "Content-Type": "application/json" },
           signal: AbortSignal.any([abort.signal, AbortSignal.timeout(15000)]),
-          body: JSON.stringify({ text: source, sl: "ko", tl: lang, fast: true, pronunciation: false, useGlossary: true }),
+          body: JSON.stringify({ text: source, originalText, sl: "ko", tl: lang, fast: true, pronunciation: false, useGlossary: true }),
         }).then(async response => {
           if (!response.ok) throw new Error("translation_failed");
           const data = await response.json();
@@ -368,7 +374,7 @@ export default function TbmLiveReceiver({ siteId, lang, busyLabel, listenLabel, 
       }}>🔊 {audioBlocked ? "▶" : listenLabel}</button>
     </div>
     {failed && <p role="status" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">{lang === "ko" ? "일부 통역 또는 음성을 처리하지 못했습니다. 최종 TBM 내용을 확인해 주세요." : "⚠"}</p>}
-    {editedDraft !== null ? <div aria-live="polite" data-testid="tbm-live-edited-draft"><TbmFullTranscript text={editedDraft} lang={lang} enabled translatedLabel={translatedLabel} originalLabel={originalLabel} loadingLabel={busyLabel} /></div> : <div className="space-y-3" aria-live="polite">
+    {editedDraft !== null ? <div aria-live="polite" data-testid="tbm-live-edited-draft"><TbmFullTranscript text={editedDraft} sourceText={editedSource} lang={lang} enabled translatedLabel={translatedLabel} originalLabel={originalLabel} loadingLabel={busyLabel} /></div> : <div className="space-y-3" aria-live="polite">
       {lines.length === 0 && <div className="flex min-h-32 items-center justify-center gap-3 rounded-2xl bg-slate-50 p-5">{active && <div className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />}<span className="font-semibold text-slate-700">{active ? busyLabel : status.pending}</span></div>}
       {lines.map((line, index, visible) => <div key={line.id} className={`rounded-2xl p-4 ${index === visible.length - 1 ? "border border-blue-200 bg-blue-50" : "bg-slate-50"}`}>
         <p dir="auto" className="whitespace-pre-wrap break-words text-xl font-bold leading-relaxed text-slate-900 sm:text-2xl">{line.translated ?? busyLabel}</p>

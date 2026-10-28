@@ -41,7 +41,7 @@ class LiveTbmCompletionDatabaseTest {
         for (String file : new String[]{"V001__create_identity_and_site_core.sql", "V002__create_file_objects.sql",
                 "V003__create_tbm_core.sql", "V015__create_live_interpreter.sql", "V025__add_tbm_notice_idempotency.sql",
                 "V028__create_live_broadcast_sessions.sql", "V031__live_tbm_summaries.sql", "V032__tbm_notice_summary.sql",
-                "V035__tbm_live_participation.sql", "V036__tbm_live_drafts.sql", "V042__tbm_trade_types.sql"})
+                "V035__tbm_live_participation.sql", "V036__tbm_live_drafts.sql", "V042__tbm_trade_types.sql", "V047__tbm_draft_translation_source.sql"})
             populator.addScript(new ClassPathResource("db/migration/" + file));
         populator.execute(ds);
         jdbc.sql("insert into organizations(id,name) values(1,'Test')").update();
@@ -66,6 +66,18 @@ class LiveTbmCompletionDatabaseTest {
     }
     LiveTbmSummaryController.Summary finish(String text) {
         return tx.execute(status -> controller.finish(admin,new LiveTbmSummaryController.Request("tbm_test",2L,text)));
+    }
+    @Test void sourceEvidenceSurvivesDraftPublicationAndIdempotentRetryWithoutChangingKoreanDisplay() {
+        var drafts = new TbmLiveDraftController(jdbc,new SiteGuard(mock(AuditService.class)),events);
+        var saved = tx.execute(s -> drafts.save(admin,new TbmLiveDraftController.Request("tbm_test",2L,"각목을 확인하세요.","가꾸목을 확인하세요.")));
+        assertEquals("가꾸목을 확인하세요.",saved.sourceText());
+        assertEquals(saved,drafts.get(worker,"tbm_test",2L).get("draft"));
+        var result=tx.execute(s -> controller.finish(admin,new LiveTbmSummaryController.Request("tbm_test",2L,"각목을 확인하세요.","- 확인","가꾸목을 확인하세요.")));
+        var notice=repository.getNotice(Long.valueOf(result.tbmId()));
+        assertEquals("각목을 확인하세요.",notice.normalizedText());
+        assertEquals("가꾸목을 확인하세요.",notice.sourceText());
+        assertEquals(result,finish("retry cannot overwrite source"));
+        assertEquals("가꾸목을 확인하세요.",repository.getNotice(Long.valueOf(result.tbmId())).sourceText());
     }
     @Test void publicationPreservesSessionTradesAndLegacyNoticesStayUncategorized() {
         jdbc.sql("update live_broadcast_sessions set trade_types='[\"철근\",\"거푸집\"]'::jsonb where session_id='tbm_test'").update();

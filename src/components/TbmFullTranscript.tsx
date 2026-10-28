@@ -12,8 +12,8 @@ const retryLabels: Record<string, string> = {
 };
 
 /** Supplementary full text: never blocks summary review/signing or starts audio. */
-export default function TbmFullTranscript({ text, lang, enabled, translatedLabel, originalLabel, loadingLabel }: {
-  text: string; lang: string; enabled: boolean;
+export default function TbmFullTranscript({ text, sourceText, lang, enabled, translatedLabel, originalLabel, loadingLabel }: {
+  text: string; sourceText?: string; lang: string; enabled: boolean;
   translatedLabel: string; originalLabel: string; loadingLabel: string;
 }) {
   const [result, setResult] = useState<{ source: string; lang: string; text: string } | null>(null);
@@ -27,7 +27,7 @@ export default function TbmFullTranscript({ text, lang, enabled, translatedLabel
     const controller = new AbortController();
     // Bound individual requests and concurrency for long briefings.
     const chunks: string[] = [];
-    let rest = text;
+    let rest = sourceText || text;
     while (rest.length > 1500) {
       const window = rest.slice(0, 1500);
       const sentenceEnd = Math.max(window.lastIndexOf(". "), window.lastIndexOf("\n"));
@@ -60,7 +60,7 @@ export default function TbmFullTranscript({ text, lang, enabled, translatedLabel
       } catch { if (!controller.signal.aborted) setFailed(true); }
     })();
     return () => controller.abort();
-  }, [text, lang, enabled, retry]);
+  }, [text, sourceText, lang, enabled, retry]);
   const translated = result?.source === text && result.lang === lang ? result.text : "";
   return <div className="space-y-5" data-testid="tbm-full-transcript">
     {lang !== "ko" && text.trim() && <section aria-label={translatedLabel} className="border-t border-slate-200 pt-5">

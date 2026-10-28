@@ -233,7 +233,12 @@ public class LiveInterpreterController {
         if (sessionOwner.isEmpty() || !sessionOwner.get().equals(actor.userId())) {
             throw new AccessDeniedException("live_session_not_active_or_owned");
         }
-        Map<String, String> translations = request.translations() == null ? Map.of() : request.translations();
+        Map<String, String> translations = new java.util.HashMap<>(request.translations() == null ? Map.of() : request.translations());
+        translations.remove("__sq_source");
+        if (request.originalText() != null && !request.originalText().isBlank()) {
+            if (request.originalText().length() > 60000) throw new IllegalArgumentException("live_source_too_long");
+            translations.put("__sq_source", request.originalText().trim());
+        }
         Long id = jdbc.sql("""
                 insert into live_translation_events(session_id, site_id, text_ko, translations, created_by)
                 values (:sessionId, :siteId, :textKo, cast(:translations as jsonb), :createdBy)
@@ -496,7 +501,9 @@ public class LiveInterpreterController {
         }
     }
 
-    public record TranslationRequest(String sessionId, String siteId, @JsonProperty("text_ko") String textKo, Map<String, String> translations) {}
+    public record TranslationRequest(String sessionId, String siteId, @JsonProperty("text_ko") String textKo, Map<String, String> translations, String originalText) {
+        public TranslationRequest(String sessionId, String siteId, String textKo, Map<String, String> translations) { this(sessionId, siteId, textKo, translations, null); }
+    }
     public record TranslationEvent(String id, @JsonProperty("session_id") String sessionId, @JsonProperty("site_id") String siteId, @JsonProperty("text_ko") String textKo, Map<String, String> translations, @JsonProperty("created_by") String createdBy, @JsonProperty("created_at") String createdAt) {}
     public record BroadcastSessionRequest(String sessionId, String siteId, @JsonProperty("trade_types") List<String> tradeTypes) {
         public BroadcastSessionRequest(String sessionId, String siteId) { this(sessionId, siteId, null); }

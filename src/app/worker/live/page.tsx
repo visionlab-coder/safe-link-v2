@@ -338,6 +338,7 @@ function LegacyWorkerLivePage() {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         text: cleanTextKo,
+                        originalText: row.translations?.__sq_source?.trim().replace(/\s+/g, " "),
                         sl: "ko",
                         tl: myLang,
                         fast: true,

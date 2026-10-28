@@ -331,7 +331,7 @@ function WorkerTBMDetailContent() {
                 setTranslating(true);
 
                 const result = await translateChunked(
-                    tbmData.content_ko,
+                    tbmData.source_text || tbmData.content_ko,
                     lang,
                     // 점진적 콜백: 번역이 하나씩 완료될 때마다 화면 갱신
                     (partial) => {
@@ -360,7 +360,7 @@ function WorkerTBMDetailContent() {
 
                 // 발음·역번역은 본문 표시를 지연시키지 않는다. 본문 전체에 대해 한 번만
                 // 보완 요청하므로 긴 TBM에서 문단마다 추가 API를 호출하던 문제도 제거한다.
-                void translateKo(tbmData.content_ko, lang).then((details) => {
+                void translateKo(tbmData.source_text || tbmData.content_ko, lang).then((details) => {
                     if (version !== loadVersionRef.current) return;
                     if (!details.pron && !details.rev) return;
                     setTransData((current) => ({
@@ -666,7 +666,7 @@ function WorkerTBMDetailContent() {
                                                 onChange={event => setSummaryReviewedKey(event.target.checked ? summaryKey : "")} />
                                             {tbmSummaryUI(preferredLang).read}
                                         </label>}
-                                        {isLiveSummary ? <TbmFullTranscript text={tbm.content_ko || ""} lang={preferredLang}
+                                        {isLiveSummary ? <TbmFullTranscript text={tbm.content_ko || ""} sourceText={tbm.source_text} lang={preferredLang}
                                             enabled={summaryReadyKey === summaryKey} translatedLabel={t.translated}
                                             originalLabel={t.original} loadingLabel={t.translating} />
                                             : <section aria-label={t.original}>

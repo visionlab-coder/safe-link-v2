@@ -9,6 +9,23 @@ vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.Mo
   exports: exportsObject, crypto: require("node:crypto").webcrypto, AbortSignal, URLSearchParams, fetch,
 });
 const { TbmLiveBroadcast } = exportsObject;
+test("local and nationwide speech, draft and final publication retain source independently",async()=>{
+  for(const site of ['2','nationwide']){
+    const calls=[];
+    const b=new TbmLiveBroadcast(async(url,options)=>{
+      const data=JSON.parse(options.body || '{}');calls.push({url,...data});
+      return {ok:true,json:async()=>({sessionId:data.sessionId,tbmId:'42',text:'summary'})};
+    });
+    await b.start(site);
+    await b.publish('각목','가꾸목');
+    await b.syncDraft('각목','가꾸목');
+    await b.complete('각목','summary','가꾸목');
+    assert.equal(calls.find(c=>c.url.endsWith('/translations')).originalText,'가꾸목');
+    assert.equal(calls.find(c=>c.url.endsWith('draft')).sourceText,'가꾸목');
+    assert.equal(calls.at(-1).source_text,'가꾸목');
+    assert.equal(calls.at(-1).content_ko,'각목');
+  }
+});
 test("live start transmits multiple trades and a nationwide retry retains the initial selection", async () => {
   const calls=[];
   const broadcaster=new TbmLiveBroadcast(async (url,options)=>{

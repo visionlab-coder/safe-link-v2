@@ -99,7 +99,7 @@ function AdminLiveContent() {
         loadLangs();
     }, [siteId]);
 
-    const handleTranscript = useCallback(async (text: string, providerTranslations?: Record<string, string>) => {
+    const handleTranscript = useCallback(async (text: string, providerTranslations?: Record<string, string>, _language?: string, originalText?: string) => {
         const cleanText = text.trim().replace(/\s+/g, " ");
         if (!sessionId || !cleanText) return;
         setSttError("");
@@ -130,7 +130,7 @@ function AdminLiveContent() {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
                                 signal: controller.signal,
-                                body: JSON.stringify({ text: cleanText, sl: "ko", tl: lang, fast: true, pronunciation: false, useGlossary: true }),
+                                body: JSON.stringify({ text: cleanText, originalText: originalText?.trim().replace(/\s+/g, " "), sl: "ko", tl: lang, fast: true, pronunciation: false, useGlossary: true }),
                             });
                             const data = await res.json();
                             if (data.translated) translations[lang] = data.translated;
@@ -147,7 +147,7 @@ function AdminLiveContent() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 signal: AbortSignal.timeout(10_000),
-                body: JSON.stringify({ sessionId, siteId, text_ko: cleanText, translations }),
+                body: JSON.stringify({ sessionId, siteId, text_ko: cleanText, translations, originalText }),
             });
             if (!saveRes.ok) {
                 const err = await saveRes.json().catch(() => ({})) as { error?: string };

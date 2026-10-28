@@ -80,13 +80,13 @@ export class TbmLiveBroadcast {
     this.session = null;
     return true;
   }
-  publish(text: string) {
+  publish(text: string, originalText?: string) {
     const session = this.session;
     if (!session || !text.trim()) return Promise.resolve();
     const task = this.queue.then(async () => {
       const response = await this.requestWithTimeout(this.endpoint(session,"translations"), {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...session, text_ko: text.trim(), translations: {} }),
+        body: JSON.stringify({ ...session, text_ko: text.trim(), originalText, translations: {} }),
       });
       if (!response.ok) {
         const detail = await response.text().catch(() => "");
@@ -115,13 +115,13 @@ export class TbmLiveBroadcast {
     this.session = null;
   }
 
-  syncDraft(content: string) {
+  syncDraft(content: string, sourceText?: string) {
     const session = this.session || this.stoppedSession;
     if (!session) return Promise.resolve();
     const task = this.queue.then(async () => {
       const response = await this.requestWithTimeout(this.endpoint(session,session.siteId === "nationwide" ? "draft" : "tbm-draft"), {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...session, content }),
+        body: JSON.stringify({ ...session, content, sourceText, source_text: sourceText }),
       });
       if (!response.ok) throw new Error(`broadcast_draft_failed_${response.status}`);
     });
@@ -129,14 +129,14 @@ export class TbmLiveBroadcast {
     return task;
   }
 
-  async complete(content: string, summary?: string): Promise<{ sessionId: string; tbmId: string; text: string }> {
+  async complete(content: string, summary?: string, sourceText?: string): Promise<{ sessionId: string; tbmId: string; text: string }> {
     // Retry a failed stop first; reuse the same server session for idempotent publication.
     await this.stop();
     const session = this.stoppedSession;
     if (!session) throw new Error("broadcast_session_required");
     const response = await this.requestWithTimeout(this.endpoint(session,"summary"), {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...session, content_ko: content, summary_ko: summary }),
+      body: JSON.stringify({ ...session, content_ko: content, summary_ko: summary, source_text: sourceText }),
     }, 65_000);
     if (!response.ok) throw new Error(`broadcast_summary_failed_${response.status}`);
     const result = await response.json();

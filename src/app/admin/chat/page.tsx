@@ -9,6 +9,7 @@ import { playPremiumAudio } from "@/utils/tts";
 import { playNotificationSound } from "@/utils/notifications";
 import { Trash2, QrCode } from "lucide-react";
 import { useCloudSTT } from "@/hooks/useCloudSTT";
+import { TranslationSourceBuffer } from "@/utils/translation-source-buffer";
 import { usePresence } from "@/hooks/usePresence";
 import ExportMenu from "@/components/ExportMenu";
 import ChatPlayButton from "@/components/ChatPlayButton";
@@ -434,9 +435,10 @@ function AdminChatContent() {
         });
     };
 
-    const handleTranscript = useCallback((transcript: string) => {
+    const translationSource = useRef(new TranslationSourceBuffer());
+    const handleTranscript = useCallback((transcript: string, _translations?: Record<string, string>, _language?: string, original?: string) => {
         setSttError("");
-        setText(prev => prev ? `${prev} ${transcript}` : transcript);
+        setText(prev => translationSource.current.append(prev, transcript, original));
     }, []);
 
     const { isRecording, toggle: toggleRecording } = useCloudSTT({
@@ -449,6 +451,7 @@ function AdminChatContent() {
     });
 
     const clearComposer = useCallback(() => {
+        translationSource.current.clear();
         setText("");
         if (textareaRef.current) textareaRef.current.value = "";
         requestAnimationFrame(() => {
@@ -473,6 +476,8 @@ function AdminChatContent() {
         const workerForSend = activeWorker;
 
         const originalText = messageText.trim();
+        const translationOriginal = translationSource.current.resolve(originalText);
+        translationSource.current.clear();
         const tempId = `temp-${crypto.randomUUID()}`;
 
         // 🚀 즉시 표시 (번역 전)
@@ -501,7 +506,7 @@ function AdminChatContent() {
                     const transRes = await fetch('/api/translate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: normalized, sl: 'ko', tl: workerForSend.preferred_lang, fast: true, quality: 'high', pronunciation: false })
+                        body: JSON.stringify({ text: normalized, originalText: translationOriginal, sl: 'ko', tl: workerForSend.preferred_lang, fast: true, quality: 'high', pronunciation: false })
                     });
                     if (transRes.ok) {
                         const transData = await transRes.json();

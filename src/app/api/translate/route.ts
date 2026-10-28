@@ -13,7 +13,7 @@ import pinyin from 'tiny-pinyin';
 import { preProcessWithGlossary } from '@/utils/construction-glossary';
 import { callInternalAiTranslate, callV3AiVendor } from '@/utils/ai/v3-ai-gateway';
 import { SAFE_LINK_V3_API_BASE_URL } from '@/utils/auth/v3-proxy';
-import { normalizeKoreanGlossary, containsKoreanGlossaryTerm, hasKoreanTermAt, GLOSSARY_POLICY_VERSION } from '@/utils/korean-glossary';
+import { normalizeKoreanGlossary, koreanTranslationSource, usesDeepLGlossaryPair, containsKoreanGlossaryTerm, hasKoreanTermAt, GLOSSARY_POLICY_VERSION } from '@/utils/korean-glossary';
 
 interface CloudTranslateResponse {
     data?: { translations?: Array<{ translatedText?: string }> };
@@ -84,7 +84,7 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
     const internalGatewayConfigured = Boolean(process.env.TRAVEL_API_SECRET?.trim());
 
     try {
-        const { text, sl, tl, fast, quality, pronunciation: includePronunciation = true } = await request.json();
+        const { text, originalText: sourceEvidence, sl, tl, fast, quality, pronunciation: includePronunciation = true } = await request.json();
 
         if (!text || !sl || !tl) {
             return NextResponse.json({ error: "Missing required texts" }, { status: 400 });
@@ -96,12 +96,14 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
 
         // All Korean paths share the same whole-term policy; never rewrite sentence fragments.
         let processedText = text;
+        let providerSource = text;
         let glossaryChanges: { from: string; to: string }[] = [];
         if (sl === 'ko') {
             const glossary = await fetchGlossaryServer();
             const result = normalizeKoreanGlossary(text, glossary);
             processedText = result.normalized;
             glossaryChanges = result.changes;
+            providerSource = koreanTranslationSource(text, glossary, sourceEvidence);
         } else if (tl === 'ko') {
             // 외국어→한국어: 건설 전문 용어를 한국어로 치환 후 번역 (품질 향상)
             processedText = preProcessWithGlossary(text, sl);
@@ -161,7 +163,8 @@ async function handleTranslate(request: NextRequest): Promise<NextResponse> {
         // Do not mix an OpenAI rewrite or a silent Google retry into a DeepL comparison.
         if (useConfiguredProvider) {
             const provider = forced === "deepl" ? "deepl" : "auto";
-            const payload = { provider, sourceLanguage: sourceLang, targetLanguage: targetLang, text: processedText } as const;
+            const payload = { provider, sourceLanguage: sourceLang, targetLanguage: targetLang,
+                text: usesDeepLGlossaryPair(sl, tl) ? providerSource : processedText } as const;
             const result = v3AiVendorContext
                 ? await callV3AiVendor(v3AiVendorContext.request, { ...payload, siteId: v3AiVendorContext.siteId, feature: "translate" })
                 : await callInternalAiTranslate(payload);
