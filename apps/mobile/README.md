@@ -15,6 +15,9 @@ API 도메인: 운영 웹앱의 서버 프록시를 통해 연결
 
 현재 Android 폴더는 Capacitor Gradle 프로젝트로 생성되어 있다. iOS 폴더는 Capacitor Xcode 프로젝트로 생성되어 있다.
 
+Android 시스템 뒤로가기 동작 및 APK 1.0.1 검증/설치 범위는
+[뒤로가기 수정 기록](../../docs/v3/ANDROID_BACK_NAVIGATION.md)을 참고한다.
+
 ## 로컬 설정
 
 ```bash

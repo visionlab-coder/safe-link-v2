@@ -5,7 +5,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.webkit.CookieManager;
 import android.webkit.WebSettings;
+import android.webkit.WebView;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -39,6 +41,21 @@ public class MainActivity extends BridgeActivity {
         // 이 앱 WebView에서 HTML 오디오의 사용자 제스처 요구를 해제한다.
         WebSettings webSettings = getBridge().getWebView().getSettings();
         webSettings.setMediaPlaybackRequiresUserGesture(false);
+
+        final WebView webView = getBridge().getWebView();
+        final BackNavigation.PageHistory history = new BackNavigation.PageHistory() {
+            public String currentUrl() { return webView.getUrl(); }
+            public boolean canGoBack() { return webView.canGoBack(); }
+            public void goBack() { webView.goBack(); }
+        };
+        // AndroidX handles both the three-button Back key and predictive Back.
+        // Keep this enabled at the root: the default Activity fallback exits the app.
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                BackNavigation.handle(history);
+            }
+        });
 
         requestMediaPermissions();
     }
