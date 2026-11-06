@@ -4,6 +4,7 @@ import "./globals.css";
 import AuthListener from "@/components/AuthListener";
 import ChatPresenceHeartbeat from "@/components/ChatPresenceHeartbeat";
 import OfflineBanner from "@/components/OfflineBanner";
+import PublicPrivacyFooter, { PublicPrivacyHeader } from "@/components/PublicPrivacyFooter";
 import TtsFailureToast from "@/components/TtsFailureToast";
 
 // ─────────────────────────────────────────────────────
@@ -140,7 +141,9 @@ export default function RootLayout({
         <AuthListener />
         <ChatPresenceHeartbeat />
         <TtsFailureToast />
+        <PublicPrivacyHeader />
         <div className="safe-area-page">{children}</div>
+        <PublicPrivacyFooter />
       </body>
     </html>
   );
